@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+
+# Training artifacts
+*.pt
+*.nn
+*.jsonl
+*.jsonl.zst
+*.pgn
+*.pgn.zst
+*.binpack
+*.binpack.zst
+*.npy
+
+# Local run output
+tmp/
+runs/
+artifacts/
