@@ -131,6 +131,9 @@
         <a href="#vocab-tensor">tensor</a>,
         <a href="#vocab-pytorch">PyTorch</a>,
         <a href="#vocab-pack">packed dataset</a>,
+        <a href="#vocab-huber">Huber loss</a>,
+        <a href="#vocab-wdl">WDL</a>,
+        <a href="#vocab-mpe">MPE</a>,
         <a href="#vocab-quantization">.nn export</a>,
         <a href="#vocab-replay">replay gate</a>,
         <a href="#vocab-sprt">SPRT</a>.
@@ -926,6 +929,44 @@ training direction = raise this position's predicted eval</code></pre>
 large error: optimize closer to MAE
 example beta: 200 cp</code></pre>
 
+      <h3>Why the loss and data mix matter</h3>
+      <p>
+        The first Enyo runs showed an important failure mode: a candidate can
+        improve MAE against teacher scores and still be neutral or worse in
+        SPRT. That means the loss is fitting numbers, but not necessarily making
+        better search decisions. Current experiments therefore need to test
+        objectives that care more about move-ordering-relevant eval shape.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th>Idea</th><th>Meaning</th><th>Why it may help Elo</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="#vocab-mpe">MPE</a> / <a href="#vocab-wdl">WDL</a>-style loss</td>
+            <td>Train on win/draw/loss-like probability shape instead of only raw centipawns.</td>
+            <td>Being wrong near equality is usually more important than being wrong by hundreds of cp in an already won position.</td>
+          </tr>
+          <tr>
+            <td>CP-clamped <a href="#vocab-huber">Huber</a></td>
+            <td>Clamp extreme targets before computing loss, for example <code>+1800 -&gt; +800</code>.</td>
+            <td>Prevents already won/lost positions from consuming too much capacity.</td>
+          </tr>
+          <tr>
+            <td>Source-weighted training</td>
+            <td>Choose the effective mix of self-play, public evals, binpack rows, and failure positions deliberately.</td>
+            <td>Stops one large source from hiding regressions in positions Enyo actually reaches.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Static metrics are still useful, but only as a filter. A candidate must
+        also pass replay gates and then prove itself in SPRT before it becomes a
+        reference net.
+      </p>
+
       <h3>What training does not do</h3>
       <ul>
         <li>It does not imitate the move played in a PGN.</li>
@@ -1182,6 +1223,12 @@ replay_gates/enyo.log</code></pre>
 
         <dt id="vocab-huber">Huber loss</dt>
         <dd>A loss that is squared-error-like near zero and absolute-error-like for large mistakes, reducing sensitivity to extreme labels.</dd>
+
+        <dt id="vocab-wdl">WDL</dt>
+        <dd>Win/draw/loss space. It maps an eval into a game-result-like scale, so training cares more about practical outcome shape than exact centipawn size.</dd>
+
+        <dt id="vocab-mpe">MPE</dt>
+        <dd>Mean probability error. In this project it is used as a WDL-shaped objective or metric that penalizes wrong practical eval shape.</dd>
 
         <dt id="vocab-quantization">Quantization</dt>
         <dd>Converting training-time floating-point weights into the integer/compact runtime <code>.nn</code> format.</dd>
