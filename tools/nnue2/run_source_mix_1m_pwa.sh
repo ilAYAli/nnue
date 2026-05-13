@@ -302,7 +302,8 @@ PY
   fi
   notify "Enyo NNUE source-mix 1M: SPRT start $tag static_score=$score"
   mkdir -p "$RUN/sprt"
-  exec "$SPRT" \
+  set +e
+  "$SPRT" \
     --candidate "$ENGINE" \
     --reference "$ENGINE" \
     --candidate-option "nnue2_file=$net" \
@@ -317,6 +318,13 @@ PY
     --log-dir "$RUN/sprt" \
     --name "${tag}_vs_reference_net" \
     --ntfy-url "https://ntfy.wahlman.no/sprt"
+  local sprt_rc=$?
+  set -e
+  local log="$RUN/sprt/${tag}_vs_reference_net.log"
+  local final_status
+  final_status=$(rg --no-config "^(\\[[ 0-9]+/|Finished match|SPRT:|Total Time)" "$log" 2>/dev/null | tail -4 | tr "\n" " " || true)
+  notify "Enyo NNUE source-mix 1M: SPRT finished $tag rc=$sprt_rc ${final_status:-no final status}"
+  exit "$sprt_rc"
 }
 
 : > "$RUN/passed_candidates.tsv"
