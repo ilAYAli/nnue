@@ -313,6 +313,15 @@
         <code>move_uci</code>.
       </p>
 
+      <p>
+        The minimal training row is only <code>fen</code>, <code>score</code>,
+        and usually <code>wdl</code>. Fields such as <code>side</code> and
+        <code>fullmove</code> are already encoded in the FEN, so they are
+        redundant for training. They are kept as provenance fields because they
+        make audits, filtering, and source-game debugging cheaper without
+        reparsing every FEN.
+      </p>
+
       <h3>2. Teacher Labels</h3>
       <p>
         <a href="#vocab-teacher">Teacher</a> labeling asks a stronger engine,
