@@ -124,6 +124,7 @@
         <a href="#vocab-fen">FEN</a>,
         <a href="#vocab-jsonl">JSONL</a>,
         <a href="#vocab-feature">feature</a>,
+        <a href="#vocab-hidden-neuron">hidden neuron</a>,
         <a href="#vocab-weight">weight</a>,
         <a href="#vocab-teacher">teacher</a>,
         <a href="#vocab-label">label</a>,
@@ -603,6 +604,218 @@ host defaults    = --concurrency 6 --threads 4 on pwa-5090</code></pre>
     feature = FeatureIdx(piece_type, piece_color, square, king_square, perspective)
     accumulator[perspective][0..1023] += input_weights[feature][0..1023]</code></pre>
 
+      <h3>Weights and hidden neurons</h3>
+      <p>
+        A <a href="#vocab-weight">weight</a> is just a stored number in the
+        network file. It is not hand-written chess knowledge. During training,
+        PyTorch changes these numbers. During search, Enyo only reads them.
+      </p>
+
+      <p>
+        The 1024 accumulator entries are the first hidden layer. They are often
+        called hidden neurons because their meaning is learned rather than named.
+        One hidden neuron is not "king safety" or "attacks queen" by itself.
+        It is a numeric slot that receives contributions from many active
+        features. The dense head later combines many such slots, so chess concepts
+        emerge as patterns spread across weights instead of as one obvious field.
+      </p>
+
+      <pre><code>one active feature row:
+    input_weights[feature] = [w0, w1, w2, ..., w1023]
+
+accumulator after adding many pieces:
+    acc[i] = input_bias[i]
+           + input_weights[feature_a][i]
+           + input_weights[feature_b][i]
+           + ...
+
+there are 1024 hidden accumulator values,
+but 12288 * 1024 input weights before the dense head.</code></pre>
+
+      <p>
+        King buckets are not the hidden neurons. A king bucket is part of the
+        feature address. For example, "white-view black knight on f5 while the
+        white king is in bucket 3" and "white-view black knight on f5 while the
+        white king is in bucket 9" are different feature rows, and therefore use
+        different 1024-wide weight vectors.
+      </p>
+
+      <h3>How the accumulator works in search</h3>
+      <p>
+        The accumulator is an efficiency trick. Rebuilding the first layer from
+        scratch means visiting every piece and summing all active feature rows.
+        That is correct but too expensive to do at every node. Instead, Enyo
+        keeps one accumulator state per search ply and updates it when a move
+        changes the board.
+      </p>
+
+      <pre><code>quiet move, simplified:
+    remove old feature row for moved piece
+    add new feature row for moved piece
+
+capture:
+    remove old feature row for moved piece
+    remove captured piece feature row
+    add new feature row for moved piece
+
+king bucket change:
+    refresh that perspective, because many feature addresses changed</code></pre>
+
+      <p>
+        This is the "efficiently updatable" part of NNUE. The weights are fixed
+        during the game. What changes after a move is the accumulator value:
+        rows of fixed weights are added or subtracted because pieces moved,
+        appeared, or disappeared.
+      </p>
+
+      <table>
+        <thead><tr><th>Engine location</th><th>What happens there</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>src/search.cpp::evaluate()</code></td>
+            <td>Search asks for an eval. If NNUE2 is active, this calls <code>nnue-&gt;Evaluate2(board, side)</code>.</td>
+          </tr>
+          <tr>
+            <td><code>src/movegen.hpp::apply_move()</code></td>
+            <td>Search makes a move and pushes a new accumulator state for the child ply.</td>
+          </tr>
+          <tr>
+            <td><code>src/board.hpp::set_piece()</code> / <code>clr_piece()</code></td>
+            <td>Piece add/remove operations call <code>updateAccumulator</code> in the classic path.</td>
+          </tr>
+          <tr>
+            <td><code>src/nnue.cpp::update_nnue2_feature()</code></td>
+            <td>Computes the NNUE2 feature id for both perspectives and applies add/remove deltas.</td>
+          </tr>
+          <tr>
+            <td><code>src/nnue.cpp::ensure_nnue2()</code></td>
+            <td>Materializes lazy NNUE2 move updates before evaluation if the current ply accumulator is not yet correct.</td>
+          </tr>
+          <tr>
+            <td><code>src/nnue2.hpp::Propagate()</code></td>
+            <td>Runs the head: clipped accumulator values become <code>2048 -&gt; 16 -&gt; 32 -&gt; 1</code> and return a centipawn score.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Pseudocode matching Enyo's flow</h3>
+      <p>
+        The real code has templates, special move cases, cache checks, and SIMD
+        paths. This is the same control flow stripped down to the NNUE idea.
+      </p>
+
+      <pre><code>search_node(board, nnue):
+    if leaf_or_qsearch:
+        return evaluate(board, board.side_to_move, nnue)
+
+    best = -infinity
+    for move in ordered_legal_moves:
+        apply_move(board, move, nnue, update_nnue = true)
+        score = -search_node(board, nnue)
+        revert_move(board, nnue)
+        best = max(best, score)
+    return best
+
+evaluate(board, side, nnue):
+    if NNUE2.enabled:
+        return nnue.Evaluate2(board, side)
+    return nnue.Evaluate(side)</code></pre>
+
+      <p>
+        Move making either directly updates the accumulator or stores a compact
+        lazy update that can be materialized later. NNUE2 currently uses the lazy
+        route for normal search moves.
+      </p>
+
+      <pre><code>apply_move(board, move, nnue, update_nnue):
+    if update_nnue:
+        nnue.push_new_ply_accumulator_state()
+
+    old_white_king = board.white_king_square
+    old_black_king = board.black_king_square
+    captured_square = square_of_captured_piece_if_any(move)
+
+    update_board_bitboards_and_state(move)
+
+    if update_nnue and NNUE2.enabled:
+        # Store enough information to update from the parent accumulator later.
+        nnue.mark_nnue2_lazy_move(
+            move,
+            captured_square,
+            old_white_king,
+            old_black_king)
+    else if update_nnue:
+        # Older direct path: piece edits immediately add/subtract feature rows.
+        for each removed piece:
+            nnue.updateAccumulator(add = false, piece, square, old kings)
+        for each added piece:
+            nnue.updateAccumulator(add = true, piece, square, new kings)</code></pre>
+
+      <p>
+        Evaluation forces the accumulator to be correct before running the dense
+        head. If a move crossed a king-bucket boundary, the affected perspective
+        is refreshed because many feature indices changed at once.
+      </p>
+
+      <pre><code>Evaluate2(board, side):
+    acc = nnue.nnue2_accumulator_stack[current_search_ply]
+
+    if acc.cached_eval_is_valid_for(side):
+        return acc.cached_eval[side]
+
+    ensure_nnue2(board)
+
+    raw = NNUE2.Propagate(acc, side)
+    score = ScaleEval(board, raw)
+    acc.cached_eval[side] = score
+    return score
+
+ensure_nnue2(board):
+    for perspective in [white, black]:
+        base = nearest earlier ply with correct accumulator[perspective]
+
+        if no valid base exists:
+            refresh_nnue2_from_board(board, perspective)
+            continue
+
+        for ply from base + 1 to current_search_ply:
+            lazy = accumulator_stack[ply].lazy_update[perspective]
+
+            if lazy requires king-bucket refresh:
+                refresh_nnue2_from_board(board, perspective)
+                break
+
+            apply lazy delta from parent:
+                subtract feature rows for removed piece facts
+                add feature rows for added piece facts</code></pre>
+
+      <p>
+        The low-level update itself is just vector arithmetic over the first
+        hidden layer.
+      </p>
+
+      <pre><code>ApplyDelta(dest_acc, src_acc, delta):
+    dest_acc = src_acc
+
+    for feature in delta.removed_features:
+        for i in 0..1023:
+            dest_acc[i] -= input_weights[feature][i]
+
+    for feature in delta.added_features:
+        for i in 0..1023:
+            dest_acc[i] += input_weights[feature][i]</code></pre>
+
+      <p>
+        The important distinction is:
+      </p>
+
+      <pre><code>training:
+    changes weights in model.nn
+
+search:
+    changes accumulator values by adding/subtracting fixed weight rows
+    then runs the fixed head to get a score</code></pre>
+
       <h3>Why this architecture</h3>
       <table>
         <thead><tr><th>Choice</th><th>Reason</th></tr></thead>
@@ -918,6 +1131,9 @@ replay_gates/enyo.log</code></pre>
 
         <dt id="vocab-feature">Feature</dt>
         <dd>A concrete board fact used as network input: perspective, king bucket, piece/color type, and piece square.</dd>
+
+        <dt id="vocab-hidden-neuron">Hidden neuron</dt>
+        <dd>A learned numeric slot inside the network. Enyo's accumulator has 1024 hidden slots per perspective; they do not have fixed human names, and their meaning is distributed across many weights.</dd>
 
         <dt id="vocab-king-bucket">King bucket</dt>
         <dd>A fixed category for king location. Enyo maps the king square to one of 16 regions so the same piece square can have different weights depending on king placement.</dd>
