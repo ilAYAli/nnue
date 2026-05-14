@@ -136,7 +136,7 @@ if [ ! -d "$repo" ]; then
 fi
 
 active_pattern='run_selflichess_mix_pwa\.sh|tools/nnue2/train\.py|tools/nnue2/train_pairwise\.py|/sprt |fastchess'
-if [ "$allow_active" -eq 0 ]; then
+if [ "$allow_active" -eq 0 ] && [ "$dry_run" -eq 0 ]; then
   active="$(pgrep -af "$active_pattern" | grep -v 'train_new_net_pwa.sh' || true)"
   if [ -n "$active" ]; then
     echo "refusing to start because an NNUE job appears active:" >&2
