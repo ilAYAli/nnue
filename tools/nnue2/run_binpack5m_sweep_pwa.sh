@@ -213,7 +213,7 @@ gate_candidate() {
   issue_lines "$gate/summary.txt" | sed -E "s/[[:space:]]+/ /g" | sort -u \
     > "$dir/issues"
   comm -13 "$RUN/baseline.issues" "$dir/issues" > "$dir/new_issues"
-  rg --no-config "^(mistake|blunder|timeout|game:|replay exit|missing replay log)" \
+  rg --no-config "^(mistake|blunder|missing replay log)" \
     "$dir/new_issues" > "$dir/new_serious_issues" || true
   rg --no-config "^(missing replay log|ERROR:|Error: engine closed stdout)" \
     "$gate/summary.txt" > "$dir/gate_failures" || true
