@@ -43,6 +43,7 @@ SPRT_THREADS="${SPRT_THREADS:-2}"
 SPRT_HASH="${SPRT_HASH:-512}"
 SPRT_ELO1="${SPRT_ELO1:-8}"
 SPRT_RESTART="${SPRT_RESTART:-off}"
+ONLY_SPRT_TAG="${ONLY_SPRT_TAG:-}"
 
 mkdir -p "$RUN"
 exec > >(tee -a "$RUN/run.log") 2>&1
@@ -312,6 +313,14 @@ eval_candidate huber_nzbin_lr1e7_e8
 
 train_candidate mpe25_nzbin_lr3e7_e8 mpe25 3e-7 --wdl-lambda 1.0
 eval_candidate mpe25_nzbin_lr3e7_e8
+
+if [ -n "$ONLY_SPRT_TAG" ]; then
+  notify "Enyo NNUE nonzero-binpack sweep: forced SPRT tag $ONLY_SPRT_TAG"
+  run_sprt "$ONLY_SPRT_TAG"
+  rc=$?
+  notify "Enyo NNUE nonzero-binpack sweep: forced SPRT finished rc=$rc run=$RUN"
+  exit "$rc"
+fi
 
 : > "$RUN/static_passed.tsv"
 for tag in huber_nzbin_lr3e7_e8 huber_nzbin_lr1e7_e8 mpe25_nzbin_lr3e7_e8; do
