@@ -46,7 +46,13 @@ D16_PACKED="${D16_PACKED:-$HOME/tmp/enyo_teacher/sf_d16_bucket1m_20260512_225554
 SELFPLAY_PACKED="${SELFPLAY_PACKED:-$HOME/tmp/enyo_teacher/sf_d12_20m_20260510_115338/labeled_packed}"
 LICHESS_PACKED="${LICHESS_PACKED:-$HOME/tmp/enyo_teacher/controlled_30m_20260512_105006/val/lichess_tail100k}"
 BINPACK_PACKED="${BINPACK_PACKED:-$HOME/tmp/enyo_teacher/binpack_test79_cp1600_5m_20260512/packed}"
-HARD_REPEAT="${HARD_REPEAT:-2000}"
+HARD_MIN_LOSS="${HARD_MIN_LOSS:-150}"
+HARD_MAX_LOSS="${HARD_MAX_LOSS:-999}"
+HARD_REPEAT="${HARD_REPEAT:-10000}"
+HARD_ROWS="${HARD_ROWS:-150000}"
+D16_ROWS="${D16_ROWS:-500000}"
+BINPACK_ROWS="${BINPACK_ROWS:-350000}"
+HARD_SOURCE_WEIGHT="${HARD_SOURCE_WEIGHT:-5.0}"
 TEACHER_DEPTH="${TEACHER_DEPTH:-20}"
 
 mkdir -p "$RUN"
@@ -75,8 +81,8 @@ prepare_hard_rows() {
     notify "Enyo NNUE hardcase aug: build move gate cases"
     "$PY" "$TOOLS/build_move_gate.py" "$BUGS" \
       --output "$RUN/hard_cases.jsonl" \
-      --min-loss 70 \
-      --max-loss 999
+      --min-loss "$HARD_MIN_LOSS" \
+      --max-loss "$HARD_MAX_LOSS"
   fi
   if [ ! -s "$RUN/hard_child_rows.jsonl" ]; then
     notify "Enyo NNUE hardcase aug: expand hard cases to child rows"
@@ -106,15 +112,15 @@ prepare_hard_rows() {
 }
 
 mix_and_pack() {
-  local dir="$RUN/hardmix_d16500k_bin400k_hard100k_huber_lr3e7_e6"
+  local dir="$RUN/hardmajor_d16${D16_ROWS}_bin${BINPACK_ROWS}_hard${HARD_ROWS}"
   mkdir -p "$dir"
   if [ ! -s "$dir/source.jsonl" ]; then
-    notify "Enyo NNUE hardcase aug: mix d16/binpack/hard"
+    notify "Enyo NNUE hardcase aug: mix d16/binpack/major-hard"
     "$PY" "$TOOLS/mix_jsonl.py" \
       --output "$dir/source.jsonl" \
-      --source "$D16_JSON:500000" \
-      --source "$BINPACK_JSON:400000" \
-      --source "$RUN/hard_child_labeled_x${HARD_REPEAT}.jsonl:100000" \
+      --source "$D16_JSON:$D16_ROWS" \
+      --source "$BINPACK_JSON:$BINPACK_ROWS" \
+      --source "$RUN/hard_child_labeled_x${HARD_REPEAT}.jsonl:$HARD_ROWS" \
       --seed 2026051401 \
       --progress 200000
   fi
@@ -130,7 +136,7 @@ mix_and_pack() {
 train_candidate() {
   local tag="$1"
   local lr="$2"
-  local src="$RUN/hardmix_d16500k_bin400k_hard100k_huber_lr3e7_e6"
+  local src="$RUN/hardmajor_d16${D16_ROWS}_bin${BINPACK_ROWS}_hard${HARD_ROWS}"
   local dir="$RUN/$tag"
   mkdir -p "$dir"
   if [ ! -s "$dir/model.nn" ]; then
@@ -141,7 +147,7 @@ train_candidate() {
       --objective huber \
       --huber-beta 200 \
       --select-metric mae \
-      --epochs 6 \
+      --epochs 8 \
       --patience 2 \
       --batch-size 8192 \
       --lr "$lr" \
@@ -150,7 +156,7 @@ train_candidate() {
       --device cuda \
       --workers 2 \
       --val-rows 50000 \
-      --source-loss-weight hard_move_child=3.0 \
+      --source-loss-weight "hard_move_child=$HARD_SOURCE_WEIGHT" \
       --trainable all \
       --out "$dir/model.pt" \
       --out-nn "$dir/model.nn" | tee "$dir/train.log"
@@ -312,12 +318,12 @@ run_sprt_for_best() {
 prepare_hard_rows
 mix_and_pack
 
-train_candidate "hardmix_huber_lr3e7_e6" "3e-7"
-eval_candidate "hardmix_huber_lr3e7_e6"
-hard_gate_candidate "hardmix_huber_lr3e7_e6"
+train_candidate "hardmajor_huber_lr1e6_e8" "1e-6"
+eval_candidate "hardmajor_huber_lr1e6_e8"
+hard_gate_candidate "hardmajor_huber_lr1e6_e8"
 
-train_candidate "hardmix_huber_lr1e7_e6" "1e-7"
-eval_candidate "hardmix_huber_lr1e7_e6"
-hard_gate_candidate "hardmix_huber_lr1e7_e6"
+train_candidate "hardmajor_huber_lr3e6_e8" "3e-6"
+eval_candidate "hardmajor_huber_lr3e6_e8"
+hard_gate_candidate "hardmajor_huber_lr3e6_e8"
 
 run_sprt_for_best
