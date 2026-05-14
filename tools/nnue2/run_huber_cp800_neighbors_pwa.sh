@@ -27,6 +27,7 @@ SPRT_THREADS="${SPRT_THREADS:-2}"
 SPRT_HASH="${SPRT_HASH:-512}"
 SPRT_TC="${SPRT_TC:-2+0.02}"
 SPRT_ELO1="${SPRT_ELO1:-8}"
+SPRT_RESTART="${SPRT_RESTART:-off}"
 
 mkdir -p "$RUN"
 exec > >(tee -a "$RUN/run.log") 2>&1
@@ -93,6 +94,7 @@ run_candidate() {
     --concurrency "$SPRT_CONCURRENCY" \
     --threads "$SPRT_THREADS" \
     --tc "$SPRT_TC" \
+    --restart "$SPRT_RESTART" \
     --log-dir "$dir/sprt" \
     --name "${tag}_screen" \
     --eta | tee "$dir/sprt/sprt.log"
