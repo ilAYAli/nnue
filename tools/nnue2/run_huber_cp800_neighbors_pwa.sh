@@ -28,6 +28,7 @@ SPRT_HASH="${SPRT_HASH:-512}"
 SPRT_TC="${SPRT_TC:-2+0.02}"
 SPRT_ELO1="${SPRT_ELO1:-8}"
 SPRT_RESTART="${SPRT_RESTART:-off}"
+SKIP_TAGS="${SKIP_TAGS:-}"
 
 mkdir -p "$RUN"
 exec > >(tee -a "$RUN/run.log") 2>&1
@@ -53,6 +54,12 @@ run_candidate() {
   local epochs="$4"
   local clamp="$5"
   local dir="$RUN/$tag"
+  for skip_tag in $SKIP_TAGS; do
+    if [ "$skip_tag" = "$tag" ]; then
+      notify "Enyo NNUE huber-cp800 neighbor sweep: skip $tag"
+      return
+    fi
+  done
   mkdir -p "$dir"
 
   if [ ! -s "$dir/model.nn" ]; then
