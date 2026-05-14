@@ -116,7 +116,7 @@ run_candidate() {
   notify "Enyo NNUE huber-cp800 neighbor sweep: SPRT screen done $tag rc=$sprt_rc ${final_status:-no final status}"
 }
 
-: > "$RUN/results.tsv"
+touch "$RUN/results.tsv"
 
 # The previous keeper-ish net was this neighborhood:
 # Huber(beta=200), target clamp 800, lr=1e-6, 8 epochs, 1M d16/binpack mix.
