@@ -238,6 +238,7 @@ gate_candidate() {
     "stage270 vs EnyoBot - kp3inZBb.log"
   do
     printf "== %s ==\n" "$f" | tee -a "$gate/replay.log" "$gate/summary.txt"
+    make_wrapper "$tag"
     set +e
     /home/petter/local/bin/replay --summary-only --engine "$gate/enyo_candidate.sh" \
       "$BUGS/$f" 2>&1 \
@@ -258,19 +259,28 @@ gate_candidate() {
   comm -13 "$RUN/baseline.issues" "$dir/issues" > "$dir/new_issues"
   rg --no-config "^(mistake|blunder|timeout|game:|replay exit|missing replay log)" \
     "$dir/new_issues" > "$dir/new_serious_issues" || true
+  rg --no-config "^(replay exit|missing replay log|ERROR: Engine|Error: engine closed stdout)" \
+    "$gate/summary.txt" > "$dir/gate_failures" || true
+  cat "$dir/new_serious_issues" "$dir/gate_failures" \
+    | sed '/^$/d' | sort -u > "$dir/reject_issues"
 
-  local new_issues new_serious score
+  local new_issues new_serious gate_failures score
   new_issues=$(wc -l < "$dir/new_issues" | tr -d " ")
-  new_serious=$(wc -l < "$dir/new_serious_issues" | tr -d " ")
+  new_serious=$(wc -l < "$dir/reject_issues" | tr -d " ")
+  gate_failures=$(wc -l < "$dir/gate_failures" | tr -d " ")
   score=$(awk -F= '/^score=/ {print $2}' "$dir/static_summary.txt" | tail -1)
   {
     echo "candidate=$dir/model.nn"
     echo "static_score=$score"
     echo "new_issues=$new_issues"
     echo "new_serious_issues=$new_serious"
+    echo "gate_failures=$gate_failures"
     echo
     echo "new issues:"
     cat "$dir/new_issues"
+    echo
+    echo "gate failures:"
+    cat "$dir/gate_failures"
   } | tee "$dir/gate_decision.txt"
 
   if [ "$new_serious" -eq 0 ]; then
