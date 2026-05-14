@@ -129,3 +129,15 @@ with a FEN, it evaluates the child position after the played move and after the
 teacher-best move. A useful candidate should increase the margin in favor of
 the teacher-best move compared with the baseline net. This does not replace
 SPRT, but it stops obviously wrong objectives before they burn match time.
+
+Hard-case augmented training on `pwa-5090`:
+
+```bash
+tmux new-session -d -s nnue_test \
+  'cd ~/code/cpp/chess/nnue; tools/nnue2/run_hardcase_aug_pwa.sh'
+```
+
+That runner builds the hard gate cases, expands them into played/best child
+positions, labels those child positions with Stockfish, repeats them into the
+training mix, trains two low-LR Huber candidates, runs the hard move-choice
+gate, and only starts SPRT if a candidate improves the hard gate.

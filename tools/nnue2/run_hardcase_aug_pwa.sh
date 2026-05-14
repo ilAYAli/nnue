@@ -1,0 +1,310 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source ~/.ntfy 2>/dev/null || true
+
+notify() {
+  local msg="$1"
+  echo "$(date --iso-8601=seconds) $msg"
+  "$HOME/scripts/notifai.sh" "$msg" >/dev/null 2>&1 || true
+  if [ -n "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" ]; then
+    curl -fsS -m 10 -u "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" \
+      -d "$msg" https://ntfy.wahlman.no/ping >/dev/null 2>&1 || true
+  else
+    curl -fsS -m 10 -d "$msg" https://ntfy.wahlman.no/ping \
+      >/dev/null 2>&1 || true
+  fi
+}
+
+PY="${PY:-$HOME/.venv/bin/python}"
+NNUE_REPO="${NNUE_REPO:-$HOME/code/cpp/chess/nnue}"
+ENGINE_REPO="${ENGINE_REPO:-$HOME/code/cpp/chess/enyo}"
+TOOLS="$NNUE_REPO/tools/nnue2"
+RUN="${RUN:-$HOME/tmp/enyo_teacher/hardcase_aug_$(date +%Y%m%d_%H%M%S)}"
+INIT="${INIT:-$ENGINE_REPO/nnue/berserk-d43206fe90e4.nn}"
+ENGINE="${ENGINE:-$HOME/code/cpp/chess/assets/engines/reference}"
+BUGS="${BUGS:-$ENGINE_REPO/bugs}"
+STOCKFISH="${STOCKFISH:-/usr/games/stockfish}"
+SPRT="${SPRT:-$HOME/code/cpp/chess/sprt/sprt}"
+BOOK="${BOOK:-$HOME/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd}"
+D16_JSON="${D16_JSON:-$HOME/tmp/enyo_teacher/sf_d16_bucket1m_20260512_225554/labeled.jsonl}"
+BINPACK_JSON="${BINPACK_JSON:-$HOME/tmp/enyo_teacher/binpack_test79_cp1600_5m_20260512/binpack.jsonl}"
+D16_PACKED="${D16_PACKED:-$HOME/tmp/enyo_teacher/sf_d16_bucket1m_20260512_225554/packed}"
+SELFPLAY_PACKED="${SELFPLAY_PACKED:-$HOME/tmp/enyo_teacher/sf_d12_20m_20260510_115338/labeled_packed}"
+LICHESS_PACKED="${LICHESS_PACKED:-$HOME/tmp/enyo_teacher/controlled_30m_20260512_105006/val/lichess_tail100k}"
+BINPACK_PACKED="${BINPACK_PACKED:-$HOME/tmp/enyo_teacher/binpack_test79_cp1600_5m_20260512/packed}"
+HARD_REPEAT="${HARD_REPEAT:-2000}"
+TEACHER_DEPTH="${TEACHER_DEPTH:-20}"
+
+mkdir -p "$RUN"
+exec > >(tee -a "$RUN/run.log") 2>&1
+cd "$NNUE_REPO"
+
+notify "Enyo NNUE hardcase aug: start $RUN"
+
+for required in \
+  "$PY" "$NNUE_REPO" "$ENGINE_REPO" "$TOOLS/build_move_gate.py" \
+  "$TOOLS/move_gate_to_child_rows.py" "$TOOLS/repeat_jsonl.py" \
+  "$TOOLS/label_with_uci.py" "$TOOLS/mix_jsonl.py" "$TOOLS/pack_dataset.py" \
+  "$TOOLS/train.py" "$TOOLS/eval_dataset.py" "$TOOLS/eval_move_gate.py" \
+  "$INIT" "$ENGINE" "$BUGS" "$STOCKFISH" "$SPRT" "$BOOK" \
+  "$D16_JSON" "$BINPACK_JSON" "$D16_PACKED" "$SELFPLAY_PACKED" \
+  "$LICHESS_PACKED" "$BINPACK_PACKED"
+do
+  if [ ! -e "$required" ]; then
+    notify "Enyo NNUE hardcase aug: missing $required"
+    exit 1
+  fi
+done
+
+prepare_hard_rows() {
+  if [ ! -s "$RUN/hard_cases.jsonl" ]; then
+    notify "Enyo NNUE hardcase aug: build move gate cases"
+    "$PY" "$TOOLS/build_move_gate.py" "$BUGS" \
+      --output "$RUN/hard_cases.jsonl" \
+      --min-loss 70 \
+      --max-loss 999
+  fi
+  if [ ! -s "$RUN/hard_child_rows.jsonl" ]; then
+    notify "Enyo NNUE hardcase aug: expand hard cases to child rows"
+    "$PY" "$TOOLS/move_gate_to_child_rows.py" \
+      --cases "$RUN/hard_cases.jsonl" \
+      --output "$RUN/hard_child_rows.jsonl"
+  fi
+  if [ ! -s "$RUN/hard_child_labeled.jsonl" ]; then
+    notify "Enyo NNUE hardcase aug: Stockfish d$TEACHER_DEPTH labels for hard children"
+    "$PY" "$TOOLS/label_with_uci.py" \
+      --input "$RUN/hard_child_rows.jsonl" \
+      --output "$RUN/hard_child_labeled.jsonl" \
+      --engine "$STOCKFISH" \
+      --depth "$TEACHER_DEPTH" \
+      --threads 4 \
+      --hash 512 \
+      --max-abs-cp 1600 \
+      --progress 10
+  fi
+  if [ ! -s "$RUN/hard_child_labeled_x${HARD_REPEAT}.jsonl" ]; then
+    notify "Enyo NNUE hardcase aug: repeat hard labels x$HARD_REPEAT"
+    "$PY" "$TOOLS/repeat_jsonl.py" \
+      --input "$RUN/hard_child_labeled.jsonl" \
+      --output "$RUN/hard_child_labeled_x${HARD_REPEAT}.jsonl" \
+      --repeat "$HARD_REPEAT"
+  fi
+}
+
+mix_and_pack() {
+  local dir="$RUN/hardmix_d16500k_bin400k_hard100k_huber_lr3e7_e6"
+  mkdir -p "$dir"
+  if [ ! -s "$dir/source.jsonl" ]; then
+    notify "Enyo NNUE hardcase aug: mix d16/binpack/hard"
+    "$PY" "$TOOLS/mix_jsonl.py" \
+      --output "$dir/source.jsonl" \
+      --source "$D16_JSON:500000" \
+      --source "$BINPACK_JSON:400000" \
+      --source "$RUN/hard_child_labeled_x${HARD_REPEAT}.jsonl:100000" \
+      --seed 2026051401 \
+      --progress 200000
+  fi
+  if [ ! -s "$dir/packed/meta.json" ]; then
+    notify "Enyo NNUE hardcase aug: pack hard mix"
+    "$PY" "$TOOLS/pack_dataset.py" \
+      --input "$dir/source.jsonl" \
+      --out-dir "$dir/packed" \
+      --progress 200000
+  fi
+}
+
+train_candidate() {
+  local tag="$1"
+  local lr="$2"
+  local src="$RUN/hardmix_d16500k_bin400k_hard100k_huber_lr3e7_e6"
+  local dir="$RUN/$tag"
+  mkdir -p "$dir"
+  if [ ! -s "$dir/model.nn" ]; then
+    notify "Enyo NNUE hardcase aug: train $tag"
+    "$PY" "$TOOLS/train.py" \
+      --data "$src/packed" \
+      --init-from-nn "$INIT" \
+      --objective huber \
+      --huber-beta 200 \
+      --select-metric mae \
+      --epochs 6 \
+      --patience 2 \
+      --batch-size 8192 \
+      --lr "$lr" \
+      --weight-decay 1e-6 \
+      --target-clamp 1600 \
+      --device cuda \
+      --workers 2 \
+      --val-rows 50000 \
+      --source-loss-weight hard_move_child=3.0 \
+      --trainable all \
+      --out "$dir/model.pt" \
+      --out-nn "$dir/model.nn" | tee "$dir/train.log"
+  fi
+}
+
+eval_one() {
+  local net="$1"
+  local data="$2"
+  local skip="$3"
+  local out="$4"
+  "$PY" "$TOOLS/eval_dataset.py" \
+    --net "$net" \
+    --data "$data" \
+    --skip "$skip" \
+    --rows 50000 \
+    --batch-size 8192 \
+    --device cuda \
+    --target-clamp 1600 \
+    --buckets > "$out"
+}
+
+eval_candidate() {
+  local tag="$1"
+  local dir="$RUN/$tag"
+  mkdir -p "$dir/eval"
+  notify "Enyo NNUE hardcase aug: eval $tag"
+  eval_one "$INIT" "$D16_PACKED" 938632 "$dir/eval/d16_baseline.txt"
+  eval_one "$dir/model.nn" "$D16_PACKED" 938632 "$dir/eval/d16_candidate.txt"
+  eval_one "$INIT" "$SELFPLAY_PACKED" 20839426 "$dir/eval/selfplay_baseline.txt"
+  eval_one "$dir/model.nn" "$SELFPLAY_PACKED" 20839426 "$dir/eval/selfplay_candidate.txt"
+  eval_one "$INIT" "$LICHESS_PACKED" 0 "$dir/eval/lichess_baseline.txt"
+  eval_one "$dir/model.nn" "$LICHESS_PACKED" 0 "$dir/eval/lichess_candidate.txt"
+  eval_one "$INIT" "$BINPACK_PACKED" 4900000 "$dir/eval/binpack_baseline.txt"
+  eval_one "$dir/model.nn" "$BINPACK_PACKED" 4900000 "$dir/eval/binpack_candidate.txt"
+
+  "$PY" - "$dir/eval" <<'PY' | tee "$dir/static_summary.txt"
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(sys.argv[1])
+weights = {"d16": 1.2, "selfplay": 0.8, "lichess": 1.2, "binpack": 0.3}
+
+def metric(path: pathlib.Path, key: str) -> float:
+    text = path.read_text()
+    m = re.search(rf"^{key}=([-+0-9.]+)%?$", text, re.M)
+    if not m:
+        raise SystemExit(f"missing {key} in {path}")
+    return float(m.group(1))
+
+score = 0.0
+print("dataset       weight base_mae cand_mae delta_mae base_sign cand_sign delta_sign")
+for label, weight in weights.items():
+    b = root / f"{label}_baseline.txt"
+    c = root / f"{label}_candidate.txt"
+    b_mae = metric(b, "mae")
+    c_mae = metric(c, "mae")
+    b_sign = metric(b, "sign")
+    c_sign = metric(c, "sign")
+    d_mae = b_mae - c_mae
+    d_sign = c_sign - b_sign
+    score += weight * d_mae
+    print(
+        f"{label:10} {weight:6.2f} {b_mae:8.3f} {c_mae:8.3f} {d_mae:9.3f}"
+        f" {b_sign:9.2f} {c_sign:9.2f} {d_sign:10.2f}"
+    )
+print(f"score={score:.3f}")
+PY
+}
+
+hard_gate_candidate() {
+  local tag="$1"
+  local dir="$RUN/$tag"
+  notify "Enyo NNUE hardcase aug: hard gate $tag"
+  "$PY" "$TOOLS/eval_move_gate.py" \
+    --cases "$RUN/hard_cases.jsonl" \
+    --engine "$ENGINE" \
+    --baseline-net "$INIT" \
+    --candidate-net "$dir/model.nn" \
+    --output "$dir/hard_gate.jsonl" | tee "$dir/hard_gate.txt"
+
+  "$PY" - "$dir/hard_gate.txt" "$tag" "$dir/model.nn" <<'PY' >> "$RUN/passed_candidates.tsv"
+import pathlib
+import re
+import sys
+
+summary = pathlib.Path(sys.argv[1]).read_text()
+tag = sys.argv[2]
+net = sys.argv[3]
+
+def num(name: str) -> float:
+    m = re.search(rf"^{name}=([-+0-9.]+)", summary, re.M)
+    if not m:
+        raise SystemExit(f"missing {name}")
+    return float(m.group(1))
+
+def pair(name: str) -> tuple[int, int]:
+    m = re.search(rf"^{name}=([0-9]+)/([0-9]+)", summary, re.M)
+    if not m:
+        raise SystemExit(f"missing {name}")
+    return int(m.group(1)), int(m.group(2))
+
+fixed = int(num("fixed"))
+regressed = int(num("regressed"))
+better, total = pair("candidate_better_margin")
+weighted = num("delta_loss_weighted_margin")
+avg = num("delta_avg_margin")
+passed = (
+    weighted >= 3.0
+    and avg >= 1.0
+    and better >= max(13, total // 2 + 1)
+    and fixed >= regressed
+)
+if passed:
+    print(f"{weighted:.3f}\t{avg:.3f}\t{tag}\t{net}")
+PY
+}
+
+run_sprt_for_best() {
+  if [ ! -s "$RUN/passed_candidates.tsv" ]; then
+    notify "Enyo NNUE hardcase aug: no hard-gate-positive candidate; no SPRT"
+    exit 0
+  fi
+  local best_line weighted avg tag net
+  best_line=$(sort -k1,1nr "$RUN/passed_candidates.tsv" | head -1)
+  weighted=$(printf "%s" "$best_line" | cut -f1)
+  avg=$(printf "%s" "$best_line" | cut -f2)
+  tag=$(printf "%s" "$best_line" | cut -f3)
+  net=$(printf "%s" "$best_line" | cut -f4)
+  notify "Enyo NNUE hardcase aug: 4000-game SPRT start $tag hard_weighted=$weighted avg=$avg"
+  mkdir -p "$RUN/sprt"
+  set +e
+  "$SPRT" \
+    --candidate "$ENGINE" \
+    --reference "$ENGINE" \
+    --candidate-option "nnue2_file=$net" \
+    --candidate-option "Hash=1024" \
+    --reference-option "nnue2_file=$INIT" \
+    --reference-option "Hash=1024" \
+    --book "$BOOK" \
+    --games 4000 \
+    --concurrency 6 \
+    --threads 4 \
+    --tc "10+0.1" \
+    --log-dir "$RUN/sprt" \
+    --name "${tag}_vs_reference_net" \
+    --ntfy-url "https://ntfy.wahlman.no/sprt"
+  local sprt_rc=$?
+  set -e
+  local log="$RUN/sprt/${tag}_vs_reference_net.log"
+  local final_status
+  final_status=$(rg --no-config "^(\\[[ 0-9]+/|Finished match|SPRT:|Total Time)" "$log" 2>/dev/null | tail -4 | tr "\n" " " || true)
+  notify "Enyo NNUE hardcase aug: SPRT finished $tag rc=$sprt_rc ${final_status:-no final status}"
+  exit "$sprt_rc"
+}
+
+: > "$RUN/passed_candidates.tsv"
+prepare_hard_rows
+mix_and_pack
+
+train_candidate "hardmix_huber_lr3e7_e6" "3e-7"
+eval_candidate "hardmix_huber_lr3e7_e6"
+hard_gate_candidate "hardmix_huber_lr3e7_e6"
+
+train_candidate "hardmix_huber_lr1e7_e6" "1e-7"
+eval_candidate "hardmix_huber_lr1e7_e6"
+hard_gate_candidate "hardmix_huber_lr1e7_e6"
+
+run_sprt_for_best
