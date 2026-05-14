@@ -26,6 +26,12 @@ ENGINE="${ENGINE:-$HOME/code/cpp/chess/assets/engines/enyo_206059e}"
 BUGS="${BUGS:-$ENGINE_REPO/bugs}"
 SPRT="${SPRT:-$HOME/code/cpp/chess/sprt/sprt}"
 BOOK="${BOOK:-$HOME/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd}"
+REPLAY="${REPLAY:-$HOME/local/bin/replay}"
+REPLAY_JOBS="${REPLAY_JOBS:-4}"
+REPLAY_THREADS="${REPLAY_THREADS:-4}"
+REPLAY_MAX_REPLAY_NODES="${REPLAY_MAX_REPLAY_NODES:-}"
+REPLAY_REF_NODES="${REPLAY_REF_NODES:-}"
+REPLAY_REF_DEPTH="${REPLAY_REF_DEPTH:-}"
 
 BINPACK_PACKED="${BINPACK_PACKED:-$HOME/tmp/enyo_teacher/binpack_test79_cp1600_5m_20260512/packed}"
 D16_PACKED="${D16_PACKED:-$HOME/tmp/enyo_teacher/sf_d16_bucket1m_20260512_225554/packed}"
@@ -42,7 +48,7 @@ notify "Enyo NNUE binpack5m sweep: start $RUN"
 for required in \
   "$PY" "$NNUE_REPO" "$ENGINE_REPO" "$INIT" "$ENGINE" "$SPRT" "$BOOK" \
   "$BINPACK_PACKED" "$D16_PACKED" "$SELFPLAY_PACKED" "$LICHESS_PACKED" \
-  "$BASE_SUMMARY"
+  "$BASE_SUMMARY" "$REPLAY"
 do
   if [ ! -e "$required" ]; then
     notify "Enyo NNUE binpack5m sweep: missing $required"
@@ -154,14 +160,20 @@ make_wrapper() {
   local tag="$1"
   local dir="$RUN/$tag"
   local gate="$dir/replay_gates"
-  mkdir -p "$gate/home/.config/enyo"
-  cat > "$gate/home/.config/enyo/settings.json" <<JSON
+  mkdir -p "$gate"
+  cat > "$gate/enyo_candidate.sh" <<WRAP
+#!/usr/bin/env bash
+set -euo pipefail
+tmp_home=\$(mktemp -d "$gate/home.XXXXXX")
+trap 'rm -rf "\$tmp_home"' EXIT
+mkdir -p "\$tmp_home/.config/enyo"
+cat > "\$tmp_home/.config/enyo/settings.json" <<JSON
 {
   "constants": {
     "threads": 4,
     "Hash": 1024,
     "nnue2_file": "$dir/model.nn",
-    "logfile": "$gate/enyo.log"
+    "logfile": "$gate/enyo.\$\$.log"
   },
   "uci_options": {
     "Threads": 4,
@@ -170,12 +182,31 @@ make_wrapper() {
   }
 }
 JSON
-  cat > "$gate/enyo_candidate.sh" <<WRAP
-#!/usr/bin/env bash
-export HOME="$gate/home"
+export HOME="\$tmp_home"
 exec "$ENGINE" "\$@"
 WRAP
   chmod +x "$gate/enyo_candidate.sh"
+}
+
+run_replay_gate() {
+  local gate="$1"
+  shift
+  local args=(
+    --summary-only
+    --jobs "$REPLAY_JOBS"
+    --engine "$gate/enyo_candidate.sh"
+    --threads "$REPLAY_THREADS"
+  )
+  if [ -n "$REPLAY_MAX_REPLAY_NODES" ]; then
+    args+=(--max-replay-nodes "$REPLAY_MAX_REPLAY_NODES")
+  fi
+  if [ -n "$REPLAY_REF_NODES" ]; then
+    args+=(--ref-nodes "$REPLAY_REF_NODES")
+  fi
+  if [ -n "$REPLAY_REF_DEPTH" ]; then
+    args+=(--ref-depth "$REPLAY_REF_DEPTH")
+  fi
+  "$REPLAY" "${args[@]}" "$@"
 }
 
 gate_candidate() {
@@ -186,27 +217,23 @@ gate_candidate() {
   notify "Enyo NNUE binpack5m sweep: replay gate $tag"
   : > "$gate/replay.log"
   : > "$gate/summary.txt"
-  for f in \
-    "EnyoBot vs Lynx_BOT - jjThVRPN.log" \
-    "Hypersion vs EnyoBot - npmgxvIO.log" \
-    "JustinBot15 vs EnyoBot - JZaA98Uv.log" \
-    "EnyoBot vs stage270 - 2DRMYfOm_oot.log" \
-    "stage270 vs EnyoBot - kp3inZBb.log"
-  do
-    printf "== %s ==\n" "$f" | tee -a "$gate/replay.log" "$gate/summary.txt"
-    make_wrapper "$tag"
-    set +e
-    /home/petter/local/bin/replay --summary-only --engine "$gate/enyo_candidate.sh" \
-      "$BUGS/$f" 2>&1 \
+  local logs=(
+    "$BUGS/EnyoBot vs Lynx_BOT - jjThVRPN.log"
+    "$BUGS/Hypersion vs EnyoBot - npmgxvIO.log"
+    "$BUGS/JustinBot15 vs EnyoBot - JZaA98Uv.log"
+    "$BUGS/EnyoBot vs stage270 - 2DRMYfOm_oot.log"
+    "$BUGS/stage270 vs EnyoBot - kp3inZBb.log"
+  )
+  set +e
+  run_replay_gate "$gate" "${logs[@]}" 2>&1 \
+    | tee -a "$gate/replay.log" "$gate/summary.txt"
+  replay_rc=${PIPESTATUS[0]}
+  set -e
+  if [ "$replay_rc" -ne 0 ]; then
+    echo "replay exit $replay_rc: batch" \
       | tee -a "$gate/replay.log" "$gate/summary.txt"
-    replay_rc=${PIPESTATUS[0]}
-    set -e
-    if [ "$replay_rc" -ne 0 ]; then
-      echo "replay exit $replay_rc: $f" \
-        | tee -a "$gate/replay.log" "$gate/summary.txt"
-    fi
-    printf "\n" | tee -a "$gate/replay.log" "$gate/summary.txt"
-  done
+  fi
+  printf "\n" | tee -a "$gate/replay.log" "$gate/summary.txt"
 
   issue_lines "$BASE_SUMMARY" | sed -E "s/[[:space:]]+/ /g" | sort -u \
     > "$RUN/baseline.issues"

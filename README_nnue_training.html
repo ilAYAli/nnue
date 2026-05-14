@@ -499,8 +499,10 @@ output_bias    float32 [1]</code></pre>
       </p>
 
       <pre><code>known Enyo problem log
-  -&gt; replay reconstructs each go command
+  -&gt; replay reconstructs the logged position and UCI options
   -&gt; candidate Enyo runs with candidate nnue2_file
+  -&gt; candidate search uses logged final nodes when available
+     otherwise it falls back to the original logged go command
   -&gt; reference analysis marks best moves and centipawn losses
   -&gt; gate compares candidate issues against baseline-known issues
   -&gt; reject if candidate adds serious new blunders, timeouts, or crashes</code></pre>
