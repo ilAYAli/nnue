@@ -6,7 +6,7 @@ source ~/.ntfy 2>/dev/null || true
 notify() {
   local msg="$1"
   echo "$(date --iso-8601=seconds) $msg"
-  "$HOME/scripts/notifai.sh" "$msg" >/dev/null 2>&1 || true
+  "$HOME/scripts/notifai.sh" "$msg" codex_1 >/dev/null 2>&1 || true
   if [ -n "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" ]; then
     curl -fsS -m 10 -u "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" \
       -d "$msg" https://ntfy.wahlman.no/ping >/dev/null 2>&1 || true
@@ -22,7 +22,7 @@ ENGINE_REPO="${ENGINE_REPO:-$HOME/code/cpp/chess/enyo}"
 TOOLS="$NNUE_REPO/tools/nnue2"
 RUN="${RUN:-$HOME/tmp/enyo_teacher/nonzero_binpack_sweep_$(date +%Y%m%d_%H%M%S)}"
 INIT="${INIT:-$ENGINE_REPO/nnue/berserk-d43206fe90e4.nn}"
-ENGINE="${ENGINE:-$HOME/code/cpp/chess/assets/engines/enyo_0595e82}"
+ENGINE="${ENGINE:-$HOME/code/cpp/chess/assets/engines/reference}"
 SPRT="${SPRT:-$HOME/code/cpp/chess/sprt/sprt}"
 BOOK="${BOOK:-$HOME/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd}"
 
@@ -36,6 +36,13 @@ SELFPLAY_PACKED="${SELFPLAY_PACKED:-$HOME/tmp/enyo_teacher/sf_d12_20m_20260510_1
 BINPACK_ROWS="${BINPACK_ROWS:-1600000}"
 BINPACK_MIN_ABS_CP="${BINPACK_MIN_ABS_CP:-50}"
 BINPACK_MAX_ABS_CP="${BINPACK_MAX_ABS_CP:-1600}"
+SPRT_GAMES="${SPRT_GAMES:-1000}"
+SPRT_TC="${SPRT_TC:-2+0.02}"
+SPRT_CONCURRENCY="${SPRT_CONCURRENCY:-10}"
+SPRT_THREADS="${SPRT_THREADS:-2}"
+SPRT_HASH="${SPRT_HASH:-512}"
+SPRT_ELO1="${SPRT_ELO1:-8}"
+SPRT_RESTART="${SPRT_RESTART:-off}"
 
 mkdir -p "$RUN"
 exec > >(tee -a "$RUN/run.log") 2>&1
@@ -267,24 +274,25 @@ run_sprt() {
   local net="$RUN/$tag/model.nn"
   local sprt_dir="$RUN/sprt"
   mkdir -p "$sprt_dir"
-  notify "Enyo NNUE nonzero-binpack sweep: 4000-game SPRT start $tag"
+  notify "Enyo NNUE nonzero-binpack sweep: SPRT screen start $tag"
   set +e
   "$SPRT" \
     --candidate "$ENGINE" \
     --reference "$ENGINE" \
     --book "$BOOK" \
-    --games 4000 \
-    --tc 10+0.1 \
-    --concurrency 6 \
-    --threads 4 \
+    --games "$SPRT_GAMES" \
+    --tc "$SPRT_TC" \
+    --concurrency "$SPRT_CONCURRENCY" \
+    --threads "$SPRT_THREADS" \
     --elo0 0 \
-    --elo1 5 \
+    --elo1 "$SPRT_ELO1" \
     --srand 2026051403 \
+    --restart "$SPRT_RESTART" \
     --log-dir "$sprt_dir" \
     --name "${tag}_vs_refnet_e5" \
-    --candidate-option "Hash=1024" \
+    --candidate-option "Hash=$SPRT_HASH" \
     --candidate-option "nnue2_file=$net" \
-    --reference-option "Hash=1024" \
+    --reference-option "Hash=$SPRT_HASH" \
     --reference-option "nnue2_file=$INIT" \
     2>&1 | tee "$sprt_dir/${tag}_vs_refnet_e5.log"
   local rc=${PIPESTATUS[0]}
