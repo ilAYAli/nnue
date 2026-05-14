@@ -992,6 +992,11 @@ example beta: 200 cp</code></pre>
             <td>Builds a score-balanced set so teacher time is not spent almost entirely on near-zero positions.</td>
           </tr>
           <tr>
+            <td><code>sample_signed_buckets.py</code></td>
+            <td>Sampling</td>
+            <td>Builds score-balanced and sign-balanced sets so the net is not trained mostly in one eval direction.</td>
+          </tr>
+          <tr>
             <td><code>label_with_uci.py</code></td>
             <td>Teacher labeling</td>
             <td>Turns positions into supervised targets by asking a stronger engine for centipawn scores.</td>
