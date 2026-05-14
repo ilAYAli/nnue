@@ -24,6 +24,19 @@ RUN="${RUN:-$HOME/tmp/enyo_teacher/hardcase_aug_$(date +%Y%m%d_%H%M%S)}"
 INIT="${INIT:-$ENGINE_REPO/nnue/berserk-d43206fe90e4.nn}"
 ENGINE="${ENGINE:-$HOME/code/cpp/chess/assets/engines/reference}"
 BUGS="${BUGS:-$ENGINE_REPO/bugs}"
+if [ -z "${STOCKFISH:-}" ]; then
+  for candidate in \
+    /usr/games/stockfish \
+    "$HOME/local/bin/stockfish" \
+    "$HOME/local/stockfish-18/stockfish-ubuntu-x86-64-avx2" \
+    "$(command -v stockfish 2>/dev/null || true)"
+  do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      STOCKFISH="$candidate"
+      break
+    fi
+  done
+fi
 STOCKFISH="${STOCKFISH:-/usr/games/stockfish}"
 SPRT="${SPRT:-$HOME/code/cpp/chess/sprt/sprt}"
 BOOK="${BOOK:-$HOME/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd}"
