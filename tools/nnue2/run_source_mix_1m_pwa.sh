@@ -26,7 +26,6 @@ ENGINE="$HOME/code/cpp/chess/assets/engines/enyo_206059e"
 BUGS="$ENGINE_REPO/bugs"
 SPRT="$HOME/code/cpp/chess/sprt/sprt"
 BOOK="$HOME/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd"
-REPLAY_TIMEOUT="${REPLAY_TIMEOUT:-20m}"
 
 D16_JSON="$HOME/tmp/enyo_teacher/sf_d16_bucket1m_20260512_225554/labeled.jsonl"
 BINPACK_JSON="$HOME/tmp/enyo_teacher/binpack_test79_cp1600_5m_20260512/binpack.jsonl"
@@ -240,7 +239,7 @@ gate_candidate() {
   do
     printf "== %s ==\n" "$f" | tee -a "$gate/replay.log" "$gate/summary.txt"
     set +e
-    timeout "$REPLAY_TIMEOUT" /home/petter/local/bin/replay --engine "$gate/enyo_candidate.sh" \
+    /home/petter/local/bin/replay --engine "$gate/enyo_candidate.sh" \
       "$BUGS/$f" 2>&1 \
       | tee -a "$gate/replay.log" \
       | awk '/=== Summary ===/ { seen=1 } seen' \
@@ -248,13 +247,8 @@ gate_candidate() {
     replay_rc=${PIPESTATUS[0]}
     set -e
     if [ "$replay_rc" -ne 0 ]; then
-      if [ "$replay_rc" -eq 124 ]; then
-        echo "replay exit $replay_rc: $f (timeout after $REPLAY_TIMEOUT)" \
-          | tee -a "$gate/replay.log" "$gate/summary.txt"
-      else
-        echo "replay exit $replay_rc: $f" \
-          | tee -a "$gate/replay.log" "$gate/summary.txt"
-      fi
+      echo "replay exit $replay_rc: $f" \
+        | tee -a "$gate/replay.log" "$gate/summary.txt"
     fi
     printf "\n" | tee -a "$gate/replay.log" "$gate/summary.txt"
   done
