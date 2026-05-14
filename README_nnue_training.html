@@ -1036,6 +1036,11 @@ example beta: 200 cp</code></pre>
             <td>Binpack input preparation</td>
             <td>Brings curated Stockfish training positions into the Enyo pipeline for validation or future training.</td>
           </tr>
+          <tr>
+            <td><code>run_cp800_conservative_pwa.sh</code></td>
+            <td>Conservative candidate sweep</td>
+            <td>Reuses the prepared 5M cp800 mix, applies smaller updates, static-gates candidates, then starts one SPRT with early stop thresholds.</td>
+          </tr>
         </tbody>
       </table>
     </section>
