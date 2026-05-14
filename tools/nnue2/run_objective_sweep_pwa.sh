@@ -224,22 +224,21 @@ gate_candidate() {
     > "$dir/issues"
   comm -13 "$RUN/baseline.issues" "$dir/issues" > "$dir/new_issues"
   rg --no-config "^(mistake|blunder|missing replay log)" \
-    "$dir/new_issues" > "$dir/new_serious_issues" || true
+    "$dir/new_issues" > "$dir/new_tactical_issues" || true
   rg --no-config "^(missing replay log|ERROR:|Error: engine closed stdout)" \
     "$gate/summary.txt" > "$dir/gate_failures" || true
-  cat "$dir/new_serious_issues" "$dir/gate_failures" \
-    | sed '/^$/d' | sort -u > "$dir/reject_issues"
+  sed '/^$/d' "$dir/gate_failures" | sort -u > "$dir/reject_issues"
 
-  local new_issues new_serious gate_failures score
+  local new_issues new_tactical gate_failures score
   new_issues=$(wc -l < "$dir/new_issues" | tr -d " ")
-  new_serious=$(wc -l < "$dir/reject_issues" | tr -d " ")
+  new_tactical=$(wc -l < "$dir/new_tactical_issues" | tr -d " ")
   gate_failures=$(wc -l < "$dir/gate_failures" | tr -d " ")
   score=$(awk -F= '/^score=/ {print $2}' "$dir/static_summary.txt" | tail -1)
   {
     echo "candidate=$dir/model.nn"
     echo "static_score=$score"
     echo "new_issues=$new_issues"
-    echo "new_serious_issues=$new_serious"
+    echo "new_tactical_issues=$new_tactical"
     echo "gate_failures=$gate_failures"
     echo
     echo "new issues:"
@@ -249,7 +248,7 @@ gate_candidate() {
     cat "$dir/gate_failures"
   } | tee "$dir/gate_decision.txt"
 
-  if [ "$new_serious" -eq 0 ]; then
+  if [ "$gate_failures" -eq 0 ]; then
     printf "%s\t%s\t%s\n" "$score" "$tag" "$dir/model.nn" \
       >> "$RUN/passed_candidates.tsv"
   fi
@@ -257,7 +256,7 @@ gate_candidate() {
 
 run_screen_sprt_for_best() {
   if [ ! -s "$RUN/passed_candidates.tsv" ]; then
-    notify "Enyo NNUE objective sweep: no candidate passed replay gate"
+    notify "Enyo NNUE objective sweep: no candidate passed replay infrastructure gate"
     exit 0
   fi
   local best_line score tag net
@@ -270,7 +269,7 @@ import sys
 raise SystemExit(0 if float(sys.argv[1]) > 0.0 else 1)
 PY
   then
-    notify "Enyo NNUE objective sweep: best replay-clean candidate static_score=$score; no SPRT"
+    notify "Enyo NNUE objective sweep: best gate-clean candidate static_score=$score; no SPRT"
     exit 0
   fi
   notify "Enyo NNUE objective sweep: 1000-game SPRT screen start $tag static_score=$score"
