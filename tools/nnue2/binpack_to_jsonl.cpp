@@ -19,6 +19,7 @@ struct Args {
     std::string output;
     std::size_t limit = 0;
     std::size_t progress = 1'000'000;
+    int min_abs_cp = 0;
     int max_abs_cp = 1600;
 };
 
@@ -27,13 +28,14 @@ struct Stats {
     std::size_t written = 0;
     std::size_t skipped_invalid_move = 0;
     std::size_t skipped_invalid_fen = 0;
+    std::size_t skipped_small = 0;
     std::size_t skipped_extreme = 0;
 };
 
 [[noreturn]] void usage(std::string_view argv0) {
     fmt::print(stderr,
                "usage: {} --input FILE.binpack --output rows.jsonl "
-               "[--limit N] [--max-abs-cp N] [--progress N]\n",
+               "[--limit N] [--min-abs-cp N] [--max-abs-cp N] [--progress N]\n",
                argv0);
     std::exit(2);
 }
@@ -77,6 +79,8 @@ Args parse_args(int argc, char** argv) {
             args.limit = parse_size(require_value(key), key);
         else if (key == "--progress")
             args.progress = parse_size(require_value(key), key);
+        else if (key == "--min-abs-cp")
+            args.min_abs_cp = parse_int(require_value(key), key);
         else if (key == "--max-abs-cp")
             args.max_abs_cp = parse_int(require_value(key), key);
         else if (key == "--help" || key == "-h")
@@ -87,8 +91,12 @@ Args parse_args(int argc, char** argv) {
 
     if (args.input.empty() || args.output.empty())
         usage(argv[0]);
+    if (args.min_abs_cp < 0)
+        throw std::runtime_error("--min-abs-cp must be non-negative");
     if (args.max_abs_cp <= 0)
         throw std::runtime_error("--max-abs-cp must be positive");
+    if (args.min_abs_cp > args.max_abs_cp)
+        throw std::runtime_error("--min-abs-cp must be <= --max-abs-cp");
     return args;
 }
 
@@ -225,6 +233,10 @@ int main(int argc, char** argv) {
             }
 
             const int score_cp = stockfish_score_to_cp(entry.score);
+            if (std::abs(score_cp) < args.min_abs_cp) {
+                ++stats.skipped_small;
+                continue;
+            }
             if (std::abs(score_cp) > args.max_abs_cp) {
                 ++stats.skipped_extreme;
                 continue;
@@ -247,6 +259,7 @@ int main(int argc, char** argv) {
                    "  \"written\": {},\n"
                    "  \"skipped_invalid_move\": {},\n"
                    "  \"skipped_invalid_fen\": {},\n"
+                   "  \"skipped_small\": {},\n"
                    "  \"skipped_extreme\": {}\n"
                    "}}\n",
                    args.input,
@@ -255,6 +268,7 @@ int main(int argc, char** argv) {
                    stats.written,
                    stats.skipped_invalid_move,
                    stats.skipped_invalid_fen,
+                   stats.skipped_small,
                    stats.skipped_extreme);
         return 0;
     } catch (const std::exception& e) {
