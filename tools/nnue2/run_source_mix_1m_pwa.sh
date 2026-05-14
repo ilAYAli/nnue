@@ -62,7 +62,7 @@ done
 issue_lines() {
   local file="$1"
   rg --no-config \
-    "^(inaccuracy|mistake|blunder|timeout|game:|replay exit|missing replay log)" \
+    "^(inaccuracy|mistake|blunder|timeout|game:|missing replay log)" \
     "$file" 2>/dev/null || true
 }
 
@@ -274,7 +274,7 @@ gate_candidate() {
   replay_rc=${PIPESTATUS[0]}
   set -e
   if [ "$replay_rc" -ne 0 ]; then
-    echo "replay exit $replay_rc: batch" \
+    echo "replay rc $replay_rc: batch" \
       | tee -a "$gate/replay.log" "$gate/summary.txt"
   fi
   printf "\n" | tee -a "$gate/replay.log" "$gate/summary.txt"
@@ -286,7 +286,7 @@ gate_candidate() {
   comm -13 "$RUN/baseline.issues" "$dir/issues" > "$dir/new_issues"
   rg --no-config "^(mistake|blunder|missing replay log)" \
     "$dir/new_issues" > "$dir/new_tactical_issues" || true
-  rg --no-config "^(missing replay log|Error: engine closed stdout)" \
+  rg --no-config "^(missing replay log|Error: engine closed stdout|ERROR: Engine|ERROR: .*not found|ERROR: .*not executable|ERROR: failed|ERROR: cannot)" \
     "$gate/summary.txt" > "$dir/gate_failures" || true
   sed '/^$/d' "$dir/gate_failures" | sort -u > "$dir/reject_issues"
 
