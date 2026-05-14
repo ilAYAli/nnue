@@ -141,3 +141,24 @@ That runner builds the hard gate cases, expands them into played/best child
 positions, labels those child positions with Stockfish, repeats them into the
 training mix, trains two low-LR Huber candidates, runs the hard move-choice
 gate, and only starts SPRT if a candidate improves the hard gate.
+
+Pairwise hard-case fine-tuning:
+
+```bash
+python3 tools/nnue2/train_pairwise.py \
+  --data ~/tmp/enyo_teacher/hardcase_aug_<run>/hardmajor_d16500000_bin350000_hard150000/packed \
+  --pairs ~/tmp/enyo_teacher/hardcase_aug_<run>/hard_child_labeled.jsonl \
+  --init-from-nn ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --epochs 8 \
+  --lr 1e-6 \
+  --pair-weight 1.0 \
+  --device cuda \
+  --workers 2 \
+  --out ~/tmp/pairwise.pt \
+  --out-nn ~/tmp/pairwise.nn
+```
+
+This trains the usual centipawn fit and adds a direct pairwise margin loss:
+after the played move and after the teacher-best move, the net should score the
+teacher-best child higher from the original mover's point of view. Use this
+when broad MAE improves but the hard move-choice gate barely moves.
