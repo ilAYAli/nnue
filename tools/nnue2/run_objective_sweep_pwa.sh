@@ -205,11 +205,9 @@ gate_candidate() {
   do
     printf "== %s ==\n" "$f" | tee -a "$gate/replay.log" "$gate/summary.txt"
     set +e
-    /home/petter/local/bin/replay --engine "$gate/enyo_candidate.sh" \
+    /home/petter/local/bin/replay --summary-only --engine "$gate/enyo_candidate.sh" \
       "$BUGS/$f" 2>&1 \
-      | tee -a "$gate/replay.log" \
-      | awk '/=== Summary ===/ { seen=1 } seen' \
-      | tee -a "$gate/summary.txt"
+      | tee -a "$gate/replay.log" "$gate/summary.txt"
     replay_rc=${PIPESTATUS[0]}
     set -e
     if [ "$replay_rc" -ne 0 ]; then
