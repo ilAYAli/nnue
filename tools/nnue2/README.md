@@ -107,3 +107,25 @@ python3 tools/nnue2/pack_dataset.py \
 ```
 
 Then pass the packed directory to `--data`.
+
+Hard move-choice gate:
+
+```bash
+python3 tools/nnue2/build_move_gate.py \
+  ~/code/cpp/chess/enyo/bugs \
+  --output ~/tmp/enyo_hard_gate_cases.jsonl \
+  --min-loss 70 \
+  --max-loss 999
+
+python3 tools/nnue2/eval_move_gate.py \
+  --cases ~/tmp/enyo_hard_gate_cases.jsonl \
+  --engine ~/code/cpp/chess/assets/engines/reference \
+  --baseline-net ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --candidate-net ~/tmp/enyo_teacher/<run>/<candidate>/model.nn
+```
+
+This is a fast pre-SPRT check for known Enyo failures. For each replay issue
+with a FEN, it evaluates the child position after the played move and after the
+teacher-best move. A useful candidate should increase the margin in favor of
+the teacher-best move compared with the baseline net. This does not replace
+SPRT, but it stops obviously wrong objectives before they burn match time.

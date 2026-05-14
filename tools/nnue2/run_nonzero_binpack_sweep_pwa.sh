@@ -6,7 +6,7 @@ source ~/.ntfy 2>/dev/null || true
 notify() {
   local msg="$1"
   echo "$(date --iso-8601=seconds) $msg"
-  "$HOME/scripts/notifai.sh" "$msg" "${NOTIFAI_TARGET:-nnue_cmd}" >/dev/null 2>&1 || true
+  "$HOME/scripts/notifai.sh" "$msg" >/dev/null 2>&1 || true
   if [ -n "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" ]; then
     curl -fsS -m 10 -u "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" \
       -d "$msg" https://ntfy.wahlman.no/ping >/dev/null 2>&1 || true
