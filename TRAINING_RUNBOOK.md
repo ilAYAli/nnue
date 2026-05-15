@@ -206,21 +206,33 @@ clearly enough that noise is not the explanation.
 
 Goal: add new signal, not just rerun the same pool.
 
-1. Generate fresh Enyo self-play positions from the current reference engine.
+1. Generate `15-30M` usable fresh Enyo self-play positions from the current
+   reference engine. Use current search/eval, varied openings, and enough
+   randomness that the positions are not just repeats of the old pool.
 2. Filter out bad training rows: duplicate FENs, timeout/emergency moves, mate
    scores, missing scores, and extreme-only buckets.
-3. Sample signed score buckets so the data is not mostly neutral positions.
-4. Label the fresh positions with Stockfish depth 16 or 18.
+3. Sample signed score buckets so the data is not mostly neutral positions:
+   `0-25`, `25-75`, `75-150`, `150-300`, `300-600`, `600-1200`, both signs
+   where applicable.
+4. Label the fresh positions with Stockfish:
+   - main labels: depth `16`
+   - premium subset: depth `18` on `2-4M` high-quality signed-bucket rows
 5. Train a small matrix:
    - self-play-only `huber`, clamp `800`, beta `200`, lr `7e-7..1e-6`
+   - self-play-only `huber`, clamp `1000`, beta `200`, lr `7e-7..1e-6`
    - self-play-only `mpe25`, clamp `1200`, lr `7e-7..1e-6`
-   - same `mpe25` recipe with `10-15%` Lichess eval rows
-6. Reject with static checks first; do not use binpack or hardcase data as a
-   main training source.
-7. Test promising candidates:
+   - `mpe25` with `10-15%` Lichess eval rows
+   - one higher-LR probe, `1.2e-6..1.5e-6`, only if static metrics stay clean
+6. Reject with held-out validation first. Include validation from the fresh
+   distribution and old d16/self-play/Lichess sets. Do not use binpack or
+   hardcase data as a main training source.
+7. Run replay gates on known Enyo misses/blunders/time losses. Current `replay`
+   output is accurate enough to use as a tactical sanity check again.
+8. Test promising candidates:
    - `1000` games: smoke test
    - `4000` games: screen
-   - `10000-20000` games: confirm small `+3..+8 Elo` candidates
+   - `10000-20000` games: confirm likely `+5..+8 Elo` candidates
+   - `30000+` games or slower TC: needed before treating `+3..+5 Elo` as real
 
 If this stays neutral, the next likely bottleneck is architecture/features or
 starting-net dependency, not another tiny learning-rate change.
