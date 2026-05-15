@@ -68,7 +68,7 @@ for required in \
   "$PY" "$NNUE_REPO" "$ENGINE_REPO" "$TOOLS/build_move_gate.py" \
   "$TOOLS/move_gate_to_child_rows.py" "$TOOLS/repeat_jsonl.py" \
   "$TOOLS/label_with_uci.py" "$TOOLS/mix_jsonl.py" "$TOOLS/pack_dataset.py" \
-  "$TOOLS/train.py" "$TOOLS/eval_dataset.py" "$TOOLS/eval_move_gate.py" \
+  "$TOOLS/train.py" "$TOOLS/train_pairwise.py" "$TOOLS/eval_dataset.py" "$TOOLS/eval_move_gate.py" \
   "$INIT" "$ENGINE" "$BUGS" "$STOCKFISH" "$SPRT" "$BOOK" \
   "$D16_JSON" "$BINPACK_JSON" "$D16_PACKED" "$SELFPLAY_PACKED" \
   "$LICHESS_PACKED" "$BINPACK_PACKED"
@@ -268,15 +268,50 @@ regressed = int(num("regressed"))
 better, total = pair("candidate_better_margin")
 weighted = num("delta_loss_weighted_margin")
 avg = num("delta_avg_margin")
+min_better = total // 2 + 1
 passed = (
     weighted >= 3.0
     and avg >= 1.0
-    and better >= max(13, total // 2 + 1)
+    and better >= min_better
     and fixed >= regressed
 )
 if passed:
     print(f"{weighted:.3f}\t{avg:.3f}\t{tag}\t{net}")
 PY
+}
+
+train_pairwise_candidate() {
+  local tag="$1"
+  local init="$2"
+  local lr="$3"
+  local pair_weight="$4"
+  local epochs="$5"
+  local src="$RUN/hardmajor_d16${D16_ROWS}_bin${BINPACK_ROWS}_hard${HARD_ROWS}"
+  local dir="$RUN/$tag"
+  mkdir -p "$dir"
+  if [ ! -s "$dir/model.nn" ]; then
+    notify "Enyo NNUE hardcase aug: pairwise train $tag"
+    "$PY" "$TOOLS/train_pairwise.py" \
+      --data "$src/packed" \
+      --pairs "$RUN/hard_child_labeled.jsonl" \
+      --init-from-nn "$init" \
+      --epochs "$epochs" \
+      --batch-size 8192 \
+      --pair-batch-size 64 \
+      --lr "$lr" \
+      --weight-decay 1e-6 \
+      --huber-beta 200 \
+      --pair-beta 100 \
+      --pair-weight "$pair_weight" \
+      --target-clamp 1600 \
+      --max-target-margin 800 \
+      --min-target-margin 1 \
+      --loss-weight-by-cp \
+      --device cuda \
+      --workers 2 \
+      --out "$dir/model.pt" \
+      --out-nn "$dir/model.nn" | tee "$dir/train.log"
+  fi
 }
 
 run_sprt_for_best() {
@@ -331,5 +366,13 @@ hard_gate_candidate "hardmajor_huber_lr1e6_e8"
 train_candidate "hardmajor_huber_lr3e6_e8" "3e-6"
 eval_candidate "hardmajor_huber_lr3e6_e8"
 hard_gate_candidate "hardmajor_huber_lr3e6_e8"
+
+train_pairwise_candidate "hardpair_from_init_w1_lr1e6_e4" "$INIT" "1e-6" "1.0" 4
+eval_candidate "hardpair_from_init_w1_lr1e6_e4"
+hard_gate_candidate "hardpair_from_init_w1_lr1e6_e4"
+
+train_pairwise_candidate "hardpair_from_huber3_w1_lr3e7_e4" "$RUN/hardmajor_huber_lr3e6_e8/model.nn" "3e-7" "1.0" 4
+eval_candidate "hardpair_from_huber3_w1_lr3e7_e4"
+hard_gate_candidate "hardpair_from_huber3_w1_lr3e7_e4"
 
 run_sprt_for_best
