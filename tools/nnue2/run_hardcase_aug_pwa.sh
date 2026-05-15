@@ -6,14 +6,7 @@ source ~/.ntfy 2>/dev/null || true
 notify() {
   local msg="$1"
   echo "$(date --iso-8601=seconds) $msg"
-  "$HOME/scripts/notifai.sh" "$msg" >/dev/null 2>&1 || true
-  if [ -n "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" ]; then
-    curl -fsS -m 10 -u "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" \
-      -d "$msg" https://ntfy.wahlman.no/ping >/dev/null 2>&1 || true
-  else
-    curl -fsS -m 10 -d "$msg" https://ntfy.wahlman.no/ping \
-      >/dev/null 2>&1 || true
-  fi
+  "$HOME/scripts/notifai.sh" "$msg" codex_1 >/dev/null 2>&1 || true
 }
 
 PY="${PY:-$HOME/.venv/bin/python}"
@@ -54,10 +47,20 @@ D16_ROWS="${D16_ROWS:-500000}"
 BINPACK_ROWS="${BINPACK_ROWS:-350000}"
 HARD_SOURCE_WEIGHT="${HARD_SOURCE_WEIGHT:-5.0}"
 TEACHER_DEPTH="${TEACHER_DEPTH:-20}"
+SPRT_GAMES="${SPRT_GAMES:-1000}"
+SPRT_CONCURRENCY="${SPRT_CONCURRENCY:-10}"
+SPRT_THREADS="${SPRT_THREADS:-2}"
+SPRT_HASH="${SPRT_HASH:-512}"
+SPRT_TC="${SPRT_TC:-2+0.02}"
+SPRT_ELO1="${SPRT_ELO1:-8}"
+SPRT_RESTART="${SPRT_RESTART:-off}"
 
 mkdir -p "$RUN"
 exec > >(tee -a "$RUN/run.log") 2>&1
 cd "$NNUE_REPO"
+
+rc=0
+trap 'rc=$?; notify "Enyo NNUE hardcase aug finished rc=$rc run=$RUN"; exit $rc' EXIT
 
 notify "Enyo NNUE hardcase aug: start $RUN"
 
@@ -287,29 +290,32 @@ run_sprt_for_best() {
   avg=$(printf "%s" "$best_line" | cut -f2)
   tag=$(printf "%s" "$best_line" | cut -f3)
   net=$(printf "%s" "$best_line" | cut -f4)
-  notify "Enyo NNUE hardcase aug: 4000-game SPRT start $tag hard_weighted=$weighted avg=$avg"
+  notify "Enyo NNUE hardcase aug: ${SPRT_GAMES}-game SPRT start $tag hard_weighted=$weighted avg=$avg"
   mkdir -p "$RUN/sprt"
   set +e
   "$SPRT" \
     --candidate "$ENGINE" \
     --reference "$ENGINE" \
     --candidate-option "nnue2_file=$net" \
-    --candidate-option "Hash=1024" \
+    --candidate-option "Hash=$SPRT_HASH" \
     --reference-option "nnue2_file=$INIT" \
-    --reference-option "Hash=1024" \
+    --reference-option "Hash=$SPRT_HASH" \
     --book "$BOOK" \
-    --games 4000 \
-    --concurrency 6 \
-    --threads 4 \
-    --tc "10+0.1" \
+    --games "$SPRT_GAMES" \
+    --elo0 0 \
+    --elo1 "$SPRT_ELO1" \
+    --concurrency "$SPRT_CONCURRENCY" \
+    --threads "$SPRT_THREADS" \
+    --tc "$SPRT_TC" \
+    --restart "$SPRT_RESTART" \
     --log-dir "$RUN/sprt" \
     --name "${tag}_vs_reference_net" \
-    --ntfy-url "https://ntfy.wahlman.no/sprt"
+    --eta | tee "$RUN/sprt/${tag}_vs_reference_net.log"
   local sprt_rc=$?
   set -e
   local log="$RUN/sprt/${tag}_vs_reference_net.log"
   local final_status
-  final_status=$(rg --no-config "^(\\[[ 0-9]+/|Finished match|SPRT:|Total Time)" "$log" 2>/dev/null | tail -4 | tr "\n" " " || true)
+  final_status=$(rg --no-config "^(\\[[ 0-9]+/|Score of|Elo difference:|SPRT:|Finished match|Total Time)" "$log" 2>/dev/null | tail -6 | tr "\n" " " || true)
   notify "Enyo NNUE hardcase aug: SPRT finished $tag rc=$sprt_rc ${final_status:-no final status}"
   exit "$sprt_rc"
 }

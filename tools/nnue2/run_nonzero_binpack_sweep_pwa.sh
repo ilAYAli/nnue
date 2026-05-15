@@ -299,7 +299,7 @@ run_sprt() {
   local rc=${PIPESTATUS[0]}
   set -e
   local status
-  status=$(rg "Elo difference|SPRT:|Finished match|Total Time|^\\[[[:space:][:digit:]]+/" \
+  status=$(rg --no-config "Elo difference|SPRT:|Finished match|Total Time|^\\[[[:space:][:digit:]]+/" \
     "$sprt_dir/${tag}_vs_refnet_e5.log" | tail -6 | tr '\n' ' ')
   notify "Enyo NNUE nonzero-binpack sweep: SPRT finished $tag rc=$rc $status"
   return "$rc"
