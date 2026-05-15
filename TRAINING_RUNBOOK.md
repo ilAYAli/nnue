@@ -117,6 +117,16 @@ Good sampling:
 
 ## Choosing Training Values
 
+Objective choice:
+
+- `mpe25`: convert predicted/target centipawns to a probability-like value,
+  optionally blend in WDL/result signal, then minimize that error. Use this
+  for broad self-play + Lichess training where search behavior matters more
+  than exact centipawn fit.
+- `huber`: train directly on centipawns, but reduce the effect of very large
+  errors. Use this for clean teacher relabel runs where the target is trusted
+  and extreme scores should not dominate.
+
 Broad self-play + Lichess:
 
 - objective: `mpe25`
@@ -184,11 +194,36 @@ clearly enough that noise is not the explanation.
 
 - Stronger target quality helps static metrics, but has not yet produced a
   clear replacement net.
+- Small objective/LR changes on the same depth-12 pool are not enough. They
+  mostly retest training noise.
 - The depth-16 expansion run produced static-positive candidates; the tested
   `lr1e-6` candidate ended around `+1.7 +/- 7.6 Elo`, so it is not a keeper.
 - Hardcase-only and pairwise hardcase training moved specific positions but did
   not translate into match strength.
 - Binpack-heavy training is not trusted unless isolated and proven by SPRT.
+
+## Next Improvement Plan
+
+Goal: add new signal, not just rerun the same pool.
+
+1. Generate fresh Enyo self-play positions from the current reference engine.
+2. Filter out bad training rows: duplicate FENs, timeout/emergency moves, mate
+   scores, missing scores, and extreme-only buckets.
+3. Sample signed score buckets so the data is not mostly neutral positions.
+4. Label the fresh positions with Stockfish depth 16 or 18.
+5. Train a small matrix:
+   - self-play-only `huber`, clamp `800`, beta `200`, lr `7e-7..1e-6`
+   - self-play-only `mpe25`, clamp `1200`, lr `7e-7..1e-6`
+   - same `mpe25` recipe with `10-15%` Lichess eval rows
+6. Reject with static checks first; do not use binpack or hardcase data as a
+   main training source.
+7. Test promising candidates:
+   - `1000` games: smoke test
+   - `4000` games: screen
+   - `10000-20000` games: confirm small `+3..+8 Elo` candidates
+
+If this stays neutral, the next likely bottleneck is architecture/features or
+starting-net dependency, not another tiny learning-rate change.
 
 ## Run Log Template
 
@@ -201,9 +236,11 @@ YYYY-MM-DD | run dir | data mix | objective/lr/clamp/epochs | static take | SPRT
 ## Vocabulary
 
 - `mpe25 objective`: training loss that mixes centipawn accuracy with
-  WDL-style chess outcome behavior.
+  WDL-style chess outcome behavior. In `train.py`, scores are passed through a
+  sigmoid and compared as probability-like values with exponent `2.5`.
 - `huber objective`: centipawn loss that reduces the influence of very large
-  eval errors.
+  eval errors. Small errors behave roughly like squared error; large errors
+  become closer to linear, so one huge score miss does not dominate training.
 - `learning rate`: update size for each training step. `3e-7` means
   `0.0000003`, a cautious fine-tuning value.
 - `target clamp`: maximum absolute teacher score used for training, e.g.
