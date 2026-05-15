@@ -57,6 +57,25 @@ python3 tools/nnue2/import_lichess_eval.py \
 
 The importer converts Lichess eval DB centipawns from white POV to Enyo's
 side-to-move training convention, and rejects non-standard material positions.
+It can also signed-bucket sample while streaming the compressed file, avoiding a
+large intermediate filtered JSONL:
+
+```bash
+python3 tools/nnue2/import_lichess_eval.py \
+  --input ~/code/cpp/chess/assets/lichess_db_eval.jsonl.zst \
+  --output ~/tmp/enyo_teacher/lichess_eval_slice/lichess_eval_signed.jsonl \
+  --min-depth 18 \
+  --max-abs-cp 1600 \
+  --bucket any0:any:0:25:150000 \
+  --bucket pos25_75:pos:25:75:100000 \
+  --bucket neg25_75:neg:25:75:100000
+```
+
+On pwa-5090, the standard external-data prep command is:
+
+```bash
+tools/nnue2/run_lichess_eval_slice_pwa.sh
+```
 
 Import official Stockfish `.binpack` rows:
 
