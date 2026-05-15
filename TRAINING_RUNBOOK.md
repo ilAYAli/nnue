@@ -1,158 +1,199 @@
 # Enyo NNUE Training Runbook
 
-This is the short operational guide for starting a new Enyo NNUE run without
-Codex.
+Concise guide for starting, choosing, and judging Enyo NNUE runs.
 
-## Quick Start
+## Environment
 
-Run this on `pwa-5090`:
+Use `/home/petter/.venv/bin/python` for NNUE Python on `pwa-5090`.
+
+## Main Scripts
 
 ```sh
 cd ~/code/cpp/chess/nnue
 git pull --ff-only
+```
+
+- `tools/nnue2/train_new_net_pwa.sh`: default self-play + Lichess run.
+- `tools/nnue2/run_d16_expansion_pwa.sh`: slower Stockfish depth-16 relabel run.
+- `tools/nnue2/run_net_sprt_pwa.sh`: SPRT an existing `.nn`.
+- `tools/nnue2/pack_dataset.py`: JSONL positions -> packed tensors.
+- `tools/nnue2/train.py`: PyTorch training -> `.pt` and `.nn`.
+- `tools/nnue2/eval_dataset.py`: static validation.
+
+## One-Command Training
+
+Run this when you want the default pipeline to try producing a stronger net:
+
+```sh
 tools/nnue2/train_new_net_pwa.sh
 ```
 
-The launcher starts the job in tmux session `nnue_test`, writes all large
-outputs under `~/tmp/enyo_teacher/`, and calls `~/scripts/notifai.sh` when
-major phases complete.
+It samples rows from the two default JSONL inputs below, packs them into
+tensors, trains a candidate `.nn`, runs static checks, then runs SPRT. The
+result is only a keeper if SPRT is clearly positive.
 
-Monitor it with:
+Default inputs:
 
-```sh
-tmux attach -t nnue_test
-```
-
-or:
-
-```sh
-tail -f ~/tmp/enyo_teacher/<run-dir>/run.log
-```
-
-## What The Default Run Does
-
-The default launcher uses the current conservative recipe:
-
-```text
-positions -> packed tensors -> PyTorch training -> .nn export -> static eval -> SPRT
-```
-
-It uses:
-
-- `8,000,000` Stockfish-labeled self-play rows from
+- self-play teacher rows:
   `~/tmp/enyo_teacher/sf_d12_20m_20260510_115338/labeled.jsonl`
-- `2,000,000` Lichess eval-DB rows from
+  Enyo self-play positions evaluated by a teacher, e.g. Stockfish.
+- Lichess eval rows:
   `~/tmp/enyo_teacher/lichess_eval_d18_standard/lichess_eval.jsonl`
-- no binpack rows by default
-- MPE25 loss with source-aware WDL blending
-- a low learning rate, starting from the current compatible `.nn`
-- SPRT versus the current reference engine using the candidate net as
-  `nnue2_file`
+- starting net:
+  `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`
+- test engine:
+  `~/code/cpp/chess/assets/engines/reference`
+- opening book:
+  `~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd`
 
-Binpack data is not used by default because earlier experiments improved static
-MAE while hurting Elo. Add it only as a separate controlled experiment.
+Default values:
 
-## Common Commands
+- `8,000,000` self-play rows
+- `2,000,000` Lichess eval rows
+- `mpe25` objective
+- learning rate `3e-7`
+- target clamp `1200`
+- `4` epochs
+- SPRT `4000` games at `2+0.02`
 
-Larger run:
+Running the exact same command again mostly tests random sampling/training
+noise. For a meaningful new experiment, change one of:
+
+- row mix: `--selfplay-rows`, `--lichess-rows`
+- learning rate: `--lr`
+- target clamp: `--target-clamp`
+- epochs: `--epochs`
+- SPRT length: `--sprt-games`
+
+Example larger run:
 
 ```sh
 tools/nnue2/train_new_net_pwa.sh \
   --selfplay-rows 12000000 \
-  --lichess-rows 3000000
+  --lichess-rows 3000000 \
+  --epochs 4 \
+  --lr 3e-7 \
+  --target-clamp 1200
 ```
 
-Dry run, to see exactly what would be launched:
+## Depth-16 Target Upgrade
+
+Run this when the goal is better labels instead of just another random sample
+from the existing data:
 
 ```sh
-tools/nnue2/train_new_net_pwa.sh --dry-run
+tools/nnue2/run_d16_expansion_pwa.sh
 ```
 
-Run in the current shell instead of tmux:
+It samples signed score buckets from the existing 20M self-play pool, relabels
+them with Stockfish depth 16, trains Huber/cp800 candidates, static-checks them,
+and runs SPRT only for static-positive candidates.
+
+SPRT an existing net:
 
 ```sh
-tools/nnue2/train_new_net_pwa.sh --foreground
+NET=/path/to/model.nn TAG=my_candidate tools/nnue2/run_net_sprt_pwa.sh
 ```
 
-Change SPRT length:
+## Choosing Input Data
 
-```sh
-tools/nnue2/train_new_net_pwa.sh --sprt-games 8000
-```
+Use this order of trust:
 
-## Important Options
+| Source | Use | Notes |
+| --- | --- | --- |
+| Stockfish-labeled self-play | Main training signal | Best match to Enyo search distribution. |
+| Stockfish depth-16 relabels | Quality upgrade | Slow, but better targets. Use 1M-3M signed-bucket rows first. |
+| Lichess eval DB | Diversity | Mix in modestly, usually 10-25% of rows. |
+| Binpack data | Controlled experiment only | Earlier broad binpack-heavy runs improved MAE but hurt Elo. |
+| Lichess/bug hard cases | Validation/augmentation only | Do not train mostly on hard cases; it overfits. |
 
-| Option | Default | Meaning |
-| --- | ---: | --- |
-| `--selfplay-rows` | `8000000` | Number of self-play teacher rows to sample. |
-| `--lichess-rows` | `2000000` | Number of Lichess eval rows to sample. |
-| `--epochs` | `4` | Full passes over the sampled packed data. |
-| `--lr` | `3e-7` | AdamW learning rate. Keep this low unless testing deliberately. |
-| `--target-clamp` | `1200` | Clamp target centipawns during training. |
-| `--sprt-games` | `4000` | Maximum games for the validation match. |
-| `--sprt-tc` | `2+0.02` | Fast triage time control. Confirm keepers later at slower TC. |
-| `--sprt-elo1` | `8` | SPRT alternative hypothesis. |
+Good sampling:
 
-The wrapper refuses to start if another NNUE training/SPRT process appears
-active. Use `--allow-active` only when you intentionally want overlap.
+- Keep both positive and negative scores.
+- Avoid neutral-only data; include signed buckets like `0-50`, `50-100`,
+  `100-300`, `300-800`, and a small `800-1600` tail.
+- Use unique FENs where possible.
+- Do not let high-CP positions dominate. Clamp targets.
 
-## Output Layout
+## Choosing Training Values
 
-Each run has a directory like:
+Broad self-play + Lichess:
+
+- objective: `mpe25`
+- `--wdl-lambda 0.95`
+- Lichess/eval DB CP-only source: `source-wdl-lambda=1.0`
+- learning rate: `3e-7`
+- epochs: `4`
+- target clamp: `1200`
+- batch size: `8192`
+
+Depth-16 relabel runs:
+
+- objective: `huber`
+- Huber beta: `200`
+- learning rate: `7e-7` or `1e-6`
+- epochs: `8`
+- target clamp: `800`
+- batch size: `8192`
+
+Avoid by default:
+
+- learning rate above `3e-6`
+- mostly binpack runs
+- mostly hardcase/pairwise runs
+- promoting a net based on MAE alone
+
+## Static Gate
+
+A candidate is worth SPRT only if it roughly passes:
+
+- MAE improves on its own validation rows.
+- MAE improves on existing d16/self-play validation.
+- Lichess MAE does not regress.
+- sign rate drop is small, preferably `<= 0.3%`.
+- binpack does not show a large sign collapse.
+
+Static metric improvement is not enough. Many Enyo runs improved MAE and were
+neutral in SPRT.
+
+## SPRT Gate
+
+Fast triage:
 
 ```text
-~/tmp/enyo_teacher/selflichess_mix_YYYYMMDD_HHMMSS/
+games=4000
+tc=2+0.02
+concurrency=10
+threads=2
+Hash=512
+elo0=0
+elo1=8
 ```
 
-Important files:
+Interpretation:
 
-- `run.log`: full pipeline output
-- `source_*.jsonl`: mixed source rows
-- `packed/`: NumPy arrays consumed by PyTorch
-- `<tag>/model.nn`: candidate net for Enyo
-- `<tag>/model.pt`: PyTorch checkpoint
-- `<tag>/static_summary.txt`: baseline vs candidate static metrics
-- `<tag>/sprt/sprt.log`: match result versus the reference net
+- negative early: stop and archive
+- `0..+5 Elo`: archive as weak/inconclusive
+- `+5..+8 Elo`: rerun only if static metrics are very clean
+- `+8 Elo` or SPRT H1: confirm with more games and/or slower TC
 
-## Reading Results
-
-Static metrics are only a sanity check. A candidate can improve MAE and still
-lose Elo. Treat SPRT as the real gate.
-
-Rough promotion rules:
-
-- clearly negative early: stop and archive the run
-- `0..+5 Elo`: interesting but not a reference by itself
-- `+8..+15 Elo` with good LOS: rerun or extend with more games
-- H1/pass: promote only after confirming there is no time-management or
-  obvious replay regression
+Promote only after a confirming run. A keeper should beat the current reference
+clearly enough that noise is not the explanation.
 
 ## Current Lessons
 
-- Target scores are already side-to-move centipawns for self-play, Lichess
-  eval, and the current binpack importer.
-- Plain static loss, MAE, or sign rate is not enough to select a net.
-- Broad binpack-heavy training has repeatedly improved static loss while
-  hurting Elo.
-- Hard-case pairwise training can overfit replay misses without improving
-  match strength.
-- Keep experiments small enough to reject quickly, then spend long SPRT time
-  only on candidates already showing a positive trend.
+- Stronger target quality helps static metrics, but has not yet produced a
+  clear replacement net.
+- The depth-16 expansion run produced static-positive candidates; the tested
+  `lr1e-6` candidate ended around `+1.7 +/- 7.6 Elo`, so it is not a keeper.
+- Hardcase-only and pairwise hardcase training moved specific positions but did
+  not translate into match strength.
+- Binpack-heavy training is not trusted unless isolated and proven by SPRT.
 
-## Manual Building Blocks
+## Run Log Template
 
-The wrapper delegates to:
+Add one line per serious run:
 
-```sh
-tools/nnue2/run_selflichess_mix_pwa.sh
+```text
+YYYY-MM-DD | run dir | data mix | objective/lr/clamp/epochs | static take | SPRT take | decision
 ```
-
-Lower-level scripts:
-
-- `tools/nnue2/mix_jsonl.py`: stream-sample and interleave JSONL sources
-- `tools/nnue2/pack_dataset.py`: convert JSONL to packed NumPy tensors
-- `tools/nnue2/train.py`: PyTorch training and `.nn` export
-- `tools/nnue2/eval_dataset.py`: static baseline/candidate metrics
-- `~/code/cpp/chess/sprt/sprt`: fastchess SPRT wrapper
-
-Use `/home/petter/.venv/bin/python` for NNUE Python on `pwa-5090`.
