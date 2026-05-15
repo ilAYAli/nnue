@@ -197,3 +197,19 @@ Add one line per serious run:
 ```text
 YYYY-MM-DD | run dir | data mix | objective/lr/clamp/epochs | static take | SPRT take | decision
 ```
+
+## Vocabulary
+
+- `mpe25 objective`: training loss that mixes centipawn accuracy with
+  WDL-style chess outcome behavior.
+- `huber objective`: centipawn loss that reduces the influence of very large
+  eval errors.
+- `learning rate`: update size for each training step. `3e-7` means
+  `0.0000003`, a cautious fine-tuning value.
+- `target clamp`: maximum absolute teacher score used for training, e.g.
+  `1200` means clamp to `[-1200, +1200]`.
+- `epoch`: one full pass over the sampled training rows.
+- `MAE`: mean absolute error in centipawns. Useful filter, not proof of Elo.
+- `sign`: how often the net and target agree on which side is better.
+- `SPRT`: match test that decides whether a candidate is stronger than the
+  reference.
