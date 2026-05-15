@@ -164,16 +164,26 @@ A candidate is worth games only if:
 
 ### Step 8: Replay Gates
 
-Run known Enyo miss/blunder/time-loss logs through `replay`. This checks for
-tactical regressions and obvious bad behavior on real games.
+Use `replay` as a diagnostic on known Enyo miss/blunder/time-loss logs. Do not
+confuse the two modes:
 
-Command shape:
+- logged-game analysis: what the engine actually played in the log
+- candidate replay: what the candidate plays now at the logged node count
 
 ```sh
-replay --engine <candidate-wrapper> ~/code/cpp/chess/enyo/bugs
+# Analyze logged moves only. This does not run the candidate engine.
+replay --log --summary-only ~/code/cpp/chess/enyo/bugs
+
+# Replay a candidate against the logged positions, then analyze its moves.
+replay --engine <candidate-wrapper> --summary-only --jobs 4 ~/code/cpp/chess/enyo/bugs
 ```
 
-Replay gates are sanity checks, not final strength tests.
+Use `--force` after replay changes or when a cached report looks suspicious.
+`--pgn` is for inspecting a single game, not normal gate output.
+
+Treat replay gates as sanity checks, not final strength tests. A candidate is
+bad if it consistently adds serious misses versus the logged/reference result,
+but replay alone should not promote a net.
 
 ### Step 9: SPRT
 
