@@ -163,6 +163,12 @@ in each tool subdirectory.
 Run validation explicitly after a candidate is produced:
 
 ```sh
+tools/validate/validate.py net-diff \
+  --candidate runs/d12-d16-huber-cp800/train/d12-d16-huber-cp800/model.nn \
+  --reference ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --fail-if-identical \
+  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+
 tools/validate/validate.py static \
   --net runs/d12-d16-huber-cp800/train/d12-d16-huber-cp800/model.nn \
   --data runs/d12-d16-huber-cp800/pack/train \
