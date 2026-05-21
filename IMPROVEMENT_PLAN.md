@@ -129,6 +129,18 @@ Rejected lanes:
     sign `72.67%`, correlation `0.398`, slope `0.091`, bias `+22cp`.
   - Decision: scratch path is viable enough to scale modestly, but the eval is
     heavily compressed and not remotely ready for SPRT.
+- scratch/Kaiming 100k-row `1e-2` scale check:
+  - 100k train rows, 20k validation rows, Huber cp800, 20 epochs.
+  - Training MAE improved strongly: `141.33 -> 75.85`.
+  - Validation peaked early and then overfit: best validation MAE around
+    `129.12`; final selected sign around `75.14%`.
+  - Static validation over the 120k-row packed slice: MAE `123.470`,
+    sign `68.94%`, correlation `0.760`, slope `0.591`, bias `+85cp`.
+  - Same-slice Berserk-derived reference: MAE `136.089`, sign `92.21%`,
+    correlation `0.831`, slope `1.400`, bias `-28cp`.
+  - Decision: scratch learning is real, but the net is still badly biased and
+    much weaker by sign. Scale once more to 1M rows before deciding whether the
+    scratch baseline deserves longer schedules or a different objective.
 
 Conclusion:
 
@@ -237,12 +249,11 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Do not start another long training run yet. Run only the scratch preflight in
-`build.json`.
+Run the scratch scale check in `build.json`.
 
 Next branch:
 
-- Enyo-owned scratch/Kaiming baseline preflight.
+- Enyo-owned scratch/Kaiming baseline scale check.
 - Active recipe: `./build.py -c build.json`.
 
 Reason:
@@ -260,11 +271,11 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 100k-row LR `1e-2` scratch schedule from `build.json`.
-- Require decreasing loss and nonzero gradient norms for input, L1, L2, and
-  output before any larger scratch schedule.
-- If the preflight fails to learn, stop scratch work and inspect trainer/export
-  plumbing before changing data or architecture.
+- Run the 1M-row LR `1e-2` scratch schedule from `build.json`.
+- Compare static validation against the current Berserk-derived reference on
+  the same packed rows.
+- If the 1M run still has very poor sign or large bias, stop treating this as a
+  promotion path and use scratch only as a long-term provenance baseline.
 
 Deferred Bullet decision:
 
@@ -310,8 +321,8 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-owned-preflight-10k`
-- selected branch: scratch Enyo-owned baseline preflight
+- candidate name: `scratch-kaiming-1m-lr1e2-e20`
+- selected branch: scratch Enyo-owned baseline scale check
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
@@ -319,10 +330,10 @@ Current `build.json` intent:
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
 - initializer: scratch `kaiming`; no Berserk init net
-- objective: Huber, clamp `800`, beta `200`, lr `1e-5`, epochs `20`
+- objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `20`
 - trainable weights: `all`
-- row limit: `10k`; this is an overfit/gradient-flow preflight, not a keeper run
-- checkpoint selection: `mae`, patience disabled
+- row limit: `1M` train rows plus `200k` validation rows
+- checkpoint selection: `sign`, patience disabled
 
 Rules:
 

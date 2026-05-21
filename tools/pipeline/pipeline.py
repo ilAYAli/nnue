@@ -14,6 +14,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib.events import emit_event, hook_from_config
+from lib.defaults import DEFAULTS
 
 
 def expand_path(value: str | Path) -> Path:
@@ -138,15 +139,16 @@ def candidate_nets(run_dir: Path) -> list[Path]:
 
 def validation_commands(run_dir: Path, net: Path) -> list[str]:
     validate = repo_root() / "tools" / "validate" / "validate.py"
+    python = Path(DEFAULTS.python).expanduser()
     tag = f"{run_dir.name}_smoke"
     event_command = f'"{repo_root() / "tools" / "events" / "nnue_event_ntfy.sh"}"'
     return [
         (
-            f"{validate} static --net {net} --data {run_dir / 'pack' / 'train'} "
-            f"--rows 100000 --buckets --event-command {event_command}"
+            f"{python} {validate} static --net {net} --data {run_dir / 'pack' / 'train'} "
+            f"--rows 100000 --buckets --event-command {event_command} --python {python}"
         ),
         (
-            f"{validate} sprt --net {net} --run {run_dir} --games 1000 "
+            f"{python} {validate} sprt --net {net} --run {run_dir} --games 1000 "
             f"--tag {tag} --event-command {event_command}"
         ),
     ]
