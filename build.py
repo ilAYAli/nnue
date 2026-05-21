@@ -229,6 +229,8 @@ def create_config(args: argparse.Namespace) -> dict:
             "--huber-beta", str(args.huber_beta),
             "--select-metric", args.select_metric,
             "--wdl-lambda", str(args.wdl_lambda),
+            "--sign-loss-weight", str(args.sign_loss_weight),
+            "--sign-loss-scale", str(args.sign_loss_scale),
             "--epochs", str(args.epochs),
             "--batch-size", str(args.batch_size),
             "--lr", str(args.lr),
@@ -458,6 +460,8 @@ def add_create_args(
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
     parser.add_argument("--huber-beta", type=int, default=value("huber_beta", d.huber_beta))
     parser.add_argument("--wdl-lambda", type=float, default=value("wdl_lambda", d.wdl_lambda))
+    parser.add_argument("--sign-loss-weight", type=float, default=value("sign_loss_weight", d.sign_loss_weight))
+    parser.add_argument("--sign-loss-scale", type=float, default=value("sign_loss_scale", d.sign_loss_scale))
     parser.add_argument("--lr", type=float, default=value("lr", d.lr))
     parser.add_argument("--epochs", type=int, default=value("epochs", d.epochs))
     parser.add_argument("--batch-size", type=int, default=value("batch_size", d.batch_size))

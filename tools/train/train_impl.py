@@ -87,6 +87,18 @@ def score_loss(pred: torch.Tensor, target: torch.Tensor,
     else:
         raise ValueError(f"unknown objective: {args.objective}")
 
+    if args.sign_loss_weight > 0.0:
+        sign_mask = target != 0
+        sign_targets = (target > 0).to(pred.dtype)
+        sign_losses = F.binary_cross_entropy_with_logits(
+            pred / args.sign_loss_scale,
+            sign_targets,
+            reduction="none")
+        losses = losses + torch.where(
+            sign_mask,
+            sign_losses * args.sign_loss_weight,
+            torch.zeros_like(sign_losses))
+
     if args.source_loss_weights:
         weights = source_value_tensor(
             source_ids, 1.0, args.source_loss_weights)
@@ -326,6 +338,12 @@ def main() -> None:
                     help="Validation metric used to keep the best checkpoint. "
                          "sign is maximized; the others are minimized.")
     ap.add_argument("--wdl-lambda", type=float, default=0.75)
+    ap.add_argument("--sign-loss-weight", type=float, default=0.0,
+                    help="Optional BCE sign auxiliary loss weight. "
+                         "Zero disables it.")
+    ap.add_argument("--sign-loss-scale", type=float, default=100.0,
+                    help="Centipawn scale used to convert predicted cp to "
+                         "sign-loss logits.")
     ap.add_argument("--source-wdl-lambda", action="append", default=[],
                     metavar="SOURCE_ID=VALUE",
                     help="Override MPE WDL lambda for one packed source id. "

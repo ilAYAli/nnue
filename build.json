@@ -1,18 +1,20 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "scratch-quantized-kaiming-mpe25-preflight",
-  "goal": "Test whether MPE25 improves scratch sign/ranking versus Huber on the quantized-Kaiming path.",
+  "experiment": "scratch-quantized-kaiming-sign-loss-preflight",
+  "goal": "Test whether a small sign auxiliary loss improves scratch sign/ranking versus plain Huber.",
   "create": {
-    "name": "scratch-qkaiming-100k-mpe25-lr1e2-e10",
+    "name": "scratch-qkaiming-100k-huber-sign02-lr1e2-e10",
     "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pack_limit": 120000,
     "init_net": null,
     "init": "quantized-kaiming",
-    "objective": "mpe25",
+    "objective": "huber",
     "forward": "quantized",
-    "target_clamp": 1200,
+    "target_clamp": 800,
     "huber_beta": 200,
+    "sign_loss_weight": 0.2,
+    "sign_loss_scale": 100,
     "lr": 0.01,
     "epochs": 10,
     "batch_size": 4096,
@@ -26,17 +28,17 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "100k-row scratch MPE25 preflight",
+    "status": "100k-row scratch sign-loss preflight",
     "success_condition": [
       "training loss decreases across epochs",
       "gradient norms are nonzero for sparse input, L1, L2, and output layers",
       "exported model.nn roughly matches float .pt validation",
-      "validation sign improves over the Huber 100k scratch preflight"
+      "validation sign improves over the plain Huber 100k scratch preflight"
     ],
     "next_after_success": [
       "compare float .pt validation against exported .nn validation",
-      "compare against the Huber 100k scratch preflight",
-      "scale to 1M only if sign/ranking improves"
+      "compare against the plain Huber 100k scratch preflight",
+      "scale or sweep sign weight only if sign/ranking improves without obvious MAE collapse"
     ]
   }
 }
