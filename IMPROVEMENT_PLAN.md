@@ -187,6 +187,13 @@ Rejected lanes:
   - Same-slice Berserk-derived reference: MAE `135.862`, sign `92.21%`.
   - Decision: scratch now learns and exports correctly, but Huber is producing
     too many sign/ranking errors. Test MPE25 before scaling scratch further.
+- scratch quantized-Kaiming 100k-row MPE25 preflight:
+  - Export parity was good: exported `.nn` MAE `136.012`, sign `69.82%`,
+    correlation `0.354`.
+  - The same-size Huber preflight was better on sign/correlation: exported
+    `.nn` MAE `138.027`, sign `70.84%`, correlation `0.405`.
+  - Decision: do not scale MPE25. Add a small explicit sign auxiliary loss to
+    the Huber recipe instead.
 
 Conclusion:
 
@@ -295,11 +302,11 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the scratch quantized-Kaiming MPE25 preflight in `build.json`.
+Run the scratch quantized-Kaiming sign-loss preflight in `build.json`.
 
 Next branch:
 
-- Enyo-owned scratch quantized-forward MPE25 preflight.
+- Enyo-owned scratch quantized-forward Huber plus sign-loss preflight.
 - Active recipe: `./build.py -c build.json`.
 
 Reason:
@@ -317,10 +324,11 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 100k-row quantized-Kaiming scratch MPE25 preflight from `build.json`
-  with `forward: "quantized"`.
+- Run the 100k-row quantized-Kaiming scratch Huber-plus-sign-loss preflight
+  from `build.json` with `forward: "quantized"`.
 - Compare float `.pt` validation against exported `.nn` validation.
-- If sign/ranking improves over Huber, scale the MPE25 recipe to 1M rows.
+- If sign/ranking improves over plain Huber without an obvious MAE collapse,
+  scale or sweep the sign-loss weight.
 
 Deferred Bullet decision:
 
@@ -366,8 +374,8 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-qkaiming-100k-mpe25-lr1e2-e10`
-- selected branch: scratch Enyo-owned quantized-forward MPE25 preflight
+- candidate name: `scratch-qkaiming-100k-huber-sign02-lr1e2-e10`
+- selected branch: scratch Enyo-owned quantized-forward sign-loss preflight
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
@@ -376,7 +384,8 @@ Current `build.json` intent:
   `labeled_jsonl` is set.
 - initializer: scratch `quantized-kaiming`; no Berserk init net
 - forward path: export-aware quantized int16/int8 forward
-- objective: MPE25, clamp `1200`, lr `1e-2`, epochs `10`
+- objective: Huber plus sign BCE, clamp `800`, beta `200`, lr `1e-2`,
+  epochs `10`, sign loss weight `0.2`
 - trainable weights: `all`
 - row limit: `100k` train rows plus `20k` validation rows
 - checkpoint selection: `sign`, patience disabled
