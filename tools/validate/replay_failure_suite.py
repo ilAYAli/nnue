@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import fnmatch
 import json
 import statistics
 import subprocess
@@ -34,6 +35,60 @@ def int_field(row: dict[str, str], key: str) -> int:
         return int(row.get(key, "0"))
     except ValueError:
         return 0
+
+
+def has_uci_pairs(path: Path) -> bool:
+    saw_go = False
+    saw_bestmove = False
+    try:
+        with path.open("r", encoding="utf-8", errors="ignore") as handle:
+            for line in handle:
+                if line.startswith("go "):
+                    saw_go = True
+                elif line.startswith("bestmove "):
+                    saw_bestmove = True
+                if saw_go and saw_bestmove:
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def collect_logs(
+        logs: list[str], log_dirs: list[str],
+        exclude_patterns: list[str]) -> list[str]:
+    paths: list[tuple[Path, bool]] = []
+    for dirname in log_dirs:
+        paths.extend((path, True) for path in
+                     sorted(Path(dirname).expanduser().glob("*.log")))
+    for item in logs:
+        path = Path(item).expanduser()
+        if path.is_dir():
+            paths.extend((log, True) for log in sorted(path.glob("*.log")))
+        else:
+            paths.append((path, False))
+
+    out = []
+    seen: set[Path] = set()
+    for path, from_dir in paths:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        text = str(path)
+        name = path.name
+        if any(
+            fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(text, pattern)
+            for pattern in exclude_patterns
+        ):
+            continue
+        if from_dir and not has_uci_pairs(path):
+            continue
+        out.append(str(path))
+
+    if not out:
+        raise SystemExit("no failure-suite logs selected")
+    return out
 
 
 def run_replay(args: argparse.Namespace, logs: list[str]) -> str:
@@ -137,7 +192,9 @@ def write_outputs(
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("logs", nargs="+")
+    ap.add_argument("logs", nargs="*")
+    ap.add_argument("--log-dir", action="append", default=[])
+    ap.add_argument("--exclude-log", action="append", default=[])
     ap.add_argument("--candidate", required=True)
     ap.add_argument("--reference", required=True)
     ap.add_argument("--oracle", default="stockfish")
@@ -152,6 +209,7 @@ def main() -> None:
     ap.add_argument("--stderr", type=Path)
     args = ap.parse_args()
 
+    args.logs = collect_logs(args.logs, args.log_dir, args.exclude_log)
     csv_text = run_replay(args, args.logs)
     rows, summary = summarize(csv_text)
     write_outputs(rows, summary, args.output_dir)
