@@ -104,6 +104,14 @@ Rejected lanes:
     1024, but the direct evaluator is still several times slower than the
     current Enyo evaluator. The remaining issue is evaluator/head cost, not
     checkpoint loading correctness.
+- scratch/Kaiming `1e-5` preflight:
+  - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
+  - Gradient norms were nonzero for input, L1, L2, and output, so the training
+    graph is alive.
+  - Loss was effectively flat: train MAE stayed about `141.83`, validation MAE
+    stayed about `141.43`, sign drifted from `50.14%` to `50.03%`.
+  - Decision: `1e-5` is too conservative for scratch initialization. Continue
+    with a higher-LR preflight before drawing conclusions about scratch.
 
 Conclusion:
 
@@ -235,7 +243,7 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 10k-row preflight from `build.json`.
+- Run the 10k-row higher-LR preflight from `build.json`.
 - Require decreasing loss and nonzero gradient norms for input, L1, L2, and
   output before any larger scratch schedule.
 - If the preflight fails to learn, stop scratch work and inspect trainer/export
