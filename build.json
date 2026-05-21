@@ -1,12 +1,12 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "scratch-export-scale-check",
-  "goal": "Test a scratch initializer whose scale survives Enyo's raw integer .nn export.",
+  "experiment": "scratch-quantized-kaiming-scale",
+  "goal": "Scale the scratch quantized-Kaiming path after the 100k export-parity check succeeded.",
   "create": {
-    "name": "scratch-qkaiming-100k-quant-lr1e2-e10",
+    "name": "scratch-qkaiming-1m-quant-lr1e2-e20",
     "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pack_limit": 120000,
+    "pack_limit": 1200000,
     "init_net": null,
     "init": "quantized-kaiming",
     "objective": "huber",
@@ -14,28 +14,29 @@
     "target_clamp": 800,
     "huber_beta": 200,
     "lr": 0.01,
-    "epochs": 10,
+    "epochs": 20,
     "batch_size": 4096,
     "device": "cuda",
     "workers": 2,
-    "max_rows": 100000,
-    "val_rows": 20000,
-    "grad_norm_every": 20,
+    "max_rows": 1000000,
+    "val_rows": 200000,
+    "grad_norm_every": 100,
     "select_metric": "sign",
-    "patience": 0,
+    "patience": 4,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "export-scale preflight",
+    "status": "1M-row scratch scale check",
     "success_condition": [
       "training loss decreases across epochs",
       "gradient norms are nonzero for sparse input, L1, L2, and output layers",
-      "exported model.nn is non-empty and can be evaluated by static validation"
+      "exported model.nn roughly matches float .pt validation",
+      "validation sign moves materially closer to the current reference"
     ],
     "next_after_success": [
       "compare float .pt validation against exported .nn validation",
-      "increase LR or add fake/export-aware quantization if export is still destructive",
-      "only scale rows after exported .nn roughly matches float .pt behavior"
+      "compare against the Berserk-derived reference on the same packed slice",
+      "only consider a larger scratch run if the exported .nn remains well-behaved"
     ]
   }
 }
