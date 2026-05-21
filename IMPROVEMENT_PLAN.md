@@ -179,6 +179,14 @@ Rejected lanes:
   - Decision: this is the first scratch path that both learns and survives
     export. Scale the same method to 1M train rows before changing anything
     else.
+- scratch quantized-Kaiming 1M-row Huber scale check:
+  - Training selected epoch 11 by validation sign, then early-stopped at epoch
+    15.
+  - Export parity was good on the 200k validation slice: float `.pt` MAE
+    `109.630`, sign `80.26%`; exported `.nn` MAE `108.474`, sign `80.83%`.
+  - Same-slice Berserk-derived reference: MAE `135.862`, sign `92.21%`.
+  - Decision: scratch now learns and exports correctly, but Huber is producing
+    too many sign/ranking errors. Test MPE25 before scaling scratch further.
 
 Conclusion:
 
@@ -287,11 +295,11 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the scratch quantized-Kaiming scale check in `build.json`.
+Run the scratch quantized-Kaiming MPE25 preflight in `build.json`.
 
 Next branch:
 
-- Enyo-owned scratch quantized-forward 1M-row scale check.
+- Enyo-owned scratch quantized-forward MPE25 preflight.
 - Active recipe: `./build.py -c build.json`.
 
 Reason:
@@ -309,12 +317,10 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 1M-row quantized-Kaiming scratch scale check from `build.json` with
-  `forward: "quantized"`.
+- Run the 100k-row quantized-Kaiming scratch MPE25 preflight from `build.json`
+  with `forward: "quantized"`.
 - Compare float `.pt` validation against exported `.nn` validation.
-- If the exported `.nn` remains well-behaved, compare it to the current
-  reference on the same packed slice and decide whether a larger scratch run is
-  justified.
+- If sign/ranking improves over Huber, scale the MPE25 recipe to 1M rows.
 
 Deferred Bullet decision:
 
@@ -360,8 +366,8 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-qkaiming-1m-quant-lr1e2-e20`
-- selected branch: scratch Enyo-owned quantized-forward scale check
+- candidate name: `scratch-qkaiming-100k-mpe25-lr1e2-e10`
+- selected branch: scratch Enyo-owned quantized-forward MPE25 preflight
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
@@ -370,10 +376,10 @@ Current `build.json` intent:
   `labeled_jsonl` is set.
 - initializer: scratch `quantized-kaiming`; no Berserk init net
 - forward path: export-aware quantized int16/int8 forward
-- objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `20`
+- objective: MPE25, clamp `1200`, lr `1e-2`, epochs `10`
 - trainable weights: `all`
-- row limit: `1M` train rows plus `200k` validation rows
-- checkpoint selection: `sign`, patience `4`
+- row limit: `100k` train rows plus `20k` validation rows
+- checkpoint selection: `sign`, patience disabled
 
 Rules:
 

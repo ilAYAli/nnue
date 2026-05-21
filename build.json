@@ -1,42 +1,42 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "scratch-quantized-kaiming-scale",
-  "goal": "Scale the scratch quantized-Kaiming path after the 100k export-parity check succeeded.",
+  "experiment": "scratch-quantized-kaiming-mpe25-preflight",
+  "goal": "Test whether MPE25 improves scratch sign/ranking versus Huber on the quantized-Kaiming path.",
   "create": {
-    "name": "scratch-qkaiming-1m-quant-lr1e2-e20",
+    "name": "scratch-qkaiming-100k-mpe25-lr1e2-e10",
     "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pack_limit": 1200000,
+    "pack_limit": 120000,
     "init_net": null,
     "init": "quantized-kaiming",
-    "objective": "huber",
+    "objective": "mpe25",
     "forward": "quantized",
-    "target_clamp": 800,
+    "target_clamp": 1200,
     "huber_beta": 200,
     "lr": 0.01,
-    "epochs": 20,
+    "epochs": 10,
     "batch_size": 4096,
     "device": "cuda",
     "workers": 2,
-    "max_rows": 1000000,
-    "val_rows": 200000,
-    "grad_norm_every": 100,
+    "max_rows": 100000,
+    "val_rows": 20000,
+    "grad_norm_every": 20,
     "select_metric": "sign",
-    "patience": 4,
+    "patience": 0,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "1M-row scratch scale check",
+    "status": "100k-row scratch MPE25 preflight",
     "success_condition": [
       "training loss decreases across epochs",
       "gradient norms are nonzero for sparse input, L1, L2, and output layers",
       "exported model.nn roughly matches float .pt validation",
-      "validation sign moves materially closer to the current reference"
+      "validation sign improves over the Huber 100k scratch preflight"
     ],
     "next_after_success": [
       "compare float .pt validation against exported .nn validation",
-      "compare against the Berserk-derived reference on the same packed slice",
-      "only consider a larger scratch run if the exported .nn remains well-behaved"
+      "compare against the Huber 100k scratch preflight",
+      "scale to 1M only if sign/ranking improves"
     ]
   }
 }
