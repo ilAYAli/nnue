@@ -24,6 +24,17 @@ Rejected lanes:
   unacceptable tail regressions.
 - old-pool instability/disagreement blends: diagnostically useful, but not
   enough for SPRT promotion.
+- learned material/phase head input:
+  - all-weights training improved static MAE slightly, but failed the
+    failure-suite gate: `candidate_better=64`, `reference_better=55`,
+    `sum_diff_cp=+561`, `worst_regression_cp=-563`.
+  - float-head-only training improved scalar MAE much more, but regressed
+    move choice: `candidate_better=70`, `reference_better=74`,
+    `sum_diff_cp=-31`, `worst_regression_cp=-563`.
+  - phase-column-only training was behaviorally identical to the reference:
+    `candidate_better=0`, `reference_better=0`, `sum_diff_cp=0`.
+  - Conclusion: this head-level material/phase signal is either harmful or
+    too weak/no-op in the current architecture.
 - folded 8-king-bucket shortcut: clearly negative as a drop-in net.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
@@ -43,10 +54,10 @@ Priority order:
 
 1. Architecture/features.
    - This is the primary lane.
-   - First branch: learned material/phase head input.
-   - This is deliberately lower risk than king-bucket changes because it should
-     not change sparse feature indexing, accumulator updates, or `.nn` input
-     row count.
+   - First branch, learned material/phase head input, failed the pre-SPRT
+     gates and should not be SPRT-tested.
+   - Next branch: proper king-bucket refinement with full trainer/engine
+     support, not another folded/drop-in shortcut.
    - Verify feature extraction, export/load, and roundtrip before training.
    - Benchmark NPS before training; pause and optimize first if NPS drops more
      than about `3-5%`.
@@ -92,16 +103,19 @@ Priority order:
 
 Run exactly one architecture/feature branch first.
 
-Preferred first branch:
+Next branch:
 
-- learned material/phase head input.
+- proper king-bucket refinement.
 
 Reason:
 
-- low implementation risk.
-- easy known-FEN activation tests.
-- plausible effect on conversion, defense, and endgame calibration.
-- less invasive than king-bucket refinement or widening the net.
+- materially changes the representation instead of adding another scalar head
+  hint.
+- directly targets the likely weakness: king-local piece-square context under
+  search.
+- must be trained properly with matching engine/trainer feature extraction.
+- previous folded/drop-in bucket shortcut is not evidence against a real
+  retrain.
 
 Anti-confounding rule:
 
@@ -114,8 +128,8 @@ Anti-confounding rule:
 
 Fallback:
 
-- king-bucket refinement with full trainer/engine support, trained properly.
-- Do not use another folded/drop-in shortcut as evidence.
+- If proper king-bucket refinement also fails gates, stop bulk training and
+  reassess base net, feature family, and teacher/source assumptions.
 
 ## Candidate Workflow
 
@@ -127,8 +141,8 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `arch-material-phase-v1`
-- selected branch: learned material/phase head input
+- candidate name: `arch-kingbucket-v1`
+- selected branch: proper king-bucket refinement
 - self-play depth: `12`
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
@@ -144,6 +158,8 @@ Rules:
 - Use `--select-metric` and `--patience`; do not blindly export the final epoch.
 - Use `--trainable float-head` or `--trainable output` only for quick probes.
   Keeper attempts normally train all weights.
+- `--trainable phase-head` is diagnostic only; it produced no behavior change
+  in the material/phase experiment.
 - Keep new run data under `runs/<run-name>/`.
 - Do not assume old manual packed data and new `build.py` packed data are
   interchangeable until a roundtrip/static sanity check confirms it.
@@ -215,9 +231,9 @@ Use this sequence for the next serious attempt:
 
 1. Freeze the current reference net, validation commands, and failure-suite
    input.
-2. Implement exactly one branch: learned material/phase head input.
+2. Implement exactly one branch: proper king-bucket refinement.
 3. Add known-FEN feature activation checks:
-   `tools/validate/material_phase.py`.
+   `tools/validate/<branch>_features.py`.
 4. Add export/load/roundtrip checks:
    `tools/validate/roundtrip.py`.
 5. Benchmark NPS before training; do not continue if the branch costs more
@@ -228,11 +244,8 @@ Use this sequence for the next serious attempt:
 
 If this architecture branch fails gates or SPRT:
 
-- Try at most one more independent small architecture branch before reassessing.
-- The next best candidate is king-bucket refinement with full trainer/engine
-  support, not a folded conversion.
-- If two independent architecture branches fail, stop spending bulk GPU/search
-  time and reassess base net, architecture family, and teacher source.
+- Stop spending bulk GPU/search time and reassess base net, architecture
+  family, and teacher source.
 
 ## Historical Notes
 

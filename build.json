@@ -1,9 +1,9 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe; code changes for the selected architecture branch live in the engine/trainer code.",
-  "experiment": "learned-material-phase-head-input",
+  "experiment": "proper-king-bucket-refinement",
   "nps_gate": "pause and optimize first if the architecture branch costs more than about 3-5% NPS",
   "create": {
-    "name": "arch-material-phase-v1",
+    "name": "arch-kingbucket-v1",
     "selfplay_depth": 12,
     "selfplay_seed": 2026052101,
     "skip_plies": 8,
