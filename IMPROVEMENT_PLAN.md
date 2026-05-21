@@ -84,6 +84,16 @@ Conclusion:
   `assets/failure_suite/rejected_candidate_analysis_20260521.md`.
   Several independent candidates regress the same tail positions, so the next
   useful signal is move-choice aware, not another scalar-eval bulk run.
+- A repeated-tail target set with FENs is recorded in
+  `assets/failure_suite/repeated_tail_targets_20260521.csv`. It currently
+  contains 13 positions that regressed by at least 100cp in at least two
+  rejected candidates.
+- Initial taxonomy is recorded in
+  `assets/failure_suite/repeated_tail_taxonomy_20260521.md`. The repeated
+  failures are concentrated in low-material or queen-heavy
+  conversion/defensive move choice.
+- Oracle legal-move scores for those targets are recorded in
+  `assets/failure_suite/repeated_tail_move_scores_20260521.csv`.
 
 ## Current Strategy
 
@@ -174,9 +184,8 @@ Anti-confounding rule:
 Immediate action:
 
 - Stop bulk NNUE training.
-- Expand failure analysis into a small taxonomy and move-choice target set:
-  identify whether repeated regressions cluster by conversion, rook endgame,
-  tactical surprise, king safety, or tablebase-adjacent play.
+- Use the scored target set to design the next move-choice gate: top-1/top-3
+  overlap, child-score gap, and repeated-tail regression count.
 - Add no-op export checks (`validate.py net-diff`) before static/replay gates.
 - Choose the next branch only after the analysis points to a concrete weakness.
 

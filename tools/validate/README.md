@@ -11,6 +11,8 @@ one abstraction instead of splitting "gates" and Elo testing.
 tools/validate/validate.py static --help
 tools/validate/validate.py failure-suite --help
 tools/validate/validate.py sprt --help
+tools/validate/extract_tail_targets.py --help
+tools/validate/score_tail_targets.py --help
 ```
 
 Examples:
@@ -35,6 +37,19 @@ tools/validate/validate.py sprt \
   --games 1000 \
   --tag candidate_smoke \
   --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+
+tools/validate/extract_tail_targets.py \
+  --bug-dir ~/code/cpp/chess/enyo/bugs \
+  --out assets/failure_suite/repeated_tail_targets.csv \
+  --csv candidate_a=run-a/replay_failure_suite.csv \
+  --csv candidate_b=run-b/replay_failure_suite.csv
+
+tools/validate/score_tail_targets.py \
+  --targets assets/failure_suite/repeated_tail_targets.csv \
+  --out assets/failure_suite/repeated_tail_move_scores.csv \
+  --engine stockfish \
+  --syzygy-path ~/code/cpp/chess/assets/tablebases \
+  --nodes 200000
 ```
 
 With the generic event hook:

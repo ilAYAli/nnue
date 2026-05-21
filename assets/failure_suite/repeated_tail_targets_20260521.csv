@@ -1,0 +1,14 @@
+log,fullmove,ply,side,fen,hits,worst_diff,candidates,candidate_moves,reference_moves,oracle_moves,candidate_losses,reference_losses
+ArasanX_vs_EnyoBot_7pzXRQFZ.log,32,63,Black,r4k2/1p3r2/p6Q/8/2R5/2nP4/3N1P1P/q2BK3 b - - 2 32,2,-563,material_all;material_floathead,f7g7;f7g7,f8e7;f8e7,f8e7;f8e7,563;563,0;0
+Bot1nokk_vs_EnyoBot_mEIqToS1.log,127,253,Black,2QK4/8/pk6/8/8/8/8/8 b - - 0 127,2,-448,material_all;kingbucket_all,b6a5;b6a5,a6a5;a6a5,a6a5;a6a5,448;448,0;0
+caissa-x_vs_EnyoBot_0waEuGxc.log,68,135,Black,q5k1/6p1/5pPp/3PpBnP/4P3/4Q1K1/8/8 b - - 0 68,6,-296,material_all;material_floathead;kingbucket_all;hardcase_w12;instability_w5;old_control,a8f8;a8a1;a8a6;g8h8;a8a6;a8a6,a8a5;a8a5;a8a5;a8a5;a8a5;a8a5,a8a5;a8a5;a8a5;a8a5;a8a5;a8a5,121;296;147;147;147;147,0;0;0;0;0;0
+SF_Bot1nok_vs_EnyoBot_SbzD89kx.log,51,101,Black,8/8/6k1/5r2/2P5/3NK3/8/Q7 b - - 6 51,2,-294,material_all;kingbucket_all,f5g5;f5g5,g6f7;g6f7,g6h7;g6h7,299;299,5;5
+ArasanX_vs_EnyoBot_Q0a5I19l.log,40,79,Black,6k1/5bp1/1pR3n1/p2p1N1Q/q2Nr2P/8/6PK/8 b - - 0 40,4,-287,material_floathead;hardcase_w12;instability_w5;old_control,e4h4;e4h4;g6e7;e4h4,a4b4;a4b4;a4b4;a4b4,a4b4;a4b4;a4b4;a4b4,287;287;139;287,0;0;0;0
+caissa-x_vs_EnyoBot_0waEuGxc.log,49,97,Black,r2k4/2q3p1/1n1p1pPp/pPpPpBnP/P3P3/1N2P3/2R5/2QK4 b - - 19 49,3,-209,hardcase_w12;instability_w5;old_control,c7a7;b6a4;c7a7,c7b7;c7b7;c7b7,c7b7;c7b7;c7b7,209;104;209,0;0;0
+caissa-x vs EnyoBot - 0waEuGxc.log,67,133,Black,q5k1/6p1/5pPp/3PpBnP/4P3/4P1K1/8/2Qn4 b - - 20 67,2,-202,instability_w5;old_control,g8h8;g8f8,d1e3;d1e3,a8d8;a8d8,215;276,74;74
+caissa-x_vs_EnyoBot_0waEuGxc.log,46,91,Black,r2k4/q5p1/1n1p1pPp/pPpPpBnP/P3P3/1NQ1P3/8/R2K4 b - - 13 46,2,-170,material_all;kingbucket_all,g5f3;g5f3,d8e7;d8e7,d8e8;d8e8,171;171,1;1
+Hypersion_vs_EnyoBot_npmgxvIO.log,49,97,Black,8/1p1k4/4p3/3pP3/4B3/2P3r1/3QK2R/q7 b - - 8 49,2,-168,hardcase_w12;instability_w5,a1g1;g3g1,a1c3;a1c3,d7c7;d7c7,170;231,63;63
+caissa-x_vs_EnyoBot_0waEuGxc.log,48,95,Black,r2k4/q5p1/1n1p1pPp/pPpPpBnP/P3P3/1N2P3/R7/2QK4 b - - 17 48,2,-160,material_floathead;instability_w5,g5f3;a7b8,b6c8;b6c8,b6d7;b6d7,214;225,65;65
+EnyoBot_vs_DarkOnBot_pm9SUqFN.log,70,138,White,8/2p5/1p1p2n1/1P1P2k1/4K2p/7B/8/8 w - - 4 70,2,-143,material_floathead;old_control,h3g2;h3g2,e4f3;e4f3,e4f3;e4f3,143;143,0;0
+EnyoBot_vs_Lynx_BOT_jjThVRPN.log,57,112,White,8/5p1k/3p1P1P/8/p5P1/Kb3P2/8/2r5 w - - 0 57,3,-135,material_all;kingbucket_all;old_control,g4g5;g4g5;g4g5,a3b4;a3b4;a3b4,a3b2;a3b2;a3b2,172;172;172,37;37;37
+stage270_vs_EnyoBot_kp3inZBb.log,62,123,Black,8/6k1/1R6/P2B1p2/5Pbp/4K1P1/8/8 b - - 0 62,3,-127,material_floathead;kingbucket_all;instability_w5,h4g3;h4g3;h4g3,h4h3;h4h3;h4h3,h4h3;h4h3;h4h3,127;127;127,0;0;0
