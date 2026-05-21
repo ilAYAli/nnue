@@ -880,36 +880,32 @@ negative early       stop and archive
 Do not promote a net from MAE alone. Promote only after game strength is
 confirmed.
 
-## Shortcut Scripts
+## Workflow Entry Points
 
-`tools/nnue/run_fresh_d16_labels_pwa.sh`
+Use the root command for normal candidate creation:
 
-```text
-Runs Steps 1-5:
-self-play -> rows/filter -> signed buckets -> Stockfish d16 labels -> packed tensors
+```sh
+./build.py create --help
 ```
 
-`tools/nnue/run_fresh_d16_train_matrix_pwa.sh`
+It writes a `runs/<run-name>/config.json` pipeline and executes:
 
 ```text
-Runs Step 6 and Step 7 for several candidate recipes.
-May also start Step 9 for the best static candidate depending on the script.
+posgen -> score -> pack -> train
 ```
 
-`tools/nnue/train_new_net_pwa.sh`
+Validation is explicit:
 
-```text
-Shortcut using existing labeled sources.
-Skips Steps 1-4.
-Runs mix/pack, train, static validation, and SPRT.
-Useful only when changing inputs or parameters.
+```sh
+tools/validate/validate.py static --help
+tools/validate/validate.py failure-suite --help
+tools/validate/validate.py sprt --help
 ```
 
-`tools/nnue/run_net_sprt_pwa.sh`
-
-```text
-Runs Step 9 for one exported model.nn.
-```
+`tools/nnue/run_net_sprt_pwa.sh` is kept as the low-level SPRT runner used by
+`tools/validate/validate.py sprt`. The older one-off `run_*_pwa.sh`
+experiment launchers were removed; they were historical recipes, not the
+current workflow.
 
 Running the exact same training command repeatedly mostly tests randomness. A
 meaningful new experiment changes at least one of:
