@@ -77,6 +77,11 @@ def load_create_arg_defaults(path: str | Path | None) -> dict[str, object]:
     if not isinstance(data, dict):
         raise SystemExit(f"{config_path}: build config must be a JSON object")
 
+    validation = data.get("validation", {})
+    validation_engine = ""
+    if isinstance(validation, dict):
+        validation_engine = str(validation.get("engine", ""))
+
     if "create" in data:
         create = data["create"]
     elif "create_args" in data:
@@ -98,8 +103,17 @@ def load_create_arg_defaults(path: str | Path | None) -> dict[str, object]:
         raise SystemExit(f"{config_path}: 'create' must be a JSON object")
 
     allowed = {field.name for field in fields(DEFAULTS)}
-    allowed.update({"name", "run_dir", "dry_run", "force", "event_command"})
+    allowed.update({
+        "name",
+        "run_dir",
+        "dry_run",
+        "force",
+        "event_command",
+        "validation_engine",
+    })
     out: dict[str, object] = {"config": str(config_path)}
+    if validation_engine:
+        out["validation_engine"] = validation_engine
     for raw_key, value in create.items():
         key = normalize_key(str(raw_key))
         if key in {"command", "config", "func"}:
@@ -254,6 +268,10 @@ def create_config(args: argparse.Namespace) -> dict:
         },
         "steps": steps,
     }
+    if args.validation_engine:
+        config["validation"] = {
+            "engine": args.validation_engine,
+        }
     if args.event_command:
         config["hooks"] = {
             "event_command": args.event_command,
@@ -319,6 +337,11 @@ def add_create_args(
         "--event-command",
         default=value("event_command", None),
         help="Optional event hook command. Event JSON is passed on stdin and in NNUE_RUN_EVENT_JSON.",
+    )
+    parser.add_argument(
+        "--validation-engine",
+        default=value("validation_engine", ""),
+        help="Engine path used in generated validation commands.",
     )
 
     parser.add_argument("--engine", default=value("engine", d.engine))

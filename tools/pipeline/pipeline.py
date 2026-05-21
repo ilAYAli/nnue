@@ -136,28 +136,33 @@ def candidate_nets(run_dir: Path) -> list[Path]:
     return sorted(run_dir.glob("train/*/model.nn"))
 
 
-def validation_commands(run_dir: Path, net: Path) -> list[str]:
+def validation_commands(
+        run_dir: Path, net: Path, config: dict[str, Any] | None) -> list[str]:
     validate = repo_root() / "tools" / "validate" / "validate.py"
     tag = f"{run_dir.name}_smoke"
     event_command = '"$HOME/scripts/nnue_event_ntfy.sh"'
+    validation = config.get("validation", {}) if config else {}
+    engine = validation.get("engine", "")
+    engine_arg = f" --engine {engine}" if engine else ""
     return [
         (
             f"{validate} static --net {net} --data {run_dir / 'pack' / 'train'} "
             f"--rows 100000 --buckets --event-command {event_command}"
         ),
         (
-            f"{validate} sprt --net {net} --run {run_dir} --games 1000 "
+            f"{validate} sprt --net {net} --run {run_dir}{engine_arg} --games 1000 "
             f"--tag {tag} --event-command {event_command}"
         ),
     ]
 
 
-def completion_extra(run_dir: Path) -> dict[str, Any]:
+def completion_extra(
+        run_dir: Path, config: dict[str, Any] | None) -> dict[str, Any]:
     nets = candidate_nets(run_dir)
     if not nets:
         return {}
     net = nets[-1]
-    commands = validation_commands(run_dir, net)
+    commands = validation_commands(run_dir, net, config)
     return {
         "candidate_net": str(net),
         "candidate_nets": [str(path) for path in nets],
@@ -302,7 +307,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                 command=formatted,
                 hook_command=hook_command,
             )
-    extra = completion_extra(run_dir)
+    extra = completion_extra(run_dir, config)
     print(f"run complete: {run_dir}", flush=True)
     if extra.get("candidate_net"):
         print(f"candidate net: {extra['candidate_net']}", flush=True)

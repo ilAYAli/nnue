@@ -18,6 +18,7 @@
     "event_command": "$HOME/scripts/nnue_event_ntfy.sh"
   },
   "validation": {
+    "engine": "~/code/cpp/chess/enyo/build/enyo",
     "required_before_sprt": [
       "static",
       "failure-suite",
