@@ -86,6 +86,7 @@ class CandidateDefaults:
     bullet_manifest: str = "~/source/bullet/Cargo.toml"
     bullet_cuda_path: str = ""
     bullet_cuda_arch: str = "auto"
+    bullet_cargo_target_dir: str = ""
     bullet_hidden: int = 1024
     bullet_l2: int = 16
     bullet_batch_size: int = 2048

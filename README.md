@@ -207,6 +207,7 @@ Inspect a run:
 --bullet-manifest PATH
 --bullet-cuda-path PATH
 --bullet-cuda-arch auto|native|compute_90|sm_90|...
+--bullet-cargo-target-dir PATH
 --bullet-hidden N
 --bullet-l2 N
 --bullet-batch-size N

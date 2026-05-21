@@ -266,12 +266,17 @@ def create_config(args: argparse.Namespace) -> dict:
     elif args.backend == "bullet":
         bullet_text = "{pack}/bullet/enyo.txt"
         bullet_data = "{pack}/bullet/enyo.data"
+        bullet_cargo_target_dir = (
+            str(expand_user(args.bullet_cargo_target_dir))
+            if args.bullet_cargo_target_dir
+            else "{run}/cargo-target"
+        )
         bullet_train = [
             tool("bullet/bullet.py"), "train",
             "--data", bullet_data,
             "--out-dir", f"{candidate_dir}/checkpoints",
             "--net-id", name,
-            "--cargo-target-dir", "{run}/cargo-target",
+            "--cargo-target-dir", bullet_cargo_target_dir,
             "--cuda-arch", str(args.bullet_cuda_arch),
             "--hidden", str(args.bullet_hidden),
             "--l2", str(args.bullet_l2),
@@ -467,6 +472,7 @@ def add_create_args(
     parser.add_argument("--bullet-manifest", default=value("bullet_manifest", d.bullet_manifest))
     parser.add_argument("--bullet-cuda-path", default=value("bullet_cuda_path", d.bullet_cuda_path))
     parser.add_argument("--bullet-cuda-arch", default=value("bullet_cuda_arch", d.bullet_cuda_arch))
+    parser.add_argument("--bullet-cargo-target-dir", default=value("bullet_cargo_target_dir", d.bullet_cargo_target_dir))
     parser.add_argument("--bullet-hidden", type=int, default=value("bullet_hidden", d.bullet_hidden))
     parser.add_argument("--bullet-l2", type=int, default=value("bullet_l2", d.bullet_l2))
     parser.add_argument("--bullet-batch-size", type=int, default=value("bullet_batch_size", d.bullet_batch_size))
