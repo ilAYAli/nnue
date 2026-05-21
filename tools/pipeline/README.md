@@ -44,7 +44,7 @@ Optional event hook:
 {
   "run": "~/code/cpp/chess/nnue/runs/example",
   "hooks": {
-    "event_command": "~/scripts/nnue_event_ntfy.sh"
+    "event_command": "~/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "steps": []
 }
@@ -53,7 +53,7 @@ Optional event hook:
 or:
 
 ```sh
-tools/pipeline/pipeline.py launch config.json --on-event "$HOME/scripts/nnue_event_ntfy.sh"
+tools/pipeline/pipeline.py launch config.json --on-event "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 ```
 
 If `run` is omitted, the default is:
@@ -76,3 +76,6 @@ pack/
 train/
 validate/
 ```
+
+The tracked NNUE ntfy hook publishes normal build events to `/nnue` and
+self-notification prompts to `/AI_stdin` for `phase_done`, `done`, and `fail`.

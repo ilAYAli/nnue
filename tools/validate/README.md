@@ -24,20 +24,20 @@ tools/validate/validate.py static \
   --data run/packed \
   --rows 100000 \
   --buckets \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 
 tools/validate/validate.py failure-suite \
   --candidate ~/code/cpp/chess/assets/engines/candidate \
   --reference ~/code/cpp/chess/assets/engines/reference \
   --output-dir run/failure-suite \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh" \
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh" \
   ~/code/cpp/chess/enyo/bugs/*.log
 
 tools/validate/validate.py sprt \
   --net run/candidate/model.nn \
   --games 1000 \
   --tag candidate_smoke \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 
 tools/validate/extract_tail_targets.py \
   --bug-dir ~/code/cpp/chess/enyo/bugs \
@@ -67,7 +67,7 @@ tools/validate/validate.py sprt \
   --run runs/d12-d16-huber-cp800 \
   --games 1000 \
   --tag d12_d16_smoke \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 ```
 
 The hook receives JSON on stdin and in `NNUE_RUN_EVENT_JSON`.
