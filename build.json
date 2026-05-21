@@ -1,44 +1,38 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "scratch-quantized-kaiming-sign-loss-preflight",
-  "goal": "Test whether a small sign auxiliary loss improves scratch sign/ranking versus plain Huber.",
+  "experiment": "bullet-reckless-architecture-scale",
+  "goal": "Scale the Reckless-like Bullet architecture spike after the 100k conversion/training smoke succeeded.",
   "create": {
-    "name": "scratch-qkaiming-100k-huber-sign02-lr1e2-e10",
-    "backend": "pytorch",
+    "name": "bullet-reckless-spike-768h-1m-sb64",
+    "backend": "bullet",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pack_limit": 120000,
-    "init_net": null,
-    "init": "quantized-kaiming",
-    "objective": "huber",
-    "forward": "quantized",
-    "target_clamp": 800,
-    "huber_beta": 200,
-    "sign_loss_weight": 0.2,
-    "sign_loss_scale": 100,
-    "lr": 0.01,
-    "epochs": 10,
-    "batch_size": 4096,
+    "bullet_rows": 1000000,
+    "bullet_max_abs_cp": 1600,
+    "bullet_hidden": 768,
+    "bullet_l2": 16,
+    "bullet_batch_size": 2048,
+    "bullet_batches": 64,
+    "bullet_superbatches": 64,
+    "bullet_threads": 4,
+    "bullet_wdl": 0.75,
+    "bullet_lr": 0.001,
+    "bullet_final_lr": 0.0001,
+    "bullet_cargo_target_dir": "runs/.cargo-target/bullet",
     "device": "cuda",
-    "workers": 2,
-    "max_rows": 100000,
-    "val_rows": 20000,
-    "grad_norm_every": 20,
-    "select_metric": "sign",
-    "patience": 0,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "100k-row scratch sign-loss preflight",
+    "status": "Bullet/Reckless-like 768-hidden 1M-row scale run",
     "success_condition": [
-      "training loss decreases across epochs",
-      "gradient norms are nonzero for sparse input, L1, L2, and output layers",
-      "exported model.nn roughly matches float .pt validation",
-      "validation sign improves over the plain Huber 100k scratch preflight"
+      "Bullet text conversion and BulletFormat validation pass",
+      "training writes quantised.bin checkpoints",
+      "Enyo can load the selected quantised.bin checkpoint",
+      "Bullet parity and direct eval benchmark remain sane"
     ],
     "next_after_success": [
-      "compare float .pt validation against exported .nn validation",
-      "compare against the plain Huber 100k scratch preflight",
-      "scale or sweep sign weight only if sign/ranking improves without obvious MAE collapse"
+      "copy selected quantised.bin into an Enyo test path",
+      "run evalnet load/check/bench on pwa-5090",
+      "do not run SPRT until Bullet eval speed is acceptable or the checkpoint shows exceptional static/move-choice signal"
     ]
   }
 }
