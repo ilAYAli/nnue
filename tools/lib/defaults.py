@@ -61,6 +61,8 @@ class CandidateDefaults:
     score_progress: int = 10000
 
     max_features: int = 32
+    pack_skip: int = 0
+    pack_limit: int = 0
     pack_progress: int = 250000
 
     objective: str = "huber"
