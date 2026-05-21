@@ -53,6 +53,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--skip-rows", str(args.skip_rows),
         "--val-rows", str(args.val_rows),
         "--trainable", args.trainable,
+        "--grad-norm-every", str(args.grad_norm_every),
     ]
     if args.val:
         command += ["--val", str(expand_path(args.val))]
@@ -122,6 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--val-rows", type=int, default=0)
     train.add_argument("--trainable", default="all",
                        choices=["all", "input", "float-head", "output"])
+    train.add_argument("--grad-norm-every", type=int, default=0)
     train.add_argument("--python", default=sys.executable)
     train.set_defaults(func=cmd_run)
 

@@ -33,6 +33,7 @@ class CandidateDefaults:
     score_engine: str = default_executable("~/local/bin/stockfish", "stockfish")
     python: str = default_executable("~/.venv/bin/python", "python3")
     init_net: str = "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
+    init: str = "kaiming"
     reference_net: str = "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
     reference_engine: str = "~/code/cpp/chess/assets/engines/reference"
     sprt: str = "~/code/cpp/chess/sprt/sprt"
@@ -71,6 +72,9 @@ class CandidateDefaults:
     device: str = "cuda"
     workers: int = 2
     val_rows: int = 100000
+    max_rows: int = 0
+    skip_rows: int = 0
+    grad_norm_every: int = 0
     patience: int = 2
     select_metric: str = "mae"
     weight_decay: float = 1e-6

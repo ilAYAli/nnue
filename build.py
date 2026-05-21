@@ -210,6 +210,41 @@ def create_config(args: argparse.Namespace) -> dict:
             ],
         })
 
+    train_command = [
+        tool("train/train.py"), "run",
+        "--data", "{pack}/train",
+    ]
+    if args.init_net:
+        train_command.extend([
+            "--init-from-nn", str(expand_path(args.init_net)),
+        ])
+    else:
+        train_command.extend([
+            "--init", args.init,
+        ])
+    train_command.extend([
+        "--objective", args.objective,
+        "--huber-beta", str(args.huber_beta),
+        "--select-metric", args.select_metric,
+        "--wdl-lambda", str(args.wdl_lambda),
+        "--epochs", str(args.epochs),
+        "--batch-size", str(args.batch_size),
+        "--lr", str(args.lr),
+        "--weight-decay", str(args.weight_decay),
+        "--target-clamp", str(args.target_clamp),
+        "--device", args.device,
+        "--workers", str(args.workers),
+        "--patience", str(args.patience),
+        "--max-rows", str(args.max_rows),
+        "--skip-rows", str(args.skip_rows),
+        "--val-rows", str(args.val_rows),
+        "--trainable", args.trainable,
+        "--grad-norm-every", str(args.grad_norm_every),
+        "--python", str(expand_user(args.python)),
+        "--out", f"{candidate_dir}/model.pt",
+        "--out-nn", f"{candidate_dir}/model.nn",
+    ])
+
     steps.extend([
         {
             "name": "pack",
@@ -224,28 +259,7 @@ def create_config(args: argparse.Namespace) -> dict:
         },
         {
             "name": "train",
-            "command": [
-                tool("train/train.py"), "run",
-                "--data", "{pack}/train",
-                "--init-from-nn", str(expand_path(args.init_net)),
-                "--objective", args.objective,
-                "--huber-beta", str(args.huber_beta),
-                "--select-metric", args.select_metric,
-                "--wdl-lambda", str(args.wdl_lambda),
-                "--epochs", str(args.epochs),
-                "--batch-size", str(args.batch_size),
-                "--lr", str(args.lr),
-                "--weight-decay", str(args.weight_decay),
-                "--target-clamp", str(args.target_clamp),
-                "--device", args.device,
-                "--workers", str(args.workers),
-                "--patience", str(args.patience),
-                "--val-rows", str(args.val_rows),
-                "--trainable", args.trainable,
-                "--python", str(expand_user(args.python)),
-                "--out", f"{candidate_dir}/model.pt",
-                "--out-nn", f"{candidate_dir}/model.nn",
-            ],
+            "command": train_command,
         },
     ])
 
@@ -363,7 +377,12 @@ def add_create_args(
     parser.add_argument("--max-features", type=int, default=value("max_features", d.max_features))
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))
 
-    parser.add_argument("--init-net", default=value("init_net", d.init_net))
+    parser.add_argument(
+        "--init-net", default=value("init_net", d.init_net),
+        help="Initial .nn file. Use an empty string or null in build JSON to train from scratch.",
+    )
+    parser.add_argument("--init", default=value("init", d.init),
+                        choices=["kaiming", "berserk-ish"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -375,6 +394,9 @@ def add_create_args(
     parser.add_argument("--device", default=value("device", d.device))
     parser.add_argument("--workers", type=int, default=value("workers", d.workers))
     parser.add_argument("--val-rows", type=int, default=value("val_rows", d.val_rows))
+    parser.add_argument("--max-rows", type=int, default=value("max_rows", d.max_rows))
+    parser.add_argument("--skip-rows", type=int, default=value("skip_rows", d.skip_rows))
+    parser.add_argument("--grad-norm-every", type=int, default=value("grad_norm_every", d.grad_norm_every))
     parser.add_argument("--patience", type=int, default=value("patience", d.patience))
     parser.add_argument("--select-metric", default=value("select_metric", d.select_metric),
                         choices=["loss", "mse", "mae", "sign"])
