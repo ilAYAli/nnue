@@ -1,9 +1,10 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe; code changes for the selected architecture branch live in the engine/trainer code.",
-  "experiment": "learned-material-phase-head-input",
+  "experiment": "proper-king-bucket-refinement",
   "nps_gate": "pause and optimize first if the architecture branch costs more than about 3-5% NPS",
   "create": {
-    "name": "arch-material-phase-v1",
+    "name": "arch-kingbucket-v1",
+    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "selfplay_depth": 12,
     "selfplay_seed": 2026052101,
     "skip_plies": 8,
@@ -18,6 +19,12 @@
     "event_command": "$HOME/scripts/nnue_event_ntfy.sh"
   },
   "validation": {
+    "engine": "~/code/cpp/chess/enyo/build/enyo",
+    "failure_suite": {
+      "logs": "~/code/cpp/chess/enyo/bugs",
+      "baseline": "assets/failure_suite/baseline_reference_b19794a.md",
+      "baseline_required_before_training": true
+    },
     "required_before_sprt": [
       "static",
       "failure-suite",

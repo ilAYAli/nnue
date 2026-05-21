@@ -131,83 +131,91 @@ def create_config(args: argparse.Namespace) -> dict:
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"
-    steps = [
-        {
-            "name": "posgen_selfplay",
-            "command": [
-                tool("posgen/posgen.py"), "selfplay",
-                "--runner", str(expand_path(args.runner)),
-                "--engine", str(expand_path(args.engine)),
-                "--nnue-file", str(expand_path(args.nnue_file)),
-                "--book", str(expand_path(args.book)),
-                "--output", "{posgen}/selfplay.pgn",
-                "--games", str(args.selfplay_games),
-                "--shard-games", str(args.selfplay_shard_games),
-                "--concurrency", str(args.selfplay_concurrency),
-                "--threads", str(args.selfplay_threads),
-                "--depth", str(args.selfplay_depth),
-                "--srand", str(args.selfplay_seed),
-                "--restart", "off",
-                "--engine-option", f"Hash={args.selfplay_hash}",
-            ],
-        },
-        {
-            "name": "posgen_extract",
-            "command": [
-                tool("posgen/posgen.py"), "extract",
-                "{posgen}/selfplay.pgn",
-                "--output", "{posgen}/positions.jsonl",
-                "--stats", "{posgen}/extract_stats.json",
-                "--skip-plies", str(args.skip_plies),
-                "--min-depth", str(args.selfplay_depth),
-                "--max-abs-cp", str(args.source_max_abs_cp),
-            ],
-        },
-        {
-            "name": "posgen_sample",
-            "command": [
-                tool("posgen/posgen.py"), "sample",
-                "--input", "{posgen}/positions.jsonl",
-                "--output", "{posgen}/source.jsonl",
-                "--preset", args.sample_preset,
-                "--unique-fen",
-                "--seed", str(args.selfplay_seed),
-            ],
-        },
-    ]
+    labeled_jsonl = str(args.labeled_jsonl or "")
+    pack_input = "{score}/labeled.jsonl"
+    steps = []
 
-    for shard in range(args.score_shards):
+    if labeled_jsonl:
+        pack_input = str(expand_path(labeled_jsonl))
+    else:
+        steps.extend([
+            {
+                "name": "posgen_selfplay",
+                "command": [
+                    tool("posgen/posgen.py"), "selfplay",
+                    "--runner", str(expand_path(args.runner)),
+                    "--engine", str(expand_path(args.engine)),
+                    "--nnue-file", str(expand_path(args.nnue_file)),
+                    "--book", str(expand_path(args.book)),
+                    "--output", "{posgen}/selfplay.pgn",
+                    "--games", str(args.selfplay_games),
+                    "--shard-games", str(args.selfplay_shard_games),
+                    "--concurrency", str(args.selfplay_concurrency),
+                    "--threads", str(args.selfplay_threads),
+                    "--depth", str(args.selfplay_depth),
+                    "--srand", str(args.selfplay_seed),
+                    "--restart", "off",
+                    "--engine-option", f"Hash={args.selfplay_hash}",
+                ],
+            },
+            {
+                "name": "posgen_extract",
+                "command": [
+                    tool("posgen/posgen.py"), "extract",
+                    "{posgen}/selfplay.pgn",
+                    "--output", "{posgen}/positions.jsonl",
+                    "--stats", "{posgen}/extract_stats.json",
+                    "--skip-plies", str(args.skip_plies),
+                    "--min-depth", str(args.selfplay_depth),
+                    "--max-abs-cp", str(args.source_max_abs_cp),
+                ],
+            },
+            {
+                "name": "posgen_sample",
+                "command": [
+                    tool("posgen/posgen.py"), "sample",
+                    "--input", "{posgen}/positions.jsonl",
+                    "--output", "{posgen}/source.jsonl",
+                    "--preset", args.sample_preset,
+                    "--unique-fen",
+                    "--seed", str(args.selfplay_seed),
+                ],
+            },
+        ])
+
+        for shard in range(args.score_shards):
+            steps.append({
+                "name": f"score_{shard:02d}",
+                "command": [
+                    tool("score/score.py"), "uci",
+                    "--input", "{posgen}/source.jsonl",
+                    "--output", f"{{score}}/shards/label.{shard}.jsonl",
+                    "--engine", str(expand_path(args.score_engine)),
+                    "--depth", str(args.score_depth),
+                    "--threads", str(args.score_threads),
+                    "--hash", str(args.score_hash),
+                    "--shard-count", str(args.score_shards),
+                    "--shard-index", str(shard),
+                    "--max-abs-cp", str(args.score_max_abs_cp),
+                    "--progress", str(args.score_progress),
+                ],
+            })
+
         steps.append({
-            "name": f"score_{shard:02d}",
-            "command": [
-                tool("score/score.py"), "uci",
-                "--input", "{posgen}/source.jsonl",
-                "--output", f"{{score}}/shards/label.{shard}.jsonl",
-                "--engine", str(expand_path(args.score_engine)),
-                "--depth", str(args.score_depth),
-                "--threads", str(args.score_threads),
-                "--hash", str(args.score_hash),
-                "--shard-count", str(args.score_shards),
-                "--shard-index", str(shard),
-                "--max-abs-cp", str(args.score_max_abs_cp),
-                "--progress", str(args.score_progress),
-            ],
-        })
-
-    steps.extend([
-        {
             "name": "score_merge",
             "command": [
                 "bash", "-lc",
                 "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
                 "merge-score", "{score}",
             ],
-        },
+        })
+
+    steps.extend([
         {
             "name": "pack",
             "command": [
                 tool("pack/pack.py"), "build",
-                "--input", "{score}/labeled.jsonl",
+                "--input", pack_input,
                 "--out-dir", "{pack}/train",
                 "--max-features", str(args.max_features),
                 "--progress", str(args.pack_progress),
@@ -326,6 +334,11 @@ def add_create_args(
     parser.add_argument("--book", default=value("book", d.book))
     parser.add_argument("--runner", default=value("runner", d.runner))
     parser.add_argument("--python", default=value("python", d.python))
+    parser.add_argument(
+        "--labeled-jsonl",
+        default=value("labeled_jsonl", d.labeled_jsonl),
+        help="Existing labeled JSONL to pack/train from; skips posgen and score phases.",
+    )
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
     parser.add_argument("--selfplay-shard-games", type=int, default=value("selfplay_shard_games", d.selfplay_shard_games))
