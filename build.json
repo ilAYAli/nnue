@@ -3,7 +3,7 @@
   "experiment": "scratch-kaiming-lr-preflight",
   "goal": "Test whether a clean Enyo-owned initialization learns once LR is high enough, before spending a full training run.",
   "create": {
-    "name": "scratch-kaiming-10k-lr1e3-preflight",
+    "name": "scratch-kaiming-10k-lr1e2-preflight",
     "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pack_limit": 12000,
@@ -12,7 +12,7 @@
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.001,
+    "lr": 0.01,
     "epochs": 10,
     "batch_size": 2048,
     "device": "cuda",
