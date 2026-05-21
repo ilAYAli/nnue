@@ -59,6 +59,16 @@ Rejected lanes:
     over the same 913 positions. That points to the training result, not the
     feature-map conversion, as the source of the tail regressions.
   - Decision: no SPRT. The tail regression violates the gate.
+- proper 32-king-bucket input-only diagnostic:
+  - trained only input feature rows plus accumulator bias, keeping L1/L2/output
+    fixed.
+  - Static validation was exactly equal to the expanded reference:
+    candidate `mae=136.060`, `sign=92.20%`; reference `mae=136.060`,
+    `sign=92.20%`.
+  - Exported tensor diff was zero for every weight and bias. The small update
+    did not survive quantization/export, so the candidate is a no-op.
+  - Decision: no failure-suite, no SPRT. Add `validate.py net-diff` to catch
+    this class of no-op before replay gates.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
 Conclusion:
@@ -79,10 +89,8 @@ Priority order:
    - This is the primary lane.
    - First branch, learned material/phase head input, failed the pre-SPRT
      gates and should not be SPRT-tested.
-   - Next branch: proper king-bucket refinement with full trainer/engine
-     support, not another folded/drop-in shortcut. The first version uses 32
-     king buckets: each rank is split into four horizontally mirrored file
-     zones.
+   - Proper 32-bucket king refinement has failed the pre-SPRT gates; the
+     input-only diagnostic was an export no-op.
    - Verify feature extraction, export/load, and roundtrip before training.
    - Verify at least one known FEN where the new feature changes the exported
      eval before training.
@@ -94,9 +102,9 @@ Priority order:
      conversions as evidence.
    - Do not widen the net until at least one small feature/bucket experiment
      has failed cleanly.
-   - Material/phase has now failed, so widening is allowed only as a
-     fallback-of-last-resort after king-bucket failure analysis, not as the next
-     default move.
+   - Material/phase and 32-bucket king refinement have now both failed. Widening
+     is allowed only as a fallback-of-last-resort after failure analysis, not as
+     the next default move.
 
 2. Stronger or different teacher data.
    - Treat Stockfish d16 as the bulk baseline, not the ceiling.
@@ -135,17 +143,18 @@ Run exactly one architecture/feature branch first.
 
 Next branch:
 
-- proper king-bucket refinement.
+- none selected. Do not start another bulk training run until the failed
+  architecture branches have been analyzed.
 
 Reason:
 
-- materially changes the representation instead of adding another scalar head
-  hint.
-- directly targets the likely weakness: king-local piece-square context under
-  search.
-- must be trained properly with matching engine/trainer feature extraction.
-- previous folded/drop-in bucket shortcut is not evidence against a real
-  retrain.
+- material/phase and proper 32-bucket king refinement both failed pre-SPRT
+  gates.
+- the input-only diagnostic proved that small input-only updates can export as a
+  no-op after quantization.
+- the next candidate must either use a materially different feature family or a
+  different teacher/move-choice signal. Another same-data architecture tweak is
+  not justified by the current evidence.
 
 Anti-confounding rule:
 
@@ -158,24 +167,14 @@ Anti-confounding rule:
 - Because this moves the recipe through the new `build.py` pack/train path,
   run the pack/static/roundtrip sanity checks before training starts.
 
-Fallback:
+Immediate action:
 
-- If proper king-bucket refinement also fails gates, stop bulk training and
-  reassess base net, feature family, and teacher/source assumptions.
-  Proper 32-king-bucket v1 has now failed this gate, so the next action is
-  analysis or a materially different feature family, not another bulk
-  same-data training run.
-
-Diagnostic exception:
-
-- Run one constrained 32-bucket input-only diagnostic before abandoning this
-  feature family completely.
-- Rationale: the expanded legacy net is zero-diff, while all-weights training
-  created tail regressions. Training only feature weights plus accumulator bias
-  keeps L1/L2/output fixed and tests whether the bucket split itself has useful
-  signal without letting the whole evaluator rewrite itself.
-- This diagnostic may run static and failure-suite gates only. It must not run
-  SPRT unless the tail gate is clean.
+- Stop bulk NNUE training.
+- Run failure analysis on the rejected material/phase and 32-bucket candidates:
+  identify whether failures cluster by taxonomy, phase, endgame, king safety, or
+  tactical surprise.
+- Add no-op export checks (`validate.py net-diff`) before static/replay gates.
+- Choose the next branch only after the analysis points to a concrete weakness.
 
 ## Candidate Workflow
 
@@ -188,7 +187,7 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name: `arch-kingbucket-input-v1`
-- selected branch: proper king-bucket refinement, input-only diagnostic
+- selected branch: completed proper king-bucket refinement input-only diagnostic
 - self-play depth: `12`
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
@@ -198,6 +197,8 @@ Current `build.json` intent:
 - objective: Huber, clamp `800`, beta `200`, lr `3e-7`, epochs `8`
 - trainable weights: `input`
 - checkpoint selection: `sign`, patience `2`
+- result: no-op after quantization; do not rerun without changing the objective
+  of the experiment.
 
 Rules:
 
