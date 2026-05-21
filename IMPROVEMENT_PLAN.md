@@ -172,6 +172,13 @@ Rejected lanes:
     zero exported input/L1 tensors.
   - Decision: use a quantization-compatible Kaiming initializer with integer
     scale for input/L1 and Kaiming scale for the dense float head.
+- scratch quantized-Kaiming 100k-row quantized-forward preflight:
+  - Training moved clearly: validation sign reached `70.84%` at epoch 7.
+  - Export parity was good on the 20k validation slice: float `.pt` MAE
+    `138.672`, sign `70.58%`; exported `.nn` MAE `138.027`, sign `70.84%`.
+  - Decision: this is the first scratch path that both learns and survives
+    export. Scale the same method to 1M train rows before changing anything
+    else.
 
 Conclusion:
 
@@ -280,11 +287,11 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the scratch quantized-forward check in `build.json`.
+Run the scratch quantized-Kaiming scale check in `build.json`.
 
 Next branch:
 
-- Enyo-owned scratch quantized-forward preflight.
+- Enyo-owned scratch quantized-forward 1M-row scale check.
 - Active recipe: `./build.py -c build.json`.
 
 Reason:
@@ -302,10 +309,12 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 100k-row Kaiming scratch preflight from `build.json` with
+- Run the 1M-row quantized-Kaiming scratch scale check from `build.json` with
   `forward: "quantized"`.
 - Compare float `.pt` validation against exported `.nn` validation.
-- If quantized-forward training learns and export matches, scale rows.
+- If the exported `.nn` remains well-behaved, compare it to the current
+  reference on the same packed slice and decide whether a larger scratch run is
+  justified.
 
 Deferred Bullet decision:
 
@@ -351,8 +360,8 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-qkaiming-100k-quant-lr1e2-e10`
-- selected branch: scratch Enyo-owned quantized-forward preflight
+- candidate name: `scratch-qkaiming-1m-quant-lr1e2-e20`
+- selected branch: scratch Enyo-owned quantized-forward scale check
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
@@ -361,10 +370,10 @@ Current `build.json` intent:
   `labeled_jsonl` is set.
 - initializer: scratch `quantized-kaiming`; no Berserk init net
 - forward path: export-aware quantized int16/int8 forward
-- objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `10`
+- objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `20`
 - trainable weights: `all`
-- row limit: `100k` train rows plus `20k` validation rows
-- checkpoint selection: `sign`, patience disabled
+- row limit: `1M` train rows plus `200k` validation rows
+- checkpoint selection: `sign`, patience `4`
 
 Rules:
 
