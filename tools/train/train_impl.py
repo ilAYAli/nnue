@@ -177,6 +177,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     else:
         model = EnyoNNUE(init=args.init).to(args.device)
 
+    restore_l2_nonphase = None
     if args.trainable != "all":
         for param in model.parameters():
             param.requires_grad_(False)
@@ -186,6 +187,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         if args.trainable == "float-head":
             for param in model.l2.parameters():
                 param.requires_grad_(True)
+        if args.trainable == "phase-head":
+            model.l2.weight.requires_grad_(True)
+            restore_l2_nonphase = model.l2.weight[:, :-1].detach().clone()
         trainable_params = sum(
             p.numel() for p in model.parameters() if p.requires_grad)
         print(f"trainable={args.trainable} params={trainable_params}",
@@ -232,6 +236,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             opt.zero_grad()
             loss.backward()
             opt.step()
+            if restore_l2_nonphase is not None:
+                with torch.no_grad():
+                    model.l2.weight[:, :-1].copy_(restore_l2_nonphase)
 
             err = (pred.detach() - y)
             mae_sum += float(err.abs().sum())
@@ -312,11 +319,12 @@ def main() -> None:
     ap.add_argument("--skip-rows", type=int, default=0)
     ap.add_argument("--val-rows", type=int, default=0)
     ap.add_argument("--trainable", default="all",
-                    choices=["all", "float-head", "output"],
+                    choices=["all", "float-head", "output", "phase-head"],
                     help="'all' trains every weight. 'float-head' freezes "
                          "the quantized input/L1 layers and trains only "
                          "L2+output floats. 'output' trains only the final "
-                         "linear layer.")
+                         "linear layer. 'phase-head' trains only the new "
+                         "material/phase L2 input column.")
     args = ap.parse_args()
     source_map = load_source_map(args.data)
     args.source_wdl_lambdas = parse_source_values(

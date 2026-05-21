@@ -390,7 +390,7 @@ def add_create_args(
                         choices=["loss", "mse", "mae", "sign"])
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
-                        choices=["all", "float-head", "output"])
+                        choices=["all", "float-head", "output", "phase-head"])
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

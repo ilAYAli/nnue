@@ -121,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--skip-rows", type=int, default=0)
     train.add_argument("--val-rows", type=int, default=0)
     train.add_argument("--trainable", default="all",
-                       choices=["all", "float-head", "output"])
+                       choices=["all", "float-head", "output", "phase-head"])
     train.add_argument("--python", default=sys.executable)
     train.set_defaults(func=cmd_run)
 
