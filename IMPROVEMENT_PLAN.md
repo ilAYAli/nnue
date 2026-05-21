@@ -92,15 +92,18 @@ Rejected lanes:
     - Bullet 1024: final reported line around `0.20M` NPS.
     - Bullet 768: final reported line around `0.44M` NPS.
   - pwa-5090 direct evaluator benchmark, `evalnet bench 500000`:
+    - normal Enyo: `9.47M` eval/s.
     - Bullet 1024: `1.35M` eval/s.
-    - Bullet 768: `1.73M` eval/s.
-  - Local direct evaluator benchmark, `evalnet bench 200000`:
+    - Bullet 768: `1.70M` eval/s.
+    - Bullet 768 is about `5.6x` slower than normal Enyo direct eval.
+  - Local direct evaluator benchmark:
+    - normal Enyo, `evalnet bench 500000`: `3.12M` eval/s.
     - Bullet 1024: `0.90M` eval/s.
-    - Bullet 768: `1.17M` eval/s.
+    - Bullet 768, `evalnet bench 500000`: `0.98M` eval/s.
   - Decision: do not run Bullet SPRT yet. The 768 checkpoint is faster than
-    1024, but the search path is still roughly 4x slower than baseline even
-    though the direct evaluator is faster. The remaining issue is search-path
-    integration/head cost, not checkpoint loading correctness.
+    1024, but the direct evaluator is still several times slower than the
+    current Enyo evaluator. The remaining issue is evaluator/head cost, not
+    checkpoint loading correctness.
 
 Conclusion:
 
@@ -209,18 +212,19 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Do not start another long training run yet.
+Do not start another long training run yet. Run only the scratch preflight in
+`build.json`.
 
 Next branch:
 
-- Bullet/Reckless-like architecture feasibility in Enyo, or an Enyo-owned
-  scratch baseline if replacing Berserk provenance is the immediate project
-  goal.
+- Enyo-owned scratch/Kaiming baseline preflight.
+- Active recipe: `./build.py -c build.json`.
 
 Reason:
 
-- the Bullet spike proved conversion/training works and Enyo can now load it,
-  but the first evaluator is from-scratch and too slow for serious SPRT.
+- the Bullet spike proved conversion/training works and Enyo can now load the
+  checkpoints, but direct eval is still several times slower than current Enyo
+  eval and is too slow for serious SPRT.
 - material/phase and proper 32-bucket king refinement both failed pre-SPRT
   gates.
 - the input-only diagnostic proved that small input-only updates can export as a
@@ -229,7 +233,15 @@ Reason:
 - scratch training is justified only as a provenance/baseline reset, not because
   it is expected to immediately beat the Berserk-derived reference.
 
-Immediate Bullet decision:
+Immediate scratch decision:
+
+- Run the 10k-row preflight from `build.json`.
+- Require decreasing loss and nonzero gradient norms for input, L1, L2, and
+  output before any larger scratch schedule.
+- If the preflight fails to learn, stop scratch work and inspect trainer/export
+  plumbing before changing data or architecture.
+
+Deferred Bullet decision:
 
 - Either optimize the Bullet spike layout further in Enyo:
   10 input king buckets, 8 material output buckets, pairwise-mul hidden,
