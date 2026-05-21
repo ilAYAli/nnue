@@ -76,11 +76,16 @@ Rejected lanes:
   - The resulting checkpoint layout is documented in
     `tools/bullet/README.md` and can be inspected with
     `tools/bullet/inspect_checkpoint.py`.
-  - The checkpoint is valid, but it is not Enyo-loadable: it uses 10 mirrored
-    input king buckets, 8 material output buckets, and a different dense head.
-  - Decision: do not run more Bullet training until either Enyo has a matching
-    evaluator/loader or the Bullet trainer is configured to emit Enyo's current
-    `.nn` layout.
+  - Enyo commit `0252200` adds a correctness-first loader/evaluator for this
+    checkpoint layout. `setoption name nnue_file value <quantised.bin>` can now
+    route search through the Bullet spike evaluator.
+  - The first Enyo evaluator path is intentionally from-scratch per eval, so it
+    is for correctness/architecture experiments, not a final speed path.
+  - Local startpos `go nodes 100000` smoke: normal evaluator reached roughly
+    `400k-900k` noisy NPS; Bullet from-scratch evaluator reached roughly
+    `160k` NPS.
+  - Decision: do not run long Bullet SPRT until either the evaluator is made
+    incremental or a much stronger reason exists to accept the NPS loss.
 
 Conclusion:
 
@@ -151,10 +156,10 @@ Priority order:
    - Material/phase and 32-bucket king refinement have now both failed. Widening
      is allowed only as a fallback-of-last-resort after failure analysis, not as
      the next default move.
-   - A Bullet/Reckless-like training backend now works as an experiment runner,
-     but it has crossed from "training-tool work" into "engine architecture
-     work": the next useful step is an Enyo evaluator/loader for that layout, or
-     an intentionally Enyo-shaped Bullet trainer.
+   - A Bullet/Reckless-like training backend and correctness-first Enyo loader
+     now work. The next useful engine-side step is speed: incremental Bullet
+     accumulators, or an intentionally Enyo-shaped Bullet trainer if the goal is
+     faster training rather than a richer architecture.
 
 3. Stronger or different teacher data.
    - Treat Stockfish d16 as the bulk baseline, not the ceiling.
@@ -199,8 +204,8 @@ Next branch:
 
 Reason:
 
-- the Bullet spike proved conversion/training works, but produced a checkpoint
-  for a different evaluator shape.
+- the Bullet spike proved conversion/training works and Enyo can now load it,
+  but the first evaluator is from-scratch and too slow for serious SPRT.
 - material/phase and proper 32-bucket king refinement both failed pre-SPRT
   gates.
 - the input-only diagnostic proved that small input-only updates can export as a
@@ -211,9 +216,9 @@ Reason:
 
 Immediate Bullet decision:
 
-- Either port the Bullet spike layout into Enyo:
-  10 input king buckets, 8 material output buckets, pairwise-mul hidden, and
-  bucketed dense head.
+- Either optimize the Bullet spike layout in Enyo:
+  10 input king buckets, 8 material output buckets, pairwise-mul hidden,
+  bucketed dense head, and incremental accumulator updates.
 - Or configure Bullet to train exactly Enyo's current `.nn` layout, which gives
   faster training tooling but not a Reckless-like architecture test.
 - Do not confuse these two goals.
