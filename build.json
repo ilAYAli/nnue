@@ -1,12 +1,18 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "bullet-reckless-512h-cp-objective-scaleup",
-  "goal": "Scale the cp-only Bullet/Reckless-like run after the 1M-row checkpoint improved static MAE but still failed SPRT catastrophically. This run is gate-only: train on more rows and inspect static/move-choice behavior before considering any SPRT.",
+  "experiment": "bullet-reckless-512h-hardblend-cp",
+  "goal": "Test whether the Bullet/Reckless-like net can learn the known tactical/failure positions when they are mixed into the broad d12 Stockfish-labeled pool. This remains gate-only: train, sweep checkpoints, and do not run SPRT unless move-choice tails improve clearly.",
+  "inputs": {
+    "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
+    "hardcase": "~/code/cpp/chess/nnue/runs/legacy_tmp_20260521/enyo_teacher/hardcase_aug_d16_20260519_1002/hard_child_labeled_x10000.jsonl",
+    "generated_blend": "~/code/cpp/chess/nnue/runs/assets/hardblend/d12_all_plus_hardcase_x10000.jsonl",
+    "rows_expected": "about 2.99M broad + 0.69M hardcase = 3.68M rows"
+  },
   "create": {
-    "name": "bullet-reckless-512h-28m-wdl0-sb128",
+    "name": "bullet-reckless-512h-hardblend-wdl0-sb128",
     "backend": "bullet",
-    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "bullet_rows": 28000000,
+    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/assets/hardblend/d12_all_plus_hardcase_x10000.jsonl",
+    "bullet_rows": 0,
     "bullet_max_abs_cp": 1600,
     "bullet_hidden": 512,
     "bullet_l2": 16,
@@ -21,12 +27,13 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "512-hidden Bullet/Reckless-like cp-objective scale-up",
+    "status": "512-hidden Bullet/Reckless-like hardcase/broad cp-objective blend",
     "success_condition": [
-      "static eval sign/MAE improves materially over the 1M cp-only Bullet run",
-      "slope moves closer to the Stockfish-labeled target instead of staying heavily compressed",
+      "move-choice gate improves over the best cp-only Bullet checkpoint",
+      "worst move-choice tail does not introduce catastrophic 30k sentinel misses",
+      "static eval sign/MAE does not collapse relative to the 1M cp-only Bullet run",
       "Enyo evalnet check passes after loading quantised.bin",
-      "move-choice gate improves without catastrophic tail positions"
+      "no SPRT unless gates are clearly cleaner than prior cp-only/WDL checkpoints"
     ],
     "next_after_success": [
       "run checkpoint sweep over selected superbatches",
