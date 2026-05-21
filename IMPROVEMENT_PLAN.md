@@ -80,6 +80,10 @@ Conclusion:
 - Novel Enyo self-play alone was not enough.
 - Do not launch another same-architecture Stockfish-d16-labeled Enyo self-play
   candidate unless a move-choice/failure-suite gate gives a concrete reason.
+- Rejected-candidate failure analysis is recorded in
+  `assets/failure_suite/rejected_candidate_analysis_20260521.md`.
+  Several independent candidates regress the same tail positions, so the next
+  useful signal is move-choice aware, not another scalar-eval bulk run.
 
 ## Current Strategy
 
@@ -170,9 +174,9 @@ Anti-confounding rule:
 Immediate action:
 
 - Stop bulk NNUE training.
-- Run failure analysis on the rejected material/phase and 32-bucket candidates:
-  identify whether failures cluster by taxonomy, phase, endgame, king safety, or
-  tactical surprise.
+- Expand failure analysis into a small taxonomy and move-choice target set:
+  identify whether repeated regressions cluster by conversion, rook endgame,
+  tactical surprise, king safety, or tablebase-adjacent play.
 - Add no-op export checks (`validate.py net-diff`) before static/replay gates.
 - Choose the next branch only after the analysis points to a concrete weakness.
 
