@@ -253,6 +253,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     tool("pack/pack.py"), "build",
                     "--input", pack_input,
                     "--out-dir", "{pack}/train",
+                    "--skip", str(args.pack_skip),
+                    "--limit", str(args.pack_limit),
                     "--max-features", str(args.max_features),
                     "--progress", str(args.pack_progress),
                     "--python", str(expand_user(args.python)),
@@ -438,6 +440,8 @@ def add_create_args(
     parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
 
     parser.add_argument("--max-features", type=int, default=value("max_features", d.max_features))
+    parser.add_argument("--pack-skip", type=int, default=value("pack_skip", d.pack_skip))
+    parser.add_argument("--pack-limit", type=int, default=value("pack_limit", d.pack_limit))
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))
 
     parser.add_argument(
