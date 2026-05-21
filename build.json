@@ -1,12 +1,12 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "scratch-kaiming-lr-preflight",
-  "goal": "Test whether a clean Enyo-owned initialization learns once LR is high enough, before spending a full training run.",
+  "experiment": "scratch-kaiming-scale-check",
+  "goal": "Scale the clean Enyo-owned scratch initialization after the 10k/100k preflights showed real gradient flow and learning.",
   "create": {
-    "name": "scratch-kaiming-100k-lr1e2-e20",
+    "name": "scratch-kaiming-1m-lr1e2-e20",
     "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pack_limit": 120000,
+    "pack_limit": 1200000,
     "init_net": null,
     "init": "kaiming",
     "objective": "huber",
@@ -17,22 +17,22 @@
     "batch_size": 4096,
     "device": "cuda",
     "workers": 2,
-    "max_rows": 100000,
-    "val_rows": 20000,
-    "grad_norm_every": 20,
+    "max_rows": 1000000,
+    "val_rows": 200000,
+    "grad_norm_every": 250,
     "select_metric": "sign",
     "patience": 0,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "preflight only",
+    "status": "scale check",
     "success_condition": [
       "training loss decreases across epochs",
       "gradient norms are nonzero for sparse input, L1, L2, and output layers",
       "exported model.nn is non-empty and can be evaluated by static validation"
     ],
     "next_after_success": [
-      "run a larger scratch schedule on the same labeled source",
+      "compare static validation against the current reference net on the same packed rows",
       "compare against an identical current-reference-initialized control",
       "only then consider failure-suite and SPRT gates"
     ]

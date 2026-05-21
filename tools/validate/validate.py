@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib.events import emit_event
+from lib.defaults import DEFAULTS
 
 
 def expand_path(value: str | Path) -> Path:
@@ -42,7 +43,7 @@ def cmd_static(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "eval_dataset.py"
     run_dir = event_run_dir(args.run, expand_path(args.data).parents[1])
     command = [
-        sys.executable,
+        str(expand_path(args.python)),
         str(script),
         "--net", str(expand_path(args.net)),
         "--data", str(expand_path(args.data)),
@@ -190,6 +191,11 @@ def build_parser() -> argparse.ArgumentParser:
     static.add_argument("--sources", action="store_true")
     static.add_argument("--run")
     static.add_argument("--event-command")
+    static.add_argument(
+        "--python",
+        default=DEFAULTS.python,
+        help="Python executable used for eval_dataset.py; defaults to the project venv when present.",
+    )
     static.set_defaults(func=cmd_static)
 
     failure = subparsers.add_parser(
