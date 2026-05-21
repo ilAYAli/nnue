@@ -450,7 +450,7 @@ def add_create_args(
         help="Initial .nn file. Use an empty string or null in build JSON to train from scratch.",
     )
     parser.add_argument("--init", default=value("init", d.init),
-                        choices=["kaiming", "berserk-ish"])
+                        choices=["kaiming", "quantized-kaiming", "berserk-ish"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--forward", default=value("forward", d.forward),
