@@ -216,8 +216,10 @@ Use this sequence for the next serious attempt:
 1. Freeze the current reference net, validation commands, and failure-suite
    input.
 2. Implement exactly one branch: learned material/phase head input.
-3. Add known-FEN feature activation checks.
-4. Add export/load/roundtrip checks.
+3. Add known-FEN feature activation checks:
+   `tools/validate/material_phase.py`.
+4. Add export/load/roundtrip checks:
+   `tools/validate/roundtrip.py`.
 5. Benchmark NPS before training; do not continue if the branch costs more
    than about `3-5%` NPS without optimization.
 6. Train one candidate with `build.py`.

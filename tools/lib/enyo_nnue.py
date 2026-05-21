@@ -23,18 +23,31 @@ N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
 N_HIDDEN = 1024
 N_L1 = 2 * N_HIDDEN
 N_L2 = 16
+N_PHASE_HEAD = 1
+N_L2_HEAD = N_L2 + N_PHASE_HEAD
 N_L3 = 32
 N_OUTPUT = 1
 
 QUANT1_BITS = 5
 EVAL_DIVISOR = 32.0
 
-NETWORK_SIZE = (
+LEGACY_NETWORK_SIZE = (
     N_FEATURES * N_HIDDEN * np.dtype(np.int16).itemsize
     + N_HIDDEN * np.dtype(np.int16).itemsize
     + N_L1 * N_L2 * np.dtype(np.int8).itemsize
     + N_L2 * np.dtype(np.int32).itemsize
     + N_L2 * N_L3 * np.dtype(np.float32).itemsize
+    + N_L3 * np.dtype(np.float32).itemsize
+    + N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+    + N_OUTPUT * np.dtype(np.float32).itemsize
+)
+
+NETWORK_SIZE = (
+    N_FEATURES * N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_L1 * N_L2 * np.dtype(np.int8).itemsize
+    + N_L2 * np.dtype(np.int32).itemsize
+    + N_L2_HEAD * N_L3 * np.dtype(np.float32).itemsize
     + N_L3 * np.dtype(np.float32).itemsize
     + N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
     + N_OUTPUT * np.dtype(np.float32).itemsize
@@ -67,7 +80,7 @@ class Net:
     input_biases: np.ndarray    # (N_HIDDEN,) int16
     l1_weights: np.ndarray      # (N_L2, N_L1) int8
     l1_biases: np.ndarray       # (N_L2,) int32
-    l2_weights: np.ndarray      # (N_L3, N_L2) float32
+    l2_weights: np.ndarray      # (N_L3, N_L2_HEAD) float32
     l2_biases: np.ndarray       # (N_L3,) float32
     output_weights: np.ndarray  # (N_L3,) float32
     output_bias: float
@@ -134,11 +147,17 @@ def phase_scale_from_pieces(pieces: Sequence[tuple[int, int, int]]) -> float:
     return (128.0 + float(phase)) / 128.0
 
 
+def phase_head_from_scale(phase_scale: float) -> float:
+    return float(phase_scale) - 1.0
+
+
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
-    if len(data) != NETWORK_SIZE:
+    if len(data) not in (LEGACY_NETWORK_SIZE, NETWORK_SIZE):
         raise ValueError(
-            f"{path}: size {len(data)} != expected {NETWORK_SIZE}")
+            f"{path}: size {len(data)} != expected "
+            f"{LEGACY_NETWORK_SIZE} or {NETWORK_SIZE}")
+    has_phase_head = len(data) == NETWORK_SIZE
 
     off = 0
 
@@ -152,7 +171,12 @@ def load_net(path: str | Path) -> Net:
     ib = take(np.int16, N_HIDDEN)
     l1w = take(np.int8, N_L1 * N_L2).reshape(N_L2, N_L1)
     l1b = take(np.int32, N_L2)
-    l2w = take(np.float32, N_L2 * N_L3).reshape(N_L3, N_L2)
+    if has_phase_head:
+        l2w = take(np.float32, N_L2_HEAD * N_L3).reshape(N_L3, N_L2_HEAD)
+    else:
+        legacy_l2w = take(np.float32, N_L2 * N_L3).reshape(N_L3, N_L2)
+        l2w = np.zeros((N_L3, N_L2_HEAD), dtype=np.float32)
+        l2w[:, :N_L2] = legacy_l2w
     l2b = take(np.float32, N_L3)
     ow = take(np.float32, N_L3)
     ob = struct.unpack_from("<f", data, off)[0]

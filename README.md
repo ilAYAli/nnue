@@ -160,6 +160,13 @@ tools/validate/validate.py sprt \
   --event-command "$HOME/scripts/nnue_event_ntfy.sh"
 ```
 
+Architecture sanity checks used before expensive training:
+
+```sh
+~/.venv/bin/python tools/validate/material_phase.py
+~/.venv/bin/python tools/validate/roundtrip.py ../enyo/nnue/berserk-d43206fe90e4.nn
+```
+
 ## Important Docs
 
 ```text
