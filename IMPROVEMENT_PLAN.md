@@ -70,6 +70,17 @@ Rejected lanes:
   - Decision: no failure-suite, no SPRT. Add `validate.py net-diff` to catch
     this class of no-op before replay gates.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
+- Bullet/Reckless-like backend spike:
+  - `./build.py -c build.json` successfully converted 100k Enyo-labeled rows
+    to Bullet text, BulletFormat, and trained the spike trainer on pwa-5090.
+  - The resulting checkpoint layout is documented in
+    `tools/bullet/README.md` and can be inspected with
+    `tools/bullet/inspect_checkpoint.py`.
+  - The checkpoint is valid, but it is not Enyo-loadable: it uses 10 mirrored
+    input king buckets, 8 material output buckets, and a different dense head.
+  - Decision: do not run more Bullet training until either Enyo has a matching
+    evaluator/loader or the Bullet trainer is configured to emit Enyo's current
+    `.nn` layout.
 
 Conclusion:
 
@@ -140,6 +151,10 @@ Priority order:
    - Material/phase and 32-bucket king refinement have now both failed. Widening
      is allowed only as a fallback-of-last-resort after failure analysis, not as
      the next default move.
+   - A Bullet/Reckless-like training backend now works as an experiment runner,
+     but it has crossed from "training-tool work" into "engine architecture
+     work": the next useful step is an Enyo evaluator/loader for that layout, or
+     an intentionally Enyo-shaped Bullet trainer.
 
 3. Stronger or different teacher data.
    - Treat Stockfish d16 as the bulk baseline, not the ceiling.
@@ -174,15 +189,18 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run exactly one architecture/feature branch first.
+Do not start another long training run yet.
 
 Next branch:
 
-- Enyo-owned scratch baseline, if replacing Berserk provenance is the next
-  project goal.
+- Bullet/Reckless-like architecture feasibility in Enyo, or an Enyo-owned
+  scratch baseline if replacing Berserk provenance is the immediate project
+  goal.
 
 Reason:
 
+- the Bullet spike proved conversion/training works, but produced a checkpoint
+  for a different evaluator shape.
 - material/phase and proper 32-bucket king refinement both failed pre-SPRT
   gates.
 - the input-only diagnostic proved that small input-only updates can export as a
@@ -190,6 +208,15 @@ Reason:
 - another same-data architecture tweak is not justified by the current evidence.
 - scratch training is justified only as a provenance/baseline reset, not because
   it is expected to immediately beat the Berserk-derived reference.
+
+Immediate Bullet decision:
+
+- Either port the Bullet spike layout into Enyo:
+  10 input king buckets, 8 material output buckets, pairwise-mul hidden, and
+  bucketed dense head.
+- Or configure Bullet to train exactly Enyo's current `.nn` layout, which gives
+  faster training tooling but not a Reckless-like architecture test.
+- Do not confuse these two goals.
 
 Anti-confounding rule:
 
