@@ -104,6 +104,31 @@ Rejected lanes:
     1024, but the direct evaluator is still several times slower than the
     current Enyo evaluator. The remaining issue is evaluator/head cost, not
     checkpoint loading correctness.
+- Bullet/Reckless-like 512-hidden scale and targeted-data runs:
+  - The Enyo loader/search path is functional: `evalnet check` passes and
+    direct eval speed is about `2.7M` eval/s for 512-hidden checkpoints.
+  - 1M cp-only checkpoint `sb24` looked good statically
+    (`broad5000 mae=71.0`, `corr=0.866`) and was the best early move-choice
+    gate (`top1=5/13`, `top3=8/13`, `sum_gap=876`, `worst=301`), but SPRT
+    rejected catastrophically at `127/1000`: about `-961 Elo`, `LLR=-2.95`.
+  - Scaling cp-only to the full imported d12 pool did not improve the gate.
+    Best checkpoint `sb8`: `top1=3/13`, `top3=5/13`, `sum_gap=945`,
+    `worst=149`.
+  - Existing WDL-weighted Bullet checkpoints also did not beat the cp-only
+    gate. Best WDL checkpoint: 512-hidden `sb64`, `top1=5/13`, `top3=7/13`,
+    `sum_gap=916`, `worst=291`.
+  - Hardcase-child oversampling did not help. Best checkpoint `sb119`:
+    `top1=4/13`, `top3=7/13`, `sum_gap=1085`, `worst=301`.
+  - Direct move-choice child oversampling improved the narrow gate. Best
+    checkpoint `sb112`: `top1=4/13`, `top3=8/13`, `sum_gap=651`,
+    `worst=208`; static broad sample was still acceptable but worse than the
+    1M cp-only checkpoint (`mae=82.3` vs `71.0`).
+  - The move-choice checkpoint still failed SPRT hard at `199/1000`:
+    `-211.2 +/- 45.8`, `LLR=-2.95`, `LOS=0.0%`.
+  - Conclusion: the Bullet/Reckless-like path is technically integrated, but
+    scalar cp/WDL training on the current labels does not produce a playable
+    Enyo search eval. Do not spend more SPRT on Bullet checkpoints until a
+    broader search-aware gate improves, not just the tiny repeated-tail gate.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -307,41 +332,43 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the Bullet/Reckless-like 768-hidden scale check in `build.json`.
+Stop net farming and diagnose why Bullet improves scalar/gate metrics while
+losing badly in search.
 
 Next branch:
 
-- Bullet/Reckless-like architecture scale check.
-- Active recipe: `./build.py -c build.json`.
+- Search-aware diagnostics from the rejected Bullet SPRT.
+- Active recipe: keep `build.json` as the last attempted Bullet move-choice
+  blend, but do not launch another training run from it until the diagnostics
+  identify a broader signal.
 
 Reason:
 
-- material/phase and proper 32-bucket king refinement both failed pre-SPRT
-  gates.
-- scratch quantized-forward training now works technically, but the current
-  architecture remains far behind the reference on sign/ranking.
-- the Bullet spike proved conversion/training works and Enyo can load the
-  checkpoints, but the first checkpoint was a tiny 100k-row smoke.
-- Direct Bullet eval is still too slow for serious SPRT, so this run is an
-  architecture/training signal check, not a promotion attempt.
+- Bullet cp-only, WDL-weighted, hardcase-child, and direct move-choice blends
+  all failed to produce playable search strength.
+- The narrow repeated-tail gate can be overfit without solving general move
+  choice.
+- The current failure is no longer "not enough rows"; it is a mismatch between
+  scalar labels and the search decisions Enyo needs.
 
-Immediate Bullet decision:
+Immediate action:
 
-- Run the 1M-row, 64-superbatch, 768-hidden Bullet/Reckless-like scale check
-  from `build.json`.
-- If it trains cleanly, load the latest `quantised.bin` in Enyo and run
-  `evalnet check` plus direct eval benchmark.
-- Do not run SPRT until speed is acceptable or move-choice/static evidence is
-  unusually strong.
+- Extract losing SPRT positions where Bullet and the reference choose different
+  moves.
+- Score legal moves with the oracle for a larger, less overfit move-choice
+  gate.
+- Compare Bullet/reference eval ranking on those positions.
+- Only train another Bullet candidate if the new gate suggests a concrete
+  signal, such as move-ranking loss, instability weighting, or targeted
+  teacher labels.
 
 Deferred Bullet decisions:
 
-- Either optimize the Bullet spike layout further in Enyo:
-  10 input king buckets, 8 material output buckets, pairwise-mul hidden,
-  bucketed dense head, incremental accumulator updates, and a faster head path.
+- Either add a search-aware/ranking objective around Bullet training.
 - Or configure Bullet to train exactly Enyo's current `.nn` layout, which gives
   faster training tooling but not a Reckless-like architecture test.
-- Do not confuse these two goals.
+- Or pause Bullet and return to the Enyo-owned scratch baseline once a better
+  move-choice dataset exists.
 
 Anti-confounding rule:
 
@@ -378,8 +405,8 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `bullet-reckless-spike-768h-1m-sb64`
-- selected branch: Bullet/Reckless-like architecture scale check
+- candidate name: `bullet-reckless-512h-movechoice-wdl0-sb128`
+- selected branch: Bullet/Reckless-like move-choice/broad blend
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
@@ -387,10 +414,10 @@ Current `build.json` intent:
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
 - backend: `bullet`
-- Bullet architecture: `768` hidden, `16` L2, pairwise-mul hidden, material
+- Bullet architecture: `512` hidden, `16` L2, pairwise-mul hidden, material
   bucketed head
-- row limit: `1M` labeled positions
-- schedule: `64` batches per superbatch, `64` superbatches, lr `0.001 ->
+- row input: broad d12/d16 labels plus repeated scored move-choice child rows
+- schedule: `64` batches per superbatch, `128` superbatches, lr `0.001 ->
   0.0001`
 
 Rules:
