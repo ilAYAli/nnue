@@ -46,6 +46,63 @@ class EnyoNNUE(nn_pt.Module):
         floored = torch.floor(scaled)
         return scaled + (floored - scaled).detach()
 
+    @staticmethod
+    def _ste_round_clamp(x: torch.Tensor, lo: float, hi: float) -> torch.Tensor:
+        clipped = torch.clamp(x, lo, hi)
+        rounded = torch.round(clipped)
+        return clipped + (rounded - clipped).detach()
+
+    def _quantized_input_weight(self) -> torch.Tensor:
+        return self._ste_round_clamp(
+            self.embed.weight,
+            float(np.iinfo(np.int16).min),
+            float(np.iinfo(np.int16).max),
+        )
+
+    def _quantized_input_bias(self) -> torch.Tensor:
+        return self._ste_round_clamp(
+            self.input_bias,
+            float(np.iinfo(np.int16).min),
+            float(np.iinfo(np.int16).max),
+        )
+
+    def _quantized_l1_weight(self) -> torch.Tensor:
+        return self._ste_round_clamp(
+            self.l1_weight,
+            float(np.iinfo(np.int8).min),
+            float(np.iinfo(np.int8).max),
+        )
+
+    def _quantized_l1_bias(self) -> torch.Tensor:
+        return self._ste_round_clamp(
+            self.l1_bias,
+            float(np.iinfo(np.int32).min),
+            float(np.iinfo(np.int32).max),
+        )
+
+    def quantized_forward(self, w_feats: torch.Tensor, b_feats: torch.Tensor,
+                          w_offsets: torch.Tensor, b_offsets: torch.Tensor,
+                          stm: torch.Tensor,
+                          phase_scale: torch.Tensor) -> torch.Tensor:
+        input_weight = self._quantized_input_weight()
+        input_bias = self._quantized_input_bias()
+        w_acc = nn_pt.functional.embedding_bag(
+            w_feats, input_weight, w_offsets, mode="sum") + input_bias
+        b_acc = nn_pt.functional.embedding_bag(
+            b_feats, input_weight, b_offsets, mode="sum") + input_bias
+
+        stm_f = stm.unsqueeze(-1).float()
+        us = (1.0 - stm_f) * w_acc + stm_f * b_acc
+        them = stm_f * w_acc + (1.0 - stm_f) * b_acc
+        acc = torch.cat([us, them], dim=-1)
+
+        x0 = self._quantized_input_relu(acc)
+        x1 = torch.relu(x0 @ self._quantized_l1_weight().t()
+                        + self._quantized_l1_bias())
+        x2 = torch.relu(self.l2(x1))
+        raw = self.output(x2).squeeze(-1) / nn2.EVAL_DIVISOR
+        return torch.clamp(raw * phase_scale, min=-2045.0, max=2045.0)
+
     def raw_forward(self, w_feats: torch.Tensor, b_feats: torch.Tensor,
                     w_offsets: torch.Tensor, b_offsets: torch.Tensor,
                     stm: torch.Tensor) -> torch.Tensor:

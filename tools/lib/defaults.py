@@ -66,6 +66,7 @@ class CandidateDefaults:
     pack_progress: int = 250000
 
     objective: str = "huber"
+    forward: str = "float"
     target_clamp: int = 800
     huber_beta: int = 200
     wdl_lambda: float = 0.75
