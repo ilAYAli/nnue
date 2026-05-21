@@ -152,7 +152,7 @@ Inspect a run:
 --val-rows N
 --patience N
 --select-metric loss|mse|mae|sign
---trainable all|float-head|output
+--trainable all|input|float-head|output
 ```
 
 Defaults live in `tools/lib/defaults.py`. Phase-specific behavior is documented
