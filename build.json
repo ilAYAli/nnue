@@ -1,38 +1,43 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "bullet-reckless-architecture-scale",
-  "goal": "Measure the lower speed bound for the Reckless-like Bullet architecture at 128 hidden after 256 hidden remained slower than normal Enyo NNUE.",
+  "experiment": "scratch-enyo-owned-baseline-scale",
+  "goal": "Scale the best scratch/qkaiming Enyo-owned baseline from 1M to 2.6M training rows to test whether scratch can approach the current reference without Berserk initialization.",
   "create": {
-    "name": "bullet-reckless-spike-128h-1m-sb64",
-    "backend": "bullet",
+    "name": "scratch-qkaiming-26m-quant-lr1e2-e30",
+    "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "bullet_rows": 1000000,
-    "bullet_max_abs_cp": 1600,
-    "bullet_hidden": 128,
-    "bullet_l2": 16,
-    "bullet_batch_size": 2048,
-    "bullet_batches": 64,
-    "bullet_superbatches": 64,
-    "bullet_threads": 4,
-    "bullet_wdl": 0.75,
-    "bullet_lr": 0.001,
-    "bullet_final_lr": 0.0001,
-    "bullet_cargo_target_dir": "runs/.cargo-target/bullet",
+    "pack_limit": 2800000,
+    "max_rows": 2600000,
+    "val_rows": 200000,
+    "init_net": null,
+    "init": "quantized-kaiming",
+    "objective": "huber",
+    "forward": "quantized",
+    "target_clamp": 800,
+    "huber_beta": 200,
+    "wdl_lambda": 0.75,
+    "lr": 0.01,
+    "epochs": 30,
+    "batch_size": 4096,
     "device": "cuda",
+    "workers": 2,
+    "patience": 6,
+    "select_metric": "sign",
+    "weight_decay": 1e-06,
+    "grad_norm_every": 100,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "Bullet/Reckless-like 128-hidden 1M-row scale run",
+    "status": "Scratch/qkaiming 2.6M-row Enyo-owned baseline scale run",
     "success_condition": [
-      "Bullet text conversion and BulletFormat validation pass",
-      "training writes quantised.bin checkpoints",
-      "Enyo can load the selected 128-hidden quantised.bin checkpoint",
-      "Bullet parity and direct eval benchmark approaches normal Enyo NNUE speed"
+      "training reaches materially better sign/MAE than the 1M scratch run",
+      "exported model.nn validates with static eval",
+      "failure-suite/move-choice gates do not show catastrophic tails"
     ],
     "next_after_success": [
-      "run evalnet load/check/bench on pwa-5090",
-      "compare 128/256/384/512/768 speed and training loss",
-      "choose whether to optimize Bullet eval, change architecture, or return to scratch baseline work"
+      "run static validation against the packed run data",
+      "run move-choice/failure-suite gate before SPRT",
+      "only SPRT if it approaches reference static metrics and gates are clean"
     ]
   }
 }
