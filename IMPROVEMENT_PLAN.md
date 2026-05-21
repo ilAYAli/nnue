@@ -103,7 +103,24 @@ Conclusion:
 
 Priority order:
 
-1. Architecture/features.
+1. Enyo-owned baseline net.
+   - If the project goal is to remove the Berserk-derived net, train a scratch
+     Enyo net as its own baseline instead of fine-tuning Berserk forever.
+   - This is a provenance goal first, not an immediate keeper claim.
+   - Use `init_net: null` and `init: "kaiming"` in `build.json`.
+   - Reuse the best-understood labeled source first to avoid confounding:
+     current signed-balanced d12 self-play plus Stockfish-d16 labels.
+   - Gate it as a new baseline candidate: static metrics, net-diff,
+     repeated-tail move-choice gate, failure suite, then SPRT only if it is not
+     obviously far weaker.
+   - First run is a 10k-row preflight: prove loss decreases and gradients reach
+     the sparse input, L1, L2, and output layers before any multi-day run.
+   - Run an identical current-reference-initialized control if scratch looks
+     promising, so the effect of initialization is measured instead of guessed.
+   - If scratch is far weaker, keep it as a training base and continue with
+     larger/cleaner data or move-choice training before considering promotion.
+
+2. Architecture/features.
    - This is the primary lane.
    - First branch, learned material/phase head input, failed the pre-SPRT
      gates and should not be SPRT-tested.
@@ -124,7 +141,7 @@ Priority order:
      is allowed only as a fallback-of-last-resort after failure analysis, not as
      the next default move.
 
-2. Stronger or different teacher data.
+3. Stronger or different teacher data.
    - Treat Stockfish d16 as the bulk baseline, not the ceiling.
    - Test d18/d20 only on high-value slices first: disagreement,
      PV-instability, failure-suite, and high-loss move-choice rows.
@@ -133,7 +150,7 @@ Priority order:
    - External/prepared datasets are acceptable if converted once into the Enyo
      row format and stored with provenance under `runs/` or `assets/`.
 
-3. Targeted move-choice data.
+4. Targeted move-choice data.
    - Expand the fixed failure-suite and disagreement/PV-instability samplers.
    - Train at most one isolated candidate from this signal at a time.
    - Tail regressions can veto a candidate even when aggregate sum diff is
@@ -147,7 +164,7 @@ Priority order:
      - disagreement/PV-instability weighting.
      - tactical surprise or large child-eval swing weighting.
 
-4. Tooling.
+5. Tooling.
    - Tooling work is justified only when it directly supports the lanes above.
    - New candidates must use `./build.py create`.
    - The reviewed active recipe lives in `build.json` and should be updated in
@@ -161,8 +178,8 @@ Run exactly one architecture/feature branch first.
 
 Next branch:
 
-- none selected. Do not start another bulk training run until the failed
-  architecture branches have been analyzed.
+- Enyo-owned scratch baseline, if replacing Berserk provenance is the next
+  project goal.
 
 Reason:
 
@@ -170,9 +187,9 @@ Reason:
   gates.
 - the input-only diagnostic proved that small input-only updates can export as a
   no-op after quantization.
-- the next candidate must either use a materially different feature family or a
-  different teacher/move-choice signal. Another same-data architecture tweak is
-  not justified by the current evidence.
+- another same-data architecture tweak is not justified by the current evidence.
+- scratch training is justified only as a provenance/baseline reset, not because
+  it is expected to immediately beat the Berserk-derived reference.
 
 Anti-confounding rule:
 
@@ -209,19 +226,19 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `arch-kingbucket-input-v1`
-- selected branch: completed proper king-bucket refinement input-only diagnostic
+- candidate name: `scratch-owned-preflight-10k`
+- selected branch: scratch Enyo-owned baseline preflight
 - self-play depth: `12`
-- self-play seed: `2026052101`
+- self-play seed: `2026052111`
 - skipped opening plies: `8`
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
-- objective: Huber, clamp `800`, beta `200`, lr `3e-7`, epochs `8`
-- trainable weights: `input`
-- checkpoint selection: `sign`, patience `2`
-- result: no-op after quantization; do not rerun without changing the objective
-  of the experiment.
+- initializer: scratch `kaiming`; no Berserk init net
+- objective: Huber, clamp `800`, beta `200`, lr `1e-5`, epochs `20`
+- trainable weights: `all`
+- row limit: `10k`; this is an overfit/gradient-flow preflight, not a keeper run
+- checkpoint selection: `mae`, patience disabled
 
 Rules:
 

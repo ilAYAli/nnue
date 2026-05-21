@@ -99,6 +99,12 @@ def selection_value(metrics: dict[str, float], args: argparse.Namespace) -> floa
     return -value if args.select_metric == "sign" else value
 
 
+def grad_norm(param: torch.Tensor) -> float:
+    if param.grad is None:
+        return 0.0
+    return float(param.grad.detach().norm())
+
+
 @torch.no_grad()
 def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
                  ) -> dict[str, float]:
@@ -216,6 +222,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         mae_sum = 0.0
         mse_sum = 0.0
         n = 0
+        batch_index = 0
         for w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids in train_loader:
             w = w.to(args.device)
             b = b.to(args.device)
@@ -234,12 +241,24 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
             opt.zero_grad()
             loss.backward()
+            if args.grad_norm_every > 0 and batch_index % args.grad_norm_every == 0:
+                print(
+                    "grad "
+                    f"epoch={epoch} batch={batch_index} "
+                    f"input={grad_norm(model.embed.weight):.6g} "
+                    f"input_bias={grad_norm(model.input_bias):.6g} "
+                    f"l1={grad_norm(model.l1_weight):.6g} "
+                    f"l1_bias={grad_norm(model.l1_bias):.6g} "
+                    f"l2={grad_norm(model.l2.weight):.6g} "
+                    f"output={grad_norm(model.output.weight):.6g}",
+                    flush=True)
             opt.step()
 
             err = (pred.detach() - y)
             mae_sum += float(err.abs().sum())
             mse_sum += float((err * err).sum())
             n += len(y)
+            batch_index += 1
 
         line = (f"epoch {epoch:4d} train mse={mse_sum / max(1, n):10.2f} "
                 f"mae={mae_sum / max(1, n):7.2f}")
@@ -314,6 +333,8 @@ def main() -> None:
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
     ap.add_argument("--val-rows", type=int, default=0)
+    ap.add_argument("--grad-norm-every", type=int, default=0,
+                    help="Print selected gradient norms every N batches.")
     ap.add_argument("--trainable", default="all",
                     choices=["all", "input", "float-head", "output"],
                     help="'all' trains every weight. 'input' trains only "
