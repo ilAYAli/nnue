@@ -45,6 +45,16 @@ Rejected lanes:
   positions while introducing unacceptable worst-case regressions. Tail risk is
   now a hard veto, not just a note.
 - folded 8-king-bucket shortcut: clearly negative as a drop-in net.
+- proper 32-king-bucket v1:
+  - trained on the existing d12/self-play Stockfish-d16 labels through
+    `build.py -c build.json`.
+  - Static validation moved slightly in the right direction, but sign was flat:
+    candidate `mae=135.262`, `sign=92.18%`; expanded reference `mae=135.948`,
+    `sign=92.20%`.
+  - Failure-suite gate was aggregate-positive but tail-negative:
+    `candidate_better=68`, `reference_better=54`, `sum_diff_cp=+1491`,
+    `worst_regression_cp=-448`.
+  - Decision: no SPRT. The tail regression violates the gate.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
 Conclusion:
@@ -148,6 +158,9 @@ Fallback:
 
 - If proper king-bucket refinement also fails gates, stop bulk training and
   reassess base net, feature family, and teacher/source assumptions.
+  Proper 32-king-bucket v1 has now failed this gate, so the next action is
+  analysis or a materially different feature family, not another bulk
+  same-data training run.
 
 ## Candidate Workflow
 
