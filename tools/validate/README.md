@@ -13,6 +13,7 @@ tools/validate/validate.py failure-suite --help
 tools/validate/validate.py sprt --help
 tools/validate/extract_tail_targets.py --help
 tools/validate/score_tail_targets.py --help
+tools/validate/move_choice_gate.py --help
 ```
 
 Examples:
@@ -50,6 +51,12 @@ tools/validate/score_tail_targets.py \
   --engine stockfish \
   --syzygy-path ~/code/cpp/chess/assets/tablebases \
   --nodes 200000
+
+tools/validate/move_choice_gate.py \
+  --scores assets/failure_suite/repeated_tail_move_scores.csv \
+  --engine ~/code/cpp/chess/assets/engines/reference \
+  --out run/move_choice_gate.csv \
+  --nodes 100000
 ```
 
 With the generic event hook:

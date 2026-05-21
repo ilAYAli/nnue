@@ -4,6 +4,8 @@ Source: `repeated_tail_targets_20260521.csv`.
 
 Legal-move scores: `repeated_tail_move_scores_20260521.csv`.
 
+Reference move-choice baseline: `reference_move_choice_gate_20260521.csv`.
+
 These are positions where at least two independent rejected candidates lost at
 least `100cp` against the reference/oracle replay gate. The goal is not to
 promote any candidate from these positions directly. The goal is to identify
@@ -17,6 +19,7 @@ which move-choice failures repeat across unrelated training attempts.
 - Not a normal opening or middlegame data-coverage problem.
 - Next useful signal: move ranking / child-score targets around these positions,
   not another bulk scalar-eval run.
+- Current reference on this target set: top-1 `3/13`, top-3 `6/13`.
 
 ## Initial Categories
 
@@ -49,3 +52,8 @@ The next candidate should therefore start from a small move-choice dataset:
 
 The legal-move score file is now available. It should be treated as a gate and
 diagnostic input first; training from only 13 targets would overfit.
+
+The reference baseline is intentionally weak here because the set was mined from
+positions where rejected candidates and/or the reference are fragile. A future
+candidate should not regress this file before SPRT, but solving this tiny set is
+not sufficient evidence of Elo improvement.

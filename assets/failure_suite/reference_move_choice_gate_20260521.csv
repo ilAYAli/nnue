@@ -1,0 +1,14 @@
+log,ply,fullmove,side,fen,best_move,engine_move,rank,gap_cp,score_cp,nodes
+ArasanX_vs_EnyoBot_7pzXRQFZ.log,63,32,Black,r4k2/1p3r2/p6Q/8/2R5/2nP4/3N1P1P/q2BK3 b - - 2 32,f8e7,f8e7,1,0,-185,53989
+Bot1nokk_vs_EnyoBot_mEIqToS1.log,253,127,Black,2QK4/8/pk6/8/8/8/8/8 b - - 0 127,b6b5,a6a5,3,31311,-31995,25967
+caissa-x_vs_EnyoBot_0waEuGxc.log,135,68,Black,q5k1/6p1/5pPp/3PpBnP/4P3/4Q1K1/8/8 b - - 0 68,g5e4,a8a5,8,217,-589,49663
+SF_Bot1nok_vs_EnyoBot_SbzD89kx.log,101,51,Black,8/8/6k1/5r2/2P5/3NK3/8/Q7 b - - 6 51,g6h7,g6f7,2,53,-722,60786
+ArasanX_vs_EnyoBot_Q0a5I19l.log,79,40,Black,6k1/5bp1/1pR3n1/p2p1N1Q/q2Nr2P/8/6PK/8 b - - 0 40,a4b4,a4b4,1,0,-118,39547
+caissa-x_vs_EnyoBot_0waEuGxc.log,97,49,Black,r2k4/2q3p1/1n1p1pPp/pPpPpBnP/P3P3/1N2P3/2R5/2QK4 b - - 19 49,c7b7,c7b7,1,0,-77,20995
+caissa-x vs EnyoBot - 0waEuGxc.log,133,67,Black,q5k1/6p1/5pPp/3PpBnP/4P3/4P1K1/8/2Qn4 b - - 20 67,d1e3,g8f8,6,93,-509,96019
+caissa-x_vs_EnyoBot_0waEuGxc.log,91,46,Black,r2k4/q5p1/1n1p1pPp/pPpPpBnP/P3P3/1NQ1P3/8/R2K4 b - - 13 46,d8e8,d8e7,4,72,-161,70773
+Hypersion_vs_EnyoBot_npmgxvIO.log,97,49,Black,8/1p1k4/4p3/3pP3/4B3/2P3r1/3QK2R/q7 b - - 8 49,d7c8,a1g1,9,210,-355,37451
+caissa-x_vs_EnyoBot_0waEuGxc.log,95,48,Black,r2k4/q5p1/1n1p1pPp/pPpPpBnP/P3P3/1N2P3/R7/2QK4 b - - 17 48,b6d7,d8e7,10,208,-302,99756
+EnyoBot_vs_DarkOnBot_pm9SUqFN.log,138,70,White,8/2p5/1p1p2n1/1P1P2k1/4K2p/7B/8/8 w - - 4 70,e4f3,h3e6,9,217,-680,5372
+EnyoBot_vs_Lynx_BOT_jjThVRPN.log,112,57,White,8/5p1k/3p1P1P/8/p5P1/Kb3P2/8/2r5 w - - 0 57,g4g5,a3b4,2,10,-833,66365
+stage270_vs_EnyoBot_kp3inZBb.log,123,62,Black,8/6k1/1R6/P2B1p2/5Pbp/4K1P1/8/8 b - - 0 62,g4h3,h4h3,5,2,-31992,80356
