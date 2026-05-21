@@ -193,10 +193,13 @@ Static validation:
 Move-choice/failure-suite gate:
 
 - Use candidate/reference/oracle replay CSV where possible.
-- Current status: gate logic exists, but the committed baseline suite/status is
-  not yet recorded.
-- Hard blocker before architecture training starts: record the suite path, position
-  count, current-reference baseline numbers, and command used to produce them.
+- Current status: baseline is recorded in
+  `assets/failure_suite/baseline_reference_b19794a.md`.
+- Baseline: `913` positions, same-reference run,
+  `candidate_better=0`, `reference_better=0`, `sum_diff_cp=0`,
+  `worst_regression_cp=0`.
+- Before architecture training starts, run the branch-specific feature
+  activation and roundtrip checks. Do not skip them because the baseline exists.
 - Track move-choice correlation metrics, not only scalar eval deltas:
   - top-move agreement.
   - top-3 overlap.

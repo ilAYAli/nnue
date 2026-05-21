@@ -22,6 +22,7 @@
     "engine": "~/code/cpp/chess/enyo/build/enyo",
     "failure_suite": {
       "logs": "~/code/cpp/chess/enyo/bugs",
+      "baseline": "assets/failure_suite/baseline_reference_b19794a.md",
       "baseline_required_before_training": true
     },
     "required_before_sprt": [
