@@ -112,6 +112,15 @@ Rejected lanes:
     stayed about `141.43`, sign drifted from `50.14%` to `50.03%`.
   - Decision: `1e-5` is too conservative for scratch initialization. Continue
     with a higher-LR preflight before drawing conclusions about scratch.
+- scratch/Kaiming `1e-3` preflight:
+  - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
+  - The preflight used `pack_limit=12000`, so it avoided repacking the full
+    3M-row source.
+  - Learning became visible but remained slow: train MSE moved from
+    `42632.13` to `42627.18`; validation sign moved from `50.08%` to
+    `53.32%`.
+  - Decision: scratch training is alive, but `1e-3` is still too slow for the
+    planned baseline reset. Continue with `1e-2` before scaling rows/epochs.
 
 Conclusion:
 
