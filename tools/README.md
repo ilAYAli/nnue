@@ -12,6 +12,7 @@ tools/pack/pack.py --help
 tools/train/train.py --help
 tools/validate/validate.py --help
 tools/pipeline/pipeline.py --help
+tools/bullet/bullet.py --help
 ```
 
 Phase meanings:
@@ -23,6 +24,7 @@ pack        convert scored JSONL to tensors
 train       train/export .nn candidates
 validate    static checks, failure suite, replay, SPRT
 pipeline    config launch/status backend
+bullet      experimental BulletFormat conversion/training backend
 ```
 
 Generic run events are emitted by `tools/pipeline/pipeline.py` and appended to

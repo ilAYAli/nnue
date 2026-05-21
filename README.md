@@ -16,6 +16,16 @@ It creates a candidate net by running:
 posgen -> score -> pack -> train
 ```
 
+The default backend is the Enyo PyTorch trainer. An experimental Bullet backend
+uses the same `posgen -> score` front half, then switches to:
+
+```text
+jsonl -> Bullet text -> BulletFormat -> Bullet trainer
+```
+
+The Bullet backend currently produces Bullet checkpoints only. It is for
+architecture/training experiments until an Enyo `.nn` exporter exists.
+
 Validation is separate and lives under `tools/validate/`.
 
 ## Build A Net
@@ -53,6 +63,21 @@ self-play/scoring:
 
 This still repacks the data, so feature-index changes are reflected in the
 new tensors.
+
+Experimental Bullet/Reckless-like architecture spike:
+
+```sh
+./build.py create \
+  --name bullet-reckless-spike \
+  --backend bullet \
+  --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl \
+  --bullet-rows 100000 \
+  --bullet-superbatches 2 \
+  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+```
+
+This verifies Bullet conversion/training under the normal pipeline/event
+machinery. It does not produce an Enyo-loadable `model.nn` yet.
 
 To train an Enyo-owned net from scratch instead of fine-tuning the current
 reference net, set `init_net` to `null` in `build.json` or pass an empty
@@ -137,6 +162,7 @@ Inspect a run:
 --runner PATH
 --python PATH
 --labeled-jsonl PATH
+--backend pytorch|bullet
 
 --selfplay-games N
 --selfplay-shard-games N
@@ -175,6 +201,21 @@ Inspect a run:
 --patience N
 --select-metric loss|mse|mae|sign
 --trainable all|input|float-head|output
+
+--bullet-rows N
+--bullet-max-abs-cp CP
+--bullet-manifest PATH
+--bullet-cuda-path PATH
+--bullet-cuda-arch auto|native|compute_90|sm_90|...
+--bullet-hidden N
+--bullet-l2 N
+--bullet-batch-size N
+--bullet-batches N
+--bullet-superbatches N
+--bullet-threads N
+--bullet-wdl X
+--bullet-lr X
+--bullet-final-lr X
 ```
 
 Defaults live in `tools/lib/defaults.py`. Phase-specific behavior is documented

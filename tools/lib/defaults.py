@@ -39,6 +39,7 @@ class CandidateDefaults:
     sprt: str = "~/code/cpp/chess/sprt/sprt"
     run_base: str = "~/code/cpp/chess/nnue/runs"
     labeled_jsonl: str = ""
+    backend: str = "pytorch"
 
     selfplay_games: int = 160000
     selfplay_shard_games: int = 1000
@@ -79,6 +80,21 @@ class CandidateDefaults:
     select_metric: str = "mae"
     weight_decay: float = 1e-6
     trainable: str = "all"
+
+    bullet_rows: int = 0
+    bullet_max_abs_cp: int = 1600
+    bullet_manifest: str = "~/source/bullet/Cargo.toml"
+    bullet_cuda_path: str = ""
+    bullet_cuda_arch: str = "auto"
+    bullet_hidden: int = 1024
+    bullet_l2: int = 16
+    bullet_batch_size: int = 2048
+    bullet_batches: int = 64
+    bullet_superbatches: int = 2
+    bullet_threads: int = 4
+    bullet_wdl: float = 0.75
+    bullet_lr: float = 1e-3
+    bullet_final_lr: float = 3e-4
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
