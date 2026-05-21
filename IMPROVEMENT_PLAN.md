@@ -121,6 +121,14 @@ Rejected lanes:
     `53.32%`.
   - Decision: scratch training is alive, but `1e-3` is still too slow for the
     planned baseline reset. Continue with `1e-2` before scaling rows/epochs.
+- scratch/Kaiming `1e-2` preflight:
+  - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
+  - Loss and sign moved clearly: train MAE `141.83 -> 127.44`,
+    validation MAE `141.43 -> 136.25`, validation sign `50.08% -> 62.96%`.
+  - Static validation over the 12k-row packed slice: MAE `130.893`,
+    sign `72.67%`, correlation `0.398`, slope `0.091`, bias `+22cp`.
+  - Decision: scratch path is viable enough to scale modestly, but the eval is
+    heavily compressed and not remotely ready for SPRT.
 
 Conclusion:
 
@@ -252,7 +260,7 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 10k-row higher-LR preflight from `build.json`.
+- Run the 100k-row LR `1e-2` scratch schedule from `build.json`.
 - Require decreasing loss and nonzero gradient norms for input, L1, L2, and
   output before any larger scratch schedule.
 - If the preflight fails to learn, stop scratch work and inspect trainer/export
