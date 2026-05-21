@@ -70,6 +70,8 @@ class CandidateDefaults:
     target_clamp: int = 800
     huber_beta: int = 200
     wdl_lambda: float = 0.75
+    sign_loss_weight: float = 0.0
+    sign_loss_scale: float = 100.0
     lr: float = 7e-7
     epochs: int = 8
     batch_size: int = 8192

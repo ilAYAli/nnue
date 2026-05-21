@@ -42,6 +42,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--huber-beta", str(args.huber_beta),
         "--select-metric", args.select_metric,
         "--wdl-lambda", str(args.wdl_lambda),
+        "--sign-loss-weight", str(args.sign_loss_weight),
+        "--sign-loss-scale", str(args.sign_loss_scale),
         "--epochs", str(args.epochs),
         "--batch-size", str(args.batch_size),
         "--lr", str(args.lr),
@@ -111,6 +113,8 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--select-metric", default="loss",
                        choices=["loss", "mse", "mae", "sign"])
     train.add_argument("--wdl-lambda", type=float, default=0.75)
+    train.add_argument("--sign-loss-weight", type=float, default=0.0)
+    train.add_argument("--sign-loss-scale", type=float, default=100.0)
     train.add_argument("--source-wdl-lambda", action="append", default=[])
     train.add_argument("--source-loss-weight", action="append", default=[])
     train.add_argument("--epochs", type=int, default=80)
