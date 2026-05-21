@@ -166,6 +166,17 @@ Fallback:
   analysis or a materially different feature family, not another bulk
   same-data training run.
 
+Diagnostic exception:
+
+- Run one constrained 32-bucket input-only diagnostic before abandoning this
+  feature family completely.
+- Rationale: the expanded legacy net is zero-diff, while all-weights training
+  created tail regressions. Training only feature weights plus accumulator bias
+  keeps L1/L2/output fixed and tests whether the bucket split itself has useful
+  signal without letting the whole evaluator rewrite itself.
+- This diagnostic may run static and failure-suite gates only. It must not run
+  SPRT unless the tail gate is clean.
+
 ## Candidate Workflow
 
 Normal candidate creation:
@@ -176,15 +187,16 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `arch-kingbucket-v1`
-- selected branch: proper king-bucket refinement
+- candidate name: `arch-kingbucket-input-v1`
+- selected branch: proper king-bucket refinement, input-only diagnostic
 - self-play depth: `12`
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
-- objective: Huber, clamp `800`, beta `200`, lr `7e-7`, epochs `8`
+- objective: Huber, clamp `800`, beta `200`, lr `3e-7`, epochs `8`
+- trainable weights: `input`
 - checkpoint selection: `sign`, patience `2`
 
 Rules:

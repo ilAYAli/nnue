@@ -180,6 +180,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     if args.trainable != "all":
         for param in model.parameters():
             param.requires_grad_(False)
+        if args.trainable == "input":
+            model.embed.weight.requires_grad_(True)
+            model.input_bias.requires_grad_(True)
         if args.trainable in ("float-head", "output"):
             for param in model.output.parameters():
                 param.requires_grad_(True)
@@ -312,8 +315,9 @@ def main() -> None:
     ap.add_argument("--skip-rows", type=int, default=0)
     ap.add_argument("--val-rows", type=int, default=0)
     ap.add_argument("--trainable", default="all",
-                    choices=["all", "float-head", "output"],
-                    help="'all' trains every weight. 'float-head' freezes "
+                    choices=["all", "input", "float-head", "output"],
+                    help="'all' trains every weight. 'input' trains only "
+                         "feature weights plus accumulator bias. 'float-head' freezes "
                          "the quantized input/L1 layers and trains only "
                          "L2+output floats. 'output' trains only the final "
                          "linear layer.")
