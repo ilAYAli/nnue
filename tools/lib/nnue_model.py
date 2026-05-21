@@ -27,6 +27,11 @@ class EnyoNNUE(nn_pt.Module):
             nn_pt.init.normal_(self.l1_weight, std=math.sqrt(2.0 / nn2.N_L1))
             nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / nn2.N_L2))
             nn_pt.init.normal_(self.output.weight, std=math.sqrt(2.0 / nn2.N_L3))
+        elif init == "quantized-kaiming":
+            nn_pt.init.normal_(self.embed.weight, std=8.0)
+            nn_pt.init.normal_(self.l1_weight, std=1.0)
+            nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / nn2.N_L2))
+            nn_pt.init.normal_(self.output.weight, std=math.sqrt(2.0 / nn2.N_L3))
         elif init == "berserk-ish":
             nn_pt.init.normal_(self.embed.weight, std=64.0)
             nn_pt.init.normal_(self.l1_weight, std=4.0)
