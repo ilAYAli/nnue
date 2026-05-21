@@ -1,17 +1,18 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "bullet-reckless-512h-hardblend-cp",
-  "goal": "Test whether the Bullet/Reckless-like net can learn the known tactical/failure positions when they are mixed into the broad d12 Stockfish-labeled pool. This remains gate-only: train, sweep checkpoints, and do not run SPRT unless move-choice tails improve clearly.",
+  "experiment": "bullet-reckless-512h-movechoice-cp",
+  "goal": "Test whether the Bullet/Reckless-like net can learn the exact parent move-choice gate positions by training on all scored legal child positions, mixed with the broad d12 Stockfish-labeled pool. This remains gate-only: train, sweep checkpoints, and do not run SPRT unless move-choice tails improve clearly.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "hardcase": "~/code/cpp/chess/nnue/runs/legacy_tmp_20260521/enyo_teacher/hardcase_aug_d16_20260519_1002/hard_child_labeled_x10000.jsonl",
-    "generated_blend": "~/code/cpp/chess/nnue/runs/assets/hardblend/d12_all_plus_hardcase_x10000.jsonl",
-    "rows_expected": "about 2.99M broad + 0.69M hardcase = 3.68M rows"
+    "move_choice_scores": "~/code/cpp/chess/nnue/runs/bullet-move-choice-gates-20260522/scores.csv",
+    "generated_move_choice": "~/code/cpp/chess/nnue/runs/assets/movechoice/movechoice_children_x10000.jsonl",
+    "generated_blend": "~/code/cpp/chess/nnue/runs/assets/movechoice/d12_all_plus_movechoice_x10000.jsonl",
+    "rows_expected": "about 2.99M broad + 2.45M move-choice child rows = 5.44M rows"
   },
   "create": {
-    "name": "bullet-reckless-512h-hardblend-wdl0-sb128",
+    "name": "bullet-reckless-512h-movechoice-wdl0-sb128",
     "backend": "bullet",
-    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/assets/hardblend/d12_all_plus_hardcase_x10000.jsonl",
+    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/assets/movechoice/d12_all_plus_movechoice_x10000.jsonl",
     "bullet_rows": 0,
     "bullet_max_abs_cp": 1600,
     "bullet_hidden": 512,
@@ -27,7 +28,7 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "512-hidden Bullet/Reckless-like hardcase/broad cp-objective blend",
+    "status": "512-hidden Bullet/Reckless-like move-choice/broad cp-objective blend",
     "success_condition": [
       "move-choice gate improves over the best cp-only Bullet checkpoint",
       "worst move-choice tail does not introduce catastrophic 30k sentinel misses",
