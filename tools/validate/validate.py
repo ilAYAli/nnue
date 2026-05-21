@@ -103,6 +103,30 @@ def cmd_failure_suite(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_net_diff(args: argparse.Namespace) -> int:
+    script = tools_root() / "validate" / "net_diff.py"
+    run_dir = event_run_dir(args.run, expand_path(args.candidate).parent)
+    command = [
+        sys.executable,
+        str(script),
+        "--candidate", str(expand_path(args.candidate)),
+        "--reference", str(expand_path(args.reference)),
+    ]
+    if args.fail_if_identical:
+        command.append("--fail-if-identical")
+    emit_event(
+        run_dir, "phase_start", stage="validate_net_diff", status="running",
+        command=command, hook_command=args.event_command or "",
+    )
+    rc = run(command)
+    emit_event(
+        run_dir, "phase_done" if rc == 0 else "fail",
+        stage="validate_net_diff", status="ok" if rc == 0 else "failed",
+        rc=rc, command=command, hook_command=args.event_command or "",
+    )
+    return rc
+
+
 def cmd_sprt(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "run_net_sprt_pwa.sh"
     run_dir = event_run_dir(args.run, expand_path(args.net).parent)
@@ -188,6 +212,17 @@ def build_parser() -> argparse.ArgumentParser:
     failure.add_argument("--run")
     failure.add_argument("--event-command")
     failure.set_defaults(func=cmd_failure_suite)
+
+    net_diff = subparsers.add_parser(
+        "net-diff",
+        help="Compare exported NNUE tensors and catch no-op exports.",
+    )
+    net_diff.add_argument("--candidate", required=True)
+    net_diff.add_argument("--reference", required=True)
+    net_diff.add_argument("--run")
+    net_diff.add_argument("--event-command")
+    net_diff.add_argument("--fail-if-identical", action="store_true")
+    net_diff.set_defaults(func=cmd_net_diff)
 
     sprt = subparsers.add_parser("sprt", help="Run NNUE candidate SPRT.")
     sprt.add_argument("--net", required=True)
