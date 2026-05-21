@@ -137,6 +137,13 @@ def candidate_nets(run_dir: Path) -> list[Path]:
     return sorted(run_dir.glob("train/*/model.nn"))
 
 
+def checkpoint_index(path: Path) -> int:
+    try:
+        return int(path.parent.name.rsplit("-", 1)[1])
+    except (IndexError, ValueError):
+        return -1
+
+
 def validation_commands(run_dir: Path, net: Path) -> list[str]:
     validate = repo_root() / "tools" / "validate" / "validate.py"
     python = Path(DEFAULTS.python).expanduser()
@@ -160,17 +167,22 @@ def completion_extra(run_dir: Path) -> dict[str, Any]:
         checkpoint_dirs = sorted(
             path for path in run_dir.glob("train/*/checkpoints") if path.is_dir()
         )
-        checkpoint_files = sorted(
-            path
-            for directory in checkpoint_dirs
-            for path in directory.rglob("*")
-            if path.is_file()
-        )
         if not checkpoint_dirs:
             return {}
+        checkpoint_files = sorted(
+            (
+                path
+                for directory in checkpoint_dirs
+                for path in directory.rglob("quantised.bin")
+                if path.is_file()
+            ),
+            key=checkpoint_index,
+        )
         return {
             "bullet_checkpoint_dirs": [str(path) for path in checkpoint_dirs],
-            "bullet_checkpoints": [str(path) for path in checkpoint_files],
+            "bullet_checkpoint_count": len(checkpoint_files),
+            "bullet_first_checkpoint": str(checkpoint_files[0]) if checkpoint_files else "",
+            "bullet_latest_checkpoint": str(checkpoint_files[-1]) if checkpoint_files else "",
         }
     net = nets[-1]
     commands = validation_commands(run_dir, net)
