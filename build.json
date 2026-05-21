@@ -1,14 +1,14 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
   "experiment": "bullet-reckless-architecture-scale",
-  "goal": "Test whether the Reckless-like Bullet architecture is practical at 384 hidden after 512 hidden improved speed but remained slower than normal Enyo NNUE.",
+  "goal": "Test whether the Reckless-like Bullet architecture is practical at 256 hidden after 384 hidden improved speed but remained slower than normal Enyo NNUE.",
   "create": {
-    "name": "bullet-reckless-spike-384h-1m-sb64",
+    "name": "bullet-reckless-spike-256h-1m-sb64",
     "backend": "bullet",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "bullet_rows": 1000000,
     "bullet_max_abs_cp": 1600,
-    "bullet_hidden": 384,
+    "bullet_hidden": 256,
     "bullet_l2": 16,
     "bullet_batch_size": 2048,
     "bullet_batches": 64,
@@ -22,17 +22,17 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "Bullet/Reckless-like 384-hidden 1M-row scale run",
+    "status": "Bullet/Reckless-like 256-hidden 1M-row scale run",
     "success_condition": [
       "Bullet text conversion and BulletFormat validation pass",
       "training writes quantised.bin checkpoints",
-      "Enyo can load the selected 384-hidden quantised.bin checkpoint",
-      "Bullet parity and direct eval benchmark improves materially versus 512-hidden (~2.7M eval/s)"
+      "Enyo can load the selected 256-hidden quantised.bin checkpoint",
+      "Bullet parity and direct eval benchmark improves materially versus 384-hidden (~3.5M eval/s)"
     ],
     "next_after_success": [
       "run evalnet load/check/bench on pwa-5090",
-      "compare 384-hidden speed against 512-hidden and 768-hidden checkpoints",
-      "decide whether the Bullet path is worth further SIMD/integration work or needs a smaller/different architecture"
+      "compare 256-hidden speed against 384/512/768-hidden checkpoints",
+      "decide whether to train a larger data/longer schedule candidate or continue shrinking/optimizing the loader"
     ]
   }
 }
