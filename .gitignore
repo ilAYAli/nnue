@@ -13,6 +13,6 @@ __pycache__/
 *.npy
 
 # Local run output
-tmp/
-runs/
-artifacts/
+/tmp/
+/runs/
+/artifacts/

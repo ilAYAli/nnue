@@ -1,23 +1,173 @@
-# Enyo NNUE Training
+# Enyo NNUE
 
-This repo contains the training pipeline, experiment docs, and helper tools for
-building Enyo NNUE networks.
+This repo contains the NNUE training tools and experiment notes for Enyo.
+Engine binaries, source checkouts, books, and reference nets are configured via
+command-line arguments and defaults in `tools/lib/defaults.py`.
 
-The engine remains in the sibling repo:
+The high-level build command is:
 
-```text
-../enyo
+```sh
+./build.py
 ```
 
-Useful entry points:
+It creates a candidate net by running:
 
-- `README_nnue_training.html`: explanation of the full pipeline.
-- `TRAINING_RUNBOOK.md`: practical command guide for starting and judging runs.
-- `tools/nnue2/train_new_net_pwa.sh`: guarded one-command launcher for pwa-5090.
-- `tools/nnue2/`: import, label, pack, train, export, and validation scripts.
-- `tools/nnue2/run_selflichess_mix_pwa.sh`: current self-play/Lichess experiment runner.
-- `tools/nnue2/run_huber_cp800_neighbors_pwa.sh`: short SPRT screens around
-  the best currently observed Huber cp800 recipe.
+```text
+posgen -> score -> pack -> train
+```
 
-Large datasets, packed tensors, checkpoints, PGNs, and run directories should
-stay outside git under `~/tmp/` or `~/code/cpp/chess/assets/`.
+Validation is separate and lives under `tools/validate/`.
+
+## Build A Net
+
+Small smoke run:
+
+```sh
+./build.py create \
+  --name smoke-d8-d12 \
+  --selfplay-games 1000 \
+  --score-depth 12 \
+  --score-shards 4 \
+  --epochs 1 \
+  --device cpu
+```
+
+Depth-12 self-play candidate with event notifications:
+
+```sh
+./build.py create \
+  --name d12-d16-huber-cp800 \
+  --selfplay-depth 12 \
+  --selfplay-games 120000 \
+  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+```
+
+`--event-command` must point to a script that exists on the machine running the
+build command. The repo emits generic JSON events; ntfy and personal
+routing stay outside the repo.
+
+Dry-run the generated pipeline without starting work:
+
+```sh
+./build.py create \
+  --name inspect-config \
+  --selfplay-depth 12 \
+  --dry-run
+```
+
+Resume or inspect a run:
+
+```sh
+./build.py resume runs/d12-d16-huber-cp800 \
+  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+
+./build.py status runs/d12-d16-huber-cp800
+./build.py status runs/d12-d16-huber-cp800 --tail 20
+./build.py report runs/d12-d16-huber-cp800
+```
+
+## Common Candidate Arguments
+
+```text
+--name NAME
+--run-dir DIR
+--dry-run
+--force
+--event-command COMMAND
+
+--engine PATH
+--nnue-file PATH
+--book PATH
+--runner PATH
+--python PATH
+
+--selfplay-games N
+--selfplay-shard-games N
+--selfplay-concurrency N
+--selfplay-threads N
+--selfplay-hash MB
+--selfplay-depth N
+--selfplay-seed N
+
+--skip-plies N
+--source-max-abs-cp CP
+--sample-preset NAME
+
+--score-engine PATH
+--score-depth N
+--score-shards N
+--score-threads N
+--score-hash MB
+--score-max-abs-cp CP
+
+--init-net PATH
+--objective mse|huber|mpe25
+--target-clamp CP
+--huber-beta CP
+--wdl-lambda X
+--lr X
+--epochs N
+--batch-size N
+--device cpu|cuda
+--workers N
+--val-rows N
+--patience N
+--select-metric loss|mse|mae|sign
+--trainable all|float-head|output
+```
+
+Defaults live in `tools/lib/defaults.py`. Phase-specific behavior is documented
+in each tool subdirectory.
+
+## Validation
+
+Run validation explicitly after a candidate is produced:
+
+```sh
+tools/validate/validate.py static \
+  --net runs/d12-d16-huber-cp800/train/d12-d16-huber-cp800/model.nn \
+  --data runs/d12-d16-huber-cp800/pack/train \
+  --rows 100000 \
+  --buckets \
+  --sources \
+  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+
+tools/validate/validate.py sprt \
+  --net runs/d12-d16-huber-cp800/train/d12-d16-huber-cp800/model.nn \
+  --run runs/d12-d16-huber-cp800 \
+  --games 1000 \
+  --tag d12_d16_smoke \
+  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+```
+
+## Important Docs
+
+```text
+NNUE.md              NNUE architecture, weights, accumulators, and training concepts
+IMPROVEMENT_PLAN.md  Current experiment plan and lessons from failed runs
+tools/README.md      Lower-level phase tool overview
+```
+
+## Run Data
+
+Run data is stored under:
+
+```text
+runs/<run-name>/
+```
+
+Expected layout:
+
+```text
+config.json
+manifest.json
+status.json
+events.jsonl
+logs/
+assets/
+posgen/
+score/
+pack/
+train/
+validate/
+```
