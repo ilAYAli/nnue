@@ -1,14 +1,14 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
   "experiment": "bullet-reckless-architecture-scale",
-  "goal": "Scale the Reckless-like Bullet architecture spike after the 100k conversion/training smoke succeeded.",
+  "goal": "Test whether the Reckless-like Bullet architecture is practical at 512 hidden after 768 hidden loaded correctly but was too slow in Enyo.",
   "create": {
-    "name": "bullet-reckless-spike-768h-1m-sb64",
+    "name": "bullet-reckless-spike-512h-1m-sb64",
     "backend": "bullet",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "bullet_rows": 1000000,
     "bullet_max_abs_cp": 1600,
-    "bullet_hidden": 768,
+    "bullet_hidden": 512,
     "bullet_l2": 16,
     "bullet_batch_size": 2048,
     "bullet_batches": 64,
@@ -22,17 +22,17 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "Bullet/Reckless-like 768-hidden 1M-row scale run",
+    "status": "Bullet/Reckless-like 512-hidden 1M-row scale run",
     "success_condition": [
       "Bullet text conversion and BulletFormat validation pass",
       "training writes quantised.bin checkpoints",
-      "Enyo can load the selected quantised.bin checkpoint",
-      "Bullet parity and direct eval benchmark remain sane"
+      "Enyo can load the selected 512-hidden quantised.bin checkpoint",
+      "Bullet parity and direct eval benchmark improve materially versus 768-hidden (~1.8M eval/s)"
     ],
     "next_after_success": [
-      "copy selected quantised.bin into an Enyo test path",
       "run evalnet load/check/bench on pwa-5090",
-      "do not run SPRT until Bullet eval speed is acceptable or the checkpoint shows exceptional static/move-choice signal"
+      "compare 512-hidden speed against the previous 768-hidden checkpoint",
+      "only consider SPRT if speed is acceptable and validation signal is exceptional"
     ]
   }
 }
