@@ -225,6 +225,7 @@ def create_config(args: argparse.Namespace) -> dict:
             ])
         train_command.extend([
             "--objective", args.objective,
+            "--forward", args.forward,
             "--huber-beta", str(args.huber_beta),
             "--select-metric", args.select_metric,
             "--wdl-lambda", str(args.wdl_lambda),
@@ -452,6 +453,8 @@ def add_create_args(
                         choices=["kaiming", "berserk-ish"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
+    parser.add_argument("--forward", default=value("forward", d.forward),
+                        choices=["float", "quantized"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
     parser.add_argument("--huber-beta", type=int, default=value("huber_beta", d.huber_beta))
     parser.add_argument("--wdl-lambda", type=float, default=value("wdl_lambda", d.wdl_lambda))

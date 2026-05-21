@@ -159,6 +159,12 @@ Rejected lanes:
     `50%` on the 20k validation slice.
   - Decision: this scale survives export, but LR `1e-4` is far too low for
     scratch learning. Increase LR before scaling rows.
+- scratch `berserk-ish` 100k-row `1e-2` export-scale preflight:
+  - Export matched float: float `.pt` MAE `141.041`, sign `63.04%`; exported
+    `.nn` MAE `141.056`, sign `63.02%`.
+  - Learning is much slower than Kaiming, but the result survives export.
+  - Decision: implement export-aware quantized-forward training so Kaiming can
+    learn while optimizing the rounded int16/int8 path Enyo actually loads.
 
 Conclusion:
 
@@ -267,11 +273,11 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the scratch export-scale check in `build.json`.
+Run the scratch quantized-forward check in `build.json`.
 
 Next branch:
 
-- Enyo-owned scratch export-scale preflight.
+- Enyo-owned scratch quantized-forward preflight.
 - Active recipe: `./build.py -c build.json`.
 
 Reason:
@@ -289,10 +295,10 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 100k-row `berserk-ish` scratch preflight from `build.json`.
+- Run the 100k-row Kaiming scratch preflight from `build.json` with
+  `forward: "quantized"`.
 - Compare float `.pt` validation against exported `.nn` validation.
-- If exported `.nn` still diverges badly from float `.pt`, implement
-  export-aware or fake-quantized training before scaling rows again.
+- If quantized-forward training learns and export matches, scale rows.
 
 Deferred Bullet decision:
 
@@ -338,15 +344,16 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-berserkish-100k-lr1e2-e10`
-- selected branch: scratch Enyo-owned export-scale preflight
+- candidate name: `scratch-kaiming-100k-quant-lr1e2-e10`
+- selected branch: scratch Enyo-owned quantized-forward preflight
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
-- initializer: scratch `berserk-ish`; no Berserk init net
+- initializer: scratch `kaiming`; no Berserk init net
+- forward path: export-aware quantized int16/int8 forward
 - objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `10`
 - trainable weights: `all`
 - row limit: `100k` train rows plus `20k` validation rows

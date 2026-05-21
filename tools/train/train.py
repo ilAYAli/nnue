@@ -38,6 +38,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--data", str(expand_path(args.data)),
         "--out", str(expand_path(args.out)),
         "--objective", args.objective,
+        "--forward", args.forward,
         "--huber-beta", str(args.huber_beta),
         "--select-metric", args.select_metric,
         "--wdl-lambda", str(args.wdl_lambda),
@@ -104,6 +105,8 @@ def build_parser() -> argparse.ArgumentParser:
                        choices=["kaiming", "berserk-ish"])
     train.add_argument("--objective", default="mpe25",
                        choices=["mse", "huber", "mpe25"])
+    train.add_argument("--forward", default="float",
+                       choices=["float", "quantized"])
     train.add_argument("--huber-beta", type=float, default=200.0)
     train.add_argument("--select-metric", default="loss",
                        choices=["loss", "mse", "mae", "sign"])
