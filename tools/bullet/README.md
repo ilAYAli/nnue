@@ -21,8 +21,9 @@ This path currently writes Bullet checkpoints under:
 runs/<run>/train/<name>/checkpoints/
 ```
 
-It does not yet export an Enyo-loadable `.nn`. Use it to test whether Bullet
-training and richer architectures are worth porting into Enyo.
+It does not export a normal Enyo `.nn`. The experimental Enyo branch can load
+these raw `quantised.bin` checkpoints directly for architecture tests, but the
+current search path is still too slow for serious SPRT.
 
 Inspect a checkpoint:
 
@@ -31,7 +32,8 @@ tools/bullet/inspect_checkpoint.py \
   runs/bullet-reckless-spike-100k/train/bullet-reckless-spike-100k/checkpoints/bullet-reckless-spike-100k-2
 ```
 
-The current spike writes `quantised.bin` as raw tensors with no header:
+The current 1024-hidden spike writes `quantised.bin` as raw tensors with no
+header:
 
 ```text
 l0w  i16  [1024, 7680]  input weights, 10 mirrored king buckets
@@ -45,8 +47,19 @@ l3b  f32  [8]
 ```
 
 That architecture is not the same as Enyo's current exported `.nn` format. A
-real Bullet/Reckless-like candidate needs an Enyo evaluator/loader for this
-layout, or a Bullet trainer configured to save exactly Enyo's current layout.
+smaller 768-hidden checkpoint uses the same layout with the first two tensor
+dimensions adjusted:
+
+```text
+l0w  i16  [768, 7680]
+l0b  i16  [768]
+l1w  i8   [128, 768]
+```
+
+A real Bullet/Reckless-like candidate now needs speed work on the Enyo
+evaluator/head path, or a Bullet trainer configured to save exactly Enyo's
+current layout if the goal is faster tooling rather than this richer
+architecture.
 
 On RTX 50-series GPUs with CUDA 12.4, `--bullet-cuda-arch auto` patches Bullet's
 cached CUDA runtime to use `compute_90`, because NVRTC rejects `sm_120`.
