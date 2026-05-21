@@ -141,6 +141,19 @@ Rejected lanes:
   - Decision: scratch learning is real, but the net is still badly biased and
     much weaker by sign. Scale once more to 1M rows before deciding whether the
     scratch baseline deserves longer schedules or a different objective.
+- scratch/Kaiming 1M-row `1e-2` scale check:
+  - 1M train rows, 200k validation rows, Huber cp800, 20 epochs.
+  - Float training looked viable: validation peaked around epoch 4-5 with MAE
+    about `97-98` and sign about `84.7%`.
+  - Exported `.nn` was much worse than the float `.pt` checkpoint on the same
+    validation rows: float `.pt` MAE `98.357`, sign `84.71%`, bias `-6cp`;
+    exported `.nn` MAE `168.067`, sign `66.15%`, bias `-146cp`.
+  - Root cause: Kaiming-scale scratch weights are fractional in Enyo's raw
+    integer export format. Export rounds away too much signal and shifts the
+    eval badly.
+  - Decision: stop scaling Kaiming. Test an export-scale-compatible scratch
+    initializer or add export-aware/fake-quantized training before any larger
+    scratch run.
 
 Conclusion:
 
@@ -249,11 +262,11 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the scratch scale check in `build.json`.
+Run the scratch export-scale check in `build.json`.
 
 Next branch:
 
-- Enyo-owned scratch/Kaiming baseline scale check.
+- Enyo-owned scratch export-scale preflight.
 - Active recipe: `./build.py -c build.json`.
 
 Reason:
@@ -271,11 +284,10 @@ Reason:
 
 Immediate scratch decision:
 
-- Run the 1M-row LR `1e-2` scratch schedule from `build.json`.
-- Compare static validation against the current Berserk-derived reference on
-  the same packed rows.
-- If the 1M run still has very poor sign or large bias, stop treating this as a
-  promotion path and use scratch only as a long-term provenance baseline.
+- Run the 100k-row `berserk-ish` scratch preflight from `build.json`.
+- Compare float `.pt` validation against exported `.nn` validation.
+- If exported `.nn` still diverges badly from float `.pt`, implement
+  export-aware or fake-quantized training before scaling rows again.
 
 Deferred Bullet decision:
 
@@ -321,18 +333,18 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-kaiming-1m-lr1e2-e20`
-- selected branch: scratch Enyo-owned baseline scale check
+- candidate name: `scratch-berserkish-100k-lr1e4-e10`
+- selected branch: scratch Enyo-owned export-scale preflight
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
-- initializer: scratch `kaiming`; no Berserk init net
-- objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `20`
+- initializer: scratch `berserk-ish`; no Berserk init net
+- objective: Huber, clamp `800`, beta `200`, lr `1e-4`, epochs `10`
 - trainable weights: `all`
-- row limit: `1M` train rows plus `200k` validation rows
+- row limit: `100k` train rows plus `20k` validation rows
 - checkpoint selection: `sign`, patience disabled
 
 Rules:

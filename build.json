@@ -1,40 +1,40 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "scratch-kaiming-scale-check",
-  "goal": "Scale the clean Enyo-owned scratch initialization after the 10k/100k preflights showed real gradient flow and learning.",
+  "experiment": "scratch-export-scale-check",
+  "goal": "Test a scratch initializer whose scale survives Enyo's raw integer .nn export.",
   "create": {
-    "name": "scratch-kaiming-1m-lr1e2-e20",
+    "name": "scratch-berserkish-100k-lr1e4-e10",
     "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pack_limit": 1200000,
+    "pack_limit": 120000,
     "init_net": null,
-    "init": "kaiming",
+    "init": "berserk-ish",
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.01,
-    "epochs": 20,
+    "lr": 0.0001,
+    "epochs": 10,
     "batch_size": 4096,
     "device": "cuda",
     "workers": 2,
-    "max_rows": 1000000,
-    "val_rows": 200000,
-    "grad_norm_every": 250,
+    "max_rows": 100000,
+    "val_rows": 20000,
+    "grad_norm_every": 20,
     "select_metric": "sign",
     "patience": 0,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "scale check",
+    "status": "export-scale preflight",
     "success_condition": [
       "training loss decreases across epochs",
       "gradient norms are nonzero for sparse input, L1, L2, and output layers",
       "exported model.nn is non-empty and can be evaluated by static validation"
     ],
     "next_after_success": [
-      "compare static validation against the current reference net on the same packed rows",
-      "compare against an identical current-reference-initialized control",
-      "only then consider failure-suite and SPRT gates"
+      "compare float .pt validation against exported .nn validation",
+      "increase LR or add fake/export-aware quantization if export is still destructive",
+      "only scale rows after exported .nn roughly matches float .pt behavior"
     ]
   }
 }
