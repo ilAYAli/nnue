@@ -54,6 +54,10 @@ Rejected lanes:
   - Failure-suite gate was aggregate-positive but tail-negative:
     `candidate_better=68`, `reference_better=54`, `sum_diff_cp=+1491`,
     `worst_regression_cp=-448`.
+  - Expanded-legacy sanity check was clean: the legacy 16-bucket net expanded
+    to 32 buckets produced zero replay-gate differences against the legacy net
+    over the same 913 positions. That points to the training result, not the
+    feature-map conversion, as the source of the tail regressions.
   - Decision: no SPRT. The tail regression violates the gate.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
