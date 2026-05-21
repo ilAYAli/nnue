@@ -19,7 +19,7 @@
     "bullet_final_lr": 0.0003,
     "bullet_cuda_arch": "auto",
     "bullet_cargo_target_dir": "~/code/cpp/chess/nnue/runs/.cargo-target/bullet",
-    "event_command": "$HOME/scripts/nnue_event_ntfy.sh"
+    "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "status": "Bullet backend currently produces Bullet checkpoints only.",

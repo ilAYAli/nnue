@@ -139,7 +139,7 @@ def candidate_nets(run_dir: Path) -> list[Path]:
 def validation_commands(run_dir: Path, net: Path) -> list[str]:
     validate = repo_root() / "tools" / "validate" / "validate.py"
     tag = f"{run_dir.name}_smoke"
-    event_command = '"$HOME/scripts/nnue_event_ntfy.sh"'
+    event_command = f'"{repo_root() / "tools" / "events" / "nnue_event_ntfy.sh"}"'
     return [
         (
             f"{validate} static --net {net} --data {run_dir / 'pack' / 'train'} "

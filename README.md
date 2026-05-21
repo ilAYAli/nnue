@@ -73,7 +73,7 @@ Experimental Bullet/Reckless-like architecture spike:
   --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl \
   --bullet-rows 100000 \
   --bullet-superbatches 2 \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 ```
 
 This verifies Bullet conversion/training under the normal pipeline/event
@@ -122,12 +122,14 @@ Depth-12 self-play candidate with event notifications:
   --name d12-d16-huber-cp800 \
   --selfplay-depth 12 \
   --selfplay-games 120000 \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 ```
 
 `--event-command` must point to a script that exists on the machine running the
-build command. The repo emits generic JSON events; ntfy and personal
-routing stay outside the repo.
+build command. The tracked `tools/events/nnue_event_ntfy.sh` hook sends build
+events to `https://ntfy.wahlman.no/nnue` and phase-completion prompts to
+`https://ntfy.wahlman.no/AI_stdin`. Override with `NNUE_NTFY_URL` and
+`NNUE_AI_STDIN_URL` if needed.
 
 Dry-run the generated pipeline without starting work:
 
@@ -231,7 +233,7 @@ tools/validate/validate.py net-diff \
   --candidate runs/d12-d16-huber-cp800/train/d12-d16-huber-cp800/model.nn \
   --reference ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
   --fail-if-identical \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 
 tools/validate/validate.py static \
   --net runs/d12-d16-huber-cp800/train/d12-d16-huber-cp800/model.nn \
@@ -239,14 +241,14 @@ tools/validate/validate.py static \
   --rows 100000 \
   --buckets \
   --sources \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 
 tools/validate/validate.py sprt \
   --net runs/d12-d16-huber-cp800/train/d12-d16-huber-cp800/model.nn \
   --run runs/d12-d16-huber-cp800 \
   --games 1000 \
   --tag d12_d16_smoke \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 ```
 
 ## Important Docs
