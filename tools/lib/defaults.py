@@ -37,6 +37,7 @@ class CandidateDefaults:
     reference_engine: str = "~/code/cpp/chess/assets/engines/reference"
     sprt: str = "~/code/cpp/chess/sprt/sprt"
     run_base: str = "~/code/cpp/chess/nnue/runs"
+    labeled_jsonl: str = ""
 
     selfplay_games: int = 160000
     selfplay_shard_games: int = 1000

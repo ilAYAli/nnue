@@ -24,6 +24,26 @@ Rejected lanes:
   unacceptable tail regressions.
 - old-pool instability/disagreement blends: diagnostically useful, but not
   enough for SPRT promotion.
+- learned material/phase head input:
+  - all-weights training improved static MAE slightly, but failed the
+    failure-suite gate: `candidate_better=64`, `reference_better=55`,
+    `sum_diff_cp=+561`, `worst_regression_cp=-563`.
+  - float-head-only training improved scalar MAE much more, but regressed
+    move choice: `candidate_better=70`, `reference_better=74`,
+    `sum_diff_cp=-31`, `worst_regression_cp=-563`.
+  - phase-column-only training was behaviorally identical to the reference:
+    `candidate_better=0`, `reference_better=0`, `sum_diff_cp=0`.
+  - Conclusion: this head-level material/phase signal is either harmful or
+    too weak/no-op in the current architecture.
+  - Process lesson: the phase-column-only no-op should have been caught by a
+    known-FEN activation and export-delta check before training. The all-weights
+    run changed move choices, so the feature path was not completely dead, but
+    future architecture branches must prove the feature affects exported evals
+    before spending training time.
+- aggregate-positive/tail-negative experiments are a repeated failure mode:
+  material/phase all-weights and hardcase fine-tunes both improved some
+  positions while introducing unacceptable worst-case regressions. Tail risk is
+  now a hard veto, not just a note.
 - folded 8-king-bucket shortcut: clearly negative as a drop-in net.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
@@ -43,11 +63,13 @@ Priority order:
 
 1. Architecture/features.
    - This is the primary lane.
-   - First branch: learned material/phase head input.
-   - This is deliberately lower risk than king-bucket changes because it should
-     not change sparse feature indexing, accumulator updates, or `.nn` input
-     row count.
+   - First branch, learned material/phase head input, failed the pre-SPRT
+     gates and should not be SPRT-tested.
+   - Next branch: proper king-bucket refinement with full trainer/engine
+     support, not another folded/drop-in shortcut.
    - Verify feature extraction, export/load, and roundtrip before training.
+   - Verify at least one known FEN where the new feature changes the exported
+     eval before training.
    - Benchmark NPS before training; pause and optimize first if NPS drops more
      than about `3-5%`.
    - If NPS loss is above that threshold, require much stronger pre-SPRT
@@ -56,6 +78,9 @@ Priority order:
      conversions as evidence.
    - Do not widen the net until at least one small feature/bucket experiment
      has failed cleanly.
+   - Material/phase has now failed, so widening is allowed only as a
+     fallback-of-last-resort after king-bucket failure analysis, not as the next
+     default move.
 
 2. Stronger or different teacher data.
    - Treat Stockfish d16 as the bulk baseline, not the ceiling.
@@ -92,30 +117,35 @@ Priority order:
 
 Run exactly one architecture/feature branch first.
 
-Preferred first branch:
+Next branch:
 
-- learned material/phase head input.
+- proper king-bucket refinement.
 
 Reason:
 
-- low implementation risk.
-- easy known-FEN activation tests.
-- plausible effect on conversion, defense, and endgame calibration.
-- less invasive than king-bucket refinement or widening the net.
+- materially changes the representation instead of adding another scalar head
+  hint.
+- directly targets the likely weakness: king-local piece-square context under
+  search.
+- must be trained properly with matching engine/trainer feature extraction.
+- previous folded/drop-in bucket shortcut is not evidence against a real
+  retrain.
 
 Anti-confounding rule:
 
 - Do not change architecture and data source in the same first candidate.
 - Reuse the best-understood training source for the first architecture test:
-  the current signed-balanced d12 self-play plus Stockfish-d16 label recipe
-  expressed through `build.py`.
-- Because this moves the recipe through the new `build.py` pipeline, run the
-  pack/static/roundtrip sanity checks before training starts.
+  the current signed-balanced d12 self-play plus Stockfish-d16 labels.
+- Use `build.py --labeled-jsonl` so the first architecture test repacks the
+  existing labels with the new feature map instead of generating fresh
+  self-play or relabeling.
+- Because this moves the recipe through the new `build.py` pack/train path,
+  run the pack/static/roundtrip sanity checks before training starts.
 
 Fallback:
 
-- king-bucket refinement with full trainer/engine support, trained properly.
-- Do not use another folded/drop-in shortcut as evidence.
+- If proper king-bucket refinement also fails gates, stop bulk training and
+  reassess base net, feature family, and teacher/source assumptions.
 
 ## Candidate Workflow
 
@@ -127,12 +157,14 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `arch-material-phase-v1`
-- selected branch: learned material/phase head input
+- candidate name: `arch-kingbucket-v1`
+- selected branch: proper king-bucket refinement
 - self-play depth: `12`
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
-- score depth: `16`
+- labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
+- label provenance: Stockfish depth `16`; `build.py` skips scoring because
+  `labeled_jsonl` is set.
 - objective: Huber, clamp `800`, beta `200`, lr `7e-7`, epochs `8`
 - checkpoint selection: `sign`, patience `2`
 
@@ -159,10 +191,13 @@ Static validation:
 Move-choice/failure-suite gate:
 
 - Use candidate/reference/oracle replay CSV where possible.
-- Current status: gate logic exists, but the committed baseline suite/status is
-  not yet recorded.
-- Blocker before architecture training starts: record the suite path, position
-  count, current-reference baseline numbers, and command used to produce them.
+- Current status: baseline is recorded in
+  `assets/failure_suite/baseline_reference_b19794a.md`.
+- Baseline: `913` positions, same-reference run,
+  `candidate_better=0`, `reference_better=0`, `sum_diff_cp=0`,
+  `worst_regression_cp=0`.
+- Before architecture training starts, run the branch-specific feature
+  activation and roundtrip checks. Do not skip them because the baseline exists.
 - Track move-choice correlation metrics, not only scalar eval deltas:
   - top-move agreement.
   - top-3 overlap.
@@ -215,9 +250,19 @@ Use this sequence for the next serious attempt:
 
 1. Freeze the current reference net, validation commands, and failure-suite
    input.
-2. Implement exactly one branch: learned material/phase head input.
-3. Add known-FEN feature activation checks.
-4. Add export/load/roundtrip checks.
+2. Implement exactly one branch: proper king-bucket refinement.
+3. Add known-FEN feature activation checks:
+   `tools/validate/<branch>_features.py`.
+   Required cases:
+   - both kings in each bucket.
+   - castling before and after.
+   - mirrored positions.
+   - king near a bucket boundary.
+   - quiet non-king move should not change the king bucket.
+   - king move across a boundary should change only the expected bucket and
+     trigger only the expected accumulator refresh.
+4. Add export/load/roundtrip checks:
+   `tools/validate/roundtrip.py`.
 5. Benchmark NPS before training; do not continue if the branch costs more
    than about `3-5%` NPS without optimization.
 6. Train one candidate with `build.py`.
@@ -226,11 +271,12 @@ Use this sequence for the next serious attempt:
 
 If this architecture branch fails gates or SPRT:
 
-- Try at most one more independent small architecture branch before reassessing.
-- The next best candidate is king-bucket refinement with full trainer/engine
-  support, not a folded conversion.
-- If two independent architecture branches fail, stop spending bulk GPU/search
-  time and reassess base net, architecture family, and teacher source.
+- Do not launch another bulk candidate immediately.
+- First inspect whether the failure came from implementation, NPS cost, sparse
+  buckets, bad bucket geometry, quantization/export mismatch, or true lack of
+  signal.
+- If that analysis still points to true lack of signal, reassess base net,
+  architecture family, and teacher source before widening the net.
 
 ## Historical Notes
 
