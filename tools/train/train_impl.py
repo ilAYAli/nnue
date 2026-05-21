@@ -313,7 +313,7 @@ def main() -> None:
     ap.add_argument("--init-from-nn", default=None,
                     help="Start from an existing Berserk-format .nn")
     ap.add_argument("--init", default="kaiming",
-                    choices=["kaiming", "berserk-ish"])
+                    choices=["kaiming", "quantized-kaiming", "berserk-ish"])
     ap.add_argument("--forward", default="float",
                     choices=["float", "quantized"],
                     help="Use float training forward or export-aware rounded int16/int8 forward with straight-through gradients.")

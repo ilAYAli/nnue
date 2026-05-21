@@ -102,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--out-nn")
     train.add_argument("--init-from-nn")
     train.add_argument("--init", default="kaiming",
-                       choices=["kaiming", "berserk-ish"])
+                       choices=["kaiming", "quantized-kaiming", "berserk-ish"])
     train.add_argument("--objective", default="mpe25",
                        choices=["mse", "huber", "mpe25"])
     train.add_argument("--forward", default="float",

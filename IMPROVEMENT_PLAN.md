@@ -165,6 +165,13 @@ Rejected lanes:
   - Learning is much slower than Kaiming, but the result survives export.
   - Decision: implement export-aware quantized-forward training so Kaiming can
     learn while optimizing the rounded int16/int8 path Enyo actually loads.
+- scratch Kaiming 100k-row quantized-forward preflight:
+  - Float/export matched, but the run was a no-op: both MAE `143.151` and sign
+    `50.05%`.
+  - Input/L1 gradient norms stayed zero because rounded Kaiming starts with
+    zero exported input/L1 tensors.
+  - Decision: use a quantization-compatible Kaiming initializer with integer
+    scale for input/L1 and Kaiming scale for the dense float head.
 
 Conclusion:
 
@@ -344,7 +351,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-kaiming-100k-quant-lr1e2-e10`
+- candidate name: `scratch-qkaiming-100k-quant-lr1e2-e10`
 - selected branch: scratch Enyo-owned quantized-forward preflight
 - self-play depth: `12`
 - self-play seed: `2026052111`
@@ -352,7 +359,7 @@ Current `build.json` intent:
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
-- initializer: scratch `kaiming`; no Berserk init net
+- initializer: scratch `quantized-kaiming`; no Berserk init net
 - forward path: export-aware quantized int16/int8 forward
 - objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `10`
 - trainable weights: `all`
