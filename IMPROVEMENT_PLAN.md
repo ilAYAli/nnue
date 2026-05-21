@@ -332,15 +332,14 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Stop net farming and diagnose why Bullet improves scalar/gate metrics while
-losing badly in search.
+Use the completed Bullet SPRT-failure diagnostic to run exactly one broader
+targeted candidate.
 
 Next branch:
 
-- Search-aware diagnostics from the rejected Bullet SPRT.
-- Active recipe: keep `build.json` as the last attempted Bullet move-choice
-  blend, but do not launch another training run from it until the diagnostics
-  identify a broader signal.
+- Bullet/Reckless-like 512-hidden SPRT-failure move-choice blend.
+- Active recipe: `build.json` points at broad d12/d16 labels plus repeated
+  child rows from the rejected Bullet SPRT positions.
 
 Reason:
 
@@ -348,19 +347,18 @@ Reason:
   all failed to produce playable search strength.
 - The narrow repeated-tail gate can be overfit without solving general move
   choice.
-- The current failure is no longer "not enough rows"; it is a mismatch between
-  scalar labels and the search decisions Enyo needs.
+- The rejected `sb112` checkpoint was bad on actual failed-SPRT move choices:
+  candidate `top1=3/60`, `top3=19/60`, `sum_gap=6567`; reference `top1=30/60`,
+  `top3=46/60`, `sum_gap=841`.
+- This is a concrete search-aware signal. Train one candidate against it, then
+  stop again if the broader gate does not improve.
 
 Immediate action:
 
-- Extract losing SPRT positions where Bullet and the reference choose different
-  moves.
-- Score legal moves with the oracle for a larger, less overfit move-choice
-  gate.
-- Compare Bullet/reference eval ranking on those positions.
-- Only train another Bullet candidate if the new gate suggests a concrete
-  signal, such as move-ranking loss, instability weighting, or targeted
-  teacher labels.
+- Generate child rows from the scored SPRT-failure legal moves.
+- Blend those rows with the broad d12/d16 pool.
+- Train one 512-hidden Bullet candidate through `./build.py -c build.json`.
+- Sweep checkpoints against the SPRT-failure gate before considering any SPRT.
 
 Deferred Bullet decisions:
 
@@ -405,8 +403,8 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `bullet-reckless-512h-movechoice-wdl0-sb128`
-- selected branch: Bullet/Reckless-like move-choice/broad blend
+- candidate name: `bullet-reckless-512h-sprtfail-wdl0-sb128`
+- selected branch: Bullet/Reckless-like SPRT-failure move-choice/broad blend
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
@@ -416,7 +414,7 @@ Current `build.json` intent:
 - backend: `bullet`
 - Bullet architecture: `512` hidden, `16` L2, pairwise-mul hidden, material
   bucketed head
-- row input: broad d12/d16 labels plus repeated scored move-choice child rows
+- row input: broad d12/d16 labels plus repeated scored failed-SPRT child rows
 - schedule: `64` batches per superbatch, `128` superbatches, lr `0.001 ->
   0.0001`
 
