@@ -94,6 +94,15 @@ def score_loss(pred: torch.Tensor, target: torch.Tensor,
     return losses.mean()
 
 
+def model_forward(model: EnyoNNUE, w: torch.Tensor, b: torch.Tensor,
+                  w_off: torch.Tensor, b_off: torch.Tensor,
+                  stm: torch.Tensor, phase_scale: torch.Tensor,
+                  args: argparse.Namespace) -> torch.Tensor:
+    if args.forward == "quantized":
+        return model.quantized_forward(w, b, w_off, b_off, stm, phase_scale)
+    return model(w, b, w_off, b_off, stm, phase_scale)
+
+
 def selection_value(metrics: dict[str, float], args: argparse.Namespace) -> float:
     value = metrics[args.select_metric]
     return -value if args.select_metric == "sign" else value
@@ -127,7 +136,7 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
         source_ids = source_ids.to(args.device)
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-        pred = model(w, b, w_off, b_off, stm, phase_scale)
+        pred = model_forward(model, w, b, w_off, b_off, stm, phase_scale, args)
         loss = score_loss(pred, y, wdl, source_ids, args)
         err = pred - y
         sign_mask = y != 0
@@ -236,7 +245,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             if args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
 
-            pred = model(w, b, w_off, b_off, stm, phase_scale)
+            pred = model_forward(model, w, b, w_off, b_off, stm, phase_scale, args)
             loss = score_loss(pred, y, wdl, source_ids, args)
 
             opt.zero_grad()
@@ -305,6 +314,9 @@ def main() -> None:
                     help="Start from an existing Berserk-format .nn")
     ap.add_argument("--init", default="kaiming",
                     choices=["kaiming", "berserk-ish"])
+    ap.add_argument("--forward", default="float",
+                    choices=["float", "quantized"],
+                    help="Use float training forward or export-aware rounded int16/int8 forward with straight-through gradients.")
     ap.add_argument("--objective", default="mpe25",
                     choices=["mse", "huber", "mpe25"])
     ap.add_argument("--huber-beta", type=float, default=200.0,
