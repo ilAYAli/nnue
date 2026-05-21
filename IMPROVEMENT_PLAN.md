@@ -40,14 +40,19 @@ Priority order:
 
 1. Architecture/features.
    - This is the primary lane.
-   - Choose one small, auditable feature or bucket change.
+   - First branch: learned material/phase head input.
+   - This is deliberately lower risk than king-bucket changes because it should
+     not change sparse feature indexing, accumulator updates, or `.nn` input
+     row count.
    - Verify feature extraction, export/load, and roundtrip before training.
-   - Benchmark NPS before any long SPRT.
+   - Benchmark NPS before training; pause and optimize first if NPS drops more
+     than about `3-5%`.
+   - If NPS loss is above that threshold, require much stronger pre-SPRT
+     evidence before spending games.
    - Train the changed architecture properly. Do not treat folded/drop-in
      conversions as evidence.
-   - Prefer first experiments like king-bucket refinement, material/phase
-     feature or bucket, side-to-move/tempo feature, or endgame bucket/scale.
-   - Avoid a wide-network change as the first experiment.
+   - Do not widen the net until at least one small feature/bucket experiment
+     has failed cleanly.
 
 2. Stronger or different teacher data.
    - Treat Stockfish d16 as the bulk baseline, not the ceiling.
@@ -72,6 +77,31 @@ Priority order:
    - Manual step-by-step pipelines are historical/legacy only.
    - Planned recipes should be concrete `build.py create` commands, not prose.
 
+## Next Concrete Experiment
+
+Run exactly one architecture/feature branch first.
+
+Preferred first branch:
+
+- learned material/phase head input.
+
+Reason:
+
+- low implementation risk.
+- easy known-FEN activation tests.
+- plausible effect on conversion, defense, and endgame calibration.
+- less invasive than king-bucket refinement or widening the net.
+
+Anti-confounding rule:
+
+- Do not change architecture and data source in the same first candidate.
+- Reuse the best-understood training source for the first architecture test.
+
+Fallback:
+
+- king-bucket refinement with full trainer/engine support, trained properly.
+- Do not use another folded/drop-in shortcut as evidence.
+
 ## Candidate Workflow
 
 Normal candidate creation:
@@ -79,6 +109,17 @@ Normal candidate creation:
 ```sh
 ./build.py -c build.json
 ```
+
+Current `build.json` intent:
+
+- candidate name: `arch-material-phase-v1`
+- selected branch: learned material/phase head input
+- self-play depth: `12`
+- self-play seed: `2026052101`
+- skipped opening plies: `8`
+- score depth: `16`
+- objective: Huber, clamp `800`, beta `200`, lr `7e-7`, epochs `8`
+- checkpoint selection: `sign`, patience `2`
 
 Rules:
 
@@ -103,6 +144,9 @@ Static validation:
 Move-choice/failure-suite gate:
 
 - Use candidate/reference/oracle replay CSV where possible.
+- Current status: gate logic exists, but the committed baseline suite/status is
+  not yet recorded. Before the architecture candidate may start SPRT, record
+  the suite path, position count, and current-reference baseline numbers.
 - Required direction: candidate better count should exceed reference better
   count, aggregate cp diff should be positive, and tail regressions must be
   controlled.
@@ -113,6 +157,8 @@ Move-choice/failure-suite gate:
   - no new tactical regression worse than `-300cp`
 - These numbers are starting heuristics, not law. The principle is the
   important part: do not spend SPRT on nets with ugly tails.
+- A candidate that fails these gates can still be kept as diagnostic evidence,
+  but it must not consume long SPRT time.
 
 SPRT:
 
@@ -131,13 +177,22 @@ Use this sequence for the next serious attempt:
 
 1. Freeze the current reference net, validation commands, and failure-suite
    input.
-2. Choose exactly one feature/bucket branch.
+2. Implement exactly one branch: learned material/phase head input.
 3. Add known-FEN feature activation checks.
 4. Add export/load/roundtrip checks.
-5. Benchmark NPS before training.
+5. Benchmark NPS before training; do not continue if the branch costs more
+   than about `3-5%` NPS without optimization.
 6. Train one candidate with `build.py`.
 7. Run static validation plus failure-suite/move-choice gates.
 8. Start SPRT only if gates are clean.
+
+If this architecture branch fails gates or SPRT:
+
+- Try at most one more independent small architecture branch before reassessing.
+- The next best candidate is king-bucket refinement with full trainer/engine
+  support, not a folded conversion.
+- If two independent architecture branches fail, stop spending bulk GPU/search
+  time and reassess base net, architecture family, and teacher source.
 
 ## Historical Notes
 
