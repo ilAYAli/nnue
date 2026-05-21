@@ -1,22 +1,27 @@
 {
-  "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe; code changes for the selected architecture branch live in the engine/trainer code.",
-  "experiment": "proper-king-bucket-refinement-input-only",
-  "nps_gate": "pause and optimize first if the architecture branch costs more than about 3-5% NPS",
+  "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
+  "experiment": "scratch-owned-baseline-preflight",
+  "goal": "Train an Enyo-owned baseline from random Kaiming initialization, without Berserk weights.",
   "create": {
-    "name": "arch-kingbucket-input-v1",
+    "name": "scratch-owned-preflight-10k",
+    "init_net": null,
+    "init": "kaiming",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "selfplay_depth": 12,
-    "selfplay_seed": 2026052101,
+    "selfplay_seed": 2026052111,
     "skip_plies": 8,
     "score_depth": 16,
     "objective": "huber",
     "huber_beta": 200,
     "target_clamp": 800,
-    "lr": 0.0000003,
-    "epochs": 8,
-    "trainable": "input",
-    "select_metric": "sign",
-    "patience": 2,
+    "lr": 0.00001,
+    "epochs": 20,
+    "trainable": "all",
+    "max_rows": 10000,
+    "val_rows": 0,
+    "select_metric": "mae",
+    "patience": 0,
+    "grad_norm_every": 50,
     "event_command": "$HOME/scripts/nnue_event_ntfy.sh"
   },
   "validation": {
@@ -27,10 +32,11 @@
       "baseline_required_before_training": true
     },
     "required_before_sprt": [
+      "scratch preflight: loss decreases and gradient norms are non-zero",
       "static",
       "failure-suite",
       "move-choice gate",
-      "NPS benchmark for architecture changes"
+      "SPRT only if not obviously far weaker"
     ]
   }
 }

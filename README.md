@@ -54,6 +54,24 @@ self-play/scoring:
 This still repacks the data, so feature-index changes are reflected in the
 new tensors.
 
+To train an Enyo-owned net from scratch instead of fine-tuning the current
+reference net, set `init_net` to `null` in `build.json` or pass an empty
+`--init-net` value and choose an initializer:
+
+```json
+{
+  "create": {
+    "name": "scratch-huber-cp800",
+    "init_net": null,
+    "init": "kaiming",
+    "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
+  }
+}
+```
+
+This is the clean path for replacing the Berserk-derived net. It will likely
+start weaker and needs its own gates before it can become the reference.
+
 Before training an architecture branch, run its feature-map sanity check:
 
 ```sh
@@ -140,6 +158,7 @@ Inspect a run:
 --score-max-abs-cp CP
 
 --init-net PATH
+--init kaiming|berserk-ish
 --objective mse|huber|mpe25
 --target-clamp CP
 --huber-beta CP
@@ -150,6 +169,9 @@ Inspect a run:
 --device cpu|cuda
 --workers N
 --val-rows N
+--max-rows N
+--skip-rows N
+--grad-norm-every N
 --patience N
 --select-metric loss|mse|mae|sign
 --trainable all|input|float-head|output
