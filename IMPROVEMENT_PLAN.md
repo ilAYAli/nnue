@@ -84,8 +84,15 @@ Rejected lanes:
   - Local startpos `go nodes 100000` smoke: normal evaluator reached roughly
     `400k-900k` noisy NPS; Bullet from-scratch evaluator reached roughly
     `160k` NPS.
-  - Decision: do not run long Bullet SPRT until either the evaluator is made
-    incremental or a much stronger reason exists to accept the NPS loss.
+  - Enyo now supports incremental Bullet accumulators and both the original
+    1024-hidden smoke checkpoint and a smaller 768-hidden checkpoint. Parity
+    checks pass for both sizes.
+  - pwa-5090 `go nodes 1000000`, Threads=1:
+    - baseline Enyo: final reported line around `1.69M` NPS.
+    - Bullet 1024: final reported line around `0.20M` NPS.
+    - Bullet 768: final reported line around `0.44M` NPS.
+  - Decision: do not run Bullet SPRT yet. The 768 checkpoint is faster than
+    1024 but still roughly 4x slower than baseline.
 
 Conclusion:
 
@@ -216,9 +223,9 @@ Reason:
 
 Immediate Bullet decision:
 
-- Either optimize the Bullet spike layout in Enyo:
+- Either optimize the Bullet spike layout further in Enyo:
   10 input king buckets, 8 material output buckets, pairwise-mul hidden,
-  bucketed dense head, and incremental accumulator updates.
+  bucketed dense head, incremental accumulator updates, and a faster head path.
 - Or configure Bullet to train exactly Enyo's current `.nn` layout, which gives
   faster training tooling but not a Reckless-like architecture test.
 - Do not confuse these two goals.
