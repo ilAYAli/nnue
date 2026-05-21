@@ -1,4 +1,4 @@
-"""PyTorch model matching Enyo NNUE's Berserk-format architecture."""
+"""PyTorch model matching Enyo's exported NNUE architecture."""
 from __future__ import annotations
 
 import math

@@ -54,6 +54,12 @@ self-play/scoring:
 This still repacks the data, so feature-index changes are reflected in the
 new tensors.
 
+Before training an architecture branch, run its feature-map sanity check:
+
+```sh
+tools/validate/king_bucket_features.py --engine ~/code/cpp/chess/enyo/build/enyo
+```
+
 Small smoke run:
 
 ```sh

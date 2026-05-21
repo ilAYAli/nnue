@@ -1,7 +1,8 @@
-"""Python reference helpers for Enyo's Berserk-format NNUE.
+"""Python reference helpers for Enyo's exported NNUE.
 
-The constants and feature-index formula mirror src/nnue.hpp.  The file
-format is Berserk v13's .nn layout as loaded by NNUE::LoadNetwork().
+The constants and feature-index formula mirror Enyo's Network path in
+src/nnue_model.hpp. Legacy 16-bucket files can be expanded to the active
+32-bucket feature map for architecture experiments.
 """
 from __future__ import annotations
 
@@ -16,10 +17,12 @@ import numpy as np
 WHITE, BLACK = 0, 1
 PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6
 
-N_KING_BUCKETS = 16
+N_KING_BUCKETS = 32
+LEGACY_N_KING_BUCKETS = 16
 N_PIECE_TYPES = 12
 N_SQUARES = 64
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
+LEGACY_N_FEATURES = LEGACY_N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
 N_HIDDEN = 1024
 N_L1 = 2 * N_HIDDEN
 N_L2 = 16
@@ -40,15 +43,33 @@ NETWORK_SIZE = (
     + N_OUTPUT * np.dtype(np.float32).itemsize
 )
 
+LEGACY_NETWORK_SIZE = (
+    LEGACY_N_FEATURES * N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_L1 * N_L2 * np.dtype(np.int8).itemsize
+    + N_L2 * np.dtype(np.int32).itemsize
+    + N_L2 * N_L3 * np.dtype(np.float32).itemsize
+    + N_L3 * np.dtype(np.float32).itemsize
+    + N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+    + N_OUTPUT * np.dtype(np.float32).itemsize
+)
+
 KING_BUCKETS: tuple[int, ...] = (
-    15, 15, 14, 14, 14, 14, 15, 15,
-    15, 15, 14, 14, 14, 14, 15, 15,
-    13, 13, 12, 12, 12, 12, 13, 13,
-    13, 13, 12, 12, 12, 12, 13, 13,
-    11, 10,  9,  8,  8,  9, 10, 11,
+    31, 30, 29, 28, 28, 29, 30, 31,
+    27, 26, 25, 24, 24, 25, 26, 27,
+    23, 22, 21, 20, 20, 21, 22, 23,
+    19, 18, 17, 16, 16, 17, 18, 19,
+    15, 14, 13, 12, 12, 13, 14, 15,
     11, 10,  9,  8,  8,  9, 10, 11,
      7,  6,  5,  4,  4,  5,  6,  7,
      3,  2,  1,  0,  0,  1,  2,  3,
+)
+
+LEGACY_BUCKET_FOR_BUCKET: tuple[int, ...] = (
+     0,  1,  2,  3,  4,  5,  6,  7,
+     8,  9, 10, 11,  8,  9, 10, 11,
+    12, 12, 13, 13, 12, 12, 13, 13,
+    14, 14, 15, 15, 14, 14, 15, 15,
 )
 
 _FEN_PIECE = {
@@ -136,9 +157,11 @@ def phase_scale_from_pieces(pieces: Sequence[tuple[int, int, int]]) -> float:
 
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
-    if len(data) != NETWORK_SIZE:
+    if len(data) not in (LEGACY_NETWORK_SIZE, NETWORK_SIZE):
         raise ValueError(
-            f"{path}: size {len(data)} != expected {NETWORK_SIZE}")
+            f"{path}: size {len(data)} != expected "
+            f"{LEGACY_NETWORK_SIZE} or {NETWORK_SIZE}")
+    legacy_layout = len(data) == LEGACY_NETWORK_SIZE
 
     off = 0
 
@@ -148,7 +171,19 @@ def load_net(path: str | Path) -> Net:
         off += arr.nbytes
         return arr.copy()
 
-    iw = take(np.int16, N_FEATURES * N_HIDDEN).reshape(N_FEATURES, N_HIDDEN)
+    if legacy_layout:
+        legacy_iw = take(np.int16, LEGACY_N_FEATURES * N_HIDDEN).reshape(
+            LEGACY_N_FEATURES, N_HIDDEN)
+        iw = np.empty((N_FEATURES, N_HIDDEN), dtype=np.int16)
+        bucket_stride = N_PIECE_TYPES * N_SQUARES
+        for bucket, legacy_bucket in enumerate(LEGACY_BUCKET_FOR_BUCKET):
+            src = slice(legacy_bucket * bucket_stride,
+                        (legacy_bucket + 1) * bucket_stride)
+            dst = slice(bucket * bucket_stride,
+                        (bucket + 1) * bucket_stride)
+            iw[dst] = legacy_iw[src]
+    else:
+        iw = take(np.int16, N_FEATURES * N_HIDDEN).reshape(N_FEATURES, N_HIDDEN)
     ib = take(np.int16, N_HIDDEN)
     l1w = take(np.int8, N_L1 * N_L2).reshape(N_L2, N_L1)
     l1b = take(np.int32, N_L2)

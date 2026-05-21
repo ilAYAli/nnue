@@ -66,7 +66,9 @@ Priority order:
    - First branch, learned material/phase head input, failed the pre-SPRT
      gates and should not be SPRT-tested.
    - Next branch: proper king-bucket refinement with full trainer/engine
-     support, not another folded/drop-in shortcut.
+     support, not another folded/drop-in shortcut. The first version uses 32
+     king buckets: each rank is split into four horizontally mirrored file
+     zones.
    - Verify feature extraction, export/load, and roundtrip before training.
    - Verify at least one known FEN where the new feature changes the exported
      eval before training.
