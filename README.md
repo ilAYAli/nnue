@@ -20,6 +20,28 @@ Validation is separate and lives under `tools/validate/`.
 
 ## Build A Net
 
+Current reviewed improvement run:
+
+```sh
+./build.py -c build.json
+```
+
+`build.json` is the committed active candidate recipe. Update it when the next
+experiment changes, so the intended run is visible in one diff. Command-line
+arguments override values from the file:
+
+```sh
+./build.py -c build.json --name local-smoke --selfplay-games 1000 --device cpu
+```
+
+Re-running the same `-c build.json` command resumes the same run by
+skipping phases with existing `.done` markers. Use `--force` to rerun phases.
+Generated run configs can also be relaunched the same way:
+
+```sh
+./build.py -c runs/d12-d16-huber-cp800/config.json
+```
+
 Small smoke run:
 
 ```sh
@@ -55,12 +77,9 @@ Dry-run the generated pipeline without starting work:
   --dry-run
 ```
 
-Resume or inspect a run:
+Inspect a run:
 
 ```sh
-./build.py resume runs/d12-d16-huber-cp800 \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
-
 ./build.py status runs/d12-d16-huber-cp800
 ./build.py status runs/d12-d16-huber-cp800 --tail 20
 ./build.py report runs/d12-d16-huber-cp800
@@ -71,6 +90,7 @@ Resume or inspect a run:
 ```text
 --name NAME
 --run-dir DIR
+-c, --config FILE
 --dry-run
 --force
 --event-command COMMAND

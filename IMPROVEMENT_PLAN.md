@@ -67,6 +67,8 @@ Priority order:
 4. Tooling.
    - Tooling work is justified only when it directly supports the lanes above.
    - New candidates must use `./build.py create`.
+   - The reviewed active recipe lives in `build.json` and should be updated in
+     the same commit as the experiment decision.
    - Manual step-by-step pipelines are historical/legacy only.
    - Planned recipes should be concrete `build.py create` commands, not prose.
 
@@ -75,24 +77,12 @@ Priority order:
 Normal candidate creation:
 
 ```sh
-./build.py create \
-  --name d12-d16-huber-cp800-lr7e7-e8 \
-  --selfplay-depth 12 \
-  --selfplay-seed 2026052101 \
-  --skip-plies 8 \
-  --score-depth 16 \
-  --objective huber \
-  --huber-beta 200 \
-  --target-clamp 800 \
-  --lr 7e-7 \
-  --epochs 8 \
-  --select-metric sign \
-  --patience 2 \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
+./build.py -c build.json
 ```
 
 Rules:
 
+- Commit `build.json` changes so the current intended run is reviewable.
 - Always record `--selfplay-seed`.
 - Treat `--skip-plies` as an opening-distribution knob.
 - Use `--select-metric` and `--patience`; do not blindly export the final epoch.

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import fields
 import json
+import os
 import subprocess
 import sys
 import time
@@ -15,11 +17,11 @@ from lib.defaults import DEFAULTS, repo_root
 
 
 def expand_path(value: str | Path) -> Path:
-    return Path(value).expanduser().resolve()
+    return Path(os.path.expandvars(str(value))).expanduser().resolve()
 
 
 def expand_user(value: str | Path) -> Path:
-    return Path(value).expanduser()
+    return Path(os.path.expandvars(str(value))).expanduser()
 
 
 def tool(path: str) -> str:
@@ -40,6 +42,76 @@ def run(command: list[str], *, dry_run: bool = False) -> int:
 
 def default_name() -> str:
     return time.strftime("candidate_%Y%m%d_%H%M%S")
+
+
+def normalize_key(key: str) -> str:
+    return key.strip().lstrip("-").replace("-", "_")
+
+
+def create_config_path(argv: list[str]) -> str | None:
+    if len(argv) < 2 or argv[1] != "create":
+        return None
+    args = argv[2:]
+    for i, item in enumerate(args):
+        if item in {"-c", "--config"}:
+            if i + 1 >= len(args):
+                raise SystemExit(f"{item} requires a path")
+            return args[i + 1]
+        if item.startswith("--config="):
+            return item.split("=", 1)[1]
+    return None
+
+
+def normalize_argv(argv: list[str]) -> list[str]:
+    if len(argv) > 1 and (argv[1] in {"-c", "--config"} or argv[1].startswith("--config=")):
+        return [argv[0], "create", *argv[1:]]
+    return argv
+
+
+def load_create_arg_defaults(path: str | Path | None) -> dict[str, object]:
+    if not path:
+        return {}
+
+    config_path = expand_path(path)
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"{config_path}: build config must be a JSON object")
+
+    if "create" in data:
+        create = data["create"]
+    elif "create_args" in data:
+        create = data["create_args"]
+    else:
+        create = {
+            key: value for key, value in data.items()
+            if not key.startswith("_")
+            and key not in {
+                "description",
+                "notes",
+                "rationale",
+                "validation",
+                "metadata",
+            }
+        }
+
+    if not isinstance(create, dict):
+        raise SystemExit(f"{config_path}: 'create' must be a JSON object")
+
+    allowed = {field.name for field in fields(DEFAULTS)}
+    allowed.update({"name", "run_dir", "dry_run", "force", "event_command"})
+    out: dict[str, object] = {"config": str(config_path)}
+    for raw_key, value in create.items():
+        key = normalize_key(str(raw_key))
+        if key in {"command", "config", "func"}:
+            continue
+        if key not in allowed:
+            raise SystemExit(f"{config_path}: unknown create argument '{raw_key}'")
+        out[key] = value
+    return out
+
+
+def config_default(overrides: dict[str, object], key: str, fallback: object) -> object:
+    return overrides.get(key, fallback)
 
 
 def run_dir_for(name: str, run_dir: str | None) -> Path:
@@ -178,7 +250,7 @@ def create_config(args: argparse.Namespace) -> dict:
         "create_args": {
             key: value
             for key, value in vars(args).items()
-            if key not in {"func"}
+            if key not in {"command", "config", "func"}
         },
         "steps": steps,
     }
@@ -198,21 +270,6 @@ def cmd_create(args: argparse.Namespace) -> int:
     config_path = write_config(run_dir, config)
     print(f"wrote {config_path}")
     command = [sys.executable, tool("pipeline/pipeline.py"), "launch", str(config_path)]
-    if args.force:
-        command.append("--force")
-    return run(command)
-
-
-def cmd_resume(args: argparse.Namespace) -> int:
-    run_dir = expand_path(args.run)
-    config = run_dir / "config.json"
-    if not config.exists():
-        config = run_dir / "config.yml"
-    if not config.exists():
-        raise SystemExit(f"missing config.json/config.yml in {run_dir}")
-    command = [sys.executable, tool("pipeline/pipeline.py"), "launch", str(config)]
-    if args.event_command:
-        command += ["--on-event", args.event_command]
     if args.force:
         command.append("--force")
     return run(command)
@@ -242,84 +299,86 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
-def add_create_args(parser: argparse.ArgumentParser) -> None:
+def add_create_args(
+    parser: argparse.ArgumentParser,
+    overrides: dict[str, object] | None = None,
+) -> None:
     d = DEFAULTS
-    parser.add_argument("--name")
-    parser.add_argument("--run-dir")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--force", action="store_true")
+    cfg = overrides or {}
+    value = lambda key, fallback: config_default(cfg, key, fallback)
+
+    parser.add_argument("-c", "--config", default=value("config", None),
+                        help="JSON create-argument config. CLI args override it.")
+    parser.add_argument("--name", default=value("name", None))
+    parser.add_argument("--run-dir", default=value("run_dir", None))
+    parser.add_argument("--dry-run", action="store_true",
+                        default=value("dry_run", False))
+    parser.add_argument("--force", action="store_true",
+                        default=value("force", False))
     parser.add_argument(
         "--event-command",
+        default=value("event_command", None),
         help="Optional event hook command. Event JSON is passed on stdin and in NNUE_RUN_EVENT_JSON.",
     )
 
-    parser.add_argument("--engine", default=d.engine)
-    parser.add_argument("--nnue-file", default=d.nnue_file)
-    parser.add_argument("--book", default=d.book)
-    parser.add_argument("--runner", default=d.runner)
-    parser.add_argument("--python", default=d.python)
+    parser.add_argument("--engine", default=value("engine", d.engine))
+    parser.add_argument("--nnue-file", default=value("nnue_file", d.nnue_file))
+    parser.add_argument("--book", default=value("book", d.book))
+    parser.add_argument("--runner", default=value("runner", d.runner))
+    parser.add_argument("--python", default=value("python", d.python))
 
-    parser.add_argument("--selfplay-games", type=int, default=d.selfplay_games)
-    parser.add_argument("--selfplay-shard-games", type=int, default=d.selfplay_shard_games)
-    parser.add_argument("--selfplay-concurrency", type=int, default=d.selfplay_concurrency)
-    parser.add_argument("--selfplay-threads", type=int, default=d.selfplay_threads)
-    parser.add_argument("--selfplay-hash", type=int, default=d.selfplay_hash)
-    parser.add_argument("--selfplay-depth", type=int, default=d.selfplay_depth)
-    parser.add_argument("--selfplay-seed", type=int, default=d.selfplay_seed)
+    parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
+    parser.add_argument("--selfplay-shard-games", type=int, default=value("selfplay_shard_games", d.selfplay_shard_games))
+    parser.add_argument("--selfplay-concurrency", type=int, default=value("selfplay_concurrency", d.selfplay_concurrency))
+    parser.add_argument("--selfplay-threads", type=int, default=value("selfplay_threads", d.selfplay_threads))
+    parser.add_argument("--selfplay-hash", type=int, default=value("selfplay_hash", d.selfplay_hash))
+    parser.add_argument("--selfplay-depth", type=int, default=value("selfplay_depth", d.selfplay_depth))
+    parser.add_argument("--selfplay-seed", type=int, default=value("selfplay_seed", d.selfplay_seed))
 
-    parser.add_argument("--skip-plies", type=int, default=d.skip_plies)
-    parser.add_argument("--source-max-abs-cp", type=int, default=d.source_max_abs_cp)
-    parser.add_argument("--sample-preset", default=d.sample_preset)
+    parser.add_argument("--skip-plies", type=int, default=value("skip_plies", d.skip_plies))
+    parser.add_argument("--source-max-abs-cp", type=int, default=value("source_max_abs_cp", d.source_max_abs_cp))
+    parser.add_argument("--sample-preset", default=value("sample_preset", d.sample_preset))
 
-    parser.add_argument("--score-engine", default=d.score_engine)
-    parser.add_argument("--score-depth", type=int, default=d.score_depth)
-    parser.add_argument("--score-shards", type=int, default=d.score_shards)
-    parser.add_argument("--score-threads", type=int, default=d.score_threads)
-    parser.add_argument("--score-hash", type=int, default=d.score_hash)
-    parser.add_argument("--score-max-abs-cp", type=int, default=d.score_max_abs_cp)
-    parser.add_argument("--score-progress", type=int, default=d.score_progress)
+    parser.add_argument("--score-engine", default=value("score_engine", d.score_engine))
+    parser.add_argument("--score-depth", type=int, default=value("score_depth", d.score_depth))
+    parser.add_argument("--score-shards", type=int, default=value("score_shards", d.score_shards))
+    parser.add_argument("--score-threads", type=int, default=value("score_threads", d.score_threads))
+    parser.add_argument("--score-hash", type=int, default=value("score_hash", d.score_hash))
+    parser.add_argument("--score-max-abs-cp", type=int, default=value("score_max_abs_cp", d.score_max_abs_cp))
+    parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
 
-    parser.add_argument("--max-features", type=int, default=d.max_features)
-    parser.add_argument("--pack-progress", type=int, default=d.pack_progress)
+    parser.add_argument("--max-features", type=int, default=value("max_features", d.max_features))
+    parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))
 
-    parser.add_argument("--init-net", default=d.init_net)
-    parser.add_argument("--objective", default=d.objective,
+    parser.add_argument("--init-net", default=value("init_net", d.init_net))
+    parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
-    parser.add_argument("--target-clamp", type=int, default=d.target_clamp)
-    parser.add_argument("--huber-beta", type=int, default=d.huber_beta)
-    parser.add_argument("--wdl-lambda", type=float, default=d.wdl_lambda)
-    parser.add_argument("--lr", type=float, default=d.lr)
-    parser.add_argument("--epochs", type=int, default=d.epochs)
-    parser.add_argument("--batch-size", type=int, default=d.batch_size)
-    parser.add_argument("--device", default=d.device)
-    parser.add_argument("--workers", type=int, default=d.workers)
-    parser.add_argument("--val-rows", type=int, default=d.val_rows)
-    parser.add_argument("--patience", type=int, default=d.patience)
-    parser.add_argument("--select-metric", default=d.select_metric,
+    parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
+    parser.add_argument("--huber-beta", type=int, default=value("huber_beta", d.huber_beta))
+    parser.add_argument("--wdl-lambda", type=float, default=value("wdl_lambda", d.wdl_lambda))
+    parser.add_argument("--lr", type=float, default=value("lr", d.lr))
+    parser.add_argument("--epochs", type=int, default=value("epochs", d.epochs))
+    parser.add_argument("--batch-size", type=int, default=value("batch_size", d.batch_size))
+    parser.add_argument("--device", default=value("device", d.device))
+    parser.add_argument("--workers", type=int, default=value("workers", d.workers))
+    parser.add_argument("--val-rows", type=int, default=value("val_rows", d.val_rows))
+    parser.add_argument("--patience", type=int, default=value("patience", d.patience))
+    parser.add_argument("--select-metric", default=value("select_metric", d.select_metric),
                         choices=["loss", "mse", "mae", "sign"])
-    parser.add_argument("--weight-decay", type=float, default=d.weight_decay)
-    parser.add_argument("--trainable", default=d.trainable,
+    parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
+    parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "float-head", "output"])
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create, resume, and inspect Enyo NNUE candidate runs."
+        description="Create and inspect Enyo NNUE candidate runs."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     create = subparsers.add_parser("create", help="Create/train a candidate.")
-    add_create_args(create)
+    add_create_args(create, create_defaults)
     create.set_defaults(func=cmd_create)
-
-    resume = subparsers.add_parser("resume", help="Resume a candidate run.")
-    resume.add_argument("run")
-    resume.add_argument("--force", action="store_true")
-    resume.add_argument(
-        "--event-command",
-        help="Optional event hook command. Event JSON is passed on stdin and in NNUE_RUN_EVENT_JSON.",
-    )
-    resume.set_defaults(func=cmd_resume)
 
     status = subparsers.add_parser("status", help="Show candidate run status.")
     status.add_argument("run")
@@ -335,8 +394,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
+    argv = normalize_argv(sys.argv)
+    create_defaults = load_create_arg_defaults(create_config_path(argv))
+    parser = build_parser(create_defaults)
+    args = parser.parse_args(argv[1:])
     return args.func(args)
 
 

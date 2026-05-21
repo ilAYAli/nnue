@@ -1,0 +1,26 @@
+{
+  "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe; code changes for the selected architecture branch live in the engine/trainer code.",
+  "create": {
+    "name": "arch-material-phase-v1",
+    "selfplay_depth": 12,
+    "selfplay_seed": 2026052101,
+    "skip_plies": 8,
+    "score_depth": 16,
+    "objective": "huber",
+    "huber_beta": 200,
+    "target_clamp": 800,
+    "lr": 0.0000007,
+    "epochs": 8,
+    "select_metric": "sign",
+    "patience": 2,
+    "event_command": "$HOME/scripts/nnue_event_ntfy.sh"
+  },
+  "validation": {
+    "required_before_sprt": [
+      "static",
+      "failure-suite",
+      "move-choice gate",
+      "NPS benchmark for architecture changes"
+    ]
+  }
+}
