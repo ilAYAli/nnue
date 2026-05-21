@@ -155,7 +155,21 @@ def validation_commands(run_dir: Path, net: Path) -> list[str]:
 def completion_extra(run_dir: Path) -> dict[str, Any]:
     nets = candidate_nets(run_dir)
     if not nets:
-        return {}
+        checkpoint_dirs = sorted(
+            path for path in run_dir.glob("train/*/checkpoints") if path.is_dir()
+        )
+        checkpoint_files = sorted(
+            path
+            for directory in checkpoint_dirs
+            for path in directory.rglob("*")
+            if path.is_file()
+        )
+        if not checkpoint_dirs:
+            return {}
+        return {
+            "bullet_checkpoint_dirs": [str(path) for path in checkpoint_dirs],
+            "bullet_checkpoints": [str(path) for path in checkpoint_files],
+        }
     net = nets[-1]
     commands = validation_commands(run_dir, net)
     return {
@@ -306,6 +320,8 @@ def cmd_launch(args: argparse.Namespace) -> int:
     print(f"run complete: {run_dir}", flush=True)
     if extra.get("candidate_net"):
         print(f"candidate net: {extra['candidate_net']}", flush=True)
+    for checkpoint_dir in extra.get("bullet_checkpoint_dirs", []):
+        print(f"bullet checkpoints: {checkpoint_dir}", flush=True)
     commands = extra.get("validation_commands", [])
     if commands:
         print("validate:", flush=True)

@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""Bullet helper commands for Enyo NNUE runs."""
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+
+def expand_path(value: str | Path) -> Path:
+    return Path(os.path.expandvars(str(value))).expanduser().resolve()
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def cargo_bin() -> str:
+    cargo = shutil.which("cargo")
+    if cargo:
+        return cargo
+    fallback = Path.home() / ".cargo" / "bin" / "cargo"
+    if fallback.exists():
+        return str(fallback)
+    raise SystemExit("cargo not found in PATH or ~/.cargo/bin")
+
+
+def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
+    print(" ".join(command), flush=True)
+    subprocess.run(command, check=True, cwd=repo_root(), env=env)
+
+
+def usable_cuda_path(path: Path) -> bool:
+    return (
+        (path / "include" / "cuda.h").exists()
+        and (path / "lib64" / "libcudart.so").exists()
+        and (path / "lib64" / "libnvrtc.so").exists()
+        and (path / "lib64" / "libcublas.so").exists()
+    )
+
+
+def symlink_dir(link: Path, target: Path) -> None:
+    if link.is_symlink() or link.exists():
+        if link.resolve() == target.resolve():
+            return
+        raise SystemExit(f"{link} already exists and does not point to {target}")
+    link.symlink_to(target, target_is_directory=True)
+
+
+def auto_cuda_path(target_dir: Path) -> Path:
+    for raw in (os.environ.get("CUDA_PATH"), "/usr/local/cuda", "/usr/lib/cuda", "/usr"):
+        if not raw:
+            continue
+        path = expand_path(raw)
+        if usable_cuda_path(path):
+            return path
+
+    debian_include = Path("/usr/include")
+    debian_lib = Path("/usr/lib/x86_64-linux-gnu")
+    if (
+        (debian_include / "cuda.h").exists()
+        and (debian_lib / "libcudart.so").exists()
+        and (debian_lib / "libnvrtc.so").exists()
+        and (debian_lib / "libcublas.so").exists()
+    ):
+        compat = target_dir / "cuda-path"
+        compat.mkdir(parents=True, exist_ok=True)
+        symlink_dir(compat / "include", debian_include)
+        symlink_dir(compat / "lib64", debian_lib)
+        return compat
+
+    raise SystemExit(
+        "CUDA libraries not found. Set --cuda-path to a directory with include/cuda.h "
+        "and lib64/{libcudart,libnvrtc,libcublas}.so."
+    )
+
+
+def nvidia_compute_cap() -> tuple[int, int] | None:
+    try:
+        out = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=compute_cap",
+                "--format=csv,noheader",
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    first = out.strip().splitlines()[0] if out.strip() else ""
+    try:
+        major, minor = first.split(".", 1)
+        return int(major), int(minor)
+    except (ValueError, IndexError):
+        return None
+
+
+def cuda_arch_override(value: str) -> str:
+    if value in {"", "native", "none"}:
+        return ""
+    if value != "auto":
+        return value
+    cap = nvidia_compute_cap()
+    if cap and cap >= (12, 0):
+        # CUDA 12.4 does not accept sm_120 in NVRTC. PTX compute_90 still
+        # lets the installed driver JIT kernels for Blackwell GPUs.
+        return "compute_90"
+    return ""
+
+
+def patch_bullet_cuda_arch(manifest: Path, arch: str) -> None:
+    if not arch:
+        return
+    run([cargo_bin(), "fetch", "--manifest-path", str(manifest)])
+    checkouts = Path.home() / ".cargo" / "git" / "checkouts"
+    candidates = sorted(checkouts.glob("bullet-*/**/crates/gpu/src/runtime/cuda.rs"))
+    if not candidates:
+        raise SystemExit("could not find Bullet CUDA runtime source in cargo git checkout")
+    for path in candidates:
+        text = path.read_text(encoding="utf-8")
+        old_native = 'arch: Some(format!("sm_{mjr}{mnr}")),'
+        old_forced_prefix = 'arch: Some("'
+        old_forced_suffix = '".to_string()),'
+        new = f'arch: Some("{arch}".to_string()),'
+        if new in text:
+            continue
+        if old_native in text:
+            if not (path.with_suffix(path.suffix + ".enyo-bak")).exists():
+                path.with_suffix(path.suffix + ".enyo-bak").write_text(text, encoding="utf-8")
+            path.write_text(text.replace(old_native, new), encoding="utf-8")
+            continue
+        start = text.find(old_forced_prefix)
+        if start >= 0:
+            end = text.find(old_forced_suffix, start)
+            if end >= 0:
+                end += len(old_forced_suffix)
+                if not (path.with_suffix(path.suffix + ".enyo-bak")).exists():
+                    path.with_suffix(path.suffix + ".enyo-bak").write_text(text, encoding="utf-8")
+                path.write_text(text[:start] + new + text[end:], encoding="utf-8")
+                continue
+        raise SystemExit(f"could not patch Bullet CUDA arch in {path}")
+
+
+def cmd_format(args: argparse.Namespace) -> int:
+    input_path = expand_path(args.input)
+    output_path = expand_path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest = expand_path(args.bullet_manifest)
+
+    base = [
+        cargo_bin(),
+        "run",
+        "-q",
+        "-p",
+        "bullet-utils",
+        "--manifest-path",
+        str(manifest),
+        "--",
+    ]
+    run([
+        *base,
+        "convert",
+        "--from",
+        "text",
+        "--input",
+        str(input_path),
+        "--output",
+        str(output_path),
+    ])
+    if args.validate:
+        run([*base, "validate", "--input", str(output_path)])
+    return 0
+
+
+def cmd_train(args: argparse.Namespace) -> int:
+    data = expand_path(args.data)
+    out_dir = expand_path(args.out_dir)
+    target_dir = expand_path(args.cargo_target_dir)
+    manifest = repo_root() / "tools" / "bullet" / "spike_trainer" / "Cargo.toml"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    env = os.environ.copy()
+    env.update({
+        "CARGO_TARGET_DIR": str(target_dir),
+        "ENYO_BULLET_DATA": str(data),
+        "ENYO_BULLET_OUT": str(out_dir),
+        "ENYO_BULLET_NET_ID": args.net_id,
+        "ENYO_BULLET_HIDDEN": str(args.hidden),
+        "ENYO_BULLET_L2": str(args.l2),
+        "ENYO_BULLET_BATCH_SIZE": str(args.batch_size),
+        "ENYO_BULLET_BATCHES": str(args.batches),
+        "ENYO_BULLET_SUPERBATCHES": str(args.superbatches),
+        "ENYO_BULLET_THREADS": str(args.threads),
+        "ENYO_BULLET_WDL": str(args.wdl),
+        "ENYO_BULLET_LR": str(args.lr),
+        "ENYO_BULLET_FINAL_LR": str(args.final_lr),
+    })
+    if args.cuda_path:
+        env["CUDA_PATH"] = str(expand_path(args.cuda_path))
+    elif args.accelerator == "cuda":
+        env["CUDA_PATH"] = str(auto_cuda_path(target_dir))
+        patch_bullet_cuda_arch(manifest, cuda_arch_override(args.cuda_arch))
+
+    command = [
+        cargo_bin(),
+        "run",
+        "-q",
+        "--release",
+        "--features",
+        args.accelerator,
+        "--manifest-path",
+        str(manifest),
+    ]
+    run(command, env=env)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run Bullet conversion/training phases.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    fmt = subparsers.add_parser("format", help="Convert Bullet text to BulletFormat.")
+    fmt.add_argument("--input", required=True)
+    fmt.add_argument("--output", required=True)
+    fmt.add_argument("--bullet-manifest", default="~/source/bullet/Cargo.toml")
+    fmt.add_argument("--validate", action="store_true", default=True)
+    fmt.set_defaults(func=cmd_format)
+
+    train = subparsers.add_parser("train", help="Train the experimental Bullet net.")
+    train.add_argument("--data", required=True)
+    train.add_argument("--out-dir", required=True)
+    train.add_argument("--net-id", required=True)
+    train.add_argument("--cargo-target-dir", required=True)
+    train.add_argument("--accelerator", choices=["cuda", "rocm"], default="cuda")
+    train.add_argument("--cuda-path", default="")
+    train.add_argument("--cuda-arch", default="auto")
+    train.add_argument("--hidden", type=int, default=1024)
+    train.add_argument("--l2", type=int, default=16)
+    train.add_argument("--batch-size", type=int, default=2048)
+    train.add_argument("--batches", type=int, default=64)
+    train.add_argument("--superbatches", type=int, default=2)
+    train.add_argument("--threads", type=int, default=4)
+    train.add_argument("--wdl", type=float, default=0.75)
+    train.add_argument("--lr", type=float, default=1e-3)
+    train.add_argument("--final-lr", type=float, default=3e-4)
+    train.set_defaults(func=cmd_train)
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

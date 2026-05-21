@@ -210,58 +210,110 @@ def create_config(args: argparse.Namespace) -> dict:
             ],
         })
 
-    train_command = [
-        tool("train/train.py"), "run",
-        "--data", "{pack}/train",
-    ]
-    if args.init_net:
+    if args.backend == "pytorch":
+        train_command = [
+            tool("train/train.py"), "run",
+            "--data", "{pack}/train",
+        ]
+        if args.init_net:
+            train_command.extend([
+                "--init-from-nn", str(expand_path(args.init_net)),
+            ])
+        else:
+            train_command.extend([
+                "--init", args.init,
+            ])
         train_command.extend([
-            "--init-from-nn", str(expand_path(args.init_net)),
+            "--objective", args.objective,
+            "--huber-beta", str(args.huber_beta),
+            "--select-metric", args.select_metric,
+            "--wdl-lambda", str(args.wdl_lambda),
+            "--epochs", str(args.epochs),
+            "--batch-size", str(args.batch_size),
+            "--lr", str(args.lr),
+            "--weight-decay", str(args.weight_decay),
+            "--target-clamp", str(args.target_clamp),
+            "--device", args.device,
+            "--workers", str(args.workers),
+            "--patience", str(args.patience),
+            "--max-rows", str(args.max_rows),
+            "--skip-rows", str(args.skip_rows),
+            "--val-rows", str(args.val_rows),
+            "--trainable", args.trainable,
+            "--grad-norm-every", str(args.grad_norm_every),
+            "--python", str(expand_user(args.python)),
+            "--out", f"{candidate_dir}/model.pt",
+            "--out-nn", f"{candidate_dir}/model.nn",
+        ])
+
+        steps.extend([
+            {
+                "name": "pack",
+                "command": [
+                    tool("pack/pack.py"), "build",
+                    "--input", pack_input,
+                    "--out-dir", "{pack}/train",
+                    "--max-features", str(args.max_features),
+                    "--progress", str(args.pack_progress),
+                    "--python", str(expand_user(args.python)),
+                ],
+            },
+            {
+                "name": "train",
+                "command": train_command,
+            },
+        ])
+    elif args.backend == "bullet":
+        bullet_text = "{pack}/bullet/enyo.txt"
+        bullet_data = "{pack}/bullet/enyo.data"
+        bullet_train = [
+            tool("bullet/bullet.py"), "train",
+            "--data", bullet_data,
+            "--out-dir", f"{candidate_dir}/checkpoints",
+            "--net-id", name,
+            "--cargo-target-dir", "{run}/cargo-target",
+            "--cuda-arch", str(args.bullet_cuda_arch),
+            "--hidden", str(args.bullet_hidden),
+            "--l2", str(args.bullet_l2),
+            "--batch-size", str(args.bullet_batch_size),
+            "--batches", str(args.bullet_batches),
+            "--superbatches", str(args.bullet_superbatches),
+            "--threads", str(args.bullet_threads),
+            "--wdl", str(args.bullet_wdl),
+            "--lr", str(args.bullet_lr),
+            "--final-lr", str(args.bullet_final_lr),
+        ]
+        if args.bullet_cuda_path:
+            bullet_train.extend(["--cuda-path", str(expand_user(args.bullet_cuda_path))])
+
+        steps.extend([
+            {
+                "name": "bullet_text",
+                "command": [
+                    tool("bullet/jsonl_to_bullet_text.py"),
+                    "--input", pack_input,
+                    "--output", bullet_text,
+                    "--limit", str(args.bullet_rows),
+                    "--max-abs-cp", str(args.bullet_max_abs_cp),
+                ],
+            },
+            {
+                "name": "bullet_format",
+                "command": [
+                    tool("bullet/bullet.py"), "format",
+                    "--input", bullet_text,
+                    "--output", bullet_data,
+                    "--bullet-manifest", str(expand_user(args.bullet_manifest)),
+                    "--validate",
+                ],
+            },
+            {
+                "name": "bullet_train",
+                "command": bullet_train,
+            },
         ])
     else:
-        train_command.extend([
-            "--init", args.init,
-        ])
-    train_command.extend([
-        "--objective", args.objective,
-        "--huber-beta", str(args.huber_beta),
-        "--select-metric", args.select_metric,
-        "--wdl-lambda", str(args.wdl_lambda),
-        "--epochs", str(args.epochs),
-        "--batch-size", str(args.batch_size),
-        "--lr", str(args.lr),
-        "--weight-decay", str(args.weight_decay),
-        "--target-clamp", str(args.target_clamp),
-        "--device", args.device,
-        "--workers", str(args.workers),
-        "--patience", str(args.patience),
-        "--max-rows", str(args.max_rows),
-        "--skip-rows", str(args.skip_rows),
-        "--val-rows", str(args.val_rows),
-        "--trainable", args.trainable,
-        "--grad-norm-every", str(args.grad_norm_every),
-        "--python", str(expand_user(args.python)),
-        "--out", f"{candidate_dir}/model.pt",
-        "--out-nn", f"{candidate_dir}/model.nn",
-    ])
-
-    steps.extend([
-        {
-            "name": "pack",
-            "command": [
-                tool("pack/pack.py"), "build",
-                "--input", pack_input,
-                "--out-dir", "{pack}/train",
-                "--max-features", str(args.max_features),
-                "--progress", str(args.pack_progress),
-                "--python", str(expand_user(args.python)),
-            ],
-        },
-        {
-            "name": "train",
-            "command": train_command,
-        },
-    ])
+        raise SystemExit(f"unknown backend: {args.backend}")
 
     config = {
         "name": name,
@@ -353,6 +405,12 @@ def add_create_args(
         default=value("labeled_jsonl", d.labeled_jsonl),
         help="Existing labeled JSONL to pack/train from; skips posgen and score phases.",
     )
+    parser.add_argument(
+        "--backend",
+        default=value("backend", d.backend),
+        choices=["pytorch", "bullet"],
+        help="Training backend. 'bullet' is experimental and currently emits Bullet checkpoints, not Enyo .nn files.",
+    )
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
     parser.add_argument("--selfplay-shard-games", type=int, default=value("selfplay_shard_games", d.selfplay_shard_games))
@@ -403,6 +461,21 @@ def add_create_args(
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "input", "float-head", "output"])
+
+    parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
+    parser.add_argument("--bullet-max-abs-cp", type=int, default=value("bullet_max_abs_cp", d.bullet_max_abs_cp))
+    parser.add_argument("--bullet-manifest", default=value("bullet_manifest", d.bullet_manifest))
+    parser.add_argument("--bullet-cuda-path", default=value("bullet_cuda_path", d.bullet_cuda_path))
+    parser.add_argument("--bullet-cuda-arch", default=value("bullet_cuda_arch", d.bullet_cuda_arch))
+    parser.add_argument("--bullet-hidden", type=int, default=value("bullet_hidden", d.bullet_hidden))
+    parser.add_argument("--bullet-l2", type=int, default=value("bullet_l2", d.bullet_l2))
+    parser.add_argument("--bullet-batch-size", type=int, default=value("bullet_batch_size", d.bullet_batch_size))
+    parser.add_argument("--bullet-batches", type=int, default=value("bullet_batches", d.bullet_batches))
+    parser.add_argument("--bullet-superbatches", type=int, default=value("bullet_superbatches", d.bullet_superbatches))
+    parser.add_argument("--bullet-threads", type=int, default=value("bullet_threads", d.bullet_threads))
+    parser.add_argument("--bullet-wdl", type=float, default=value("bullet_wdl", d.bullet_wdl))
+    parser.add_argument("--bullet-lr", type=float, default=value("bullet_lr", d.bullet_lr))
+    parser.add_argument("--bullet-final-lr", type=float, default=value("bullet_final_lr", d.bullet_final_lr))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
