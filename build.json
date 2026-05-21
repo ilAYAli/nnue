@@ -1,34 +1,39 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "bullet-reckless-like-backend-spike",
-  "goal": "Run the experimental Bullet/Reckless-like backend through one complete build.py pipeline without manual phase transitions.",
+  "experiment": "scratch-kaiming-preflight",
+  "goal": "Test whether a clean Enyo-owned initialization can learn the current d12/d16 labeled source before spending a full training run.",
   "create": {
-    "name": "bullet-reckless-spike-100k",
-    "backend": "bullet",
+    "name": "scratch-kaiming-10k-preflight",
+    "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "bullet_rows": 100000,
-    "bullet_max_abs_cp": 1600,
-    "bullet_hidden": 1024,
-    "bullet_l2": 16,
-    "bullet_batch_size": 2048,
-    "bullet_batches": 64,
-    "bullet_superbatches": 2,
-    "bullet_threads": 4,
-    "bullet_wdl": 0.75,
-    "bullet_lr": 0.001,
-    "bullet_final_lr": 0.0003,
-    "bullet_cuda_arch": "auto",
-    "bullet_cargo_target_dir": "~/code/cpp/chess/nnue/runs/.cargo-target/bullet",
+    "init_net": null,
+    "init": "kaiming",
+    "objective": "huber",
+    "target_clamp": 800,
+    "huber_beta": 200,
+    "lr": 0.00001,
+    "epochs": 10,
+    "batch_size": 2048,
+    "device": "cuda",
+    "workers": 2,
+    "max_rows": 10000,
+    "val_rows": 2000,
+    "grad_norm_every": 1,
+    "select_metric": "sign",
+    "patience": 0,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "Bullet backend currently produces Bullet checkpoints only.",
-    "blocked_until": "Add an exporter or importer that converts Bullet checkpoint tensors into an Enyo-loadable .nn file.",
+    "status": "preflight only",
+    "success_condition": [
+      "training loss decreases across epochs",
+      "gradient norms are nonzero for sparse input, L1, L2, and output layers",
+      "exported model.nn is non-empty and can be evaluated by static validation"
+    ],
     "next_after_success": [
-      "inspect Bullet checkpoint layout",
-      "map Bullet tensors to an Enyo architecture",
-      "implement Enyo .nn export/import",
-      "only then run static/failure-suite/SPRT gates"
+      "run a larger scratch schedule on the same labeled source",
+      "compare against an identical current-reference-initialized control",
+      "only then consider failure-suite and SPRT gates"
     ]
   }
 }
