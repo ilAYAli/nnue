@@ -194,6 +194,11 @@ Rejected lanes:
     `.nn` MAE `138.027`, sign `70.84%`, correlation `0.405`.
   - Decision: do not scale MPE25. Add a small explicit sign auxiliary loss to
     the Huber recipe instead.
+- scratch quantized-Kaiming 100k-row Huber plus sign-loss preflight:
+  - Peak validation sign was `70.75%`, not better than plain Huber's `70.84%`.
+  - MAE also degraded late in training.
+  - Decision: do not scale the current-architecture scratch sign-loss lane.
+    Return to the Bullet/Reckless-like architecture lane.
 
 Conclusion:
 
@@ -302,35 +307,34 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the scratch quantized-Kaiming sign-loss preflight in `build.json`.
+Run the Bullet/Reckless-like 768-hidden scale check in `build.json`.
 
 Next branch:
 
-- Enyo-owned scratch quantized-forward Huber plus sign-loss preflight.
+- Bullet/Reckless-like architecture scale check.
 - Active recipe: `./build.py -c build.json`.
 
 Reason:
 
-- the Bullet spike proved conversion/training works and Enyo can now load the
-  checkpoints, but direct eval is still several times slower than current Enyo
-  eval and is too slow for serious SPRT.
 - material/phase and proper 32-bucket king refinement both failed pre-SPRT
   gates.
-- the input-only diagnostic proved that small input-only updates can export as a
-  no-op after quantization.
-- another same-data architecture tweak is not justified by the current evidence.
-- scratch training is justified only as a provenance/baseline reset, not because
-  it is expected to immediately beat the Berserk-derived reference.
+- scratch quantized-forward training now works technically, but the current
+  architecture remains far behind the reference on sign/ranking.
+- the Bullet spike proved conversion/training works and Enyo can load the
+  checkpoints, but the first checkpoint was a tiny 100k-row smoke.
+- Direct Bullet eval is still too slow for serious SPRT, so this run is an
+  architecture/training signal check, not a promotion attempt.
 
-Immediate scratch decision:
+Immediate Bullet decision:
 
-- Run the 100k-row quantized-Kaiming scratch Huber-plus-sign-loss preflight
-  from `build.json` with `forward: "quantized"`.
-- Compare float `.pt` validation against exported `.nn` validation.
-- If sign/ranking improves over plain Huber without an obvious MAE collapse,
-  scale or sweep the sign-loss weight.
+- Run the 1M-row, 64-superbatch, 768-hidden Bullet/Reckless-like scale check
+  from `build.json`.
+- If it trains cleanly, load the latest `quantised.bin` in Enyo and run
+  `evalnet check` plus direct eval benchmark.
+- Do not run SPRT until speed is acceptable or move-choice/static evidence is
+  unusually strong.
 
-Deferred Bullet decision:
+Deferred Bullet decisions:
 
 - Either optimize the Bullet spike layout further in Enyo:
   10 input king buckets, 8 material output buckets, pairwise-mul hidden,
@@ -374,21 +378,20 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-qkaiming-100k-huber-sign02-lr1e2-e10`
-- selected branch: scratch Enyo-owned quantized-forward sign-loss preflight
+- candidate name: `bullet-reckless-spike-768h-1m-sb64`
+- selected branch: Bullet/Reckless-like architecture scale check
 - self-play depth: `12`
 - self-play seed: `2026052111`
 - skipped opening plies: `8`
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
-- initializer: scratch `quantized-kaiming`; no Berserk init net
-- forward path: export-aware quantized int16/int8 forward
-- objective: Huber plus sign BCE, clamp `800`, beta `200`, lr `1e-2`,
-  epochs `10`, sign loss weight `0.2`
-- trainable weights: `all`
-- row limit: `100k` train rows plus `20k` validation rows
-- checkpoint selection: `sign`, patience disabled
+- backend: `bullet`
+- Bullet architecture: `768` hidden, `16` L2, pairwise-mul hidden, material
+  bucketed head
+- row limit: `1M` labeled positions
+- schedule: `64` batches per superbatch, `64` superbatches, lr `0.001 ->
+  0.0001`
 
 Rules:
 
