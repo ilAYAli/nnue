@@ -94,6 +94,10 @@ Conclusion:
   conversion/defensive move choice.
 - Oracle legal-move scores for those targets are recorded in
   `assets/failure_suite/repeated_tail_move_scores_20260521.csv`.
+- Reference-engine move-choice baseline is recorded in
+  `assets/failure_suite/reference_move_choice_gate_20260521.csv`:
+  top-1 `3/13`, top-3 `6/13`, `sum_gap_cp=32393`,
+  `worst_gap_cp=31311`.
 
 ## Current Strategy
 
@@ -186,6 +190,12 @@ Immediate action:
 - Stop bulk NNUE training.
 - Use the scored target set to design the next move-choice gate: top-1/top-3
   overlap, child-score gap, and repeated-tail regression count.
+- Run `tools/validate/move_choice_gate.py` on the reference and future
+  candidates before SPRT.
+- The current reference baseline is weak on this tiny set, so first use the
+  gate as a regression detector and diagnostic. Do not require a candidate to
+  solve every target before SPRT unless the scoring is refined into a stable
+  validation suite.
 - Add no-op export checks (`validate.py net-diff`) before static/replay gates.
 - Choose the next branch only after the analysis points to a concrete weakness.
 
