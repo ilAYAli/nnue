@@ -9,7 +9,7 @@ NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 AI_STDIN_DRY_RUN=${NNUE_AI_STDIN_DRY_RUN:-$DRY_RUN}
-AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-phase_done,done,fail}
+AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-done,fail}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
 if [ "${1:-}" = "test" ]; then
