@@ -1,31 +1,30 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "bullet-reckless-512h-scale",
-  "goal": "Scale the best Bullet/Reckless-like hidden-size candidate after the active-accumulator copy fix. 512 hidden had the cleanest move-choice tail; this run tests whether more rows and more superbatches improve it enough to justify deeper gating.",
+  "experiment": "bullet-reckless-512h-cp-objective",
+  "goal": "Test whether the catastrophic Bullet match result comes from the WDL-heavy Bullet objective. Previous Bullet runs used wdl=0.75 and had poor static sign versus Stockfish labels; this run keeps the 512-hidden architecture but uses a cp-focused objective.",
   "create": {
-    "name": "bullet-reckless-512h-28m-sb128",
+    "name": "bullet-reckless-512h-1m-wdl0-sb64",
     "backend": "bullet",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "bullet_rows": 2800000,
+    "bullet_rows": 1000000,
     "bullet_max_abs_cp": 1600,
     "bullet_hidden": 512,
     "bullet_l2": 16,
     "bullet_batch_size": 2048,
     "bullet_batches": 64,
-    "bullet_superbatches": 128,
+    "bullet_superbatches": 64,
     "bullet_threads": 4,
-    "bullet_wdl": 0.75,
+    "bullet_wdl": 0.0,
     "bullet_lr": 0.001,
     "bullet_final_lr": 0.0001,
     "bullet_cargo_target_dir": "runs/.cargo-target/bullet",
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "512-hidden Bullet/Reckless-like scale run",
+    "status": "512-hidden Bullet/Reckless-like cp-objective run",
     "success_condition": [
-      "Bullet training loss improves over the 1M-row 512-hidden spike",
+      "static eval sign/MAE improves materially over the wdl=0.75 Bullet runs",
       "Enyo evalnet check passes after loading quantised.bin",
-      "direct eval speed and fixed-node search speed remain acceptable after the active-copy fix",
       "move-choice gate keeps the 512-hidden tail quality advantage"
     ],
     "next_after_success": [
