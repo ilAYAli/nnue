@@ -39,7 +39,7 @@ def event_run_dir(*paths: str | Path | None) -> Path:
 
 
 def cmd_static(args: argparse.Namespace) -> int:
-    script = tools_root() / "nnue" / "eval_dataset.py"
+    script = tools_root() / "validate" / "eval_dataset.py"
     run_dir = event_run_dir(args.run, expand_path(args.data).parents[1])
     command = [
         sys.executable,
@@ -70,7 +70,7 @@ def cmd_static(args: argparse.Namespace) -> int:
 
 
 def cmd_failure_suite(args: argparse.Namespace) -> int:
-    script = tools_root() / "nnue" / "replay_failure_suite.py"
+    script = tools_root() / "validate" / "replay_failure_suite.py"
     run_dir = event_run_dir(args.run, args.output_dir)
     command = [
         sys.executable,
@@ -104,7 +104,7 @@ def cmd_failure_suite(args: argparse.Namespace) -> int:
 
 
 def cmd_sprt(args: argparse.Namespace) -> int:
-    script = tools_root() / "nnue" / "run_net_sprt_pwa.sh"
+    script = tools_root() / "validate" / "run_net_sprt_pwa.sh"
     run_dir = event_run_dir(args.run, expand_path(args.net).parent)
     env = os.environ.copy()
     env.update({

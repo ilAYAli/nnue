@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
 
 import torch
 
-from model import EnyoNNUE, export_model
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib.nnue_model import EnyoNNUE, export_model
 
 
 def main() -> None:

@@ -3,14 +3,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from dataset import count_rows, load_score_dataset
-from model import EnyoNNUE, export_model, load_model_from_nn
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib.nnue_dataset import count_rows, load_score_dataset
+from lib.nnue_model import EnyoNNUE, export_model, load_model_from_nn
 
 
 MPE_SCALE = 2.5 / 400.0

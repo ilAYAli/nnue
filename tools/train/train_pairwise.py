@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -9,9 +10,11 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-import enyo_nnue as nn2
-from dataset import load_score_dataset
-from model import EnyoNNUE, export_model, load_model_from_nn
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib import enyo_nnue as nn2
+from lib.nnue_dataset import load_score_dataset
+from lib.nnue_model import EnyoNNUE, export_model, load_model_from_nn
 
 
 def fen_features(fen: str) -> tuple[list[int], list[int], int, float]:

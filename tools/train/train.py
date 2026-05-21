@@ -31,7 +31,7 @@ def run(command: list[str]) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    script = tools_root() / "nnue" / "train.py"
+    script = tools_root() / "train" / "train_impl.py"
     command = [
         str(expand_user(args.python)),
         str(script),
@@ -70,7 +70,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_eval(args: argparse.Namespace) -> int:
-    script = tools_root() / "nnue" / "eval_dataset.py"
+    script = tools_root() / "validate" / "eval_dataset.py"
     command = [
         str(expand_user(args.python)),
         str(script),

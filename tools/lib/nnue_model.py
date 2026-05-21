@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn_pt
 
-import enyo_nnue as nn2
+from . import enyo_nnue as nn2
 
 
 class EnyoNNUE(nn_pt.Module):

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import sys
 import tempfile
 from pathlib import Path
 
-from model import export_model, load_model_from_nn
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib.nnue_model import export_model, load_model_from_nn
 
 
 def main() -> None:

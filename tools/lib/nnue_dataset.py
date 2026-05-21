@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-import enyo_nnue as nn2
+from . import enyo_nnue as nn2
 
 
 class FenScoreDataset(Dataset):

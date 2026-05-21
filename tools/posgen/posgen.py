@@ -420,7 +420,7 @@ def cmd_selfplay(args: argparse.Namespace) -> int:
 
 
 def cmd_instability(args: argparse.Namespace) -> int:
-    sampler = script_root() / "nnue" / "sample_search_instability.py"
+    sampler = script_root() / "posgen" / "sample_search_instability.py"
     if not sampler.exists():
         raise SystemExit(f"instability sampler not found: {sampler}")
 

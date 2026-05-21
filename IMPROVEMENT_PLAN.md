@@ -251,7 +251,7 @@ Lane B: build the fixed failure-suite gate.
 - Current prepared tool:
 
 ```sh
-tools/nnue/replay_failure_suite.py
+tools/validate/replay_failure_suite.py
 ```
 
 Lane C: prepare instability/disagreement sampling.
@@ -313,7 +313,7 @@ Lane D: data audit / novelty report.
 - Current prepared tool:
 
 ```sh
-tools/nnue/dataset_novelty_report.py
+tools/validate/dataset_novelty_report.py
 ```
 
 Lane E: architecture/feature branch preparation.
@@ -449,7 +449,7 @@ Sample positions that matter to search decisions, not only static cp buckets:
 Prepared tool:
 
 ```sh
-tools/nnue/sample_search_instability.py
+tools/posgen/sample_search_instability.py
 ```
 
 It compares a low-depth and high-depth teacher search and emits high-depth

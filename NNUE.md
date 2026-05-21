@@ -676,7 +676,7 @@ PyTorch can load efficiently.
 Script:
 
 ```sh
-tools/nnue/pack_dataset.py
+tools/pack/pack.py build
 ```
 
 Typical output:
@@ -714,7 +714,7 @@ numeric form.
 Script:
 
 ```sh
-tools/nnue/train.py
+tools/train/train.py run
 ```
 
 Step 6 loads packed tensors, initializes the model, trains weights, and exports:
@@ -773,7 +773,7 @@ setoption name nnue_file value /path/to/model.nn
 Script:
 
 ```sh
-tools/nnue/eval_dataset.py
+tools/validate/validate.py static
 ```
 
 Static validation compares the starting net and candidate net on held-out rows.
@@ -855,7 +855,7 @@ SPRT is the final strength test.
 Script:
 
 ```sh
-NET=/path/to/model.nn TAG=my_candidate tools/nnue/run_net_sprt_pwa.sh
+tools/validate/validate.py sprt --net /path/to/model.nn --tag my_candidate
 ```
 
 It runs:
@@ -902,10 +902,9 @@ tools/validate/validate.py failure-suite --help
 tools/validate/validate.py sprt --help
 ```
 
-`tools/nnue/run_net_sprt_pwa.sh` is kept as the low-level SPRT runner used by
-`tools/validate/validate.py sprt`. The older one-off `run_*_pwa.sh`
-experiment launchers were removed; they were historical recipes, not the
-current workflow.
+`tools/validate/run_net_sprt_pwa.sh` is kept as the low-level SPRT runner used
+by `tools/validate/validate.py sprt`. The older one-off experiment launchers
+were removed; they were historical recipes, not the current workflow.
 
 Running the exact same training command repeatedly mostly tests randomness. A
 meaningful new experiment changes at least one of:

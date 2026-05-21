@@ -22,8 +22,8 @@ def tools_root() -> Path:
 
 
 def cmd_uci(args: argparse.Namespace) -> int:
-    nnue_tools = tools_root() / "nnue"
-    sys.path.insert(0, str(nnue_tools))
+    score_tools = tools_root() / "score"
+    sys.path.insert(0, str(score_tools))
     import label_with_uci  # type: ignore
 
     forwarded = [

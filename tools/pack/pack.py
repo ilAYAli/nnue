@@ -32,7 +32,7 @@ def run(command: list[str]) -> int:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    script = tools_root() / "nnue" / "pack_dataset.py"
+    script = tools_root() / "pack" / "pack_dataset.py"
     command = [
         str(expand_user(args.python)),
         str(script),

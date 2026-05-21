@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
 
-import enyo_nnue as nn2
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib import enyo_nnue as nn2
 
 
 def count_rows(path: Path, *, skip: int, limit: int) -> int:

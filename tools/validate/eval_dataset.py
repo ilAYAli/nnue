@@ -3,14 +3,18 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
 
-from dataset import load_score_dataset
-from model import load_model_from_nn
-from train import MPE_EXPONENT, MPE_SCALE
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "train"))
+
+from lib.nnue_dataset import load_score_dataset
+from lib.nnue_model import load_model_from_nn
+from train_impl import MPE_EXPONENT, MPE_SCALE
 
 
 BUCKETS = (
