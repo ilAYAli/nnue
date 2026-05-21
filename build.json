@@ -4,6 +4,7 @@
   "nps_gate": "pause and optimize first if the architecture branch costs more than about 3-5% NPS",
   "create": {
     "name": "arch-kingbucket-v1",
+    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "selfplay_depth": 12,
     "selfplay_seed": 2026052101,
     "skip_plies": 8,
@@ -19,6 +20,10 @@
   },
   "validation": {
     "engine": "~/code/cpp/chess/enyo/build/enyo",
+    "failure_suite": {
+      "logs": "~/code/cpp/chess/enyo/bugs",
+      "baseline_required_before_training": true
+    },
     "required_before_sprt": [
       "static",
       "failure-suite",

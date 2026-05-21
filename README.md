@@ -42,6 +42,18 @@ Generated run configs can also be relaunched the same way:
 ./build.py -c runs/d12-d16-huber-cp800/config.json
 ```
 
+Architecture experiments can reuse existing teacher labels and skip
+self-play/scoring:
+
+```sh
+./build.py create \
+  --name arch-kingbucket-v1 \
+  --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl
+```
+
+This still repacks the data, so feature-index changes are reflected in the
+new tensors.
+
 Small smoke run:
 
 ```sh
@@ -100,6 +112,7 @@ Inspect a run:
 --book PATH
 --runner PATH
 --python PATH
+--labeled-jsonl PATH
 
 --selfplay-games N
 --selfplay-shard-games N
