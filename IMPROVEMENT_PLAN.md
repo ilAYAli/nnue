@@ -106,7 +106,11 @@ Reason:
 Anti-confounding rule:
 
 - Do not change architecture and data source in the same first candidate.
-- Reuse the best-understood training source for the first architecture test.
+- Reuse the best-understood training source for the first architecture test:
+  the current signed-balanced d12 self-play plus Stockfish-d16 label recipe
+  expressed through `build.py`.
+- Because this moves the recipe through the new `build.py` pipeline, run the
+  pack/static/roundtrip sanity checks before training starts.
 
 Fallback:
 
@@ -156,8 +160,9 @@ Move-choice/failure-suite gate:
 
 - Use candidate/reference/oracle replay CSV where possible.
 - Current status: gate logic exists, but the committed baseline suite/status is
-  not yet recorded. Before the architecture candidate may start SPRT, record
-  the suite path, position count, and current-reference baseline numbers.
+  not yet recorded.
+- Blocker before architecture training starts: record the suite path, position
+  count, current-reference baseline numbers, and command used to produce them.
 - Track move-choice correlation metrics, not only scalar eval deltas:
   - top-move agreement.
   - top-3 overlap.
