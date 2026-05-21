@@ -1,18 +1,18 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "bullet-reckless-512h-cp-objective",
-  "goal": "Test whether the catastrophic Bullet match result comes from the WDL-heavy Bullet objective. Previous Bullet runs used wdl=0.75 and had poor static sign versus Stockfish labels; this run keeps the 512-hidden architecture but uses a cp-focused objective.",
+  "experiment": "bullet-reckless-512h-cp-objective-scaleup",
+  "goal": "Scale the cp-only Bullet/Reckless-like run after the 1M-row checkpoint improved static MAE but still failed SPRT catastrophically. This run is gate-only: train on more rows and inspect static/move-choice behavior before considering any SPRT.",
   "create": {
-    "name": "bullet-reckless-512h-1m-wdl0-sb64",
+    "name": "bullet-reckless-512h-28m-wdl0-sb128",
     "backend": "bullet",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "bullet_rows": 1000000,
+    "bullet_rows": 28000000,
     "bullet_max_abs_cp": 1600,
     "bullet_hidden": 512,
     "bullet_l2": 16,
     "bullet_batch_size": 2048,
     "bullet_batches": 64,
-    "bullet_superbatches": 64,
+    "bullet_superbatches": 128,
     "bullet_threads": 4,
     "bullet_wdl": 0.0,
     "bullet_lr": 0.001,
@@ -21,16 +21,18 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "512-hidden Bullet/Reckless-like cp-objective run",
+    "status": "512-hidden Bullet/Reckless-like cp-objective scale-up",
     "success_condition": [
-      "static eval sign/MAE improves materially over the wdl=0.75 Bullet runs",
+      "static eval sign/MAE improves materially over the 1M cp-only Bullet run",
+      "slope moves closer to the Stockfish-labeled target instead of staying heavily compressed",
       "Enyo evalnet check passes after loading quantised.bin",
-      "move-choice gate keeps the 512-hidden tail quality advantage"
+      "move-choice gate improves without catastrophic tail positions"
     ],
     "next_after_success": [
-      "run evalnet check/bench on the final quantised.bin",
-      "run move-choice gate against repeated-tail failure positions",
-      "only consider SPRT after speed and gate checks are clean"
+      "run checkpoint sweep over selected superbatches",
+      "run evalnet check/bench on the best quantised.bin",
+      "run move-choice gate against repeated-tail and SPRT-opening failure positions",
+      "only consider SPRT if static slope/sign and move-choice gates are clean"
     ]
   }
 }
