@@ -29,6 +29,9 @@ Rejected lanes:
 
 Conclusion:
 
+- The current architecture/training regime appears locally saturated.
+- Further gains from relabeling or self-play refresh alone are expected to be
+  low.
 - Static MAE/sign is now only a rejection filter.
 - Novel Enyo self-play alone was not enough.
 - Do not launch another same-architecture Stockfish-d16-labeled Enyo self-play
@@ -68,6 +71,14 @@ Priority order:
    - Train at most one isolated candidate from this signal at a time.
    - Tail regressions can veto a candidate even when aggregate sum diff is
      positive.
+   - Longer-term goal: optimize search decision quality, not only scalar
+     evaluation accuracy.
+   - Search-aware signals to track before training from them:
+     - top-move agreement.
+     - top-3 move overlap.
+     - eval ranking consistency for candidate moves.
+     - disagreement/PV-instability weighting.
+     - tactical surprise or large child-eval swing weighting.
 
 4. Tooling.
    - Tooling work is justified only when it directly supports the lanes above.
@@ -147,6 +158,11 @@ Move-choice/failure-suite gate:
 - Current status: gate logic exists, but the committed baseline suite/status is
   not yet recorded. Before the architecture candidate may start SPRT, record
   the suite path, position count, and current-reference baseline numbers.
+- Track move-choice correlation metrics, not only scalar eval deltas:
+  - top-move agreement.
+  - top-3 overlap.
+  - eval ranking consistency across legal or candidate moves.
+  - near-threshold instability where several moves are close.
 - Required direction: candidate better count should exceed reference better
   count, aggregate cp diff should be positive, and tail regressions must be
   controlled.
@@ -159,6 +175,23 @@ Move-choice/failure-suite gate:
   important part: do not spend SPRT on nets with ugly tails.
 - A candidate that fails these gates can still be kept as diagnostic evidence,
   but it must not consume long SPRT time.
+
+Failure taxonomy:
+
+- Tag failure-suite positions by category so improvements/regressions are not
+  treated as one flat bucket.
+- Suggested initial tags:
+  - tactic.
+  - king attack.
+  - fortress.
+  - conversion.
+  - pawn race.
+  - zugzwang.
+  - space.
+  - initiative.
+  - imbalance.
+  - quiet maneuver.
+- Every candidate should report deltas by category once the taxonomy exists.
 
 SPRT:
 
