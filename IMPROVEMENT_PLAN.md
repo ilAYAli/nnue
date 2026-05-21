@@ -91,8 +91,16 @@ Rejected lanes:
     - baseline Enyo: final reported line around `1.69M` NPS.
     - Bullet 1024: final reported line around `0.20M` NPS.
     - Bullet 768: final reported line around `0.44M` NPS.
+  - pwa-5090 direct evaluator benchmark, `evalnet bench 500000`:
+    - Bullet 1024: `1.35M` eval/s.
+    - Bullet 768: `1.73M` eval/s.
+  - Local direct evaluator benchmark, `evalnet bench 200000`:
+    - Bullet 1024: `0.90M` eval/s.
+    - Bullet 768: `1.17M` eval/s.
   - Decision: do not run Bullet SPRT yet. The 768 checkpoint is faster than
-    1024 but still roughly 4x slower than baseline.
+    1024, but the search path is still roughly 4x slower than baseline even
+    though the direct evaluator is faster. The remaining issue is search-path
+    integration/head cost, not checkpoint loading correctness.
 
 Conclusion:
 

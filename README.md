@@ -23,8 +23,10 @@ uses the same `posgen -> score` front half, then switches to:
 jsonl -> Bullet text -> BulletFormat -> Bullet trainer
 ```
 
-The Bullet backend currently produces Bullet checkpoints only. It is for
-architecture/training experiments until an Enyo `.nn` exporter exists.
+The Bullet backend currently produces Bullet checkpoints, not the normal Enyo
+`.nn` format. The experimental Enyo branch can load these `quantised.bin`
+checkpoints directly for architecture experiments, but the path is not yet fast
+enough for candidate SPRT.
 
 Validation is separate and lives under `tools/validate/`.
 
@@ -77,7 +79,8 @@ Experimental Bullet/Reckless-like architecture spike:
 ```
 
 This verifies Bullet conversion/training under the normal pipeline/event
-machinery. It does not produce an Enyo-loadable `model.nn` yet.
+machinery. It writes Bullet `quantised.bin` checkpoints. The experimental Enyo
+loader can load those directly, but they are not normal Enyo `model.nn` files.
 
 To train an Enyo-owned net from scratch instead of fine-tuning the current
 reference net, set `init_net` to `null` in `build.json` or pass an empty
