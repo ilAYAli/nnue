@@ -154,6 +154,11 @@ Rejected lanes:
   - Decision: stop scaling Kaiming. Test an export-scale-compatible scratch
     initializer or add export-aware/fake-quantized training before any larger
     scratch run.
+- scratch `berserk-ish` 100k-row `1e-4` export-scale preflight:
+  - Float `.pt` and exported `.nn` matched: both around MAE `143.16` and sign
+    `50%` on the 20k validation slice.
+  - Decision: this scale survives export, but LR `1e-4` is far too low for
+    scratch learning. Increase LR before scaling rows.
 
 Conclusion:
 
@@ -333,7 +338,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scratch-berserkish-100k-lr1e4-e10`
+- candidate name: `scratch-berserkish-100k-lr1e2-e10`
 - selected branch: scratch Enyo-owned export-scale preflight
 - self-play depth: `12`
 - self-play seed: `2026052111`
@@ -342,7 +347,7 @@ Current `build.json` intent:
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
 - initializer: scratch `berserk-ish`; no Berserk init net
-- objective: Huber, clamp `800`, beta `200`, lr `1e-4`, epochs `10`
+- objective: Huber, clamp `800`, beta `200`, lr `1e-2`, epochs `10`
 - trainable weights: `all`
 - row limit: `100k` train rows plus `20k` validation rows
 - checkpoint selection: `sign`, patience disabled
