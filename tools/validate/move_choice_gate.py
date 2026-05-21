@@ -77,11 +77,14 @@ def load_targets(path: Path) -> dict[tuple[str, str], dict[str, object]]:
 
 
 def configure_engine(
-        proc: subprocess.Popen[str], threads: int, hash_mb: int) -> None:
+        proc: subprocess.Popen[str], threads: int, hash_mb: int,
+        nnue_file: str) -> None:
     send(proc, "uci")
     read_until(proc, "uciok")
     send(proc, f"setoption name Threads value {threads}")
     send(proc, f"setoption name Hash value {hash_mb}")
+    if nnue_file:
+        send(proc, f"setoption name nnue_file value {nnue_file}")
     send(proc, "isready")
     read_until(proc, "readyok")
 
@@ -92,6 +95,7 @@ def main() -> int:
     parser.add_argument("--scores", required=True, type=Path)
     parser.add_argument("--engine", required=True)
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--nnue-file", default="")
     parser.add_argument("--nodes", type=int, default=100000)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--hash", type=int, default=128)
@@ -108,7 +112,7 @@ def main() -> int:
     )
     rows: list[dict[str, object]] = []
     try:
-        configure_engine(proc, args.threads, args.hash)
+        configure_engine(proc, args.threads, args.hash, args.nnue_file)
         for target in targets.values():
             move, nodes_seen = bestmove(proc, str(target["fen"]), args.nodes)
             move_info = target["moves"].get(move)
