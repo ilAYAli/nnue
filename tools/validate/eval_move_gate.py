@@ -13,14 +13,14 @@ from pathlib import Path
 import chess
 
 
-EVAL2_RE = re.compile(r"^eval2\s+(-?\d+)\s+cp\s+\(stm=(white|black)\)")
+EVALNET_RE = re.compile(r"^evalnet\s+(-?\d+)\s+cp\s+\(stm=(white|black)(?:,\s+bullet)?\)")
 
 
 class EngineError(RuntimeError):
     pass
 
 
-class EnyoEval2:
+class EnyoEval:
     def __init__(self, engine: Path, net: Path, threads: int, hash_mb: int):
         self.proc = subprocess.Popen(
             [str(engine)],
@@ -83,13 +83,13 @@ class EnyoEval2:
 
     def eval_stm_cp(self, fen: str) -> int:
         self.send(f"position fen {fen}")
-        self.send("eval2")
+        self.send("evalnet")
         while True:
             line = self.read_line(10.0)
-            match = EVAL2_RE.match(line)
+            match = EVALNET_RE.match(line)
             if match:
                 return int(match.group(1))
-            if line.startswith("eval2 error:"):
+            if line.startswith("evalnet error:"):
                 raise EngineError(line)
 
 
@@ -117,8 +117,8 @@ def child_fen(fen: str, move_uci: str) -> str:
     return board.fen()
 
 
-def original_pov_child_eval(engine: EnyoEval2, child: str) -> int:
-    # After a legal move, child side-to-move is the opponent, while eval2 is
+def original_pov_child_eval(engine: EnyoEval, child: str) -> int:
+    # After a legal move, child side-to-move is the opponent, while evalnet is
     # side-to-move POV. Negate it to recover the mover's POV at the root.
     return -engine.eval_stm_cp(child)
 
@@ -134,7 +134,7 @@ def load_cases(path: Path, limit: int) -> list[dict[str, object]]:
     return rows
 
 
-def margins(engine: EnyoEval2, rows: list[dict[str, object]]) -> list[int]:
+def margins(engine: EnyoEval, rows: list[dict[str, object]]) -> list[int]:
     out: list[int] = []
     for row in rows:
         fen = str(row["fen"])
@@ -166,13 +166,13 @@ def main() -> None:
     if not rows:
         raise SystemExit("no cases")
 
-    baseline = EnyoEval2(args.engine, args.baseline_net, args.threads, args.hash)
+    baseline = EnyoEval(args.engine, args.baseline_net, args.threads, args.hash)
     try:
         baseline_margins = margins(baseline, rows)
     finally:
         baseline.close()
 
-    candidate = EnyoEval2(args.engine, args.candidate_net, args.threads, args.hash)
+    candidate = EnyoEval(args.engine, args.candidate_net, args.threads, args.hash)
     try:
         candidate_margins = margins(candidate, rows)
     finally:
