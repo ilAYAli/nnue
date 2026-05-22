@@ -94,6 +94,7 @@ Pairwise move-choice fine-tune:
   --backend pairwise \
   --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl \
   --pairwise-scores-csv runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv \
+  --pairwise-candidate-moves-csv runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv \
   --pairwise-pair-weight 0.25 \
   --epochs 4 \
   --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
@@ -229,6 +230,7 @@ Inspect a run:
 
 --pairwise-scores-csv PATH
 --pairwise-pairs-jsonl PATH
+--pairwise-candidate-moves-csv PATH
 --pairwise-pair-batch-size N
 --pairwise-pair-weight X
 --pairwise-pair-beta CP

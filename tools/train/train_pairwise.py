@@ -82,21 +82,35 @@ class HardPairDataset(Dataset):
         return cls(rows, min_target_margin=min_target_margin,
                    max_target_margin=max_target_margin)
 
+    @staticmethod
+    def candidate_move_overrides(path: str | Path) -> dict[tuple[str, str], str]:
+        out: dict[tuple[str, str], str] = {}
+        if not path:
+            return out
+        with Path(path).open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                move = row.get("engine_move") or row.get("candidate_move")
+                if move:
+                    out[(row["log"], row["ply"])] = move
+        return out
+
     @classmethod
-    def from_sprt_scores_csv(cls, path: str | Path, *, min_target_margin: float,
+    def from_sprt_scores_csv(cls, path: str | Path, *, candidate_moves_csv: str | Path = "",
+                             min_target_margin: float,
                              max_target_margin: float) -> "HardPairDataset":
         by_target: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
         with Path(path).open(newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
                 by_target[(row["log"], row["ply"])].append(row)
+        candidate_moves = cls.candidate_move_overrides(candidate_moves_csv)
 
         dataset = cls.__new__(cls)
         dataset.items = []
-        for rows in by_target.values():
+        for key, rows in by_target.items():
             best = next((row for row in rows if int(row["rank"]) == 1), None)
             if best is None:
                 continue
-            candidate_move = rows[0]["candidate_move"]
+            candidate_move = candidate_moves.get(key, rows[0]["candidate_move"])
             played = next((row for row in rows if row["move"] == candidate_move), None)
             if played is None:
                 continue
@@ -215,6 +229,7 @@ def train(args) -> EnyoNNUE:
     if args.scores_csv:
         pair_set = HardPairDataset.from_sprt_scores_csv(
             args.scores_csv,
+            candidate_moves_csv=args.candidate_moves_csv,
             min_target_margin=args.min_target_margin,
             max_target_margin=args.max_target_margin)
     else:
@@ -310,6 +325,7 @@ def main() -> None:
     ap.add_argument("--data", required=True)
     ap.add_argument("--pairs", default="")
     ap.add_argument("--scores-csv", default="")
+    ap.add_argument("--candidate-moves-csv", default="")
     ap.add_argument("--out", required=True)
     ap.add_argument("--out-nn", default=None)
     ap.add_argument("--init-from-nn", default=None)
