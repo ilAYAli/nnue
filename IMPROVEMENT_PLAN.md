@@ -88,13 +88,27 @@ Current active tooling branch:
     non-mate `candidate_better=9`, `reference_better=113`.
   - Decision: no failure-suite, no SPRT. Sparse export movement is possible,
     but this pressure did not move search behavior.
-- `build.json` now names a target-only sparse overfit diagnostic:
-  `search-aware-targetonly-sparse-overfit-in3000-l1x3000-e8`. It disables broad
-  loss, freezes dense/head LR, and applies the search-aware objective to test
-  whether target choices can move at all through sparse/L1.
-- This diagnostic must never be SPRT-tested. It only answers whether the
-  objective is capable of moving target choices before reintroducing broad
-  preservation.
+- Target-only sparse overfit diagnostic
+  `search-aware-targetonly-sparse-overfit-in3000-l1x3000-e8` completed and was
+  rejected before failure-suite/SPRT:
+  - training target metrics moved, so the objective is not dead:
+    `target_top1=21->32/232`, `target_top3=96->143/232`,
+    `target_sum_gap=60182->50357`.
+  - exported sparse movement was large: input weights `503728/25165824`,
+    input biases `551/1024`, L1 weights `19236/32768`, L1 biases `12/16`,
+    total `523527/25200209`.
+  - static broad sample improved despite broad loss being disabled:
+    `mae=130.693`, `sign=92.36%`.
+  - 100k-node search-gate still failed: `top1=34/232`, `top3=87/232`,
+    `candidate_better=41`, `reference_better=147`,
+    `capped_sum_diff_cp=-18167`, `worst_regression_cp=-31839`; non-mate
+    remained bad with `candidate_better=11`, `reference_better=113`,
+    `capped_sum_diff_cp=-15342`.
+  - Decision: no failure-suite, no SPRT. The objective can move exported
+    sparse/L1 tensors and internal child-ranking metrics, but it does not
+    improve Enyo search choices. Stop this search-aware sparse-multiplier lane;
+    any next attempt needs a different target/objective, not another LR bump.
+- No active `build.json` recipe is approved after this rejection.
 
 Current gate status:
 
@@ -1084,14 +1098,12 @@ Normal candidate creation:
 
 Current `build.json` state:
 
-- Active recipe: `search-aware-targetonly-sparse-overfit-in3000-l1x3000-e8`.
-- Lane: `nnue_reckless`; no engine change; existing Enyo/Berserk-derived init
-  weights.
-- Hypothesis: sparse export movement alone did not move search behavior. This
-  diagnostic disables broad loss and freezes dense/head LR to test whether the
-  search-aware target objective can move target choices through sparse/L1 at all.
-- Validation gates: training target metrics and `net-diff` first; static only to
-  quantify damage; no SPRT from this target-only diagnostic.
+- No active recipe is approved.
+- The latest `nnue_reckless` search-aware sparse target diagnostics are rejected.
+- Do not run another search-aware sparse LR/multiplier sweep from the same
+  target/objective. If this lane continues, first change the target construction
+  or objective so that improvements are measured in engine-search choice, not
+  only child-eval ranking.
 
 Rules:
 
