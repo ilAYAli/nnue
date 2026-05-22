@@ -147,11 +147,19 @@ Current gate status:
     no SPRT.
   - Decision: no native SPRT. Native remains a long-term lane; the current
     scratch/Bullet-Enyo nets are not close enough on move choice.
-  - Next native calibration: run `native-bullet-enyo-scratch-5m-eval200-sb4096`
-    on `feature/nnue-native-bullet-eval200` with the same data and Bullet-Enyo
-    architecture as the 5M eval400 run, but `bullet_eval_scale=200`. This is a
-    targeted calibration test after the full eval400 run produced a badly
-    over-amplified static slope, not a new data recipe.
+  - Native Bullet-Enyo scratch 5M eval200
+    (`native-bullet-enyo-scratch-5m-eval200-sb4096`) improved scalar
+    calibration, but not move choice: static `mae=105.864`, `sign=85.01%`,
+    slope `0.648`; final composite gate `top1=31/213`, `top3=89/213`,
+    `candidate_better=37`, `reference_better=134`,
+    `cap200_sum_delta_cp=-16487`, `cap1000_sum_delta_cp=-32344`.
+    Checkpoint sweep also failed; the best capped checkpoint was `2048` with
+    `top1=33/213`, `top3=86/213`, `candidate_better=41`,
+    `reference_better=124`, `cap200_sum_delta_cp=-16239`,
+    `cap1000_sum_delta_cp=-33462`.
+  - Decision: no SPRT for eval200. Eval-scale calibration alone does not close
+    the native move-choice gap. Do not run more native scale sweeps without a
+    concrete architecture or target-change reason.
 - Embedded validation note: when `validate.py static` is used inside a custom
   gate against imported data, pass `--run <candidate-run>` or omit
   `--event-command`; otherwise the event hook reports the imported data run
