@@ -1,7 +1,7 @@
 {
   "description": "Active Enyo NNUE improvement-run config. This file is the reviewed source of truth for the current candidate recipe.",
-  "experiment": "Reckless lane check-state output buckets",
-  "goal": "Test a small existing-weight delta: duplicate the current Enyo .nn float head into check/king-pressure output buckets, train only the output layer, and gate before any SPRT.",
+  "experiment": "Reckless lane conservative check-state output buckets",
+  "goal": "Retest the same small existing-weight check-state output-bucket delta with a lower LR/shorter fit after the first run improved non-mate targets but failed mate-like tails.",
   "track": "nnue_reckless",
   "engine_branch": "feature/nnue-reckless-check-bucket",
   "nnue_branch": "feature/nnue-reckless-check-bucket",
@@ -10,7 +10,7 @@
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "create": {
-    "name": "reckless-check-bucket-output-1m-lr5e6-e8",
+    "name": "reckless-check-bucket-output-1m-lr1e6-e4",
     "backend": "material-head",
     "bucket_mode": "check-state",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
@@ -19,9 +19,9 @@
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.000005,
+    "lr": 1e-06,
     "weight_decay": 0.0,
-    "epochs": 8,
+    "epochs": 4,
     "pack_limit": 1100000,
     "max_rows": 1000000,
     "val_rows": 100000,

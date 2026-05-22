@@ -33,6 +33,20 @@ Current gate status:
   false positives. Do not run SPRT from that gate alone. A candidate must beat
   the reference on this composite gate, or explain why the composite target set
   is invalid, before it earns match time.
+- Check-state output-bucket probe (feature/nnue-reckless-check-bucket):
+  - Engine feature branch and NNUE build.json were committed before launch.
+  - This is a nnue_reckless lane only: existing Berserk/Enyo weights, copied
+    output head expanded to 8 check/king-pressure buckets, trained output only.
+  - Static validation was safe: mae=135.043, sign=92.18%.
+  - Composite gate improved non-mate targets: top1=76/164, top3=133/164,
+    candidate_better=42, reference_better=22, cap200=+912, worst=-48cp.
+  - The same candidate failed the mate-like subset badly: top1=22/49,
+    top3=34/49, candidate_better=11, reference_better=12, cap1000=-5961,
+    worst=-31187cp. All mate-like moves were scored, so this is not an
+    unscored-move artifact.
+  - Decision: no SPRT. Try only one conservative lower-LR check-bucket output
+    fit to see whether the non-mate gain survives without the mate-like cliff;
+    if not, close this check-state bucket lane.
 - Split-gate diagnosis shows why the remaining existing-weight deltas are still
   not promotable:
   - `output_signfit_lr5e6` mildly improved non-mate targets:
