@@ -286,6 +286,42 @@ def king_pressure_bucket_from_pieces(
     return max(0, min(pressure, N_OUTPUT_BUCKETS - 1))
 
 
+def check_state_bucket_from_pieces(
+    pieces: Sequence[tuple[int, int, int]],
+    stm: int,
+) -> int:
+    them = BLACK if stm == WHITE else WHITE
+    king_sq = next(sq for pt, color, sq in pieces
+                   if pt == KING and color == stm)
+    occ = 0
+    for _pt, _color, sq in pieces:
+        occ |= 1 << sq
+    king_bit = 1 << king_sq
+    king_zone = attacks_from_piece(KING, stm, king_sq, occ) | king_bit
+
+    checkers = 0
+    slider_checkers = 0
+    pressure = 0
+    for pt, color, sq in pieces:
+        if color != them or pt == KING:
+            continue
+        attacks = attacks_from_piece(pt, color, sq, occ)
+        if attacks & king_bit:
+            checkers += 1
+            if pt in (BISHOP, ROOK, QUEEN):
+                slider_checkers += 1
+        if attacks & king_zone:
+            pressure += 1
+
+    if checkers >= 2:
+        return min(3, N_OUTPUT_BUCKETS - 1)
+    if checkers == 1:
+        return min(2 if slider_checkers else 1, N_OUTPUT_BUCKETS - 1)
+    if pressure <= 0:
+        return 0
+    return min(3 + pressure, N_OUTPUT_BUCKETS - 1)
+
+
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
     valid_sizes = (

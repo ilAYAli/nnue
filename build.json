@@ -1,51 +1,49 @@
 {
   "description": "Active Enyo NNUE improvement-run config. This file is the reviewed source of truth for the current candidate recipe.",
-  "experiment": "Native Enyo-owned Bullet scratch full-data run",
-  "goal": "Train a clean Enyo-native .nn from scratch with Bullet using Enyo's current runtime layout. This is the nnue_native lane: no Berserk initialization; validate by static/composite gates before any SPRT.",
-  "track": "nnue_native",
+  "experiment": "Reckless lane check-state output buckets",
+  "goal": "Test a small existing-weight delta: duplicate the current Enyo .nn float head into check/king-pressure output buckets, train only the output layer, and gate before any SPRT.",
+  "track": "nnue_reckless",
+  "engine_branch": "feature/nnue-reckless-check-bucket",
+  "nnue_branch": "feature/nnue-reckless-check-bucket",
   "inputs": {
-    "broad": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
+    "broad": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
+    "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "create": {
-    "name": "native-bullet-enyo-scratch-full-eval400-sb16384",
-    "backend": "bullet",
+    "name": "reckless-check-bucket-output-1m-lr5e6-e8",
+    "backend": "material-head",
+    "bucket_mode": "check-state",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "bullet_mode": "enyo",
-    "init_net": "",
-    "bullet_rows": 3000000,
-    "bullet_hidden": 1024,
-    "bullet_l2": 16,
-    "bullet_batch_size": 4096,
-    "bullet_batches": 64,
-    "bullet_superbatches": 16384,
-    "bullet_threads": 4,
-    "bullet_wdl": 0.75,
-    "bullet_lr": 0.001,
-    "bullet_final_lr": 5e-05,
-    "bullet_eval_scale": 400.0,
-    "bullet_save_rate": 4096,
+    "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "trainable": "output",
+    "objective": "huber",
+    "target_clamp": 800,
+    "huber_beta": 200,
+    "lr": 0.000005,
+    "weight_decay": 0.0,
+    "epochs": 8,
+    "pack_limit": 1100000,
+    "max_rows": 1000000,
+    "val_rows": 100000,
+    "batch_size": 8192,
+    "device": "cuda",
+    "workers": 2,
+    "select_metric": "sign",
+    "patience": 2,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "rejected",
-    "summary": "runs/native-bullet-enyo-scratch-full-eval400-sb16384/validate/checkpoint_sweep_20260522_211315/summary.txt",
-    "result": [
-      "final checkpoint static: mae=503.945, sign=84.46%, slope=2.56",
-      "final checkpoint composite: top1=26/213, top3=89/213, candidate_better=30, reference_better=135",
-      "checkpoint sweep best by sum_gap was 8192: top1=30/213, top3=87/213, candidate_better=29, reference_better=129",
-      "all checkpoints were far below reference on composite move choice; no SPRT"
+    "status": "pending",
+    "required_before_training": [
+      "engine builds with ENYO_ENABLE_CHECK_BUCKET_NNUE=OFF and ON",
+      "copied-head bucketed net loads and is parity with the single-head net",
+      "evalnet bench shows no normal-build overhead and acceptable enabled overhead"
     ],
-    "success_condition": [
-      "exported model.nn loads in Enyo and validate.py",
-      "static metrics improve meaningfully over prior native scratch attempts",
-      "composite move-choice gate is not clearly worse than reference",
-      "mate-like/tactical-tail slice does not collapse",
-      "no SPRT unless the cheap gates justify match time"
-    ],
-    "next": [
-      "do not run SPRT for this candidate",
-      "choose and commit the next build.json recipe before launching another training run",
-      "keep nnue_native and nnue_reckless lanes separate"
+    "required_before_sprt": [
+      "static gate is not worse than reference on broad validation",
+      "composite move-choice gate does not show a tactical-tail collapse",
+      "mate-like and mined SPRT-failure slices do not regress",
+      "SPRT only if cheap gates are clean"
     ]
   }
 }
