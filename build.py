@@ -644,7 +644,7 @@ def add_create_args(
             "mode=reckless emits Bullet checkpoints, mode=enyo emits model.nn."),
     )
     parser.add_argument("--bucket-mode", default=value("bucket_mode", d.bucket_mode),
-                        choices=["material", "king-pressure"])
+                        choices=["material", "king-pressure", "check-state"])
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
     parser.add_argument("--selfplay-shard-games", type=int, default=value("selfplay_shard_games", d.selfplay_shard_games))

@@ -38,6 +38,7 @@ class PackedMaterialDataset(Dataset):
         bucket_mode: str = "material",
     ):
         root = Path(path)
+        self.bucket_mode = bucket_mode
         self.w_features = np.load(root / "white_features.npy", mmap_mode="r")
         self.b_features = np.load(root / "black_features.npy", mmap_mode="r")
         self.counts = np.load(root / "counts.npy", mmap_mode="r")
@@ -50,9 +51,17 @@ class PackedMaterialDataset(Dataset):
             np.load(king_pressure_path, mmap_mode="r")
             if king_pressure_path.exists() else None
         )
+        check_state_path = root / "check_state_bucket.npy"
+        self.check_state_buckets = (
+            np.load(check_state_path, mmap_mode="r")
+            if check_state_path.exists() else None
+        )
         if bucket_mode == "king-pressure" and self.king_pressure_buckets is None:
             raise FileNotFoundError(
                 f"{king_pressure_path} missing; rebuild pack data first")
+        if bucket_mode == "check-state" and self.check_state_buckets is None:
+            raise FileNotFoundError(
+                f"{check_state_path} missing; rebuild pack data first")
         rows = len(self.counts)
         self.start = min(skip, rows)
         self.end = rows if limit <= 0 else min(rows, self.start + limit)
@@ -72,7 +81,12 @@ class PackedMaterialDataset(Dataset):
             self.phase_scales[real_idx],
             (
                 self.king_pressure_buckets[real_idx]
-                if self.king_pressure_buckets is not None else 0
+                if self.bucket_mode == "king-pressure"
+                and self.king_pressure_buckets is not None
+                else self.check_state_buckets[real_idx]
+                if self.bucket_mode == "check-state"
+                and self.check_state_buckets is not None
+                else 0
             ),
         )
 
@@ -91,6 +105,8 @@ def collate_material(batch, *, bucket_mode: str):
     if bucket_mode == "material":
         buckets = torch.clamp((counts_t - 2) // 4, 0, nn2.N_OUTPUT_BUCKETS - 1)
     elif bucket_mode == "king-pressure":
+        buckets = torch.as_tensor(np.asarray(row_buckets), dtype=torch.long)
+    elif bucket_mode == "check-state":
         buckets = torch.as_tensor(np.asarray(row_buckets), dtype=torch.long)
     else:
         raise ValueError(f"unknown bucket mode: {bucket_mode}")
@@ -402,7 +418,7 @@ def main() -> int:
     parser.add_argument("--trainable", default="output",
                         choices=["output", "float-head"])
     parser.add_argument("--bucket-mode", default="material",
-                        choices=["material", "king-pressure"])
+                        choices=["material", "king-pressure", "check-state"])
     parser.add_argument("--objective", default="huber",
                         choices=["huber", "mse", "mpe25"])
     parser.add_argument("--huber-beta", type=float, default=200.0)

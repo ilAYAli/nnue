@@ -208,7 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     static.add_argument("--device", default="cpu")
     static.add_argument("--target-clamp", type=float, default=0.0)
     static.add_argument("--bucket-mode", default="material",
-                        choices=["material", "king-pressure"])
+                        choices=["material", "king-pressure", "check-state"])
     static.add_argument("--buckets", action="store_true")
     static.add_argument("--sources", action="store_true")
     static.add_argument("--run")

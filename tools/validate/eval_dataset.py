@@ -118,7 +118,7 @@ def main() -> None:
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--target-clamp", type=float, default=0.0)
     ap.add_argument("--bucket-mode", default="material",
-                    choices=["material", "king-pressure"])
+                    choices=["material", "king-pressure", "check-state"])
     ap.add_argument("--buckets", action="store_true",
                     help="Print metrics grouped by absolute target score.")
     ap.add_argument("--sources", action="store_true",

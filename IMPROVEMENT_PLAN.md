@@ -833,7 +833,28 @@ Immediate next branch:
     `sum_diff_cp=+731`, `median_nonzero_diff_cp=-6.5`,
     `worst_regression_cp=-138`.
   - Decision: no SPRT. Close this king-pressure head-bucket lane unless there
-    is a new implementation hypothesis; do not run another LR/objective sweep.
+    is a new bucket signal that targets the mate-like tails directly.
+- Current `nnue_reckless` probe: check-state output bucket.
+  - Branches:
+    - Enyo: `feature/nnue-reckless-check-bucket`,
+      commit `7582378`.
+    - NNUE: `feature/nnue-reckless-check-bucket` with the committed
+      `build.json` recipe.
+  - This is a small existing-weight delta. It keeps the sparse input
+    transformer and L1 unchanged, accepts copied single-head nets as a no-op,
+    and only trains the replicated float output layer.
+  - Bucket selection is side-to-move tactical state:
+    no pressure, direct check by non-slider, direct check by slider, double
+    check, then king-zone pressure bands.
+  - `build.json` is the source of truth:
+    `reckless-check-bucket-output-1m-lr5e6-e8`, backend `material-head`,
+    bucket mode `check-state`, output-only, 1M train rows plus 100k validation.
+  - Preflight already passed before launch:
+    normal build with `ENYO_ENABLE_CHECK_BUCKET_NNUE=OFF`, experimental build
+    with it `ON`, both test binaries, copied-head parity on startpos,
+    evalnet bench, pack smoke, and 1-epoch train smoke.
+  - No SPRT until broad static, composite move-choice, mate-like, and mined
+    SPRT-failure gates are clean.
 - Gate requirement before SPRT:
   - `candidate_better >= reference_better`.
   - capped `sum_diff_cp > 0` at a documented cap such as `200cp`, not only
