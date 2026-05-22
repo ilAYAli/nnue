@@ -28,8 +28,9 @@ def tool(path: str) -> str:
     return str(repo_root() / "tools" / path)
 
 
-def run(command: list[str], *, dry_run: bool = False) -> int:
-    print(" ".join(command), flush=True)
+def run(command: list[str], *, dry_run: bool = False, echo: bool = False) -> int:
+    if dry_run or echo:
+        print(" ".join(command), flush=True)
     if dry_run:
         return 0
     proc = subprocess.Popen(command, cwd=repo_root())
