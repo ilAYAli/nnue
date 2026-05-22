@@ -37,16 +37,28 @@ Current gate status:
   - Engine feature branch and NNUE build.json were committed before launch.
   - This is a nnue_reckless lane only: existing Berserk/Enyo weights, copied
     output head expanded to 8 check/king-pressure buckets, trained output only.
-  - Static validation was safe: mae=135.043, sign=92.18%.
-  - Composite gate improved non-mate targets: top1=76/164, top3=133/164,
+  - First fit `reckless-check-bucket-output-1m-lr5e6-e8` had safe static
+    validation: mae=135.043, sign=92.18%.
+  - Its composite gate improved non-mate targets: top1=76/164, top3=133/164,
     candidate_better=42, reference_better=22, cap200=+912, worst=-48cp.
-  - The same candidate failed the mate-like subset badly: top1=22/49,
+  - The same first fit failed the mate-like subset badly: top1=22/49,
     top3=34/49, candidate_better=11, reference_better=12, cap1000=-5961,
     worst=-31187cp. All mate-like moves were scored, so this is not an
     unscored-move artifact.
-  - Decision: no SPRT. Try only one conservative lower-LR check-bucket output
-    fit to see whether the non-mate gain survives without the mate-like cliff;
-    if not, close this check-state bucket lane.
+  - Conservative lower-LR fit `reckless-check-bucket-output-1m-lr1e6-e4`
+    improved top-line composite counts but still had mate-like tail risk:
+    all top1=106/213, top3=172/213, cap200=+759, worst=-31162cp; non-mate
+    cap200=+902, worst=-275cp; mate-like cap200=-143.
+  - Bucket-2-only salvage `reckless-check-bucket-mask2-lr1e6-e4` kept the
+    broad failure suite identical to the reference, but the composite gate
+    still missed the hard tail threshold: top1=106/213, top3=172/213,
+    candidate_better=55, reference_better=27, cap200=+1135,
+    worst_regression_cp=-303.
+  - Static eval parity on the worst mask2 row was clean for the root and
+    immediate child positions, so the remaining tail is search-coupled rather
+    than a basic net-format or square-orientation bug.
+  - Decision: no SPRT. Close this check-state output-bucket lane. It produced
+    useful diagnostics but did not satisfy the written pre-SPRT gate.
 - Split-gate diagnosis shows why the remaining existing-weight deltas are still
   not promotable:
   - `output_signfit_lr5e6` mildly improved non-mate targets:
@@ -848,7 +860,7 @@ Immediate next branch:
     `worst_regression_cp=-138`.
   - Decision: no SPRT. Close this king-pressure head-bucket lane unless there
     is a new bucket signal that targets the mate-like tails directly.
-- Current `nnue_reckless` probe: check-state output bucket.
+- Completed `nnue_reckless` probe: check-state output bucket.
   - Branches:
     - Enyo: `feature/nnue-reckless-check-bucket`,
       commit `7582378`.
@@ -860,15 +872,23 @@ Immediate next branch:
   - Bucket selection is side-to-move tactical state:
     no pressure, direct check by non-slider, direct check by slider, double
     check, then king-zone pressure bands.
-  - `build.json` is the source of truth:
-    `reckless-check-bucket-output-1m-lr5e6-e8`, backend `material-head`,
+  - `build.json` was the source of truth for the conservative follow-up:
+    `reckless-check-bucket-output-1m-lr1e6-e4`, backend `material-head`,
     bucket mode `check-state`, output-only, 1M train rows plus 100k validation.
   - Preflight already passed before launch:
     normal build with `ENYO_ENABLE_CHECK_BUCKET_NNUE=OFF`, experimental build
     with it `ON`, both test binaries, copied-head parity on startpos,
     evalnet bench, pack smoke, and 1-epoch train smoke.
-  - No SPRT until broad static, composite move-choice, mate-like, and mined
-    SPRT-failure gates are clean.
+  - The first fit failed mate-like tails badly. The conservative fit reduced
+    but did not remove the mate-like tail. The bucket-2 mask had positive
+    capped composite deltas and an identical broad failure-suite result, but
+    still had `worst_regression_cp=-303` on the composite gate.
+  - Static eval parity on the worst row was clean at the root and immediate
+    children, so the remaining tail is real search coupling from deeper bucket
+    use, not copied-net parity, square-index, or net-format failure.
+  - Decision: no SPRT. Close this check-state bucket lane unless a future idea
+    changes the selector or search guard materially; do not keep retuning this
+    same split.
 - Gate requirement before SPRT:
   - `candidate_better >= reference_better`.
   - capped `sum_diff_cp > 0` at a documented cap such as `200cp`, not only
