@@ -212,6 +212,16 @@ Rejected lanes:
     `top3=5/13`, `sum_gap_cp=1447`, `worst_gap_cp=291`.
   - Decision: no replay gate and no SPRT. The next diagnostic must pass
     `pairwise_candidate_moves_csv` with scratch26's actual search moves.
+- scratch26 override repair:
+  - `pairwise-searchfail-scratch26-override-w4-lr5e4-e12` preserved broad
+    static fit better than the first repair: static `mae=67.972`,
+    `sign=88.16%`.
+  - It did not fix the actual search-failure gate: `top1=9/59`,
+    `top3=23/59`, `sum_gap_cp=75150`, `worst_gap_cp=31887`.
+  - Reason: one selected bad move per target is too narrow; the aggregate run
+    fixed the catastrophic `d3e4 -> d3g6` case only by shifting the broader
+    local decision boundary.
+  - Decision: no replay gate and no SPRT. Use explicit multi-pair rows instead.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -418,15 +428,16 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run one low-weight search-failure pairwise diagnostic from scratch26's actual
-selected bad moves.
+Run one low-weight search-failure pairwise diagnostic from explicit multi-pair
+rows.
 
 Next branch:
 
 - Enyo `.nn` pairwise fine-tune from
   `scratch-qkaiming-26m-quant-lr1e2-e30`.
-- Active recipe: `build.json` points at the 59-position search-failure legal
-  move score table plus the scratch26 candidate-move override CSV.
+- Active recipe: `build.json` points at 108 explicit bad-vs-best pairs over 57
+  search-failure targets. The rows combine repeated failed-candidate moves with
+  scratch26's actual selected bad moves.
 - This is not qmid4, not broadtail-from-reference, and not a same-data scalar
   run.
 
@@ -441,7 +452,7 @@ Reason:
 
 Immediate action:
 
-- Train `pairwise-searchfail-scratch26-override-w4-lr5e4-e12` with
+- Train `pairwise-searchfail-scratch26-multipair-w4-lr5e4-e12` with
   `./build.py -c build.json`.
 - Reject without SPRT unless search-failure, repeated-tail, static, and replay
   failure-suite gates are clean.
@@ -484,19 +495,17 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `pairwise-searchfail-scratch26-override-w4-lr5e4-e12`.
-- selected branch: search-failure pairwise diagnostic from scratch26's actual
-  selected bad moves.
+- candidate name: `pairwise-searchfail-scratch26-multipair-w4-lr5e4-e12`.
+- selected branch: search-failure pairwise diagnostic from explicit multi-pair
+  rows.
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL.
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
 - backend: `pairwise`
 - initializer:
   `runs/scratch-qkaiming-26m-quant-lr1e2-e30/train/scratch-qkaiming-26m-quant-lr1e2-e30/model.nn`.
-- pairwise score table:
-  `assets/failure_suite/search_failure_move_scores_20260522.csv`.
-- candidate-move override table:
-  `assets/failure_suite/search_failure_scratch26_moves_20260522.csv`.
+- pairwise pair table:
+  `assets/failure_suite/search_failure_multi_pairs_20260522.jsonl`.
 - schedule: quantized forward, lr `0.0005`, epochs `12`, pair weight `4`,
   no cp-weighted pair loss, target margin cap `600`, max rows `100000`,
   pack limit `100000`.
