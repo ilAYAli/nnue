@@ -376,6 +376,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--out-dir", f"{candidate_dir}/checkpoints",
             "--net-id", name,
             "--cargo-target-dir", bullet_cargo_target_dir,
+            "--mode", str(args.bullet_mode),
             "--cuda-arch", str(args.bullet_cuda_arch),
             "--hidden", str(args.bullet_hidden),
             "--l2", str(args.bullet_l2),
@@ -515,8 +516,8 @@ def add_create_args(
         choices=["pytorch", "pairwise", "bullet"],
         help=(
             "Training backend. 'pairwise' fine-tunes Enyo .nn with "
-            "child-position ranking pairs. 'bullet' is experimental and "
-            "currently emits Bullet checkpoints, not Enyo .nn files."),
+            "child-position ranking pairs. 'bullet' is experimental; "
+            "mode=reckless emits Bullet checkpoints, mode=enyo emits model.nn."),
     )
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
@@ -593,6 +594,8 @@ def add_create_args(
     parser.add_argument("--pairwise-loss-weight-by-cp", action="store_true", default=value("pairwise_loss_weight_by_cp", d.pairwise_loss_weight_by_cp))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
+    parser.add_argument("--bullet-mode", default=value("bullet_mode", d.bullet_mode),
+                        choices=["reckless", "enyo"])
     parser.add_argument("--bullet-max-abs-cp", type=int, default=value("bullet_max_abs_cp", d.bullet_max_abs_cp))
     parser.add_argument("--bullet-manifest", default=value("bullet_manifest", d.bullet_manifest))
     parser.add_argument("--bullet-cuda-path", default=value("bullet_cuda_path", d.bullet_cuda_path))
