@@ -36,9 +36,17 @@ Current active tooling branch:
   failures, repeated tails, and two failed-SPRT mined sets.
 - Reference-vs-reference `search-gate` check over all `232` targets produced
   zero candidate/reference diffs, so the compare math and wrapper path are sane.
-- Next implementation step, after this is committed, is a training loader and
-  objective that consumes these targets. Do not launch another scalar-only net
-  run as a substitute.
+- `train_search_aware.py` and `build.py --backend search-aware` now consume the
+  target JSONL with broad scalar loss plus child-margin and soft-policy losses.
+- Smoke checks passed without launching a real candidate:
+  - output-only CPU smoke loaded targets, trained one epoch, and exported `.nn`.
+  - all-weights CPU smoke showed gradients reach input, input bias, L1, L1
+    bias, L2, and output tensors.
+  - `build.py create --dry-run --backend search-aware` generates pack plus
+    `train_search_aware` phases.
+- Next step is a committed `build.json` smoke recipe for this backend, with
+  conservative weights and `net-diff`/static/search-gate/failure-suite checks.
+  Do not launch another scalar-only net run as a substitute.
 
 Current gate status:
 
