@@ -251,6 +251,9 @@ def create_config(args: argparse.Namespace) -> dict:
             "--batch-size", str(args.batch_size),
             "--lr", str(args.lr),
             "--weight-decay", str(args.weight_decay),
+            "--input-lr-mult", str(args.input_lr_mult),
+            "--l1-lr-mult", str(args.l1_lr_mult),
+            "--dense-lr-mult", str(args.dense_lr_mult),
             "--target-clamp", str(args.target_clamp),
             "--device", args.device,
             "--workers", str(args.workers),
@@ -301,6 +304,9 @@ def create_config(args: argparse.Namespace) -> dict:
             "--pair-batch-size", str(args.pairwise_pair_batch_size),
             "--lr", str(args.lr),
             "--weight-decay", str(args.weight_decay),
+            "--input-lr-mult", str(args.input_lr_mult),
+            "--l1-lr-mult", str(args.l1_lr_mult),
+            "--dense-lr-mult", str(args.dense_lr_mult),
             "--huber-beta", str(args.huber_beta),
             "--pair-beta", str(args.pairwise_pair_beta),
             "--pair-weight", str(args.pairwise_pair_weight),
@@ -311,6 +317,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--workers", str(args.workers),
             "--max-rows", str(args.max_rows),
             "--skip-rows", str(args.skip_rows),
+            "--grad-norm-every", str(args.grad_norm_every),
         ]
         if args.init_net:
             train_command.extend([
@@ -557,6 +564,9 @@ def add_create_args(
     parser.add_argument("--sign-loss-weight", type=float, default=value("sign_loss_weight", d.sign_loss_weight))
     parser.add_argument("--sign-loss-scale", type=float, default=value("sign_loss_scale", d.sign_loss_scale))
     parser.add_argument("--lr", type=float, default=value("lr", d.lr))
+    parser.add_argument("--input-lr-mult", type=float, default=value("input_lr_mult", d.input_lr_mult))
+    parser.add_argument("--l1-lr-mult", type=float, default=value("l1_lr_mult", d.l1_lr_mult))
+    parser.add_argument("--dense-lr-mult", type=float, default=value("dense_lr_mult", d.dense_lr_mult))
     parser.add_argument("--epochs", type=int, default=value("epochs", d.epochs))
     parser.add_argument("--batch-size", type=int, default=value("batch_size", d.batch_size))
     parser.add_argument("--device", default=value("device", d.device))

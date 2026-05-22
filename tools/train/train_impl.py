@@ -126,6 +126,36 @@ def grad_norm(param: torch.Tensor) -> float:
     return float(param.grad.detach().norm())
 
 
+def optimizer_param_groups(model: EnyoNNUE, args: argparse.Namespace):
+    groups = [
+        {
+            "name": "input",
+            "lr": args.lr * args.input_lr_mult,
+            "params": [model.embed.weight, model.input_bias],
+        },
+        {
+            "name": "l1",
+            "lr": args.lr * args.l1_lr_mult,
+            "params": [model.l1_weight, model.l1_bias],
+        },
+        {
+            "name": "dense",
+            "lr": args.lr * args.dense_lr_mult,
+            "params": list(model.l2.parameters()) + list(model.output.parameters()),
+        },
+    ]
+    out = []
+    for group in groups:
+        params = [p for p in group["params"] if p.requires_grad]
+        if params:
+            out.append({
+                "params": params,
+                "lr": group["lr"],
+                "name": group["name"],
+            })
+    return out
+
+
 @torch.no_grad()
 def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
                  ) -> dict[str, float]:
@@ -231,9 +261,10 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         pin_memory=args.device.startswith("cuda"))
         if val_set is not None else None)
 
-    opt = torch.optim.AdamW(
-        (p for p in model.parameters() if p.requires_grad),
-        lr=args.lr, weight_decay=args.weight_decay)
+    param_groups = optimizer_param_groups(model, args)
+    for group in param_groups:
+        print(f"optimizer group {group['name']} lr={group['lr']}", flush=True)
+    opt = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
 
     best_metric = float("inf")
     best_display = float("inf")
@@ -356,6 +387,9 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=4096)
     ap.add_argument("--lr", type=float, default=1e-5)
     ap.add_argument("--weight-decay", type=float, default=1e-6)
+    ap.add_argument("--input-lr-mult", type=float, default=1.0)
+    ap.add_argument("--l1-lr-mult", type=float, default=1.0)
+    ap.add_argument("--dense-lr-mult", type=float, default=1.0)
     ap.add_argument("--target-clamp", type=float, default=0.0)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--workers", type=int, default=0)

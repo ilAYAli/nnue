@@ -207,6 +207,42 @@ def to_device(items, device: str):
             for item in items]
 
 
+def grad_norm(param: torch.Tensor) -> float:
+    if param.grad is None:
+        return 0.0
+    return float(param.grad.detach().norm())
+
+
+def optimizer_param_groups(model: EnyoNNUE, args: argparse.Namespace):
+    groups = [
+        {
+            "name": "input",
+            "lr": args.lr * args.input_lr_mult,
+            "params": [model.embed.weight, model.input_bias],
+        },
+        {
+            "name": "l1",
+            "lr": args.lr * args.l1_lr_mult,
+            "params": [model.l1_weight, model.l1_bias],
+        },
+        {
+            "name": "dense",
+            "lr": args.lr * args.dense_lr_mult,
+            "params": list(model.l2.parameters()) + list(model.output.parameters()),
+        },
+    ]
+    out = []
+    for group in groups:
+        params = [p for p in group["params"] if p.requires_grad]
+        if params:
+            out.append({
+                "params": params,
+                "lr": group["lr"],
+                "name": group["name"],
+            })
+    return out
+
+
 def predict(model: EnyoNNUE, args, w_feats: torch.Tensor, b_feats: torch.Tensor,
             w_offsets: torch.Tensor, b_offsets: torch.Tensor,
             stm: torch.Tensor, phase_scale: torch.Tensor) -> torch.Tensor:
@@ -282,8 +318,10 @@ def train(args) -> EnyoNNUE:
         pin_memory=args.device.startswith("cuda"))
     pair_iter = cycle(pair_loader)
 
-    opt = torch.optim.AdamW(
-        model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    param_groups = optimizer_param_groups(model, args)
+    for group in param_groups:
+        print(f"optimizer group {group['name']} lr={group['lr']}", flush=True)
+    opt = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
 
     for epoch in range(args.epochs):
         broad_mae_sum = 0.0
@@ -319,6 +357,17 @@ def train(args) -> EnyoNNUE:
             loss = broad_loss + args.pair_weight * pair_loss
             opt.zero_grad()
             loss.backward()
+            if args.grad_norm_every > 0 and pair_n % args.grad_norm_every == 0:
+                print(
+                    "grad "
+                    f"epoch={epoch} pair_n={pair_n} "
+                    f"input={grad_norm(model.embed.weight):.6g} "
+                    f"input_bias={grad_norm(model.input_bias):.6g} "
+                    f"l1={grad_norm(model.l1_weight):.6g} "
+                    f"l1_bias={grad_norm(model.l1_bias):.6g} "
+                    f"l2={grad_norm(model.l2.weight):.6g} "
+                    f"output={grad_norm(model.output.weight):.6g}",
+                    flush=True)
             opt.step()
 
             broad_err = (pred.detach() - y).abs()
@@ -362,6 +411,9 @@ def main() -> None:
     ap.add_argument("--pair-batch-size", type=int, default=64)
     ap.add_argument("--lr", type=float, default=1e-6)
     ap.add_argument("--weight-decay", type=float, default=1e-6)
+    ap.add_argument("--input-lr-mult", type=float, default=1.0)
+    ap.add_argument("--l1-lr-mult", type=float, default=1.0)
+    ap.add_argument("--dense-lr-mult", type=float, default=1.0)
     ap.add_argument("--huber-beta", type=float, default=200.0)
     ap.add_argument("--pair-beta", type=float, default=100.0)
     ap.add_argument("--pair-weight", type=float, default=1.0)
@@ -373,6 +425,7 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
+    ap.add_argument("--grad-norm-every", type=int, default=0)
     args = ap.parse_args()
     if bool(args.pairs) == bool(args.scores_csv):
         raise SystemExit("provide exactly one of --pairs or --scores-csv")
