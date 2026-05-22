@@ -63,8 +63,16 @@ Current gate status:
     all `top1=106/213`, `top3=172/213`, cap200 `+1135`,
     `worst_regression_cp=-303`. The guard did not address the actual search
     tail and adds extra head work when active.
-  - Decision: no SPRT. Close this check-state output-bucket lane. It produced
-    useful diagnostics but did not satisfy the written pre-SPRT gate.
+  - A short match check confirmed the rejection. The mask2 candidate was stopped
+    at 456/1000 games because it was clearly negative:
+    `Elo=-29.8 +/- 22.4`, `LLR=-0.85/2.94`, `LOS=0.4%`,
+    `draw=50.7%`.
+  - Failed-smoke mining with a low-node diagnostic scanned 872 candidate
+    positions and found zero candidate/reference move disagreements. That makes
+    it unsuitable as a new move-choice target source; the match failure is
+    probably not captured by that shallow re-search setup.
+  - Decision: close this check-state output-bucket lane. It produced useful
+    diagnostics but failed the written pre-SPRT gate and then matched negative.
 - Split-gate diagnosis shows why the remaining existing-weight deltas are still
   not promotable:
   - `output_signfit_lr5e6` mildly improved non-mate targets:
@@ -896,9 +904,14 @@ Immediate next branch:
     clamp=200cp) built and passed tests, but the composite gate was unchanged
     from mask2 and still had `worst_regression_cp=-303`. Do not pursue this
     guard; it does not fix the tail and costs extra output-head work.
-  - Decision: no SPRT. Close this check-state bucket lane unless a future idea
-    changes the selector or search guard materially; do not keep retuning this
-    same split.
+  - Match check of mask2 was negative and stopped at 456/1000 games:
+    `Elo=-29.8 +/- 22.4`, `LLR=-0.85/2.94`, `LOS=0.4%`.
+  - Failed-smoke mining produced zero low-node candidate/reference
+    disagreements from 872 candidate positions, so it did not generate a useful
+    target set.
+  - Decision: close this check-state bucket lane unless a future idea changes
+    the selector or search guard materially; do not keep retuning this same
+    split.
 - Gate requirement before SPRT:
   - `candidate_better >= reference_better`.
   - capped `sum_diff_cp > 0` at a documented cap such as `200cp`, not only
