@@ -158,11 +158,14 @@ def create_config(args: argparse.Namespace) -> dict:
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"
     labeled_jsonl = str(args.labeled_jsonl or "")
+    external_bullet_data = args.backend == "bullet" and bool(args.bullet_data)
     pack_input = "{score}/labeled.jsonl"
     steps = []
 
     if labeled_jsonl:
         pack_input = str(expand_path(labeled_jsonl))
+    elif external_bullet_data:
+        pass
     else:
         steps.extend([
             {
@@ -512,7 +515,7 @@ def create_config(args: argparse.Namespace) -> dict:
         ])
     elif args.backend == "bullet":
         bullet_text = "{pack}/bullet/enyo.txt"
-        bullet_data = "{pack}/bullet/enyo.data"
+        bullet_data = str(args.bullet_data or "{pack}/bullet/enyo.data")
         bullet_cargo_target_dir = (
             str(expand_user(args.bullet_cargo_target_dir))
             if args.bullet_cargo_target_dir
@@ -521,6 +524,11 @@ def create_config(args: argparse.Namespace) -> dict:
         bullet_train = [
             tool("bullet/bullet.py"), "train",
             "--data", bullet_data,
+            "--loader", str(args.bullet_loader),
+            "--sfbinpack-buffer-mb", str(args.bullet_sfbinpack_buffer_mb),
+            "--sfbinpack-min-ply", str(args.bullet_sfbinpack_min_ply),
+            "--sfbinpack-max-abs-cp", str(args.bullet_sfbinpack_max_abs_cp),
+            "--sfbinpack-quiet-only" if args.bullet_sfbinpack_quiet_only else "--no-sfbinpack-quiet-only",
             "--out-dir", f"{candidate_dir}/checkpoints",
             "--net-id", name,
             "--cargo-target-dir", bullet_cargo_target_dir,
@@ -564,7 +572,7 @@ def create_config(args: argparse.Namespace) -> dict:
         if args.bullet_cuda_path:
             bullet_train.extend(["--cuda-path", str(expand_user(args.bullet_cuda_path))])
 
-        if args.bullet_mode == "enyo":
+        if args.bullet_mode == "enyo" and not args.bullet_data:
             steps.append({
                 "name": "pack",
                 "command": [
@@ -579,32 +587,33 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             })
 
-        steps.extend([
-            {
-                "name": "bullet_text",
-                "command": [
-                    tool("bullet/jsonl_to_bullet_text.py"),
-                    "--input", pack_input,
-                    "--output", bullet_text,
-                    "--limit", str(args.bullet_rows),
-                    "--max-abs-cp", str(args.bullet_max_abs_cp),
-                ] + (["--enyo-runtime-target"] if args.bullet_mode == "enyo" else []),
-            },
-            {
-                "name": "bullet_format",
-                "command": [
-                    tool("bullet/bullet.py"), "format",
-                    "--input", bullet_text,
-                    "--output", bullet_data,
-                    "--bullet-manifest", str(expand_user(args.bullet_manifest)),
-                    "--validate",
-                ],
-            },
-            {
-                "name": "bullet_train",
-                "command": bullet_train,
-            },
-        ])
+        if not args.bullet_data:
+            steps.extend([
+                {
+                    "name": "bullet_text",
+                    "command": [
+                        tool("bullet/jsonl_to_bullet_text.py"),
+                        "--input", pack_input,
+                        "--output", bullet_text,
+                        "--limit", str(args.bullet_rows),
+                        "--max-abs-cp", str(args.bullet_max_abs_cp),
+                    ] + (["--enyo-runtime-target"] if args.bullet_mode == "enyo" else []),
+                },
+                {
+                    "name": "bullet_format",
+                    "command": [
+                        tool("bullet/bullet.py"), "format",
+                        "--input", bullet_text,
+                        "--output", bullet_data,
+                        "--bullet-manifest", str(expand_user(args.bullet_manifest)),
+                        "--validate",
+                    ],
+                },
+            ])
+        steps.append({
+            "name": "bullet_train",
+            "command": bullet_train,
+        })
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -803,6 +812,25 @@ def add_create_args(
     parser.add_argument("--search-target-limit", type=int, default=value("search_target_limit", d.search_target_limit))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
+    parser.add_argument(
+        "--bullet-data",
+        default=value("bullet_data", d.bullet_data),
+        help=(
+            "Existing Bullet training data path. With --bullet-loader=direct this is a "
+            "BulletFormat .data file; with --bullet-loader=sfbinpack this is one or more "
+            "Stockfish binpack paths separated by ';'. Skips JSONL->Bullet conversion."
+        ),
+    )
+    parser.add_argument("--bullet-loader", default=value("bullet_loader", d.bullet_loader),
+                        choices=["direct", "sfbinpack"])
+    parser.add_argument("--bullet-sfbinpack-buffer-mb", type=int,
+                        default=value("bullet_sfbinpack_buffer_mb", d.bullet_sfbinpack_buffer_mb))
+    parser.add_argument("--bullet-sfbinpack-min-ply", type=int,
+                        default=value("bullet_sfbinpack_min_ply", d.bullet_sfbinpack_min_ply))
+    parser.add_argument("--bullet-sfbinpack-max-abs-cp", type=int,
+                        default=value("bullet_sfbinpack_max_abs_cp", d.bullet_sfbinpack_max_abs_cp))
+    parser.add_argument("--bullet-sfbinpack-quiet-only", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_sfbinpack_quiet_only", d.bullet_sfbinpack_quiet_only))
     parser.add_argument("--bullet-mode", default=value("bullet_mode", d.bullet_mode),
                         choices=["reckless", "enyo"])
     parser.add_argument("--bullet-max-abs-cp", type=int, default=value("bullet_max_abs_cp", d.bullet_max_abs_cp))

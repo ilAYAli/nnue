@@ -29,6 +29,14 @@ def expand_path(value: str | Path) -> Path:
     return Path(os.path.expandvars(str(value))).expanduser().resolve()
 
 
+def expand_data_paths(value: str) -> str:
+    return ";".join(
+        str(expand_path(path))
+        for path in str(value).split(";")
+        if path.strip()
+    )
+
+
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -192,7 +200,7 @@ def cmd_format(args: argparse.Namespace) -> int:
 
 
 def cmd_train(args: argparse.Namespace) -> int:
-    data = expand_path(args.data)
+    data = expand_data_paths(args.data)
     out_dir = expand_path(args.out_dir)
     target_dir = expand_path(args.cargo_target_dir)
     manifest = repo_root() / "tools" / "bullet" / "spike_trainer" / "Cargo.toml"
@@ -202,7 +210,12 @@ def cmd_train(args: argparse.Namespace) -> int:
     env = os.environ.copy()
     env.update({
         "CARGO_TARGET_DIR": str(target_dir),
-        "ENYO_BULLET_DATA": str(data),
+        "ENYO_BULLET_DATA": data,
+        "ENYO_BULLET_LOADER": str(args.loader),
+        "ENYO_BULLET_SFBINPACK_BUFFER_MB": str(args.sfbinpack_buffer_mb),
+        "ENYO_BULLET_SFBINPACK_MIN_PLY": str(args.sfbinpack_min_ply),
+        "ENYO_BULLET_SFBINPACK_MAX_ABS_CP": str(args.sfbinpack_max_abs_cp),
+        "ENYO_BULLET_SFBINPACK_QUIET_ONLY": "1" if args.sfbinpack_quiet_only else "0",
         "ENYO_BULLET_OUT": str(out_dir),
         "ENYO_BULLET_NET_ID": args.net_id,
         "ENYO_BULLET_MODE": args.mode,
@@ -277,6 +290,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     train = subparsers.add_parser("train", help="Train the experimental Bullet net.")
     train.add_argument("--data", required=True)
+    train.add_argument(
+        "--loader",
+        choices=["direct", "sfbinpack"],
+        default="direct",
+        help="Training data loader. direct expects BulletFormat .data; sfbinpack reads Stockfish binpack directly.",
+    )
+    train.add_argument("--sfbinpack-buffer-mb", type=int, default=1024)
+    train.add_argument("--sfbinpack-min-ply", type=int, default=16)
+    train.add_argument("--sfbinpack-max-abs-cp", type=int, default=10000)
+    train.add_argument("--sfbinpack-quiet-only", action=argparse.BooleanOptionalAction, default=True)
     train.add_argument("--out-dir", required=True)
     train.add_argument("--net-id", required=True)
     train.add_argument("--cargo-target-dir", required=True)
