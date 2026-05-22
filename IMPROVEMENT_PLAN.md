@@ -252,6 +252,21 @@ Rejected lanes:
     `sum_gap_cp=32467`, `worst_gap_cp=31311`.
   - Decision: no replay gate and no SPRT. The signal is real but too
     destructive. Try one lower-pressure scalar blend before stopping this lane.
+- scratch26 conservative scalar child-row blend:
+  - `scalar-searchfail-scratch26-childx25-lr2e4-e8` reduced the child repeat
+    count to 25 and lr to `0.0002`.
+  - It still only moved the dense head in the exported net:
+    `497/25200209` exported values changed; input, input bias, L1 weights, and
+    L1 bias were unchanged.
+  - It improved search-failure over scratch26 and avoided the catastrophic
+    repeated-tail collapse from `childx100`: search-failure `top1=13/59`,
+    `top3=23/59`, `sum_gap_cp=11014`, `worst_gap_cp=699`;
+    repeated-tail `top1=4/13`, `top3=6/13`, `sum_gap_cp=1503`,
+    `worst_gap_cp=294`.
+  - Broad scalar fit was still worse than scratch26:
+    `mae=69.222`, `sign=86.67%`, `corr=0.852982`, `slope=0.738942`.
+  - Decision: no replay gate and no SPRT. Try one minimal child-row blend; if
+    it does not preserve broad fit, stop this scalar child-blend lane.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -458,14 +473,14 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run one conservative scalar child-row blend diagnostic from the same
-search-failure child positions.
+Run one minimal scalar child-row blend diagnostic from the same search-failure
+child positions.
 
 Next branch:
 
 - Enyo `.nn` scalar fine-tune from
   `scratch-qkaiming-26m-quant-lr1e2-e30`.
-- Active recipe: `build.json` blends 100k broad labeled rows with 25 repeats of
+- Active recipe: `build.json` blends 100k broad labeled rows with 10 repeats of
   the 216 search-failure child rows from
   `assets/failure_suite/search_failure_multi_pairs_20260522.jsonl`.
 - This is not another pairwise run. It tests whether normal scalar supervision
@@ -480,13 +495,15 @@ Reason:
   not fix the broad search-failure gate.
 - The first scalar child-row blend improved search failures but destroyed broad
   static fit and repeated-tail behavior.
+- The conservative scalar child-row blend reduced the damage, but still
+  regressed broad static fit.
 - The diagnostic question is whether oversampling the same child positions as
   normal labeled rows can improve scratch move choice without destroying broad
   scalar behavior.
 
 Immediate action:
 
-- Train `scalar-searchfail-scratch26-childx25-lr2e4-e8` with
+- Train `scalar-searchfail-scratch26-childx10-lr1e4-e8` with
   `./build.py -c build.json`.
 - Reject without SPRT unless search-failure, repeated-tail, static, and replay
   failure-suite gates are clean.
@@ -529,7 +546,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `scalar-searchfail-scratch26-childx25-lr2e4-e8`.
+- candidate name: `scalar-searchfail-scratch26-childx10-lr1e4-e8`.
 - selected branch: scalar child-row blend diagnostic from repeated
   search-failure children.
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL.
@@ -540,9 +557,9 @@ Current `build.json` intent:
   `runs/scratch-qkaiming-26m-quant-lr1e2-e30/train/scratch-qkaiming-26m-quant-lr1e2-e30/model.nn`.
 - extra child rows:
   `assets/failure_suite/search_failure_multi_pairs_20260522.jsonl`.
-- blend: first `100000` broad rows plus `25` repeats of the 216 child rows,
+- blend: first `100000` broad rows plus `10` repeats of the 216 child rows,
   shuffled with seed `2026052202`.
-- schedule: quantized forward, Huber cp800 beta200, lr `0.0002`, epochs `8`,
+- schedule: quantized forward, Huber cp800 beta200, lr `0.0001`, epochs `8`,
   max rows `100000`.
 - expected result: diagnostic only; no SPRT unless repeated-tail and replay
   failure-suite gates become clean and the new search-failure gate improves
