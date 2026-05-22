@@ -120,6 +120,31 @@ def run_dir_for(name: str, run_dir: str | None) -> Path:
     return expand_path(DEFAULTS.run_base) / name
 
 
+def default_build_config_path() -> Path:
+    return repo_root() / "build.json"
+
+
+def run_dir_from_build_config(path: str | Path | None = None) -> Path:
+    config_path = expand_path(path or default_build_config_path())
+    if not config_path.exists():
+        raise SystemExit(
+            f"{config_path}: missing; pass a run path or create build.json")
+
+    create_args = load_create_arg_defaults(config_path)
+    name = create_args.get("name")
+    if not name:
+        raise SystemExit(f"{config_path}: create.name is required")
+
+    run_dir = create_args.get("run_dir")
+    return run_dir_for(str(name), str(run_dir) if run_dir else None)
+
+
+def resolve_run_arg(run: str | None) -> Path:
+    if run:
+        return expand_path(run)
+    return run_dir_from_build_config()
+
+
 def write_config(run_dir: Path, config: dict) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / "config.json"
@@ -551,15 +576,16 @@ def cmd_create(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
+    run_dir = resolve_run_arg(args.run)
     return run([
         sys.executable, tool("pipeline/pipeline.py"), "status",
-        str(expand_path(args.run)),
+        str(run_dir),
         "--tail", str(args.tail),
     ])
 
 
 def cmd_report(args: argparse.Namespace) -> int:
-    run_dir = expand_path(args.run)
+    run_dir = resolve_run_arg(args.run)
     print(f"run={run_dir}")
     for net in sorted(run_dir.glob("train/*/model.nn")):
         print(f"candidate={net}")
@@ -729,13 +755,19 @@ def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.A
     add_create_args(create, create_defaults)
     create.set_defaults(func=cmd_create)
 
-    status = subparsers.add_parser("status", help="Show candidate run status.")
-    status.add_argument("run")
+    status = subparsers.add_parser(
+        "status",
+        help="Show candidate run status. Defaults to build.json's run.",
+    )
+    status.add_argument("run", nargs="?")
     status.add_argument("--tail", type=int, default=0)
     status.set_defaults(func=cmd_status)
 
-    report = subparsers.add_parser("report", help="Print candidate run report.")
-    report.add_argument("run")
+    report = subparsers.add_parser(
+        "report",
+        help="Print candidate run report. Defaults to build.json's run.",
+    )
+    report.add_argument("run", nargs="?")
     report.add_argument("--tail", type=int, default=20)
     report.set_defaults(func=cmd_report)
 

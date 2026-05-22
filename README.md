@@ -10,14 +10,22 @@ The public workflow is intentionally small:
 
 ```sh
 ./build.py -c build.json
-./build.py status runs/<run-name>
-./build.py report runs/<run-name>
+./build.py status
+./build.py report
 ```
 
 `build.json` is the committed source of truth for the current reviewed
 experiment. Change that file, commit it, then run the command above. The many
 files under `tools/` are phase helpers and library modules used by `build.py`;
 they are not the normal interface for creating a candidate.
+
+`status` and `report` use `build.json` by default. Pass an explicit run path
+only when inspecting an older run:
+
+```sh
+./build.py status runs/d12-d16-huber-cp800
+./build.py report runs/d12-d16-huber-cp800
+```
 
 Candidate creation runs:
 
@@ -210,9 +218,9 @@ Dry-run the generated pipeline without starting work:
 Inspect a run:
 
 ```sh
-./build.py status runs/d12-d16-huber-cp800
-./build.py status runs/d12-d16-huber-cp800 --tail 20
-./build.py report runs/d12-d16-huber-cp800
+./build.py status
+./build.py status --tail 20
+./build.py report
 ```
 
 ## Common Candidate Arguments
