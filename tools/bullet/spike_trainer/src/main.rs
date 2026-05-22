@@ -7,7 +7,7 @@ use bullet_lib::{
         outputs::MaterialCount,
     },
     nn::{
-        InitSettings, Shape,
+        Affine, InitSettings, ModelBuilder, Shape,
         optimiser::{AdamW, AdamWParams},
     },
     trainer::{
@@ -27,6 +27,30 @@ fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> T {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
+}
+
+fn enyo_affine<'a>(
+    builder: &'a ModelBuilder,
+    id: &str,
+    input_size: usize,
+    output_size: usize,
+    stdev: f32,
+) -> Affine<'a> {
+    let weights = builder.new_weights(
+        &format!("{id}w"),
+        Shape::new(output_size, input_size),
+        InitSettings::Normal { mean: 0.0, stdev },
+    );
+    let bias = builder.new_weights(
+        &format!("{id}b"),
+        Shape::new(output_size, 1),
+        InitSettings::Zeroed,
+    );
+    Affine { weights, bias }
+}
+
+fn maybe_frozen<'a, T>(builder: &'a ModelBuilder, frozen: bool, mut f: impl FnMut() -> T) -> T {
+    if frozen { builder.no_grad(|| f()) } else { f() }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -104,6 +128,13 @@ fn train_enyo(
     wdl_proportion: f32,
     initial_lr: f32,
     final_lr: f32,
+    l0_stdev: f32,
+    l1_stdev: f32,
+    l1_export_scale: f32,
+    eval_scale: f32,
+    save_rate: usize,
+    trainable: String,
+    weight_decay: f32,
 ) {
     if hidden != 1024 || l2_size != 16 {
         panic!("Enyo mode writes the fixed Enyo .nn layout; hidden=1024 and l2=16 are required");
@@ -114,69 +145,151 @@ fn train_enyo(
     println!("output={output}");
     println!("net_id={net_id}");
     println!("hidden={hidden} l2={l2_size}");
+    println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
+    println!("enyo_l1_export_scale={l1_export_scale}");
+    println!("enyo_l0_export_scale=1");
+    println!("eval_scale={eval_scale}");
+    println!("save_rate={save_rate}");
+    println!("trainable={trainable}");
+    println!("weight_decay={weight_decay}");
     println!(
         "batch_size={batch_size} batches_per_superbatch={batches_per_superbatch} superbatches={end_superbatch}"
     );
+
+    let train_input = trainable == "all" || trainable == "input";
+    let train_l1 = trainable == "all";
+    let train_l2 = trainable == "all" || trainable == "float-head";
+    let train_l3 = trainable == "all" || trainable == "float-head" || trainable == "output";
+    let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
+    let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
         .inputs(EnyoInputs)
         .save_format(&[
-            SavedFormat::id("l0w").transpose().round().quantise::<i16>(1),
+            SavedFormat::id("l0w").round().quantise::<i16>(1),
             SavedFormat::id("l0b").round().quantise::<i16>(1),
-            SavedFormat::id("l1w").transpose().round().quantise::<i8>(1),
-            SavedFormat::id("l1b").round().quantise::<i32>(1),
-            SavedFormat::id("l2w").transpose(),
+            SavedFormat::id("l1w")
+                .transpose()
+                .round()
+                .quantise::<i8>(l1_export_scale as i16),
+            SavedFormat::id("l1b")
+                .round()
+                .quantise::<i32>(l1_export_scale as i32),
+            SavedFormat::id("l2w")
+                .transpose()
+                .transform(move |_store, weights| {
+                    weights.into_iter().map(|w| w / l1_export_scale).collect()
+                }),
             SavedFormat::id("l2b"),
-            SavedFormat::id("l3w").transpose(),
-            SavedFormat::id("l3b"),
+            SavedFormat::id("l3w")
+                .transpose()
+                .transform(move |_store, weights| {
+                    weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                }),
+            SavedFormat::id("l3b").transform(move |_store, weights| {
+                weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+            }),
         ])
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
         .build(|builder, stm_inputs, ntm_inputs| {
-            let l0 = builder.new_affine("l0", 32 * 12 * 64, hidden);
-            l0.init_with_effective_input_size(32);
-            let l1 = builder.new_affine("l1", 2 * hidden, l2_size);
-            let l2 = builder.new_affine("l2", l2_size, 32);
-            let l3 = builder.new_affine("l3", 32, 1);
+            let mut l0 = maybe_frozen(builder, !train_input, || {
+                enyo_affine(builder, "l0", 32 * 12 * 64, hidden, l0_stdev)
+            });
+            l0.weights = l0.weights.faux_quantise(1.0, true);
+            l0.bias = l0.bias.faux_quantise(1.0, true);
 
-            let stm_hidden = l0.forward(stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0;
-            let ntm_hidden = l0.forward(ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0;
+            let mut l1 = maybe_frozen(builder, !train_l1, || {
+                enyo_affine(builder, "l1", 2 * hidden, l2_size, l1_stdev)
+            });
+            l1.weights = l1.weights.faux_quantise(l1_export_scale, true);
+            l1.bias = l1.bias.faux_quantise(l1_export_scale, true);
+            let l2 = maybe_frozen(builder, !train_l2, || builder.new_affine("l2", l2_size, 32));
+            let l3 = maybe_frozen(builder, !train_l3, || builder.new_affine("l3", 32, 1));
+
+            let stm_hidden = (l0.forward(stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+                .faux_quantise(1.0, false);
+            let ntm_hidden = (l0.forward(ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+                .faux_quantise(1.0, false);
             let x0 = stm_hidden.concat(ntm_hidden);
             let x1 = l1.forward(x0).relu();
             let x2 = l2.forward(x1).relu();
-            l3.forward(x2) / (400.0 * 32.0)
+            l3.forward(x2)
         });
 
-    trainer.optimiser.set_params_for_weight(
-        "l0w",
-        AdamWParams { max_weight: 4095.0, min_weight: -4095.0, ..Default::default() },
-    );
-    trainer.optimiser.set_params_for_weight(
-        "l0b",
-        AdamWParams { max_weight: 4095.0, min_weight: -4095.0, ..Default::default() },
-    );
-    trainer.optimiser.set_params_for_weight(
-        "l1w",
-        AdamWParams { max_weight: 127.0, min_weight: -128.0, ..Default::default() },
-    );
+    let open_params = AdamWParams {
+        decay: weight_decay,
+        max_weight: 1.0e9,
+        min_weight: -1.0e9,
+        ..Default::default()
+    };
+    trainer.optimiser.set_params(open_params);
+    if train_input {
+        trainer.optimiser.set_params_for_weight(
+            "l0w",
+            AdamWParams {
+                decay: weight_decay,
+                max_weight: 4095.0,
+                min_weight: -4095.0,
+                ..Default::default()
+            },
+        );
+        trainer.optimiser.set_params_for_weight(
+            "l0b",
+            AdamWParams {
+                decay: weight_decay,
+                max_weight: 4095.0,
+                min_weight: -4095.0,
+                ..Default::default()
+            },
+        );
+    }
+    if train_l1 {
+        trainer.optimiser.set_params_for_weight(
+            "l1w",
+            AdamWParams {
+                decay: weight_decay,
+                max_weight: 127.0 / l1_export_scale,
+                min_weight: -128.0 / l1_export_scale,
+                ..Default::default()
+            },
+        );
+    }
+
+    if !init_weights.is_empty() {
+        trainer
+            .optimiser
+            .load_weights_from_file(&init_weights)
+            .expect("failed to load initial Bullet weights");
+        println!("loaded_init_weights={init_weights}");
+        trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+        if export_init_only {
+            println!("export_init_only=1");
+            return;
+        }
+    } else if export_init_only {
+        panic!("ENYO_BULLET_EXPORT_INIT_ONLY requires ENYO_BULLET_INIT_WEIGHTS");
+    }
 
     let schedule = TrainingSchedule {
         net_id,
-        eval_scale: 400.0,
+        eval_scale,
         steps: TrainingSteps {
             batch_size,
             batches_per_superbatch,
             start_superbatch: 1,
             end_superbatch,
         },
-        wdl_scheduler: wdl::ConstantWDL { value: wdl_proportion },
+        wdl_scheduler: wdl::ConstantWDL {
+            value: wdl_proportion,
+        },
         lr_scheduler: lr::CosineDecayLR {
             initial_lr,
             final_lr,
             final_superbatch: end_superbatch,
         },
-        save_rate: 1,
+        save_rate,
     };
 
     let settings = LocalSettings {
@@ -204,6 +317,13 @@ fn main() {
     let wdl_proportion = env_parse("ENYO_BULLET_WDL", 0.75f32);
     let initial_lr = env_parse("ENYO_BULLET_LR", 0.001f32);
     let final_lr = env_parse("ENYO_BULLET_FINAL_LR", initial_lr * 0.3f32);
+    let enyo_l0_std = env_parse("ENYO_BULLET_ENYO_L0_STD", 8.0f32);
+    let enyo_l1_std = env_parse("ENYO_BULLET_ENYO_L1_STD", 1.0f32);
+    let enyo_l1_export_scale = env_parse("ENYO_BULLET_ENYO_L1_EXPORT_SCALE", 1.0f32);
+    let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
+    let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 1usize);
+    let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
+    let weight_decay = env_parse("ENYO_BULLET_WEIGHT_DECAY", 0.0f32);
 
     if mode == "enyo" {
         train_enyo(
@@ -219,6 +339,13 @@ fn main() {
             wdl_proportion,
             initial_lr,
             final_lr,
+            enyo_l0_std,
+            enyo_l1_std,
+            enyo_l1_export_scale,
+            eval_scale,
+            save_rate,
+            trainable,
+            weight_decay,
         );
         return;
     }
@@ -227,11 +354,11 @@ fn main() {
     #[rustfmt::skip]
     const BUCKET_LAYOUT: [usize; 32] = [
         0, 1, 2, 3,
-        4, 4, 5, 5,
-        6, 6, 6, 6,
-        7, 7, 7, 7,
+        4, 5, 6, 7,
         8, 8, 8, 8,
-        8, 8, 8, 8,
+        9, 9, 9, 9,
+        9, 9, 9, 9,
+        9, 9, 9, 9,
         9, 9, 9, 9,
         9, 9, 9, 9,
     ];
@@ -324,7 +451,7 @@ fn main() {
             final_lr,
             final_superbatch: end_superbatch,
         },
-        save_rate: 1,
+        save_rate,
     };
 
     let settings = LocalSettings {

@@ -307,6 +307,17 @@ def train(args) -> EnyoNNUE:
         model = load_model_from_nn(args.init_from_nn, device=args.device)
     else:
         model = EnyoNNUE(init=args.init).to(args.device)
+    init_model = None
+    if args.broad_target == "init":
+        if not args.init_from_nn:
+            raise SystemExit("--broad-target init requires --init-from-nn")
+        init_model = load_model_from_nn(args.init_from_nn, device=args.device)
+        init_model.eval()
+        for param in init_model.parameters():
+            param.requires_grad_(False)
+        print("broad target: init net distillation", flush=True)
+    else:
+        print("broad target: teacher labels", flush=True)
 
     broad_loader = DataLoader(
         broad_set, batch_size=args.batch_size, shuffle=True,
@@ -332,7 +343,10 @@ def train(args) -> EnyoNNUE:
         for broad_batch in broad_loader:
             broad_batch = to_device(broad_batch, args.device)
             w, b, w_off, b_off, stm, y, _wdl, phase_scale, _source_ids = broad_batch
-            if args.target_clamp > 0:
+            if init_model is not None:
+                with torch.no_grad():
+                    y = predict(init_model, args, w, b, w_off, b_off, stm, phase_scale)
+            elif args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
             pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
             broad_loss = F.smooth_l1_loss(
@@ -354,7 +368,7 @@ def train(args) -> EnyoNNUE:
             else:
                 pair_loss = pair_losses.mean()
 
-            loss = broad_loss + args.pair_weight * pair_loss
+            loss = args.broad_weight * broad_loss + args.pair_weight * pair_loss
             opt.zero_grad()
             loss.backward()
             if args.grad_norm_every > 0 and pair_n % args.grad_norm_every == 0:
@@ -415,6 +429,9 @@ def main() -> None:
     ap.add_argument("--l1-lr-mult", type=float, default=1.0)
     ap.add_argument("--dense-lr-mult", type=float, default=1.0)
     ap.add_argument("--huber-beta", type=float, default=200.0)
+    ap.add_argument("--broad-weight", type=float, default=1.0)
+    ap.add_argument("--broad-target", default="teacher",
+                    choices=["teacher", "init"])
     ap.add_argument("--pair-beta", type=float, default=100.0)
     ap.add_argument("--pair-weight", type=float, default=1.0)
     ap.add_argument("--target-clamp", type=float, default=1600.0)

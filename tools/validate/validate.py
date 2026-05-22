@@ -43,9 +43,24 @@ def event_run_dir(*paths: str | Path | None) -> Path:
     return tools_root().parent / "runs" / "validation"
 
 
+def candidate_run_dir_from_net(net: str | Path) -> Path | None:
+    path = expand_path(net)
+    parts = path.parts
+    if "train" not in parts:
+        return None
+    idx = parts.index("train")
+    if idx == 0:
+        return None
+    return Path(*parts[:idx])
+
+
 def cmd_static(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "eval_dataset.py"
-    run_dir = event_run_dir(args.run, expand_path(args.data).parents[1])
+    run_dir = event_run_dir(
+        args.run,
+        candidate_run_dir_from_net(args.net),
+        expand_path(args.data).parents[1],
+    )
     command = [
         str(expand_user(args.python)),
         str(script),
@@ -56,6 +71,7 @@ def cmd_static(args: argparse.Namespace) -> int:
         "--batch-size", str(args.batch_size),
         "--device", args.device,
         "--target-clamp", str(args.target_clamp),
+        "--bucket-mode", args.bucket_mode,
     ]
     if args.buckets:
         command.append("--buckets")
@@ -191,6 +207,8 @@ def build_parser() -> argparse.ArgumentParser:
     static.add_argument("--batch-size", type=int, default=4096)
     static.add_argument("--device", default="cpu")
     static.add_argument("--target-clamp", type=float, default=0.0)
+    static.add_argument("--bucket-mode", default="material",
+                        choices=["material", "king-pressure"])
     static.add_argument("--buckets", action="store_true")
     static.add_argument("--sources", action="store_true")
     static.add_argument("--run")

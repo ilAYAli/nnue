@@ -15,6 +15,15 @@ import json
 from pathlib import Path
 
 
+def phase_scale_from_fen(fen: str) -> float:
+    board = fen.split()[0]
+    minors = sum(1 for ch in board if ch in "NnBb")
+    rooks = sum(1 for ch in board if ch in "Rr")
+    queens = sum(1 for ch in board if ch in "Qq")
+    phase = 3 * minors + 5 * rooks + 10 * queens
+    return (128.0 + float(phase)) / 128.0
+
+
 def white_result_from_row(row: dict) -> float:
     result = row.get("result")
     if result == "1-0":
@@ -30,7 +39,7 @@ def white_result_from_row(row: dict) -> float:
 
 
 def convert(input_path: Path, output_path: Path, *, limit: int,
-            max_abs_cp: int) -> dict[str, int | str]:
+            max_abs_cp: int, enyo_runtime_target: bool) -> dict[str, int | str]:
     stats: dict[str, int | str] = {
         "input": str(input_path),
         "output": str(output_path),
@@ -38,6 +47,7 @@ def convert(input_path: Path, output_path: Path, *, limit: int,
         "written": 0,
         "skipped_cp": 0,
         "skipped_bad": 0,
+        "target": "enyo-runtime" if enyo_runtime_target else "raw-cp",
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +61,8 @@ def convert(input_path: Path, output_path: Path, *, limit: int,
                 fen = str(row["fen"])
                 stm = fen.split()[1]
                 score = int(round(float(row["score"])))
+                if enyo_runtime_target:
+                    score = int(round(score / phase_scale_from_fen(fen)))
                 if stm == "b":
                     score = -score
                 if max_abs_cp > 0 and abs(score) > max_abs_cp:
@@ -77,6 +89,16 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--max-abs-cp", type=int, default=1600)
+    parser.add_argument(
+        "--enyo-runtime-target",
+        action="store_true",
+        help=(
+            "Pre-divide labels by Enyo's runtime phase scale. Enyo applies "
+            "that scale after Propagate(), so Bullet should train the raw "
+            "network output against the inverse-scaled target when exporting "
+            "to Enyo .nn format."
+        ),
+    )
     args = parser.parse_args()
 
     stats = convert(
@@ -84,6 +106,7 @@ def main() -> None:
         args.output.expanduser(),
         limit=args.limit,
         max_abs_cp=args.max_abs_cp,
+        enyo_runtime_target=args.enyo_runtime_target,
     )
     print(json.dumps(stats, indent=2, sort_keys=True))
 

@@ -40,6 +40,7 @@ class CandidateDefaults:
     run_base: str = "~/code/cpp/chess/nnue/runs"
     labeled_jsonl: str = ""
     backend: str = "pytorch"
+    bucket_mode: str = "material"
 
     selfplay_games: int = 160000
     selfplay_shard_games: int = 1000
@@ -97,11 +98,13 @@ class CandidateDefaults:
     pairwise_pairs_jsonl: str = ""
     pairwise_candidate_moves_csv: str = ""
     pairwise_pair_batch_size: int = 64
+    pairwise_broad_weight: float = 1.0
     pairwise_pair_weight: float = 1.0
     pairwise_pair_beta: float = 100.0
     pairwise_min_target_margin: float = 1.0
     pairwise_max_target_margin: float = 800.0
     pairwise_loss_weight_by_cp: bool = False
+    pairwise_broad_target: str = "teacher"
 
     bullet_rows: int = 0
     bullet_mode: str = "reckless"
@@ -119,6 +122,11 @@ class CandidateDefaults:
     bullet_wdl: float = 0.75
     bullet_lr: float = 1e-3
     bullet_final_lr: float = 3e-4
+    bullet_enyo_l0_std: float = 8.0
+    bullet_enyo_l1_std: float = 1.0
+    bullet_enyo_l1_export_scale: float = 1.0
+    bullet_eval_scale: float = 400.0
+    bullet_save_rate: int = 10
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
