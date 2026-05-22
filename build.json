@@ -1,19 +1,17 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-sprt-failure-iterative-hard-negative-qmid3",
-  "goal": "Third pairwise pass: qmid2 improved search gap substantially but still trails reference and introduced a static tail. Start from qmid2, train against qmid2-selected bad moves with lower pair weight/LR and capped margins. Still no SPRT unless gates clear.",
+  "experiment": "pairwise-broadtail-reference-diagnostic",
+  "goal": "Broaden the pairwise target set after qmid3 improved the narrow SPRT-failure gate but failed repeated-tail and replay failure-suite gates. Start from the current reference net, not a damaged qmid checkpoint.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "qmid_candidate_moves": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv",
-    "qmid2_candidate_moves": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/validate/sprtfail_gate_20260522_030827/move_choice_gate.csv"
+    "pairwise_scores": "~/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv"
   },
   "create": {
-    "name": "pairwise-sprtfail-qmid3-w10-lr5e4-e20",
+    "name": "pairwise-broadtail-ref-w8-lr5e4-e16",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pairwise_scores_csv": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "pairwise_pair_weight": 10.0,
+    "pairwise_scores_csv": "~/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv",
+    "pairwise_pair_weight": 8.0,
     "pairwise_pair_batch_size": 64,
     "pairwise_pair_beta": 100,
     "pairwise_min_target_margin": 20,
@@ -23,27 +21,29 @@
     "target_clamp": 800,
     "huber_beta": 200,
     "lr": 0.0005,
-    "epochs": 20,
+    "epochs": 16,
     "batch_size": 8192,
     "max_rows": 100000,
+    "pack_limit": 100000,
     "device": "cuda",
     "workers": 2,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "forward": "quantized",
-    "init_net": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/train/pairwise-sprtfail-qmid2-w25-lr1e3-e20/model.nn",
-    "pairwise_candidate_moves_csv": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/validate/sprtfail_gate_20260522_030827/move_choice_gate.csv"
+    "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "validation": {
-    "status": "iterative hard-negative pairwise diagnostic from qmid2",
+    "status": "broad-tail pairwise diagnostic from current reference",
     "success_condition": [
       "net_diff shows controlled exported movement",
-      "fixed eval_move_gate does not produce a worse tail than qmid2",
-      "move_choice_gate improves over qmid2 and approaches reference",
-      "no SPRT unless search move-choice and failure-suite gates become clearly positive"
+      "static validation is not obviously worse than recent qmid candidates",
+      "repeated-tail move-choice gate does not regress",
+      "failure-suite replay gate is non-negative with controlled tail",
+      "no SPRT unless broad gates become clean"
     ],
     "next_after_success": [
-      "run fixed eval_move_gate and search move_choice_gate against model.nn",
-      "run failure-suite replay gate if search gate is not destructive",
+      "run net_diff against current reference",
+      "run repeated-tail move-choice gate",
+      "run replay failure-suite gate",
       "only then consider a 1000-game smoke SPRT"
     ]
   }

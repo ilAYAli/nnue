@@ -83,13 +83,34 @@ class HardPairDataset(Dataset):
                    max_target_margin=max_target_margin)
 
     @staticmethod
+    def first_move(value: str) -> str:
+        for item in value.split(";"):
+            item = item.strip()
+            if item:
+                return item
+        return ""
+
+    @classmethod
+    def row_candidate_move(cls, row: dict[str, str]) -> str:
+        return (
+            row.get("candidate_move")
+            or row.get("engine_move")
+            or cls.first_move(row.get("target_candidate_moves", ""))
+        )
+
+    @staticmethod
     def candidate_move_overrides(path: str | Path) -> dict[tuple[str, str], str]:
         out: dict[tuple[str, str], str] = {}
         if not path:
             return out
         with Path(path).open(newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
-                move = row.get("engine_move") or row.get("candidate_move")
+                move = (
+                    row.get("engine_move")
+                    or row.get("candidate_move")
+                    or HardPairDataset.first_move(
+                        row.get("target_candidate_moves", ""))
+                )
                 if move:
                     out[(row["log"], row["ply"])] = move
         return out
@@ -110,7 +131,10 @@ class HardPairDataset(Dataset):
             best = next((row for row in rows if int(row["rank"]) == 1), None)
             if best is None:
                 continue
-            candidate_move = candidate_moves.get(key, rows[0]["candidate_move"])
+            candidate_move = candidate_moves.get(
+                key, cls.row_candidate_move(rows[0]))
+            if not candidate_move:
+                continue
             played = next((row for row in rows if row["move"] == candidate_move), None)
             if played is None:
                 continue
