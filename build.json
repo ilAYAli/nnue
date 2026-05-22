@@ -1,49 +1,45 @@
 {
   "description": "Active Enyo NNUE improvement-run config. This file is the reviewed source of truth for the current candidate recipe.",
-  "experiment": "Reckless lane conservative check-state output buckets",
-  "goal": "Retest the same small existing-weight check-state output-bucket delta with a lower LR/shorter fit after the first run improved non-mate targets but failed mate-like tails.",
-  "track": "nnue_reckless",
-  "engine_branch": "feature/nnue-reckless-check-bucket",
-  "nnue_branch": "feature/nnue-reckless-check-bucket",
+  "experiment": "Native Bullet-Enyo scratch eval-scale calibration",
+  "goal": "Retest the native Enyo-owned scratch lane with the same Bullet-Enyo architecture and data, but lower eval scale after eval400 over-amplified outputs and failed static/composite gates.",
+  "track": "nnue_native",
+  "engine_branch": "none",
+  "nnue_branch": "feature/nnue-native-bullet-eval200",
   "inputs": {
     "broad": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
+    "init_net": ""
   },
   "create": {
-    "name": "reckless-check-bucket-output-1m-lr1e6-e4",
-    "backend": "material-head",
-    "bucket_mode": "check-state",
+    "name": "native-bullet-enyo-scratch-5m-eval200-sb4096",
+    "backend": "bullet",
+    "bullet_mode": "enyo",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "trainable": "output",
-    "objective": "huber",
-    "target_clamp": 800,
-    "huber_beta": 200,
-    "lr": 1e-06,
-    "weight_decay": 0.0,
-    "epochs": 4,
-    "pack_limit": 1100000,
-    "max_rows": 1000000,
-    "val_rows": 100000,
-    "batch_size": 8192,
-    "device": "cuda",
-    "workers": 2,
-    "select_metric": "sign",
-    "patience": 2,
+    "init_net": "",
+    "trainable": "all",
+    "weight_decay": 1e-06,
+    "bullet_rows": 5000000,
+    "bullet_hidden": 1024,
+    "bullet_l2": 16,
+    "bullet_batch_size": 4096,
+    "bullet_batches": 64,
+    "bullet_superbatches": 4096,
+    "bullet_threads": 4,
+    "bullet_wdl": 0.0,
+    "bullet_lr": 0.001,
+    "bullet_final_lr": 0.0001,
+    "bullet_enyo_l0_std": 8.0,
+    "bullet_enyo_l1_std": 1.0,
+    "bullet_enyo_l1_export_scale": 1.0,
+    "bullet_eval_scale": 200.0,
+    "bullet_save_rate": 1024,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "status": "pending",
-    "required_before_training": [
-      "engine builds with ENYO_ENABLE_CHECK_BUCKET_NNUE=OFF and ON",
-      "copied-head bucketed net loads and is parity with the single-head net",
-      "evalnet bench shows no normal-build overhead and acceptable enabled overhead"
-    ],
     "required_before_sprt": [
-      "static gate is not worse than reference on broad validation",
-      "composite move-choice gate does not show a tactical-tail collapse",
-      "mate-like and mined SPRT-failure slices do not regress",
-      "SPRT only if cheap gates are clean"
+      "static validation must be materially closer to reference than eval400 native scratch",
+      "composite move-choice gate must be much better than previous native scratch runs",
+      "SPRT only if static/composite gates show a credible near-reference candidate"
     ]
   }
 }

@@ -147,6 +147,11 @@ Current gate status:
     no SPRT.
   - Decision: no native SPRT. Native remains a long-term lane; the current
     scratch/Bullet-Enyo nets are not close enough on move choice.
+  - Next native calibration: run `native-bullet-enyo-scratch-5m-eval200-sb4096`
+    on `feature/nnue-native-bullet-eval200` with the same data and Bullet-Enyo
+    architecture as the 5M eval400 run, but `bullet_eval_scale=200`. This is a
+    targeted calibration test after the full eval400 run produced a badly
+    over-amplified static slope, not a new data recipe.
 - Embedded validation note: when `validate.py static` is used inside a custom
   gate against imported data, pass `--run <candidate-run>` or omit
   `--event-command`; otherwise the event hook reports the imported data run
@@ -971,8 +976,8 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `native-bullet-enyo-scratch-full-eval400-sb16384`.
-- selected branch: `feature/nnue-native-bullet-scratch-full`.
+  `native-bullet-enyo-scratch-5m-eval200-sb4096`.
+- selected branch: `feature/nnue-native-bullet-eval200`.
 - selected lane: `nnue_native`, a clean Enyo-owned scratch net with no Berserk
   initialization.
 - backend: `bullet`, `bullet_mode=enyo`, exporting a normal Enyo `model.nn`.
@@ -980,9 +985,10 @@ Current `build.json` intent:
   existing-weight delta.
 - broad source:
   `runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl`.
-- schedule: `3M` rows, hidden `1024`, L2 `16`, batch `4096`, batches `64`,
-  superbatches `16384`, lr `0.001 -> 0.00005`, eval scale `400`.
-- result: rejected by static/composite gates and checkpoint sweep. No SPRT.
+- schedule: `5M` rows, hidden `1024`, L2 `16`, batch `4096`, batches `64`,
+  superbatches `4096`, lr `0.001 -> 0.0001`, eval scale `200`.
+- purpose: test whether lower Bullet-Enyo export/eval scaling improves native
+  scratch calibration after eval400 failed static/composite gates.
 - next `build.json` change must name a new branch/lane and should be committed
   before launch.
 
