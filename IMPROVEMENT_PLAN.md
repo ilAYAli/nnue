@@ -300,15 +300,23 @@ Rejected lanes:
   - Decision: no replay gate and no SPRT. Current-reference quantized
     fine-tunes are dense/head-only at this scale. Do not keep increasing LR
     unless the objective explicitly targets sparse/exported movement.
-- sparse export-threshold diagnosis:
+- current-reference sparse export-threshold diagnosis:
   - Float `.pt` deltas from the sparse-LR probe confirmed why export stayed
     unchanged: max input delta was `0.058586`, max input-bias delta `0.052368`,
     max L1 delta `0.010529`, and max L1-bias delta `0.012695`.
   - None approached the roughly half-integer threshold needed to alter rounded
     int16/int8 exported tensors.
-  - Decision: one explicit threshold-crossing probe is justified, with
-    dense/head LR frozen to zero so the test answers only whether sparse
-    exported movement is achievable.
+  - `pairwise-ref-sparsecross-w2-lr5e6-in1200-l11200-d0-e12` proved exported
+    sparse movement is achievable when dense/head is frozen and sparse LR is
+    pushed hard: input weights changed `233232/25165824`, input biases
+    `740/1024`, L1 weights `25744/32768`, L1 biases `10/16`, with dense/head
+    unchanged.
+  - The same candidate failed broad replay badly versus the current reference:
+    `positions=913`, `candidate_better=71`, `reference_better=495`,
+    `sum_diff_cp=-114245`, `median_nonzero_diff_cp=-151.5`,
+    `worst_regression_cp=-923`, `best_gain_cp=465`.
+  - Decision: no SPRT. Crossing sparse export thresholds is possible, but the
+    repeated-tail pairwise objective is not usable at this pressure.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -515,13 +523,15 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run one sparse export-threshold crossing probe.
+Run one broad-label sparse refresh probe.
 
 Next branch:
 
 - Do not run another same-shape pairwise/scalar child blend from scratch26.
 - Do not run another current-reference pairwise fine-tune that lets the dense
   head absorb the change.
+- Do not run another repeated-tail pairwise sparse-cross probe: it moved sparse
+  tensors, but broad replay was overwhelmingly worse than the current reference.
 
 Reason:
 
@@ -541,18 +551,23 @@ Reason:
   low value.
 - Sparse-LR multipliers did not change that: gradients reached input/L1, but
   exported tensors stayed identical.
-- The measured float deltas were far below export rounding thresholds, so this
-  diagnostic intentionally freezes dense/head and pushes sparse tensors hard.
+- The measured float deltas were far below export rounding thresholds, so the
+  sparse-cross diagnostic intentionally froze dense/head and pushed sparse
+  tensors hard.
+- The sparse-cross diagnostic answered the export question but failed the
+  behavior question. The remaining useful question for this lane is whether
+  broad scalar labels can move sparse tensors without the pairwise tail damage.
 
 Immediate action:
 
 - Do not SPRT any scratch26 repair from this lane.
-- Train one current-reference repeated-tail pairwise probe with dense/head LR
-  `0`, input/L1 multipliers `1200`, and first gate by `net-diff`.
-- If input/L1 still do not move after export, stop current-reference
-  fine-tuning and move to a fresh-net or architecture-format branch.
-- If input/L1 move but gates are bad, treat it as proof that crossing export
-  thresholds is possible but this objective is not usable.
+- Train one current-reference broad Huber probe with dense/head LR `0`,
+  input/L1 multipliers `800`, and first gate by `net-diff`.
+- If input/L1 do not move after export, stop this lane.
+- If input/L1 move but gates are bad, stop this lane and move to a fresh-net or
+  architecture-format branch.
+- If broad sparse refresh somehow passes cheap gates, run replay failure-suite
+  before any SPRT.
 
 Deferred Bullet decisions:
 
@@ -593,19 +608,19 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `pairwise-ref-sparsecross-w2-lr5e6-in1200-l11200-d0-e12`.
-- selected branch: current-reference pairwise repeated-tail repair with dense
-  head frozen and deliberately high sparse LR multipliers.
-- backend: `pairwise`.
+  `broad-ref-sparse-huber-cp800-lr5e6-in800-l1800-d0-e8`.
+- selected branch: current-reference broad-label sparse refresh with dense/head
+  frozen and high sparse LR multipliers.
+- backend: `pytorch`.
 - initializer: current reference net
   `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`.
-- pairwise score table:
-  `assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv`.
-- schedule: quantized forward, base lr `5e-6`, input multiplier `1200`, L1
-  multiplier `1200`, dense multiplier `0`, pair weight `2`, epochs `12`,
+- broad source:
+  `runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl`.
+- schedule: quantized forward, Huber cp800 beta200, base lr `5e-6`, input
+  multiplier `800`, L1 multiplier `800`, dense multiplier `0`, epochs `8`,
   pack/max rows `100000`.
 - expected result: diagnostic only. Require nonzero input/L1 export movement
-  before replay gates; no SPRT unless replay gates are clean.
+  before move-choice/replay gates; no SPRT unless replay gates are clean.
 
 Rules:
 
