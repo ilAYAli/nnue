@@ -64,6 +64,10 @@ class CandidateDefaults:
     pack_skip: int = 0
     pack_limit: int = 0
     pack_progress: int = 250000
+    blend_extra_jsonl: str = ""
+    blend_extra_repeat: int = 1
+    blend_base_limit: int = 0
+    blend_shuffle_seed: int = 0
 
     objective: str = "huber"
     forward: str = "float"
