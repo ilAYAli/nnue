@@ -1,17 +1,19 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-search-failure-scratch26-diagnostic",
-  "goal": "Test whether the Enyo-owned scratch26 net can be repaired on a broader repeated search-failure move-choice set without destroying broad scalar behavior. Diagnostic only; no SPRT unless broad gates are clean.",
+  "experiment": "pairwise-search-failure-scratch26-move-override-diagnostic",
+  "goal": "Test whether the Enyo-owned scratch26 net can be repaired on its actual selected bad moves from the broader repeated search-failure move-choice set without destroying broad scalar behavior. Diagnostic only; no SPRT unless broad gates are clean.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pairwise_scores": "~/code/cpp/chess/nnue/assets/failure_suite/search_failure_move_scores_20260522.csv"
+    "pairwise_scores": "~/code/cpp/chess/nnue/assets/failure_suite/search_failure_move_scores_20260522.csv",
+    "candidate_moves": "~/code/cpp/chess/nnue/assets/failure_suite/search_failure_scratch26_moves_20260522.csv"
   },
   "create": {
-    "name": "pairwise-searchfail-scratch26-w6-lr1e3-e16",
+    "name": "pairwise-searchfail-scratch26-override-w4-lr5e4-e12",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/assets/failure_suite/search_failure_move_scores_20260522.csv",
-    "pairwise_pair_weight": 6.0,
+    "pairwise_candidate_moves_csv": "~/code/cpp/chess/nnue/assets/failure_suite/search_failure_scratch26_moves_20260522.csv",
+    "pairwise_pair_weight": 4.0,
     "pairwise_pair_batch_size": 64,
     "pairwise_pair_beta": 100,
     "pairwise_min_target_margin": 20,
@@ -20,8 +22,8 @@
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.001,
-    "epochs": 16,
+    "lr": 0.0005,
+    "epochs": 12,
     "batch_size": 8192,
     "max_rows": 100000,
     "pack_limit": 100000,
@@ -32,7 +34,7 @@
     "init_net": "~/code/cpp/chess/nnue/runs/scratch-qkaiming-26m-quant-lr1e2-e30/train/scratch-qkaiming-26m-quant-lr1e2-e30/model.nn"
   },
   "validation": {
-    "status": "search-failure pairwise diagnostic from scratch26",
+    "status": "search-failure pairwise diagnostic from scratch26 actual search moves",
     "success_condition": [
       "net_diff shows controlled exported movement",
       "static validation stays near scratch26 or improves",
