@@ -1,27 +1,28 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-sprt-failure-iterative-hard-negative",
-  "goal": "Second pairwise pass: keep the scored legal-move table, but train against the moves qmid actually selected in search. qmid improved static margins, but search still picked new bad moves, so this run is an iterative hard-negative diagnostic. Still no SPRT unless gates clear.",
+  "experiment": "pairwise-sprt-failure-iterative-hard-negative-qmid3",
+  "goal": "Third pairwise pass: qmid2 improved search gap substantially but still trails reference and introduced a static tail. Start from qmid2, train against qmid2-selected bad moves with lower pair weight/LR and capped margins. Still no SPRT unless gates clear.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "qmid_candidate_moves": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv"
+    "qmid_candidate_moves": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv",
+    "qmid2_candidate_moves": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/validate/sprtfail_gate_20260522_030827/move_choice_gate.csv"
   },
   "create": {
-    "name": "pairwise-sprtfail-qmid2-w25-lr1e3-e20",
+    "name": "pairwise-sprtfail-qmid3-w10-lr5e4-e20",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "pairwise_pair_weight": 25.0,
+    "pairwise_pair_weight": 10.0,
     "pairwise_pair_batch_size": 64,
     "pairwise_pair_beta": 100,
     "pairwise_min_target_margin": 20,
-    "pairwise_max_target_margin": 800,
+    "pairwise_max_target_margin": 600,
     "pairwise_loss_weight_by_cp": true,
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.001,
+    "lr": 0.0005,
     "epochs": 20,
     "batch_size": 8192,
     "max_rows": 100000,
@@ -29,15 +30,15 @@
     "workers": 2,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "forward": "quantized",
-    "init_net": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/train/pairwise-sprtfail-qmid-w50-lr3e3-e30/model.nn",
-    "pairwise_candidate_moves_csv": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv"
+    "init_net": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/train/pairwise-sprtfail-qmid2-w25-lr1e3-e20/model.nn",
+    "pairwise_candidate_moves_csv": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/validate/sprtfail_gate_20260522_030827/move_choice_gate.csv"
   },
   "validation": {
-    "status": "iterative hard-negative pairwise diagnostic from qmid",
+    "status": "iterative hard-negative pairwise diagnostic from qmid2",
     "success_condition": [
-      "net_diff shows exported integer movement",
-      "fixed eval_move_gate remains positive without large tail regression",
-      "move_choice_gate improves materially over qmid and moves toward reference",
+      "net_diff shows controlled exported movement",
+      "fixed eval_move_gate does not produce a worse tail than qmid2",
+      "move_choice_gate improves over qmid2 and approaches reference",
       "no SPRT unless search move-choice and failure-suite gates become clearly positive"
     ],
     "next_after_success": [
