@@ -1,0 +1,13 @@
+pgn_candidate_positions=3455
+targets=80
+candidate top1=22/80 top3=49/80 sum_gap_cp=34360 worst_gap_cp=31218
+reference top1=16/80 top3=55/80 sum_gap_cp=95518 worst_gap_cp=31082
+candidate_better=31
+reference_better=42
+sum_diff_cp=61158
+worst_regression_cp=-31006
+best_gain_cp=31082
+capped_100cp candidate_better=31 reference_better=42 sum_diff_cp=-388 worst_regression_cp=-100 best_gain_cp=100
+capped_200cp candidate_better=31 reference_better=42 sum_diff_cp=-223 worst_regression_cp=-200 best_gain_cp=200
+capped_500cp candidate_better=31 reference_better=42 sum_diff_cp=377 worst_regression_cp=-500 best_gain_cp=500
+capped_1000cp candidate_better=31 reference_better=42 sum_diff_cp=1377 worst_regression_cp=-1000 best_gain_cp=1000
