@@ -44,9 +44,13 @@ Current active tooling branch:
     bias, L2, and output tensors.
   - `build.py create --dry-run --backend search-aware` generates pack plus
     `train_search_aware` phases.
-- Next step is a committed `build.json` smoke recipe for this backend, with
-  conservative weights and `net-diff`/static/search-gate/failure-suite checks.
-  Do not launch another scalar-only net run as a substitute.
+- `build.json` now names the first small preflight recipe:
+  `search-aware-existing-preflight-lr1e7-e2`. It uses existing Enyo weights,
+  quantized forward, broad d12/d16 labels, and the committed
+  `assets/failure_suite/search_aware_targets_20260523.jsonl` target set.
+- Required post-train checks are `net-diff`, static validation, search-gate, and
+  failure-suite replay. No SPRT unless those are clean. Do not launch another
+  scalar-only net run as a substitute.
 
 Current gate status:
 

@@ -1,79 +1,57 @@
 {
-  "description": "Reviewed Enyo NNUE improvement-run config. The last active check-bucket recipe is rejected; update this file before launching a new candidate.",
-  "experiment": "Reckless lane check-state output buckets (rejected)",
-  "goal": "Closed: the mask2 salvage passed some cheap gates but failed the written tail threshold and then matched negative in a smoke check. Do not keep retuning this same bucket split.",
+  "description": "Reviewed Enyo NNUE improvement-run config. Search-aware preflight: existing-weight Enyo net, broad labels plus multi-move search targets.",
+  "experiment": "Search-aware existing-weight preflight",
+  "goal": "Test whether search-aware child-margin/policy supervision can move exported representation without broad scalar collapse. This is a preflight, not a promotion candidate.",
   "track": "nnue_reckless",
-  "engine_branch": "feature/nnue-reckless-check-bucket",
-  "nnue_branch": "feature/nnue-reckless-check-bucket",
+  "engine_branch": "no engine change",
+  "nnue_branch": "feature/nnue-search-aware-targets",
   "inputs": {
     "broad": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
+    "search_targets": "assets/failure_suite/search_aware_targets_20260523.jsonl",
+    "search_targets_summary": "assets/failure_suite/search_aware_targets_20260523.summary.txt",
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "create": {
-    "name": "reckless-check-bucket-output-1m-lr1e6-e4",
-    "backend": "material-head",
-    "bucket_mode": "check-state",
+    "name": "search-aware-existing-preflight-lr1e7-e2",
+    "backend": "search-aware",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
+    "search_targets_jsonl": "assets/failure_suite/search_aware_targets_20260523.jsonl",
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "trainable": "output",
-    "objective": "huber",
+    "trainable": "all",
+    "forward": "quantized",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 1e-06,
+    "lr": 1e-07,
     "weight_decay": 0.0,
-    "epochs": 4,
-    "pack_limit": 1100000,
-    "max_rows": 1000000,
-    "val_rows": 100000,
-    "batch_size": 8192,
+    "input_lr_mult": 1.0,
+    "l1_lr_mult": 1.0,
+    "dense_lr_mult": 1.0,
+    "epochs": 2,
+    "pack_limit": 200000,
+    "max_rows": 100000,
+    "batch_size": 4096,
+    "search_target_batch_size": 16,
+    "search_broad_weight": 1.0,
+    "search_margin_weight": 0.02,
+    "search_policy_weight": 0.005,
+    "search_margin_beta": 100.0,
+    "search_policy_temperature_cp": 200.0,
+    "search_max_gap_cp": 800.0,
+    "search_max_moves": 0,
+    "search_target_limit": 0,
     "device": "cuda",
     "workers": 2,
-    "select_metric": "sign",
-    "patience": 2,
+    "grad_norm_every": 20,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "rejected",
-    "required_before_training": [
-      "engine builds with ENYO_ENABLE_CHECK_BUCKET_NNUE=OFF and ON",
-      "copied-head bucketed net loads and is parity with the single-head net",
-      "evalnet bench shows no normal-build overhead and acceptable enabled overhead"
+    "status": "pending",
+    "required_after_training": [
+      "validate.py net-diff against init net; exported input/L1 movement must be intentional and not zero unless trainable config says so",
+      "static validation on broad packed data must not show a clear sign regression",
+      "search-gate against assets/failure_suite/search_aware_targets_20260523.jsonl must improve capped gap without mate-like tail collapse",
+      "failure-suite replay must not introduce a tail worse than the current gate thresholds"
     ],
-    "required_before_sprt": [
-      "static gate is not worse than reference on broad validation",
-      "composite move-choice gate does not show a tactical-tail collapse",
-      "mate-like and mined SPRT-failure slices do not regress",
-      "SPRT only if cheap gates are clean"
-    ],
-    "result": {
-      "best_candidate": "reckless-check-bucket-mask2-lr1e6-e4",
-      "composite_gate": {
-        "top1": "106/213",
-        "top3": "172/213",
-        "candidate_better": 55,
-        "reference_better": 27,
-        "cap200_sum_diff_cp": 1135,
-        "worst_regression_cp": -303
-      },
-      "smoke": {
-        "games": 456,
-        "elo": -29.8,
-        "ci": 22.4,
-        "llr": -0.85,
-        "los_percent": 0.4,
-        "draw_percent": 50.7,
-        "stopped_reason": "clearly negative cheap smoke"
-      },
-      "failure_mine": {
-        "pgn_candidate_positions": 872,
-        "targets": 0
-      },
-      "speed_diag": {
-        "reference_evalnet_eps": 9449652,
-        "candidate_evalnet_eps": 6866434,
-        "note": "single startpos sample; PV/scores/nodes/checksum identical, so treat as warning rather than proof"
-      }
-    },
-    "next": "No active reckless recipe is approved. The next build.json change must name a genuinely different existing-weight-compatible hypothesis on a new feature branch."
+    "sprt_rule": "No SPRT unless net-diff/static/search-gate/failure-suite gates are all clean. This preflight is expected to be diagnostic."
   }
 }
