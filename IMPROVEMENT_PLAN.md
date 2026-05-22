@@ -10,6 +10,98 @@ kind of Stockfish-labeled Enyo self-play.
 
 No trained Enyo net is currently a keeper.
 
+Current gate status:
+
+- The 1M-node composite false-positive gate now combines the stable historical
+  move-choice targets plus failed-SPRT mined targets from the material-head and
+  output-signfit false positives: 213 target positions and 4,956 legal moves.
+- This gate rejected every current candidate against the reference:
+  - reference: `top1=91/213`, `top3=158/213`, `sum_gap_cp=98664`.
+  - output-signfit lr5e-6: `top1=89/213`, `top3=156/213`,
+    `sum_gap_cp=160216`.
+  - material-head float 3M: `top1=83/213`, `top3=150/213`,
+    `sum_gap_cp=136898`.
+  - king-pressure float-head: `top1=90/213`, `top3=157/213`,
+    `sum_gap_cp=160664`.
+  - king-pressure head: `top1=94/213`, `top3=165/213`,
+    `sum_gap_cp=192411`.
+  - kingbucket v3: `top1=81/213`, `top3=149/213`,
+    `sum_gap_cp=223046`.
+  - scratch26 childx10: `top1=54/213`, `top3=128/213`,
+    `sum_gap_cp=278856`.
+- Conclusion: the older stable-only gate was too narrow and admitted known
+  false positives. Do not run SPRT from that gate alone. A candidate must beat
+  the reference on this composite gate, or explain why the composite target set
+  is invalid, before it earns match time.
+- Split-gate diagnosis shows why the remaining existing-weight deltas are still
+  not promotable:
+  - `output_signfit_lr5e6` mildly improved non-mate targets:
+    `top1=65/164`, `top3=118/164`, `cap200=+285`, worst `-78cp`; but it lost
+    the mate-like subset: `cap200=-243`, raw `-61837`, worst `-31138cp`.
+  - `kingpressure_head` mildly improved non-mate targets:
+    `top1=68/164`, `top3=124/164`, `cap200=+114`, worst `-82cp`; but it also
+    lost mate-like raw sum badly: `cap200=-26`, raw `-93861`, worst `-31805cp`.
+  - Tail diagnosis found `49` mate-like targets. Only `4` are `<=6` pieces and
+    `45` are `>7` pieces, so this is not mostly a tablebase/endgame-policy
+    artifact. Treat it as real tactical/search-eval tail risk.
+  - Decision: no SPRT for output-signfit or king-pressure head. A candidate must
+    win both non-mate and mate-like subsets, or there must be a concrete runtime
+    guard/search policy that handles the mate-like tails before match testing.
+- Existing-weight composite-pairwise repair has not produced a keeper:
+  - `w005-lr5e7-e4`: static `mae=135.384`, `sign=92.18%`; composite gate
+    `top1=89/213`, `top3=152/213`, `sum_gap_cp=67877`. Raw gap improved, but
+    top1/top3 and capped deltas were not better than reference, so no SPRT.
+  - `w02-lr1e6-e6`: static `mae=134.056`, `sign=92.17%`; composite gate
+    `top1=88/213`, `top3=158/213`, `sum_gap_cp=266454`. Worse than reference.
+  - Tiny overfit diagnostics showed the pair objective is wired and learnable
+    only when broad scalar loss is removed or heavily reduced:
+    pair-only/all-weights reached `95.1%` pair correctness, but broad MAE
+    degraded to `356.93`.
+  - A high-pressure blended run (`10k-w100-lr3e3-e100`) learned the pair set
+    (`92.7%` pair correctness) but destroyed general behavior: static
+    `mae=171.905`, `sign=75.42%`; composite gate `top1=53/213`,
+    `top3=109/213`, `sum_gap_cp=395397`, with
+    `candidate_better=27`, `reference_better=97`.
+  - A low-pressure broad-data blend (`1m-w2-lr5e6-e12`) still failed:
+    training pair correctness barely moved (`40.2%`), static validation
+    regressed to `mae=167.166`, `sign=88.63%`, and composite gate was worse
+    than reference: `top1=82/213`, `top3=150/213`,
+    `sum_gap_cp=166918`, `candidate_better=33`, `reference_better=43`.
+  - A reference-distilled pairwise repair
+    (`pairdistill-1m-w10-lr1e6-e12`) preserved the initializer as the broad
+    target instead of chasing Stockfish labels, but still failed. Pair
+    correctness stayed stuck at `39.0%`, static validation regressed to
+    `mae=180.837`, `sign=88.87%`, and the composite gate remained worse than
+    reference: `top1=86/213`, `top3=152/213`,
+    `candidate_better=34`, `reference_better=37`,
+    `cap200_sum_delta_cp=-446`.
+  - Decision: no SPRT. Pairwise can move the network only when it is too
+    destructive, and reference distillation did not fix that. Close
+    composite-pairwise repair as a near-term Elo lane; reopen only with a
+    materially different objective or a less fragile target construction.
+- Native/scratch composite gate status:
+  - scratch quantized-Kaiming 26M: `top1=51/213`, `top3=114/213`,
+    `sum_gap_cp=281771`.
+  - Bullet-Enyo 28M eval400: `top1=37/213`, `top3=96/213`,
+    `sum_gap_cp=366273`.
+  - Bullet-Enyo 5M eval400: `top1=36/213`, `top3=105/213`,
+    `sum_gap_cp=302408`.
+  - Bullet-Enyo 5M eval800: `top1=40/213`, `top3=104/213`,
+    `sum_gap_cp=369294`.
+  - Clean native Bullet-Enyo scratch 5M eval400
+    (`native-bullet-enyo-scratch-5m-eval400-sb4096`) used `--init-net ''`, so
+    it did not inherit Berserk weights. It learned scalar labels better than
+    earlier native runs, but still failed the promotion gates: static
+    `mae=123.064`, `sign=81.50%`; composite gate `top1=47/213`,
+    `top3=117/213`, `candidate_better=42`, `reference_better=99`,
+    `cap200_sum_delta_cp=-9693`.
+  - Decision: no native SPRT. Native remains a long-term lane; the current
+    scratch/Bullet-Enyo nets are not close enough on move choice.
+- Embedded validation note: when `validate.py static` is used inside a custom
+  gate against imported data, pass `--run <candidate-run>` or omit
+  `--event-command`; otherwise the event hook reports the imported data run
+  such as `fresh_d12self18h64_d16_labels_20260519_113826`.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did
@@ -129,6 +221,117 @@ Rejected lanes:
     scalar cp/WDL training on the current labels does not produce a playable
     Enyo search eval. Do not spend more SPRT on Bullet checkpoints until a
     broader search-aware gate improves, not just the tiny repeated-tail gate.
+- Bullet Enyo-format native training:
+  - Bullet can now train and export Enyo `.nn` layout directly. This is useful
+    because it gives fast iteration without changing Enyo's runtime evaluator.
+  - The native/scratch lane is still not a keeper. The current 5M/28M
+    layoutfix2 runs learned scalar labels but remained far below the current
+    reference on sign/move-choice behavior.
+  - Treat this as the `nnue_native` long-term lane only: useful for proving
+    initialization, layout, and architecture ideas, not for immediate SPRT.
+- Existing-weight Bullet/PyTorch head deltas:
+  - Enyo `.nn` -> Bullet init -> Enyo `.nn` roundtrip is exact enough for this
+    purpose: integer tensors are identical and float-head epsilon is tiny.
+  - Bullet output-only training initially moved frozen sparse tensors because
+    optimizer/clipping still touched frozen layers. That was fixed; the
+    freeze-fixed run changed only `output_weights` and `output_bias`.
+  - Output-only and float-head scalar Bullet fits improved MAE but reduced sign.
+    Example output-only freeze-fix: candidate `mae=66.450`, `sign=91.38%`
+    versus reference `mae=136.060`, `sign=92.20%`.
+  - Sign-aware PyTorch head-only runs were safer but still not promotable.
+    Float-head signfit: `mae=133.047`, `sign=92.15%`, failure-suite
+    `candidate_better=71`, `reference_better=59`, `sum_diff_cp=+1116`,
+    `worst_regression_cp=-408`.
+  - Output-only signfit: `mae=132.432`, `sign=92.16%`, failure-suite
+    `candidate_better=61`, `reference_better=66`, `sum_diff_cp=+344`,
+    `worst_regression_cp=-294`.
+  - Lower-pressure output-only signfit (`lr=5e-6`) changed only 30 output
+    weights and improved MAE slightly (`135.145` vs reference `136.060`), but
+    sign still lost to reference (`92.18%` vs `92.20%`). It was rejected before
+    failure-suite/SPRT.
+  - The material-head failed-SPRT mining pass made this candidate look uniquely
+    interesting on the mined target set: `top1=28/80`, `top3=55/80`,
+    `sum_gap_cp=2561`, `worst_gap_cp=329`, far better than the other checked
+    candidates on that narrow diagnostic. Full replay failure-suite was only
+    mildly positive: `candidate_better=68`, `reference_better=67`,
+    `sum_diff_cp=+990`, `median_nonzero_diff_cp=+1`,
+    `worst_regression_cp=-187`.
+  - Corrected SPRT with `enyo/build/enyo` rejected it anyway:
+    `+1.4 +/- 15.1`, `LLR=-0.13/2.94`, `LOS=57.2%`, `draw=51.0%`.
+    It started around `+20 Elo` and collapsed to neutral by 1000 games, matching
+    the earlier false-positive smoke pattern.
+  - Mining this neutral SPRT produced another 80-target diagnostic:
+    `candidate top1=19/80`, `top3=59/80`; reference `top1=27/80`,
+    `top3=55/80`; `candidate_better=28`, `reference_better=32`.
+    Raw `sum_diff_cp=+64933` was again dominated by mate-scale outliers.
+    Capped sums were small and not convincing: `+268cp` at `100cp`,
+    `+677cp` at `200cp`, with median nonzero diff `-1cp`.
+    This explains the bad selection: the mined material-head target set was too
+    narrow and rewarded a net that did not improve aggregate search strength.
+  - Decision: no extension. Existing-weight head/output-only fitting is closed
+    as a near-term Elo lane. It can be used only as a diagnostic source, not as
+    another LR/objective/checkpoint sweep.
+- Existing-weight material-bucketed output head:
+  - Added an 8-bucket material/output-head net format as an existing-weight
+    compatible `nnue_reckless` delta. The sparse input transformer and L1 remain
+    unchanged; only the float/output head is replicated per material bucket.
+  - Copied-head parity was clean: the expanded 8-bucket net had zero tensor diff
+    against the copied source values and zero eval difference on the initial
+    smoke FENs. This proves the format can be introduced as a no-op before
+    training.
+  - Output-only 1M-row fit changed only `232` output weights and failed the
+    failure-suite gate: `candidate_better=44`, `reference_better=55`,
+    `sum_diff_cp=-529`, `worst_regression_cp=-563`.
+  - Float-head 1M-row fit changed `3136` head values and was closer, but still
+    not promotable: `candidate_better=22`, `reference_better=25`,
+    `sum_diff_cp=+592`, `median_nonzero_diff_cp=-3`,
+    `worst_regression_cp=-123`.
+  - Full-data/loss-selected float-head fit passed the failure-suite gate:
+    `candidate_better=68`, `reference_better=59`, `sum_diff_cp=+1478`,
+    `median_nonzero_diff_cp=+3`, `worst_regression_cp=-187`.
+  - First SPRT attempt was invalid because it used the old
+    `assets/engines/reference` binary against a changed-size bucketed net. That
+    old binary effectively treated the bucketed net as a single-head net and
+    lost `0-127`. `run_net_sprt_pwa.sh` now refuses changed-size nets with the
+    default asset engine unless `--engine` is supplied.
+  - Corrected SPRT with `enyo/build/enyo` was neutral-negative:
+    `-3.5 +/- 15.1`, `LLR=-0.59/2.94`, `LOS=32.6%`, `draw=51.0%`.
+  - A follow-up mask sweep kept trained material heads only for low/material
+    buckets. Replay gates looked clean:
+    - `mask0to5`: `candidate_better=63`, `reference_better=59`,
+      `sum_diff_cp=+1643`, `worst_regression_cp=-187`.
+    - `mask0to6`: `candidate_better=70`, `reference_better=59`,
+      `sum_diff_cp=+1496`, `worst_regression_cp=-187`.
+  - Corrected `mask0to6` SPRT still rejected the idea:
+    `-7.0 +/- 14.8`, `LLR=-0.94/2.94`, `LOS=17.9%`, `draw=52.8%`.
+  - Failed-SPRT mining produced 80 candidate-loss targets from the match:
+    `assets/failure_suite/material_head_mask0to6_sprt_failure_targets_20260522.csv`
+    and
+    `assets/failure_suite/material_head_mask0to6_sprt_failure_scores_20260522.csv`.
+    Raw cp sum was misleading because mate-scale outliers dominated it:
+    `candidate_better=31`, `reference_better=42`,
+    `sum_diff_cp=+61158`, `worst_regression_cp=-31006`,
+    `best_gain_cp=+31082`. After capping deltas at `100cp` or `200cp`,
+    the same gate is negative (`-388cp` / `-223cp`) with median `-1.5cp`.
+    Future SPRT-failure gates must report capped diff, median, and
+    candidate/reference counts, not only raw sum.
+  - Decision: no extension. Stop material-head-only variants. The failure
+    suite missed this regression, so mine the failed SPRT for new move-choice
+    targets before launching another reckless candidate.
+- Existing-weight king-bucket refinement:
+  - `arch-kingbucket-v1` had the most interesting pre-SPRT signal so far:
+    failure-suite `candidate_better=68`, `reference_better=54`,
+    `sum_diff_cp=+1491`, but tail veto `worst_regression_cp=-448`.
+  - `arch-kingbucket-v2-lr3e7-e8` lowered LR to reduce tail risk, but failed
+    the static gate before failure-suite: candidate `sign=92.19%` versus
+    reference `92.20%`.
+  - Current follow-up: one export-aware/sign-aware king-bucket run
+    (`arch-kingbucket-v3-quant-sign-lr7e7-e8`) targeted the observed
+    sign/tail failure mode. It changed only 504 values, improved MAE
+    (`135.375` vs reference `136.060`), but still lost sign (`92.18%` vs
+    `92.20%`) and was rejected before failure-suite/SPRT.
+  - Decision: stop this king-bucket split. Do not continue retuning it without
+    a new implementation hypothesis.
 - Enyo `.nn` pairwise SPRT-failure diagnostics:
   - Weak/current-initialized pairwise barely moved the exported net and failed
     the search gate.
@@ -536,17 +739,97 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Build a Bullet-trained Enyo-format feasibility spike.
+Immediate next branch:
 
-Next branch:
+- Head-only existing-weight fitting has been tested and rejected. Do not run
+  more LR/objective/checkpoint sweeps in this lane.
+- Material-head-only fitting has also been tested and rejected. Do not run
+  more material-head masks, LR/objective retunes, or checkpoint sweeps.
+- Immediate work: inspect a genuinely different `nnue_reckless` structural
+  hypothesis before launching more training. The latest diagnostics say
+  head/output, material-output buckets, and king-pressure heads can pass narrow
+  or non-mate gates while staying neutral or negative overall.
+- Do not spend more training or SPRT on any candidate that wins only non-mate
+  targets while losing mate-like tactical tails. The latest tail diagnosis found
+  that those tails are mostly `>7` pieces, so they are not a simple Syzygy
+  fallback issue.
+- The next `nnue_reckless` candidate must be a different
+  existing-weight-compatible structural idea. Head-only fitting, material-head
+  fitting, king-pressure head buckets, and the current king-bucket split are all
+  rejected.
+- The first candidate to inspect is a Reckless-inspired threat/attack feature
+  side branch:
+  - Preserve existing Enyo weights exactly at initialization.
+  - Add any new threat/attack weights as zero-initialized tensors, so copied
+    nets are eval-identical before training.
+  - Keep the sparse piece/king accumulator and current search evaluator as the
+    primary path; do not replace this lane with a scratch Reckless net.
+  - Prove copied-net parity, export roundtrip, and NPS before training.
+  - If the feature is disabled at compile/runtime, it must have zero hot-path
+    overhead.
+  - `threat-zero-parity-20260522_171752` proved copied-net tensor/eval parity:
+    all existing tensors unchanged, appended threat weights all zero, and four
+    checked FENs evaluated identically.
+  - The first active threat implementation failed the NPS gate even with zero
+    threat weights: startpos `go nodes 300000` dropped from roughly
+    `0.94M-1.63M nps` to `0.28M-0.53M nps`. Do not train or SPRT this
+    from-scratch threat recomputation path.
+  - `threat-kingzone-fastcheck-20260522_173322` reduced the active feature set
+    to occupied targets in the king zone. Copied zero nets still had parity and
+    no meaningful cost, but a single active threat row still dropped depth-19
+    NPS from roughly `1.43M` to `0.88M`.
+  - `threat-rowmask-fastcheck-20260522_173518` added an active-row mask so
+    zero-weight rows do not perform 1024-wide accumulator additions. Copied
+    zero nets remained fast, but one active row still dropped depth-19 NPS from
+    roughly `1.47M` to `1.22M`, which fails the 3-5% NPS gate.
+  - Decision: reject the current appended threat-accumulator design. Do not
+    train or SPRT it. Threat work is only worth revisiting as a much smaller
+    scalar/head feature or a genuinely incremental cached accumulator.
+- Current `nnue_reckless` probe: king-pressure output bucket.
+  - This keeps the existing sparse input transformer and L1 weights unchanged.
+    Only the float head is replicated into the existing 8 output buckets.
+  - Bucket selection is based on opponent attack pressure into the side-to-move
+    king zone, not total material count.
+  - `kingpressure-bucket-fastcheck-20260522_173949` passed copied-net parity:
+    base and bucketed-copy nets produced identical checked evals.
+  - NPS cost was acceptable for a head-bucket selector: depth-19 startpos
+    dropped from roughly `1.51M` to `1.48M` NPS, about `2.1%`, under the
+    `3-5%` gate.
+  - Active run: `reckless-kingpressure-head-1m-lr1e6-e8` via `build.py`,
+    backend `material-head`, bucket mode `king-pressure`, existing Berserk/Enyo
+    weights, output-only, 1M rows. This is a cheap probe; no SPRT unless static
+    and failure-suite gates are clean.
+  - Result: output-only probe is not SPRT-worthy. Static was slightly better
+    on MAE and equal on sign (`135.684`, `92.17%`) versus reference
+    (`135.868`, `92.17%`), but the failure-suite was only marginal:
+    `candidate_better=53`, `reference_better=52`, `sum_diff_cp=+702`,
+    `median_nonzero_diff_cp=+1`, `worst_regression_cp=-253`.
+  - Decision: reject for SPRT. The structure is close enough for one
+    float-head probe, but do not keep sweeping it if the next replay gate is
+    also marginal or tail-negative.
+  - Float-head follow-up `reckless-kingpressure-floathead-1m-lr2e7-e8` is also
+    rejected. Static was again only marginally better than reference
+    (`mae=135.807`, `sign=92.17%`, `wrong_sign=7203` versus reference
+    `mae=135.868`, `sign=92.17%`, `wrong_sign=7204`). Failure-suite was worse
+    on move choice: `candidate_better=34`, `reference_better=46`,
+    `sum_diff_cp=+731`, `median_nonzero_diff_cp=-6.5`,
+    `worst_regression_cp=-138`.
+  - Decision: no SPRT. Close this king-pressure head-bucket lane unless there
+    is a new implementation hypothesis; do not run another LR/objective sweep.
+- Gate requirement before SPRT:
+  - `candidate_better >= reference_better`.
+  - capped `sum_diff_cp > 0` at a documented cap such as `200cp`, not only
+    raw mate-scale sum.
+  - median nonzero diff should not be negative.
+  - `worst_regression_cp > -250`.
+  - static sign must not be worse than the reference on the same slice.
+- Do not keep retuning the same bucket split.
 
-- Do not run another same-shape pairwise/scalar child blend from scratch26.
-- Do not run another current-reference sparse fine-tune. The sparse lane now has
-  both answers: normal labels do not move exported input/L1 tensors, and forced
-  sparse movement breaks broad behavior.
-- Do not run another Bullet/Reckless-like SPRT until the gate improves broadly;
-  the current Bullet checkpoints are playable only as architecture diagnostics
-  and are too slow/weak as Enyo candidates.
+Background lane:
+
+- Keep `nnue_native` separate: scratch/native Enyo-owned nets can run when
+  resources allow, but they do not replace the near-term reckless lane and must
+  not use Berserk weights.
 
 Reason:
 
@@ -571,23 +854,8 @@ Reason:
   but the resulting broad behavior was unusable.
 - The broad sparse refresh answered the final sparse-lane question: broad
   scalar labels did not move exported input/L1 tensors at all.
-- Bullet training is much faster than the PyTorch path, but the current
-  Bullet/Reckless-like runtime checkpoint is not a normal Enyo `.nn` and is
-  too slow in search. The useful next question is whether Bullet can train and
-  export exactly Enyo's current `.nn` layout, giving faster iteration without
-  changing the engine runtime.
-
-Immediate action:
-
-- Add a Bullet trainer mode that uses Enyo's 32-king-bucket feature map and
-  Enyo's exported tensor order.
-- First prove feature-index parity against the Python/engine Enyo feature map.
-- First output is a smoke artifact, not a candidate: train a small row slice,
-  export a normal Enyo `.nn`, run `net-diff`, static validation, and
-  `evalnet`/roundtrip checks.
-- If Bullet cannot reproduce Enyo's quantized forward/export semantics cleanly,
-  stop the Bullet-Enyo-format lane and return to the scratch baseline or a
-  genuinely different architecture/teacher source.
+- Bullet Enyo-format training now works technically, but scalar/head-only fits
+  still show the same pattern: better MAE does not imply safer search decisions.
 
 Anti-confounding rule:
 

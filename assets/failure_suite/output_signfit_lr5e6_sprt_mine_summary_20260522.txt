@@ -1,0 +1,9 @@
+pgn_candidate_positions=5579
+targets=80
+candidate top1=19/80 top3=59/80 sum_gap_cp=67241 worst_gap_cp=30797
+reference top1=27/80 top3=55/80 sum_gap_cp=132174 worst_gap_cp=30839
+candidate_better=28
+reference_better=32
+sum_diff_cp=64933
+worst_regression_cp=-30187
+best_gain_cp=30839

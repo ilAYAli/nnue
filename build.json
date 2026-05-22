@@ -1,40 +1,44 @@
 {
-  "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "Bullet-trained Enyo-format feasibility spike",
-  "goal": "Test whether Bullet can train and export Enyo's normal .nn layout, using the current feature map and runtime format. Diagnostic only; no SPRT from this smoke artifact.",
+  "description": "Active Enyo NNUE improvement-run config. This file is the reviewed source of truth for the current candidate recipe.",
+  "experiment": "Native Enyo-owned Bullet scratch full-data run",
+  "goal": "Train a clean Enyo-native .nn from scratch with Bullet using Enyo's current runtime layout. This is the nnue_native lane: no Berserk initialization; validate by static/composite gates before any SPRT.",
+  "track": "nnue_native",
   "inputs": {
-    "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
+    "broad": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
   },
   "create": {
-    "name": "bullet-enyo-format-smoke-100k",
+    "name": "native-bullet-enyo-scratch-full-eval400-sb16384",
     "backend": "bullet",
-    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "bullet_rows": 100000,
+    "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "bullet_mode": "enyo",
+    "init_net": "",
+    "bullet_rows": 3000000,
     "bullet_hidden": 1024,
     "bullet_l2": 16,
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
-    "bullet_superbatches": 2,
+    "bullet_superbatches": 16384,
     "bullet_threads": 4,
-    "bullet_wdl": 0.0,
+    "bullet_wdl": 0.75,
     "bullet_lr": 0.001,
-    "bullet_final_lr": 0.0003,
-    "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
-    "init_net": ""
+    "bullet_final_lr": 5e-05,
+    "bullet_eval_scale": 400.0,
+    "bullet_save_rate": 4096,
+    "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "Bullet-trained Enyo-format feasibility spike",
+    "status": "training",
     "success_condition": [
-      "Bullet trainer can map features to Enyo's current 32-bucket indices",
-      "Bullet trainer can write a byte-compatible Enyo model.nn",
       "exported model.nn loads in Enyo and validate.py",
-      "static smoke metrics are sane for a tiny diagnostic run"
+      "static metrics improve meaningfully over prior native scratch attempts",
+      "composite move-choice gate is not clearly worse than reference",
+      "mate-like/tactical-tail slice does not collapse",
+      "no SPRT unless the cheap gates justify match time"
     ],
     "next_after_success": [
-      "run a larger Bullet-Enyo scratch run",
-      "compare static speed/quality against the PyTorch scratch baseline",
-      "only consider replay/SPRT after normal gates are clean"
+      "run static validation on the imported d12/d16 pack",
+      "run composite move-choice gate against the current reference",
+      "only run SPRT if gates are clean"
     ]
   }
 }
