@@ -145,9 +145,13 @@ Rejected lanes:
     `top1=14/60`, `top3=27/60`, `sum_gap_cp=35866`,
     `worst_gap_cp=31251`, versus reference around `top1=29/60`,
     `top3=47/60`, `sum_gap_cp=953`, `worst_gap_cp=272`.
+  - qmid2 targeted qmid's actual search-selected bad moves. It improved the
+    search gate dramatically but still failed promotion gates: `top1=16/60`,
+    `top3=27/60`, `sum_gap_cp=5259`, `worst_gap_cp=555`. It only moved the
+    dense head relative to qmid and introduced a `-301cp` static tail.
   - Conclusion: pairwise can create the intended static eval preference, but the
     scored target set must follow the moves a candidate actually chooses in
-    search. Do not SPRT qmid.
+    search, and tail risk remains the veto. Do not SPRT qmid/qmid2.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -358,17 +362,20 @@ Run one iterative hard-negative pairwise candidate.
 
 Next branch:
 
-- Enyo `.nn` pairwise fine-tune from the qmid candidate.
+- Enyo `.nn` pairwise fine-tune from the qmid2 candidate.
 - Active recipe: `build.json` points at broad d12/d16 labels, the scored
-  legal-move table from the rejected Bullet SPRT positions, and qmid's own
+  legal-move table from the rejected Bullet SPRT positions, and qmid2's own
   `move_choice_gate.csv` as `pairwise_candidate_moves_csv`.
 
 Reason:
 
 - qmid proved the static pairwise direction can be learned, but search chose
   new bad moves not represented by the previous candidate-move column.
-- The next useful test is whether retraining against qmid's actual search
-  choices reduces those search mistakes without reintroducing a tail blow-up.
+- qmid2 reduced the search gate gap substantially (`sum_gap_cp=5259`,
+  `worst_gap_cp=555`) but still trails reference and introduced a new
+  `-301cp` static tail.
+- The next useful test is whether a smaller pass against qmid2's actual search
+  choices keeps the search gain while reducing tail risk.
 - This is still a diagnostic. No SPRT unless the fixed static gate and search
   move-choice gate both become clean.
 
@@ -377,7 +384,7 @@ Immediate action:
 - Run `./build.py -c build.json` on pwa-5090.
 - Gate the result with `net_diff`, fixed `eval_move_gate`, and
   `move_choice_gate`.
-- Reject without SPRT unless search move-choice improves materially over qmid
+- Reject without SPRT unless search move-choice improves materially over qmid2
   and moves toward reference.
 
 Deferred Bullet decisions:
@@ -423,20 +430,20 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `pairwise-sprtfail-qmid2-w25-lr1e3-e20`
+- candidate name: `pairwise-sprtfail-qmid3-w10-lr5e4-e20`
 - selected branch: Enyo `.nn` iterative hard-negative pairwise diagnostic.
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL.
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
 - backend: `pairwise`
-- initializer: qmid candidate
-  `runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/.../model.nn`.
+- initializer: qmid2 candidate
+  `runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/.../model.nn`.
 - pairwise score table:
   `runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv`.
 - candidate-move overlay:
-  `runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv`.
-- schedule: quantized forward, lr `0.001`, epochs `20`, pair weight `25`,
-  max rows `100000`.
+  `runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/validate/sprtfail_gate_20260522_030827/move_choice_gate.csv`.
+- schedule: quantized forward, lr `0.0005`, epochs `20`, pair weight `10`,
+  target margin cap `600`, max rows `100000`.
 - expected result: diagnostic only; no SPRT unless fixed static and search
   move-choice gates become clean.
 
