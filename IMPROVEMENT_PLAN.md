@@ -355,17 +355,23 @@ Reason:
   `sum_gap=5025`, `worst=585`.
 - Static child-margin check still showed only `6/60` oracle-best preferences
   for `sb070`, so the target signal was not learned cleanly.
-- This is still a concrete search-aware signal, but the first schedule was too
-  short for an 8.06M-row blend. Run one longer schedule, then stop again if the
-  broader gate does not improve.
+- Longer training (`sb512`) improved the gate but still did not reach a safe
+  level. Best checkpoint `sb288`: `top1=16/60`, `top3=28/60`,
+  `sum_gap=4530`, `worst=485`, versus reference `top1=30/60`, `top3=46/60`,
+  `sum_gap=841`, `worst=149`.
+- Conclusion: the target signal is real, but cp/WDL Bullet training on child
+  scalar scores is not enough. Stop this lane unless the objective/gate
+  construction changes, e.g. pairwise/ranking loss or a broader move-choice
+  dataset.
 
 Immediate action:
 
 - Generate child rows from the scored SPRT-failure legal moves.
 - Blend those rows with the broad d12/d16 pool.
-- Train one longer 512-hidden Bullet candidate through `./build.py -c build.json`.
-- Sweep selected checkpoints against the SPRT-failure gate before considering
-  any SPRT.
+- Do not launch another Bullet/Reckless candidate with the same scalar child
+  target recipe.
+- Next Bullet work must change the objective or target construction before
+  training.
 
 Deferred Bullet decisions:
 
@@ -424,6 +430,7 @@ Current `build.json` intent:
 - row input: broad d12/d16 labels plus repeated scored failed-SPRT child rows
 - schedule: `64` batches per superbatch, `512` superbatches, lr `0.001 ->
   0.0001`
+- result: best sparse-gated checkpoint `sb288`, no SPRT.
 
 Rules:
 
