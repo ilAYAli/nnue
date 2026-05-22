@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from collections import defaultdict
 from pathlib import Path
 
+import chess
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
@@ -60,6 +62,15 @@ class HardPairDataset(Dataset):
                 float(played.get("hard_parent_loss_cp", target_margin)),
             ))
 
+    @staticmethod
+    def child_fen(parent_fen: str, move_uci: str) -> str:
+        board = chess.Board(parent_fen)
+        move = chess.Move.from_uci(move_uci)
+        if move not in board.legal_moves:
+            raise ValueError(f"illegal move {move_uci} in {parent_fen}")
+        board.push(move)
+        return board.fen()
+
     @classmethod
     def from_jsonl(cls, path: str | Path, *, min_target_margin: float,
                    max_target_margin: float) -> "HardPairDataset":
@@ -70,6 +81,45 @@ class HardPairDataset(Dataset):
                     rows.append(json.loads(line))
         return cls(rows, min_target_margin=min_target_margin,
                    max_target_margin=max_target_margin)
+
+    @classmethod
+    def from_sprt_scores_csv(cls, path: str | Path, *, min_target_margin: float,
+                             max_target_margin: float) -> "HardPairDataset":
+        by_target: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+        with Path(path).open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                by_target[(row["log"], row["ply"])].append(row)
+
+        dataset = cls.__new__(cls)
+        dataset.items = []
+        for rows in by_target.values():
+            best = next((row for row in rows if int(row["rank"]) == 1), None)
+            if best is None:
+                continue
+            candidate_move = rows[0]["candidate_move"]
+            played = next((row for row in rows if row["move"] == candidate_move), None)
+            if played is None:
+                continue
+
+            # scores.csv stores child scores from the parent/root side POV.
+            # After a legal move, side-to-move flips, so the child-side target
+            # margin is the candidate gap over the oracle-best child.
+            target_margin = float(played["gap_cp"])
+            if target_margin < min_target_margin:
+                continue
+            if max_target_margin > 0:
+                target_margin = min(target_margin, max_target_margin)
+
+            parent_fen = played["fen"]
+            played_fen = cls.child_fen(parent_fen, played["move"])
+            best_fen = cls.child_fen(parent_fen, best["move"])
+            dataset.items.append((
+                fen_features(played_fen),
+                fen_features(best_fen),
+                target_margin,
+                float(played["gap_cp"]),
+            ))
+        return dataset
 
     def __len__(self) -> int:
         return len(self.items)
@@ -153,10 +203,16 @@ def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
 def train(args) -> EnyoNNUE:
     broad_set, broad_collate = load_score_dataset(
         args.data, limit=args.max_rows, skip=args.skip_rows)
-    pair_set = HardPairDataset.from_jsonl(
-        args.pairs,
-        min_target_margin=args.min_target_margin,
-        max_target_margin=args.max_target_margin)
+    if args.scores_csv:
+        pair_set = HardPairDataset.from_sprt_scores_csv(
+            args.scores_csv,
+            min_target_margin=args.min_target_margin,
+            max_target_margin=args.max_target_margin)
+    else:
+        pair_set = HardPairDataset.from_jsonl(
+            args.pairs,
+            min_target_margin=args.min_target_margin,
+            max_target_margin=args.max_target_margin)
     if len(pair_set) == 0:
         raise SystemExit("no hard pairs after filtering")
 
@@ -243,7 +299,8 @@ def train(args) -> EnyoNNUE:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
-    ap.add_argument("--pairs", required=True)
+    ap.add_argument("--pairs", default="")
+    ap.add_argument("--scores-csv", default="")
     ap.add_argument("--out", required=True)
     ap.add_argument("--out-nn", default=None)
     ap.add_argument("--init-from-nn", default=None)
@@ -266,6 +323,8 @@ def main() -> None:
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
     args = ap.parse_args()
+    if bool(args.pairs) == bool(args.scores_csv):
+        raise SystemExit("provide exactly one of --pairs or --scores-csv")
 
     model = train(args)
     out = Path(args.out)

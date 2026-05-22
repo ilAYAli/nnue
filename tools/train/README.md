@@ -7,6 +7,7 @@
 ```sh
 tools/train/train.py run --help
 tools/train/train.py eval --help
+tools/train/train_pairwise.py --help
 ```
 
 Example:
@@ -23,3 +24,6 @@ tools/train/train.py run \
   --out-nn run/candidate/model.nn
 ```
 
+Pairwise training keeps the broad scalar eval loss, but adds child-position
+ranking pairs. Use it when a candidate fails by choosing the wrong move even
+though scalar cp fitting looks acceptable.
