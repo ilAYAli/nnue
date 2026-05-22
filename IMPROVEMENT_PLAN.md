@@ -159,19 +159,46 @@ Rejected lanes:
     `worst_gap_cp=31311`. Clean replay failure suite was clearly negative:
     `positions=913`, `candidate_better=101`, `reference_better=225`,
     `sum_diff_cp=-12207`, `worst_regression_cp=-881`.
-  - Broadtail-from-reference attempted that broader target set by combining
-    qmid SPRT-failure legal-move scores with repeated-tail legal-move scores,
-    starting again from the current reference net instead of a damaged qmid
-    checkpoint. It moved only the dense head (`541/25200209` exported values),
-    but failed broad validation: static `mae=114.921`, `sign=77.30%`,
-    repeated-tail `top1=3/13`, `top3=6/13`, `sum_gap_cp=32941`, and clean
-    replay failure suite `candidate_better=79`, `reference_better=332`,
-    `sum_diff_cp=-57896`, `worst_regression_cp=-717`.
+- Broadtail-from-reference attempted that broader target set by combining
+  qmid SPRT-failure legal-move scores with repeated-tail legal-move scores,
+  starting again from the current reference net instead of a damaged qmid
+  checkpoint. It moved only the dense head (`541/25200209` exported values),
+  but failed broad validation: static `mae=114.921`, `sign=77.30%`,
+  repeated-tail `top1=3/13`, `top3=6/13`, `sum_gap_cp=32941`, and clean
+  replay failure suite `candidate_better=79`, `reference_better=332`,
+  `sum_diff_cp=-57896`, `worst_regression_cp=-717`.
   - Conclusion: pairwise can create the intended local static/search preference,
     but the current pairwise target construction does not generalize. The qmid
-    loop is suspended. Do not SPRT qmid/qmid2/qmid3/broadtail, and do not launch
-    another pairwise run without a materially different target design and a
-    clean broad gate.
+    loop is suspended. Do not SPRT qmid/qmid2/qmid3/broadtail, and do not
+    launch another pairwise run without a materially different target design
+    and a clean broad gate.
+- scratch quantized-Kaiming 26M-row Huber scale check:
+  - Scalar/export behavior is the best scratch result so far on its own
+    validation slice: exported `.nn` `mae=60.865`, `sign=88.35%`,
+    `corr=0.902590`, `slope=0.811315`.
+  - Same-slice Berserk-derived reference still wins sign heavily:
+    `mae=136.093`, `sign=92.15%`, `corr=0.831691`, `slope=1.400200`.
+  - Repeated-tail gate was slightly better than reference on a tiny set:
+    scratch `top1=4/13`, `top3=6/13`, `sum_gap_cp=1121`,
+    `worst_gap_cp=291`; reference `top1=3/13`, `top3=6/13`,
+    `sum_gap_cp=32393`, `worst_gap_cp=31311`.
+  - Full replay failure-suite gate was clearly bad versus current reference:
+    `positions=913`, `candidate_better=89`, `reference_better=328`,
+    `sum_diff_cp=-37297`, `worst_regression_cp=-1008`.
+  - Decision: no SPRT. Scratch scalar fit is real, but move-choice/search
+    behavior is not close enough to replace the reference.
+- broader repeated search-failure target set:
+  - Extracted 59 positions that repeated across qmid3, broadtail, and scratch26
+    failures:
+    `assets/failure_suite/search_failure_targets_20260522.csv`.
+  - Scored all legal moves with Stockfish: 1806 move rows in
+    `assets/failure_suite/search_failure_move_scores_20260522.csv`.
+  - Current reference baseline on this set: `top1=42/59`, `top3=55/59`,
+    `sum_gap_cp=595`, `worst_gap_cp=159`.
+  - scratch26 baseline on this set: `top1=7/59`, `top3=23/59`,
+    `sum_gap_cp=44640`, `worst_gap_cp=31887`.
+  - Decision: this is a useful gate. It rejects scratch26 cleanly and is now
+    the first gate for any scratch-repair attempt.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -378,30 +405,32 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run one broad-tail pairwise diagnostic from the current reference.
+Run one low-weight search-failure pairwise diagnostic from scratch26.
 
 Next branch:
 
-- Enyo `.nn` pairwise fine-tune from the current reference net.
-- Active recipe: `build.json` points at a combined legal-move score table:
-  original SPRT-failure targets plus repeated-tail targets.
-- This is not qmid4 and does not initialize from qmid/qmid2/qmid3.
+- Enyo `.nn` pairwise fine-tune from
+  `scratch-qkaiming-26m-quant-lr1e2-e30`.
+- Active recipe: `build.json` points at the 59-position search-failure legal
+  move score table.
+- This is not qmid4, not broadtail-from-reference, and not a same-data scalar
+  run.
 
 Reason:
 
-- qmid/qmid2/qmid3 show that training can chase the currently selected bad move,
-  but then moves the problem elsewhere.
-- qmid3 improved the narrow SPRT-failure gate while getting much worse on
-  repeated-tail and replay failure-suite gates.
-- The next useful diagnostic is whether a broader pairwise target set can avoid
-  the qmid tail collapse when starting from the clean reference.
+- scratch26 proves an Enyo-owned net can learn scalar labels and survive export,
+  but it fails hard on repeated search-choice mistakes.
+- The new target set is much broader than the 13-position repeated-tail set and
+  directly separates reference behavior from scratch26 behavior.
+- The diagnostic question is whether pairwise search-failure signal can repair
+  scratch move choice without destroying broad scalar behavior.
 
 Immediate action:
 
-- Make the failure-suite validator robust to stale/empty logs.
-- Train `pairwise-broadtail-ref-w8-lr5e4-e16` with `./build.py -c build.json`.
-- Reject without SPRT unless repeated-tail and failure-suite gates are clean,
-  not merely the narrow SPRT-failure gate.
+- Train `pairwise-searchfail-scratch26-w6-lr1e3-e16` with
+  `./build.py -c build.json`.
+- Reject without SPRT unless search-failure, repeated-tail, static, and replay
+  failure-suite gates are clean.
 
 Deferred Bullet decisions:
 
@@ -422,19 +451,14 @@ Anti-confounding rule:
 - Because this moves the recipe through the new `build.py` pack/train path,
   run the pack/static/roundtrip sanity checks before training starts.
 
-Immediate action:
+Gate action:
 
-- Stop bulk NNUE training.
-- Use the scored target set to design the next move-choice gate: top-1/top-3
-  overlap, child-score gap, and repeated-tail regression count.
-- Run `tools/validate/move_choice_gate.py` on the reference and future
-  candidates before SPRT.
-- The current reference baseline is weak on this tiny set, so first use the
-  gate as a regression detector and diagnostic. Do not require a candidate to
-  solve every target before SPRT unless the scoring is refined into a stable
-  validation suite.
+- Use `search_failure_move_scores_20260522.csv` as the first scratch-repair
+  move-choice gate.
+- Current reference is strong on this set; scratch26 is not. A scratch-repair
+  candidate must improve sharply over scratch26 before any replay gate.
+- Run `tools/validate/move_choice_gate.py` before SPRT.
 - Add no-op export checks (`validate.py net-diff`) before static/replay gates.
-- Choose the next branch only after the analysis points to a concrete weakness.
 
 ## Candidate Workflow
 
@@ -446,20 +470,22 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `pairwise-broadtail-ref-w8-lr5e4-e16`.
-- selected branch: broad-tail pairwise diagnostic from current reference.
+- candidate name: `pairwise-searchfail-scratch26-w6-lr1e3-e16`.
+- selected branch: search-failure pairwise diagnostic from scratch26.
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL.
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
 - backend: `pairwise`
-- initializer: current reference net
-  `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`.
+- initializer:
+  `runs/scratch-qkaiming-26m-quant-lr1e2-e30/train/scratch-qkaiming-26m-quant-lr1e2-e30/model.nn`.
 - pairwise score table:
-  `assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv`.
-- schedule: quantized forward, lr `0.0005`, epochs `16`, pair weight `8`,
-  target margin cap `600`, max rows `100000`, pack limit `100000`.
+  `assets/failure_suite/search_failure_move_scores_20260522.csv`.
+- schedule: quantized forward, lr `0.001`, epochs `16`, pair weight `6`,
+  no cp-weighted pair loss, target margin cap `600`, max rows `100000`,
+  pack limit `100000`.
 - expected result: diagnostic only; no SPRT unless repeated-tail and replay
-  failure-suite gates become clean.
+  failure-suite gates become clean and the new search-failure gate improves
+  sharply.
 
 Rules:
 
