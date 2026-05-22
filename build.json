@@ -27,7 +27,14 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "training",
+    "status": "rejected",
+    "summary": "runs/native-bullet-enyo-scratch-full-eval400-sb16384/validate/checkpoint_sweep_20260522_211315/summary.txt",
+    "result": [
+      "final checkpoint static: mae=503.945, sign=84.46%, slope=2.56",
+      "final checkpoint composite: top1=26/213, top3=89/213, candidate_better=30, reference_better=135",
+      "checkpoint sweep best by sum_gap was 8192: top1=30/213, top3=87/213, candidate_better=29, reference_better=129",
+      "all checkpoints were far below reference on composite move choice; no SPRT"
+    ],
     "success_condition": [
       "exported model.nn loads in Enyo and validate.py",
       "static metrics improve meaningfully over prior native scratch attempts",
@@ -35,10 +42,10 @@
       "mate-like/tactical-tail slice does not collapse",
       "no SPRT unless the cheap gates justify match time"
     ],
-    "next_after_success": [
-      "run static validation on the imported d12/d16 pack",
-      "run composite move-choice gate against the current reference",
-      "only run SPRT if gates are clean"
+    "next": [
+      "do not run SPRT for this candidate",
+      "choose and commit the next build.json recipe before launching another training run",
+      "keep nnue_native and nnue_reckless lanes separate"
     ]
   }
 }

@@ -1,7 +1,19 @@
-# NNUE Tools
+# NNUE Internal Tools
 
-These are lower-level phase tools. Use `../build.py` for the normal net build
-workflow.
+These are implementation details for `../build.py`.
+
+Do not treat the number of files in this directory as the public workflow. The
+normal candidate interface is:
+
+```sh
+../build.py -c build.json
+../build.py status runs/<run-name>
+../build.py report runs/<run-name>
+```
+
+Run phase tools directly only when debugging a specific pipeline step or adding
+a new backend. If a command becomes part of the normal workflow, expose it
+through `build.py` and document it in the root `README.md`.
 
 ## Phase Tools
 

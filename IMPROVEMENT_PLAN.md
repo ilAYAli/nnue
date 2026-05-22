@@ -95,6 +95,24 @@ Current gate status:
     `mae=123.064`, `sign=81.50%`; composite gate `top1=47/213`,
     `top3=117/213`, `candidate_better=42`, `reference_better=99`,
     `cap200_sum_delta_cp=-9693`.
+  - Full-data native Bullet-Enyo scratch eval400
+    (`native-bullet-enyo-scratch-full-eval400-sb16384`) also used
+    `--init-net ''` and trained from scratch on the imported d12/d16 labels.
+    The final checkpoint failed static and move-choice gates: static
+    `mae=503.945`, `sign=84.46%`, slope `2.56`; composite gate
+    `top1=26/213`, `top3=89/213`, `candidate_better=30`,
+    `reference_better=135`, `cap1000_sum_delta_cp=-38653`.
+  - Checkpoint sweep for the same full-data run did not find a keeper:
+    - `4096`: `top1=29/213`, `top3=85/213`, `candidate_better=28`,
+      `reference_better=131`, `cap1000_sum_delta_cp=-35168`.
+    - `8192`: `top1=30/213`, `top3=87/213`, `candidate_better=29`,
+      `reference_better=129`, `cap1000_sum_delta_cp=-35193`.
+    - `12288`: `top1=33/213`, `top3=82/213`, `candidate_better=30`,
+      `reference_better=131`, `cap1000_sum_delta_cp=-35705`.
+    - `16384`: `top1=26/213`, `top3=89/213`, `candidate_better=30`,
+      `reference_better=135`, `cap1000_sum_delta_cp=-38653`.
+    All checkpoints are far below reference on the composite move-choice gate;
+    no SPRT.
   - Decision: no native SPRT. Native remains a long-term lane; the current
     scratch/Bullet-Enyo nets are not close enough on move choice.
 - Embedded validation note: when `validate.py static` is used inside a custom
@@ -888,22 +906,26 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `broad-ref-sparse-huber-cp800-lr5e6-in800-l1800-d0-e8`.
-- selected branch: current-reference broad-label sparse refresh with dense/head
-  frozen and high sparse LR multipliers.
-- backend: `pytorch`.
-- initializer: current reference net
-  `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`.
+  `native-bullet-enyo-scratch-full-eval400-sb16384`.
+- selected branch: `feature/nnue-native-bullet-scratch-full`.
+- selected lane: `nnue_native`, a clean Enyo-owned scratch net with no Berserk
+  initialization.
+- backend: `bullet`, `bullet_mode=enyo`, exporting a normal Enyo `model.nn`.
+- initializer: empty `init_net`, so this is scratch/native rather than an
+  existing-weight delta.
 - broad source:
   `runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl`.
-- schedule: quantized forward, Huber cp800 beta200, base lr `5e-6`, input
-  multiplier `800`, L1 multiplier `800`, dense multiplier `0`, epochs `8`,
-  pack/max rows `100000`.
-- expected result: diagnostic only. Require nonzero input/L1 export movement
-  before move-choice/replay gates; no SPRT unless replay gates are clean.
+- schedule: `3M` rows, hidden `1024`, L2 `16`, batch `4096`, batches `64`,
+  superbatches `16384`, lr `0.001 -> 0.00005`, eval scale `400`.
+- result: rejected by static/composite gates and checkpoint sweep. No SPRT.
+- next `build.json` change must name a new branch/lane and should be committed
+  before launch.
 
 Rules:
 
+- Treat `build.py` plus committed `build.json` as the public workflow. Files
+  under `tools/` are implementation details unless the root `README.md`
+  explicitly names them.
 - Commit `build.json` changes so the current intended run is reviewable.
 - Always record `--selfplay-seed`.
 - Treat `--skip-plies` as an opening-distribution knob.
