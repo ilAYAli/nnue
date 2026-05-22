@@ -1,13 +1,13 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-sprt-failure-aggressive-preflight",
-  "goal": "Diagnostic pairwise run: use a much stronger pairwise loss and LR on a small broad slice to prove the ranking objective changes exported Enyo evals. This is not a keeper attempt and must not go to SPRT.",
+  "experiment": "pairwise-sprt-failure-quantized-preflight",
+  "goal": "Diagnostic pairwise run using quantized/STE forward so training optimizes what model.nn exports. This follows the float pairwise preflight, which moved PyTorch metrics but left exported evals unchanged. Still no SPRT; gate first.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv"
   },
   "create": {
-    "name": "pairwise-sprtfail-aggr-w20-lr1e4-e20",
+    "name": "pairwise-sprtfail-qaggr-w20-lr1e4-e20",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
@@ -26,12 +26,14 @@
     "max_rows": 100000,
     "device": "cuda",
     "workers": 2,
-    "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+    "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
+    "forward": "quantized"
   },
   "validation": {
-    "status": "aggressive pairwise preflight; prove exported eval movement before tuning",
+    "status": "quantized pairwise preflight; prove exported eval movement before tuning",
     "success_condition": [
-      "pair_correct improves materially",
+      "pair_correct improves materially under quantized forward",
+      "net_diff shows input/L1 or exported integer-relevant values moved",
       "eval_move_gate margins differ from baseline",
       "candidate_prefers_best improves on failed-SPRT child cases",
       "do not run SPRT; use result to choose sane pairwise settings"

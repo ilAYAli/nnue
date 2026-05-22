@@ -169,6 +169,15 @@ def to_device(items, device: str):
             for item in items]
 
 
+def predict(model: EnyoNNUE, args, w_feats: torch.Tensor, b_feats: torch.Tensor,
+            w_offsets: torch.Tensor, b_offsets: torch.Tensor,
+            stm: torch.Tensor, phase_scale: torch.Tensor) -> torch.Tensor:
+    if args.forward == "quantized":
+        return model.quantized_forward(
+            w_feats, b_feats, w_offsets, b_offsets, stm, phase_scale)
+    return model(w_feats, b_feats, w_offsets, b_offsets, stm, phase_scale)
+
+
 @torch.no_grad()
 def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
     model.eval()
@@ -182,8 +191,8 @@ def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
         (pw, pb, pwo, pbo, pstm, pphase,
          bw, bb, bwo, bbo, bstm, bphase,
          target_margin, _weights) = batch
-        pred_played = model(pw, pb, pwo, pbo, pstm, pphase)
-        pred_best = model(bw, bb, bwo, bbo, bstm, bphase)
+        pred_played = predict(model, args, pw, pb, pwo, pbo, pstm, pphase)
+        pred_best = predict(model, args, bw, bb, bwo, bbo, bstm, bphase)
         pred_margin = pred_played - pred_best
         err = pred_margin - target_margin
         n += len(target_margin)
@@ -248,7 +257,7 @@ def train(args) -> EnyoNNUE:
             w, b, w_off, b_off, stm, y, _wdl, phase_scale, _source_ids = broad_batch
             if args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-            pred = model(w, b, w_off, b_off, stm, phase_scale)
+            pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
             broad_loss = F.smooth_l1_loss(
                 pred, y, beta=args.huber_beta, reduction="mean")
 
@@ -256,8 +265,8 @@ def train(args) -> EnyoNNUE:
             (pw, pb, pwo, pbo, pstm, pphase,
              bw, bb, bwo, bbo, bstm, bphase,
              target_margin, weights) = pair_batch
-            pred_played = model(pw, pb, pwo, pbo, pstm, pphase)
-            pred_best = model(bw, bb, bwo, bbo, bstm, bphase)
+            pred_played = predict(model, args, pw, pb, pwo, pbo, pstm, pphase)
+            pred_best = predict(model, args, bw, bb, bwo, bbo, bstm, bphase)
             pred_margin = pred_played - pred_best
             pair_losses = F.smooth_l1_loss(
                 pred_margin, target_margin,
@@ -306,6 +315,8 @@ def main() -> None:
     ap.add_argument("--init-from-nn", default=None)
     ap.add_argument("--init", default="kaiming",
                     choices=["kaiming", "berserk-ish"])
+    ap.add_argument("--forward", default="float",
+                    choices=["float", "quantized"])
     ap.add_argument("--epochs", type=int, default=8)
     ap.add_argument("--batch-size", type=int, default=8192)
     ap.add_argument("--pair-batch-size", type=int, default=64)
