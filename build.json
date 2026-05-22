@@ -1,7 +1,7 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "bullet-reckless-512h-sprt-failure-movechoice-cp",
-  "goal": "Test whether the Bullet/Reckless-like net can learn the broader move-choice failures seen in the rejected SPRT by training on all oracle-scored child positions from those games, mixed with the broad d12 Stockfish-labeled pool. This remains gate-only: train, sweep checkpoints, and do not run SPRT unless the SPRT-failure move-choice gate improves clearly.",
+  "experiment": "bullet-reckless-512h-sprt-failure-movechoice-cp-longer",
+  "goal": "Test whether the Bullet/Reckless-like net can learn the broader move-choice failures seen in the rejected SPRT when the 8.06M-row targeted blend gets a longer schedule. The 128-superbatch run only gave about two effective passes and improved top-3 but not top-1/tail. This remains gate-only: train, sweep selected checkpoints, and do not run SPRT unless the SPRT-failure move-choice gate improves clearly.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "sprt_failure_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
@@ -10,7 +10,7 @@
     "rows_expected": "about 2.99M broad + 5.07M SPRT-failure child rows = 8.06M rows"
   },
   "create": {
-    "name": "bullet-reckless-512h-sprtfail-wdl0-sb128",
+    "name": "bullet-reckless-512h-sprtfail-wdl0-sb512",
     "backend": "bullet",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/assets/sprt_failure/d12_all_plus_sprt_movechoice_x2500.jsonl",
     "bullet_rows": 0,
@@ -19,7 +19,7 @@
     "bullet_l2": 16,
     "bullet_batch_size": 2048,
     "bullet_batches": 64,
-    "bullet_superbatches": 128,
+    "bullet_superbatches": 512,
     "bullet_threads": 4,
     "bullet_wdl": 0.0,
     "bullet_lr": 0.001,
@@ -28,7 +28,7 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "512-hidden Bullet/Reckless-like SPRT-failure move-choice/broad cp-objective blend",
+    "status": "512-hidden Bullet/Reckless-like SPRT-failure move-choice/broad cp-objective blend, longer schedule",
     "success_condition": [
       "SPRT-failure move-choice gate improves over the failed movechoice sb112 checkpoint",
       "candidate top1/top3 moves materially closer to reference on failed-SPRT positions",
