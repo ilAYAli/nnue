@@ -1,7 +1,7 @@
 {
-  "description": "Reviewed Enyo NNUE improvement-run config. Search-aware sparse movement probe: existing-weight Enyo net, init-distilled broad loss, and search-aware child targets.",
-  "experiment": "Search-aware sparse movement probe",
-  "goal": "Test whether search-aware child-margin/policy supervision can intentionally move exported input/L1 tensors while distilling broad positions back to the initializer. Diagnostic only; no SPRT from this probe.",
+  "description": "Reviewed Enyo NNUE improvement-run config. Search-aware sparse crossing probe: existing-weight Enyo net, init-distilled broad loss, dense frozen, stronger input/L1 movement.",
+  "experiment": "Search-aware sparse crossing probe",
+  "goal": "Calibrate whether search-aware child-margin/policy supervision can cross exported input/L1 rounding thresholds without immediately damaging broad/static behavior. Diagnostic only; no SPRT from this probe.",
   "track": "nnue_reckless",
   "engine_branch": "no engine change",
   "nnue_branch": "feature/nnue-search-aware-targets",
@@ -12,7 +12,7 @@
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "create": {
-    "name": "search-aware-sparseprobe-init-in800-l1x1000-e2",
+    "name": "search-aware-sparsecross-init-in3000-l1x3000-e2",
     "backend": "search-aware",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "search_targets_jsonl": "assets/failure_suite/search_aware_targets_20260523.jsonl",
@@ -23,8 +23,8 @@
     "huber_beta": 200,
     "lr": 5e-06,
     "weight_decay": 0.0,
-    "input_lr_mult": 800.0,
-    "l1_lr_mult": 1000.0,
+    "input_lr_mult": 3000.0,
+    "l1_lr_mult": 3000.0,
     "dense_lr_mult": 0.0,
     "epochs": 2,
     "pack_limit": 200000,
@@ -48,11 +48,11 @@
   "validation": {
     "status": "pending",
     "required_after_training": [
-      "validate.py net-diff against init net; exported input/L1 movement must be nonzero but not broad-destructive",
+      "validate.py net-diff against init net; exported input/L1 movement must be nonzero and measured",
       "static validation on broad packed data must not show a clear sign regression",
       "search-gate against assets/failure_suite/search_aware_targets_20260523.jsonl must improve capped gap without mate-like tail collapse",
       "failure-suite replay only if net-diff/static/search-gate are not already dead"
     ],
-    "sprt_rule": "No SPRT unless net-diff/static/search-gate/failure-suite gates are all clean. This probe is expected to be diagnostic."
+    "sprt_rule": "No SPRT unless net-diff/static/search-gate/failure-suite gates are all clean. This crossing probe is expected to be diagnostic."
   }
 }
