@@ -11,6 +11,8 @@ one abstraction instead of splitting "gates" and Elo testing.
 tools/validate/validate.py static --help
 tools/validate/validate.py failure-suite --help
 tools/validate/validate.py sprt --help
+tools/validate/validate.py search-targets --help
+tools/validate/validate.py search-gate --help
 tools/validate/extract_tail_targets.py --help
 tools/validate/score_tail_targets.py --help
 tools/validate/move_choice_gate.py --help
@@ -57,6 +59,29 @@ tools/validate/move_choice_gate.py \
   --engine ~/code/cpp/chess/assets/engines/reference \
   --out run/move_choice_gate.csv \
   --nodes 100000
+```
+
+Build the unified search-aware target set from existing legal-move score CSVs:
+
+```sh
+tools/validate/validate.py search-targets \
+  --scores stable=assets/failure_suite/search_failure_move_scores_20260522.csv \
+  --scores repeated=assets/failure_suite/repeated_tail_move_scores_20260521.csv \
+  --scores sprt_material=assets/failure_suite/material_head_mask0to6_sprt_failure_scores_20260522.csv \
+  --scores sprt_output=assets/failure_suite/output_signfit_lr5e6_sprt_mine_scores_20260522.csv \
+  --output runs/search-aware-targets/search_aware_targets.jsonl \
+  --summary runs/search-aware-targets/summary.txt
+```
+
+Run the reusable search-aware gate:
+
+```sh
+tools/validate/validate.py search-gate \
+  --targets runs/search-aware-targets/search_aware_targets.jsonl \
+  --engine ~/code/cpp/chess/assets/engines/reference \
+  --candidate-net runs/candidate/train/candidate/model.nn \
+  --reference-net ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --out-dir runs/candidate/validate/search_gate
 ```
 
 With the generic event hook:
