@@ -284,6 +284,31 @@ Rejected lanes:
   - Decision: no SPRT. Stop scalar child-blend repairs from scratch26. The
     search-failure signal is real but still produces a much worse engine than
     the current reference.
+- current-reference sparse-LR movement probe:
+  - `pairwise-ref-sparseprobe-w2-lr5e6-in100-l120-d02-e8` used per-layer LR
+    multipliers to try to move exported sparse/input tensors:
+    base lr `5e-6`, input multiplier `100`, L1 multiplier `20`, dense
+    multiplier `0.2`.
+  - Gradients were nonzero for input and L1, but exported sparse tensors still
+    did not cross quantization thresholds:
+    `input_weights changed=0/25165824`, `input_biases changed=0/1024`,
+    `l1_weights changed=0/32768`, `l1_biases changed=0/16`.
+  - Only dense/head floats moved, and only very slightly:
+    total `508/25200209`.
+  - Repeated-tail top counts improved (`top1=5/13`, `top3=8/13`), but the tail
+    remained catastrophic: `sum_gap_cp=32243`, `worst_gap_cp=31311`.
+  - Decision: no replay gate and no SPRT. Current-reference quantized
+    fine-tunes are dense/head-only at this scale. Do not keep increasing LR
+    unless the objective explicitly targets sparse/exported movement.
+- sparse export-threshold diagnosis:
+  - Float `.pt` deltas from the sparse-LR probe confirmed why export stayed
+    unchanged: max input delta was `0.058586`, max input-bias delta `0.052368`,
+    max L1 delta `0.010529`, and max L1-bias delta `0.012695`.
+  - None approached the roughly half-integer threshold needed to alter rounded
+    int16/int8 exported tensors.
+  - Decision: one explicit threshold-crossing probe is justified, with
+    dense/head LR frozen to zero so the test answers only whether sparse
+    exported movement is achievable.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -490,13 +515,13 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Stop the scratch26 search-failure repair lane unless the target design changes
-substantially.
+Run one sparse export-threshold crossing probe.
 
 Next branch:
 
-- Run a current-reference sparse-LR movement probe.
 - Do not run another same-shape pairwise/scalar child blend from scratch26.
+- Do not run another current-reference pairwise fine-tune that lets the dense
+  head absorb the change.
 
 Reason:
 
@@ -514,15 +539,20 @@ Reason:
   existing exported `.nn` have only changed dense/head tensors after export.
   Input/L1 exported tensors stayed fixed. That makes another ordinary LR sweep
   low value.
+- Sparse-LR multipliers did not change that: gradients reached input/L1, but
+  exported tensors stayed identical.
+- The measured float deltas were far below export rounding thresholds, so this
+  diagnostic intentionally freezes dense/head and pushes sparse tensors hard.
 
 Immediate action:
 
 - Do not SPRT any scratch26 repair from this lane.
-- Add and test per-layer LR multipliers.
-- Train one current-reference repeated-tail pairwise probe with high input/L1
-  LR and low dense/head LR.
-- First gate is `net-diff`. If input/L1 still do not move after export, stop
-  this training-mechanics lane and reassess representation/format.
+- Train one current-reference repeated-tail pairwise probe with dense/head LR
+  `0`, input/L1 multipliers `1200`, and first gate by `net-diff`.
+- If input/L1 still do not move after export, stop current-reference
+  fine-tuning and move to a fresh-net or architecture-format branch.
+- If input/L1 move but gates are bad, treat it as proof that crossing export
+  thresholds is possible but this objective is not usable.
 
 Deferred Bullet decisions:
 
@@ -563,16 +593,16 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `pairwise-ref-sparseprobe-w2-lr5e6-in100-l120-d02-e8`.
-- selected branch: current-reference pairwise repeated-tail repair with
-  per-layer LR multipliers.
+  `pairwise-ref-sparsecross-w2-lr5e6-in1200-l11200-d0-e12`.
+- selected branch: current-reference pairwise repeated-tail repair with dense
+  head frozen and deliberately high sparse LR multipliers.
 - backend: `pairwise`.
 - initializer: current reference net
   `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`.
 - pairwise score table:
   `assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv`.
-- schedule: quantized forward, base lr `5e-6`, input multiplier `100`, L1
-  multiplier `20`, dense multiplier `0.2`, pair weight `2`, epochs `8`,
+- schedule: quantized forward, base lr `5e-6`, input multiplier `1200`, L1
+  multiplier `1200`, dense multiplier `0`, pair weight `2`, epochs `12`,
   pack/max rows `100000`.
 - expected result: diagnostic only. Require nonzero input/L1 export movement
   before replay gates; no SPRT unless replay gates are clean.

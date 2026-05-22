@@ -1,13 +1,13 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "current-reference sparse-lr pairwise movement probe",
-  "goal": "Test whether per-layer LR multipliers can move exported input/L1 tensors while repairing repeated-tail move choices from the current reference. Diagnostic only; no SPRT unless gates are clean.",
+  "experiment": "current-reference sparse export-threshold crossing probe",
+  "goal": "Test whether deliberately high sparse LR and frozen dense/head layers can move exported input/L1 tensors across quantization thresholds. Diagnostic only; no SPRT unless gates are clean.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores": "~/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv"
   },
   "create": {
-    "name": "pairwise-ref-sparseprobe-w2-lr5e6-in100-l120-d02-e8",
+    "name": "pairwise-ref-sparsecross-w2-lr5e6-in1200-l11200-d0-e12",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv",
@@ -21,10 +21,10 @@
     "target_clamp": 800,
     "huber_beta": 200,
     "lr": 0.000005,
-    "input_lr_mult": 100.0,
-    "l1_lr_mult": 20.0,
-    "dense_lr_mult": 0.2,
-    "epochs": 8,
+    "input_lr_mult": 1200.0,
+    "l1_lr_mult": 1200.0,
+    "dense_lr_mult": 0.0,
+    "epochs": 12,
     "batch_size": 8192,
     "max_rows": 100000,
     "pack_limit": 100000,
@@ -37,7 +37,7 @@
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "validation": {
-    "status": "current-reference sparse-LR movement probe",
+    "status": "current-reference sparse export-threshold crossing probe",
     "success_condition": [
       "net_diff shows nonzero input/L1 exported movement",
       "static validation does not collapse",
