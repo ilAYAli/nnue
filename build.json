@@ -1,7 +1,7 @@
 {
-  "description": "Reviewed Enyo NNUE improvement-run config. Search-aware sparse crossing probe: existing-weight Enyo net, init-distilled broad loss, dense frozen, stronger input/L1 movement.",
-  "experiment": "Search-aware sparse crossing probe",
-  "goal": "Calibrate whether search-aware child-margin/policy supervision can cross exported input/L1 rounding thresholds without immediately damaging broad/static behavior. Diagnostic only; no SPRT from this probe.",
+  "description": "Reviewed Enyo NNUE improvement-run config. Search-aware target-only sparse overfit diagnostic: existing-weight Enyo net, dense frozen, broad loss disabled.",
+  "experiment": "Search-aware target-only sparse overfit diagnostic",
+  "goal": "Test whether the search-aware child-margin/policy objective can move target choices at all through exported input/L1 tensors when broad scalar pressure and dense/head updates are removed. Diagnostic only; no SPRT.",
   "track": "nnue_reckless",
   "engine_branch": "no engine change",
   "nnue_branch": "feature/nnue-search-aware-targets",
@@ -12,7 +12,7 @@
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "create": {
-    "name": "search-aware-sparsecross-init-in3000-l1x3000-e2",
+    "name": "search-aware-targetonly-sparse-overfit-in3000-l1x3000-e8",
     "backend": "search-aware",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "search_targets_jsonl": "assets/failure_suite/search_aware_targets_20260523.jsonl",
@@ -26,15 +26,15 @@
     "input_lr_mult": 3000.0,
     "l1_lr_mult": 3000.0,
     "dense_lr_mult": 0.0,
-    "epochs": 2,
+    "epochs": 8,
     "pack_limit": 200000,
     "max_rows": 100000,
     "batch_size": 4096,
     "search_target_batch_size": 16,
     "search_broad_target": "init",
-    "search_broad_weight": 1.0,
-    "search_margin_weight": 0.05,
-    "search_policy_weight": 0.01,
+    "search_broad_weight": 0.0,
+    "search_margin_weight": 1.0,
+    "search_policy_weight": 0.25,
     "search_margin_beta": 100.0,
     "search_policy_temperature_cp": 200.0,
     "search_max_gap_cp": 800.0,
@@ -48,11 +48,11 @@
   "validation": {
     "status": "pending",
     "required_after_training": [
-      "validate.py net-diff against init net; exported input/L1 movement must be nonzero and measured",
-      "static validation on broad packed data must not show a clear sign regression",
-      "search-gate against assets/failure_suite/search_aware_targets_20260523.jsonl must improve capped gap without mate-like tail collapse",
-      "failure-suite replay only if net-diff/static/search-gate are not already dead"
+      "training log must show target_top1/top3 or target_sum_gap improvement; otherwise the objective cannot move choices even as an overfit diagnostic",
+      "validate.py net-diff against init net must show exported input/L1 movement",
+      "static validation is expected to regress; use it only to quantify destructiveness",
+      "search-gate only if target metrics move materially; no failure-suite/SPRT from this diagnostic"
     ],
-    "sprt_rule": "No SPRT unless net-diff/static/search-gate/failure-suite gates are all clean. This crossing probe is expected to be diagnostic."
+    "sprt_rule": "Never SPRT this target-only overfit diagnostic. It only answers whether the objective can move target choices through sparse/L1."
   }
 }
