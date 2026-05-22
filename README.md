@@ -16,8 +16,12 @@ It creates a candidate net by running:
 posgen -> score -> pack -> train
 ```
 
-The default backend is the Enyo PyTorch trainer. An experimental Bullet backend
-uses the same `posgen -> score` front half, then switches to:
+The default backend is the Enyo PyTorch trainer. A pairwise backend trains the
+normal Enyo `.nn` format from child-position ranking pairs, for move-choice
+experiments where scalar cp fitting is not enough.
+
+An experimental Bullet backend uses the same `posgen -> score` front half, then
+switches to:
 
 ```text
 jsonl -> Bullet text -> BulletFormat -> Bullet trainer
@@ -81,6 +85,22 @@ Experimental Bullet/Reckless-like architecture spike:
 This verifies Bullet conversion/training under the normal pipeline/event
 machinery. It writes Bullet `quantised.bin` checkpoints. The experimental Enyo
 loader can load those directly, but they are not normal Enyo `model.nn` files.
+
+Pairwise move-choice fine-tune:
+
+```sh
+./build.py create \
+  --name pairwise-sprtfail \
+  --backend pairwise \
+  --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl \
+  --pairwise-scores-csv runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv \
+  --pairwise-pair-weight 0.25 \
+  --epochs 4 \
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+```
+
+This exports a normal Enyo `model.nn`. It should be gated on the same
+move-choice positions before any SPRT.
 
 To train an Enyo-owned net from scratch instead of fine-tuning the current
 reference net, set `init_net` to `null` in `build.json` or pass an empty
@@ -167,7 +187,7 @@ Inspect a run:
 --runner PATH
 --python PATH
 --labeled-jsonl PATH
---backend pytorch|bullet
+--backend pytorch|pairwise|bullet
 
 --selfplay-games N
 --selfplay-shard-games N
@@ -206,6 +226,15 @@ Inspect a run:
 --patience N
 --select-metric loss|mse|mae|sign
 --trainable all|input|float-head|output
+
+--pairwise-scores-csv PATH
+--pairwise-pairs-jsonl PATH
+--pairwise-pair-batch-size N
+--pairwise-pair-weight X
+--pairwise-pair-beta CP
+--pairwise-min-target-margin CP
+--pairwise-max-target-margin CP
+--pairwise-loss-weight-by-cp
 
 --bullet-rows N
 --bullet-max-abs-cp CP
