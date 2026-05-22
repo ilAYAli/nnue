@@ -7,8 +7,8 @@ normal candidate interface is:
 
 ```sh
 ../build.py -c build.json
-../build.py status runs/<run-name>
-../build.py report runs/<run-name>
+../build.py status
+../build.py report
 ```
 
 Run phase tools directly only when debugging a specific pipeline step or adding
