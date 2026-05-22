@@ -159,10 +159,19 @@ Rejected lanes:
     `worst_gap_cp=31311`. Clean replay failure suite was clearly negative:
     `positions=913`, `candidate_better=101`, `reference_better=225`,
     `sum_diff_cp=-12207`, `worst_regression_cp=-881`.
+  - Broadtail-from-reference attempted that broader target set by combining
+    qmid SPRT-failure legal-move scores with repeated-tail legal-move scores,
+    starting again from the current reference net instead of a damaged qmid
+    checkpoint. It moved only the dense head (`541/25200209` exported values),
+    but failed broad validation: static `mae=114.921`, `sign=77.30%`,
+    repeated-tail `top1=3/13`, `top3=6/13`, `sum_gap_cp=32941`, and clean
+    replay failure suite `candidate_better=79`, `reference_better=332`,
+    `sum_diff_cp=-57896`, `worst_regression_cp=-717`.
   - Conclusion: pairwise can create the intended local static/search preference,
-    but narrow target following is not enough. The qmid loop is suspended. Do
-    not SPRT qmid/qmid2/qmid3, and do not launch qmid4 without a broader target
-    set that includes repeated-tail and failure-suite regressions.
+    but the current pairwise target construction does not generalize. The qmid
+    loop is suspended. Do not SPRT qmid/qmid2/qmid3/broadtail, and do not launch
+    another pairwise run without a materially different target design and a
+    clean broad gate.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
