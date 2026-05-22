@@ -4,13 +4,22 @@ This repo contains the NNUE training tools and experiment notes for Enyo.
 Engine binaries, source checkouts, books, and reference nets are configured via
 command-line arguments and defaults in `tools/lib/defaults.py`.
 
-The high-level build command is:
+## Public Workflow
+
+The public workflow is intentionally small:
 
 ```sh
-./build.py
+./build.py -c build.json
+./build.py status runs/<run-name>
+./build.py report runs/<run-name>
 ```
 
-It creates a candidate net by running:
+`build.json` is the committed source of truth for the current reviewed
+experiment. Change that file, commit it, then run the command above. The many
+files under `tools/` are phase helpers and library modules used by `build.py`;
+they are not the normal interface for creating a candidate.
+
+Candidate creation runs:
 
 ```text
 posgen -> score -> pack -> train
@@ -28,9 +37,9 @@ jsonl -> Bullet text -> BulletFormat -> Bullet trainer
 ```
 
 The Bullet backend currently produces Bullet checkpoints, not the normal Enyo
-`.nn` format. The experimental Enyo branch can load these `quantised.bin`
-checkpoints directly for architecture experiments, but the path is not yet fast
-enough for candidate SPRT.
+`.nn` format when `--bullet-mode reckless` is used. With `--bullet-mode enyo`,
+it exports a normal Enyo `model.nn` after training. Treat both Bullet modes as
+experimental until static and move-choice gates pass.
 
 Validation is separate and lives under `tools/validate/`.
 
