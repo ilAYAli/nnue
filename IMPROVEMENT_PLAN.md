@@ -129,6 +129,25 @@ Rejected lanes:
     scalar cp/WDL training on the current labels does not produce a playable
     Enyo search eval. Do not spend more SPRT on Bullet checkpoints until a
     broader search-aware gate improves, not just the tiny repeated-tail gate.
+- Enyo `.nn` pairwise SPRT-failure diagnostics:
+  - Weak/current-initialized pairwise barely moved the exported net and failed
+    the search gate.
+  - Aggressive float/quantized runs improved pairwise training metrics but did
+    not produce useful exported/search behavior.
+  - Forced quantized run proved exported integer weights can move, but destroyed
+    search behavior: `top1=4/60`, `top3=12/60`, `sum_gap_cp=40816`,
+    `worst_gap_cp=31252`.
+  - Mid-strength quantized run `pairwise-sprtfail-qmid-w50-lr3e3-e30` fixed the
+    static margin gate after the Enyo `evalnet` validation path was corrected:
+    candidate `43/49` best-preferring vs baseline `21/49`, fixed `24`,
+    regressed `2`, worst static regression `-148cp`.
+  - The same qmid net still failed the search move-choice gate badly:
+    `top1=14/60`, `top3=27/60`, `sum_gap_cp=35866`,
+    `worst_gap_cp=31251`, versus reference around `top1=29/60`,
+    `top3=47/60`, `sum_gap_cp=953`, `worst_gap_cp=272`.
+  - Conclusion: pairwise can create the intended static eval preference, but the
+    scored target set must follow the moves a candidate actually chooses in
+    search. Do not SPRT qmid.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -329,49 +348,37 @@ Priority order:
      the same commit as the experiment decision.
    - Manual step-by-step pipelines are historical/legacy only.
    - Planned recipes should be concrete `build.py create` commands, not prose.
+   - Enyo commit `8fda8d3` fixes `evalnet` for loaded Enyo `.nn` files to use
+     the same scaled `Evaluate2` route as search. Older `eval_move_gate` results
+     from before this fix understated candidate differences.
 
 ## Next Concrete Experiment
 
-Use the completed Bullet SPRT-failure diagnostic to run exactly one broader
-targeted candidate.
+Run one iterative hard-negative pairwise candidate.
 
 Next branch:
 
-- Bullet/Reckless-like 512-hidden SPRT-failure move-choice blend.
-- Active recipe: `build.json` points at broad d12/d16 labels plus repeated
-  child rows from the rejected Bullet SPRT positions.
+- Enyo `.nn` pairwise fine-tune from the qmid candidate.
+- Active recipe: `build.json` points at broad d12/d16 labels, the scored
+  legal-move table from the rejected Bullet SPRT positions, and qmid's own
+  `move_choice_gate.csv` as `pairwise_candidate_moves_csv`.
 
 Reason:
 
-- Bullet cp-only, WDL-weighted, hardcase-child, and direct move-choice blends
-  all failed to produce playable search strength.
-- The narrow repeated-tail gate can be overfit without solving general move
-  choice.
-- The rejected `sb112` checkpoint was bad on actual failed-SPRT move choices:
-  candidate `top1=3/60`, `top3=19/60`, `sum_gap=6567`; reference `top1=30/60`,
-  `top3=46/60`, `sum_gap=841`.
-- The first broader targeted run (`sb128`) improved top-3 but not top-1/tail:
-  best checkpoint `sb070` reached `top1=9/60`, `top3=26/60`,
-  `sum_gap=5025`, `worst=585`.
-- Static child-margin check still showed only `6/60` oracle-best preferences
-  for `sb070`, so the target signal was not learned cleanly.
-- Longer training (`sb512`) improved the gate but still did not reach a safe
-  level. Best checkpoint `sb288`: `top1=16/60`, `top3=28/60`,
-  `sum_gap=4530`, `worst=485`, versus reference `top1=30/60`, `top3=46/60`,
-  `sum_gap=841`, `worst=149`.
-- Conclusion: the target signal is real, but cp/WDL Bullet training on child
-  scalar scores is not enough. Stop this lane unless the objective/gate
-  construction changes, e.g. pairwise/ranking loss or a broader move-choice
-  dataset.
+- qmid proved the static pairwise direction can be learned, but search chose
+  new bad moves not represented by the previous candidate-move column.
+- The next useful test is whether retraining against qmid's actual search
+  choices reduces those search mistakes without reintroducing a tail blow-up.
+- This is still a diagnostic. No SPRT unless the fixed static gate and search
+  move-choice gate both become clean.
 
 Immediate action:
 
-- Generate child rows from the scored SPRT-failure legal moves.
-- Blend those rows with the broad d12/d16 pool.
-- Do not launch another Bullet/Reckless candidate with the same scalar child
-  target recipe.
-- Next Bullet work must change the objective or target construction before
-  training.
+- Run `./build.py -c build.json` on pwa-5090.
+- Gate the result with `net_diff`, fixed `eval_move_gate`, and
+  `move_choice_gate`.
+- Reject without SPRT unless search move-choice improves materially over qmid
+  and moves toward reference.
 
 Deferred Bullet decisions:
 
@@ -416,21 +423,22 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `bullet-reckless-512h-sprtfail-wdl0-sb512`
-- selected branch: Bullet/Reckless-like SPRT-failure move-choice/broad blend
-- self-play depth: `12`
-- self-play seed: `2026052111`
-- skipped opening plies: `8`
-- labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL
+- candidate name: `pairwise-sprtfail-qmid2-w25-lr1e3-e20`
+- selected branch: Enyo `.nn` iterative hard-negative pairwise diagnostic.
+- labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL.
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
-- backend: `bullet`
-- Bullet architecture: `512` hidden, `16` L2, pairwise-mul hidden, material
-  bucketed head
-- row input: broad d12/d16 labels plus repeated scored failed-SPRT child rows
-- schedule: `64` batches per superbatch, `512` superbatches, lr `0.001 ->
-  0.0001`
-- result: best sparse-gated checkpoint `sb288`, no SPRT.
+- backend: `pairwise`
+- initializer: qmid candidate
+  `runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/.../model.nn`.
+- pairwise score table:
+  `runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv`.
+- candidate-move overlay:
+  `runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv`.
+- schedule: quantized forward, lr `0.001`, epochs `20`, pair weight `25`,
+  max rows `100000`.
+- expected result: diagnostic only; no SPRT unless fixed static and search
+  move-choice gates become clean.
 
 Rules:
 

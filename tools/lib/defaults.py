@@ -88,6 +88,7 @@ class CandidateDefaults:
 
     pairwise_scores_csv: str = ""
     pairwise_pairs_jsonl: str = ""
+    pairwise_candidate_moves_csv: str = ""
     pairwise_pair_batch_size: int = 64
     pairwise_pair_weight: float = 1.0
     pairwise_pair_beta: float = 100.0

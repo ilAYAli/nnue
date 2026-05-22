@@ -27,3 +27,8 @@ tools/train/train.py run \
 Pairwise training keeps the broad scalar eval loss, but adds child-position
 ranking pairs. Use it when a candidate fails by choosing the wrong move even
 though scalar cp fitting looks acceptable.
+
+With `--scores-csv`, the trainer uses the scored legal-move table produced by
+the move-choice gate. Add `--candidate-moves-csv` to override which move is
+treated as the bad move for each target, for example after a newer candidate
+chooses different bad moves than the original scored candidate.

@@ -1,17 +1,18 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-sprt-failure-quantized-mid-preflight",
-  "goal": "Mid-strength export-aware pairwise diagnostic after qforce proved integer movement but destroyed the move-choice gate. Keep quantized forward, lower LR/weight, and use more broad rows to find a non-destructive pairwise setting. Still no SPRT.",
+  "experiment": "pairwise-sprt-failure-iterative-hard-negative",
+  "goal": "Second pairwise pass: keep the scored legal-move table, but train against the moves qmid actually selected in search. qmid improved static margins, but search still picked new bad moves, so this run is an iterative hard-negative diagnostic. Still no SPRT unless gates clear.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv"
+    "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
+    "qmid_candidate_moves": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv"
   },
   "create": {
-    "name": "pairwise-sprtfail-qmid-w50-lr3e3-e30",
+    "name": "pairwise-sprtfail-qmid2-w25-lr1e3-e20",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "pairwise_pair_weight": 50.0,
+    "pairwise_pair_weight": 25.0,
     "pairwise_pair_batch_size": 64,
     "pairwise_pair_beta": 100,
     "pairwise_min_target_margin": 20,
@@ -20,26 +21,28 @@
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.003,
-    "epochs": 30,
+    "lr": 0.001,
+    "epochs": 20,
     "batch_size": 8192,
     "max_rows": 100000,
     "device": "cuda",
     "workers": 2,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
-    "forward": "quantized"
+    "forward": "quantized",
+    "init_net": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/train/pairwise-sprtfail-qmid-w50-lr3e3-e30/model.nn",
+    "pairwise_candidate_moves_csv": "~/code/cpp/chess/nnue/runs/pairwise-sprtfail-qmid-w50-lr3e3-e30/validate/sprtfail_gate_20260522_030000/move_choice_gate.csv"
   },
   "validation": {
-    "status": "mid-strength export-aware pairwise diagnostic; require non-destructive move-choice gate",
+    "status": "iterative hard-negative pairwise diagnostic from qmid",
     "success_condition": [
-      "net_diff shows some exported integer movement",
-      "move_choice_gate improves over failed qforce and does not trail reference badly",
-      "broad_mae does not collapse like qforce",
-      "no SPRT unless gates become clearly positive"
+      "net_diff shows exported integer movement",
+      "fixed eval_move_gate remains positive without large tail regression",
+      "move_choice_gate improves materially over qmid and moves toward reference",
+      "no SPRT unless search move-choice and failure-suite gates become clearly positive"
     ],
     "next_after_success": [
-      "run failed-SPRT eval_move_gate against model.nn",
-      "run failure-suite replay gate against model.nn",
+      "run fixed eval_move_gate and search move_choice_gate against model.nn",
+      "run failure-suite replay gate if search gate is not destructive",
       "only then consider a 1000-game smoke SPRT"
     ]
   }
