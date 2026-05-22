@@ -1,30 +1,22 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "current-reference sparse export-threshold crossing probe",
-  "goal": "Test whether deliberately high sparse LR and frozen dense/head layers can move exported input/L1 tensors across quantization thresholds. Diagnostic only; no SPRT unless gates are clean.",
+  "experiment": "current-reference broad sparse refresh probe",
+  "goal": "Test whether broad scalar Stockfish labels can move exported input/L1 tensors with dense/head frozen, without the pairwise tail damage seen in the sparse-cross diagnostic. Diagnostic only; no SPRT unless gates are clean.",
   "inputs": {
-    "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pairwise_scores": "~/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv"
+    "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
   },
   "create": {
-    "name": "pairwise-ref-sparsecross-w2-lr5e6-in1200-l11200-d0-e12",
-    "backend": "pairwise",
+    "name": "broad-ref-sparse-huber-cp800-lr5e6-in800-l1800-d0-e8",
+    "backend": "pytorch",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "pairwise_scores_csv": "~/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv",
-    "pairwise_pair_weight": 2.0,
-    "pairwise_pair_batch_size": 64,
-    "pairwise_pair_beta": 100,
-    "pairwise_min_target_margin": 20,
-    "pairwise_max_target_margin": 600,
-    "pairwise_loss_weight_by_cp": true,
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
     "lr": 0.000005,
-    "input_lr_mult": 1200.0,
-    "l1_lr_mult": 1200.0,
+    "input_lr_mult": 800.0,
+    "l1_lr_mult": 800.0,
     "dense_lr_mult": 0.0,
-    "epochs": 12,
+    "epochs": 8,
     "batch_size": 8192,
     "max_rows": 100000,
     "pack_limit": 100000,
@@ -37,7 +29,7 @@
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
   },
   "validation": {
-    "status": "current-reference sparse export-threshold crossing probe",
+    "status": "current-reference broad sparse refresh probe",
     "success_condition": [
       "net_diff shows nonzero input/L1 exported movement",
       "static validation does not collapse",
