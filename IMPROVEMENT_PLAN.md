@@ -44,13 +44,31 @@ Current active tooling branch:
     bias, L2, and output tensors.
   - `build.py create --dry-run --backend search-aware` generates pack plus
     `train_search_aware` phases.
-- `build.json` now names the first small preflight recipe:
-  `search-aware-existing-preflight-lr1e7-e2`. It uses existing Enyo weights,
-  quantized forward, broad d12/d16 labels, and the committed
-  `assets/failure_suite/search_aware_targets_20260523.jsonl` target set.
-- Required post-train checks are `net-diff`, static validation, search-gate, and
-  failure-suite replay. No SPRT unless those are clean. Do not launch another
-  scalar-only net run as a substitute.
+- First preflight `search-aware-existing-preflight-lr1e7-e2` completed and was
+  rejected before failure-suite/SPRT:
+  - training gradients reached input, input bias, L1, L1 bias, L2, and output,
+    but the exported net still moved only dense/output floats:
+    `input_weights=0/25165824`, `l1_weights=0/32768`,
+    `total=404/25200209`.
+  - target metrics were flat across both epochs:
+    `target_top1=21/232`, `target_top3=96/232`,
+    `target_sum_gap=60182`, `target_worst_gap=800`.
+  - static was not enough to rescue it: `mae=136.046`, `sign=92.20%`.
+  - 100k-node search-gate was worse than reference: `top1=34/232`,
+    `top3=95/232`, `candidate_better=39`, `reference_better=146`,
+    `capped_sum_diff_cp=-17929`, `worst_regression_cp=-31839`.
+  - non-mate subset was especially bad: `candidate_better=9`,
+    `reference_better=113`, `capped_sum_diff_cp=-15433`.
+  - Decision: no failure-suite, no SPRT. The objective is wired, but this
+    pressure is still dense/head-only after export and behaviorally worse.
+- `build.json` now names the second small preflight recipe:
+  `search-aware-sparseprobe-init-in800-l1x1000-e2`. It keeps existing Enyo
+  weights, uses quantized forward, distills broad positions back to the init
+  net, freezes dense/head LR, and applies stronger input/L1 LR multipliers to
+  test whether exported sparse movement can be made intentional.
+- Required post-train checks remain `net-diff`, static validation, search-gate,
+  and failure-suite replay only if cheap gates are not already dead. No SPRT
+  unless those are clean.
 
 Current gate status:
 
@@ -1040,13 +1058,15 @@ Normal candidate creation:
 
 Current `build.json` state:
 
-- No active recipe is approved.
-- The committed file records the last `nnue_reckless` check-state output-bucket
-  experiment as rejected.
-- The next `build.json` change must name a new feature branch, lane, hypothesis,
-  data source, and validation gates before launch.
-- Do not leave `build.json` pointing at an already-rejected run as if it were
-  pending.
+- Active recipe: `search-aware-sparseprobe-init-in800-l1x1000-e2`.
+- Lane: `nnue_reckless`; no engine change; existing Enyo/Berserk-derived init
+  weights.
+- Hypothesis: the first search-aware preflight was too weak and exported only
+  dense/head changes. This probe uses init distillation plus dense LR `0` and
+  stronger input/L1 LR multipliers to test sparse export movement without
+  allowing the dense head to absorb the update.
+- Validation gates: `net-diff`, static validation, search-gate, and only then
+  failure-suite replay. No SPRT from this probe unless every gate is clean.
 
 Rules:
 
