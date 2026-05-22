@@ -74,13 +74,27 @@ Current active tooling branch:
   - Decision: no search-gate, no failure-suite, no SPRT. This confirmed the
     sparse objective produces float movement but not exported movement at this
     pressure.
-- `build.json` now names the third small preflight recipe:
-  `search-aware-sparsecross-init-in3000-l1x3000-e2`. It keeps the same
-  init-distilled broad objective and dense/head LR `0`, but raises input/L1 LR
-  multipliers to test deliberate export-threshold crossing.
-- Required post-train checks remain `net-diff`, static validation, search-gate,
-  and failure-suite replay only if cheap gates are not already dead. No SPRT
-  unless those are clean.
+- Third preflight `search-aware-sparsecross-init-in3000-l1x3000-e2` completed
+  and was rejected before failure-suite/SPRT:
+  - export crossing was achieved but tiny: input weights `37/25165824`,
+    input biases `1/1024`, L1 weights `51/32768`, L1 biases `1/16`,
+    total `90/25200209`.
+  - static was not immediately dead: `mae=135.882`, `sign=92.19%`.
+  - direct child eval changed on most scored moves, but direct top choice
+    changed on only `1/232` targets.
+  - 100k-node search-gate was unchanged from the rejected previous preflight:
+    `top1=34/232`, `top3=95/232`, `candidate_better=39`,
+    `reference_better=146`, `capped_sum_diff_cp=-17929`,
+    non-mate `candidate_better=9`, `reference_better=113`.
+  - Decision: no failure-suite, no SPRT. Sparse export movement is possible,
+    but this pressure did not move search behavior.
+- `build.json` now names a target-only sparse overfit diagnostic:
+  `search-aware-targetonly-sparse-overfit-in3000-l1x3000-e8`. It disables broad
+  loss, freezes dense/head LR, and applies the search-aware objective to test
+  whether target choices can move at all through sparse/L1.
+- This diagnostic must never be SPRT-tested. It only answers whether the
+  objective is capable of moving target choices before reintroducing broad
+  preservation.
 
 Current gate status:
 
@@ -1070,15 +1084,14 @@ Normal candidate creation:
 
 Current `build.json` state:
 
-- Active recipe: `search-aware-sparsecross-init-in3000-l1x3000-e2`.
+- Active recipe: `search-aware-targetonly-sparse-overfit-in3000-l1x3000-e8`.
 - Lane: `nnue_reckless`; no engine change; existing Enyo/Berserk-derived init
   weights.
-- Hypothesis: the second search-aware preflight moved sparse floats but stayed
-  below export rounding thresholds. This crossing probe keeps dense LR `0` and
-  uses stronger input/L1 LR multipliers to test whether deliberate sparse
-  export movement can be achieved without immediate broad/static collapse.
-- Validation gates: `net-diff`, static validation, search-gate, and only then
-  failure-suite replay. No SPRT from this probe unless every gate is clean.
+- Hypothesis: sparse export movement alone did not move search behavior. This
+  diagnostic disables broad loss and freezes dense/head LR to test whether the
+  search-aware target objective can move target choices through sparse/L1 at all.
+- Validation gates: training target metrics and `net-diff` first; static only to
+  quantify damage; no SPRT from this target-only diagnostic.
 
 Rules:
 
