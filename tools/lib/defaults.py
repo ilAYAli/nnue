@@ -88,6 +88,9 @@ class CandidateDefaults:
     patience: int = 2
     select_metric: str = "mae"
     weight_decay: float = 1e-6
+    input_lr_mult: float = 1.0
+    l1_lr_mult: float = 1.0
+    dense_lr_mult: float = 1.0
     trainable: str = "all"
 
     pairwise_scores_csv: str = ""

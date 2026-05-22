@@ -103,6 +103,24 @@ Pairwise move-choice fine-tune:
 This exports a normal Enyo `model.nn`. It should be gated on the same
 move-choice positions before any SPRT.
 
+Pairwise sparse/input movement probe:
+
+```sh
+./build.py create \
+  --name pairwise-sparseprobe \
+  --backend pairwise \
+  --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl \
+  --pairwise-scores-csv assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv \
+  --forward quantized \
+  --input-lr-mult 100 \
+  --l1-lr-mult 20 \
+  --dense-lr-mult 0.2
+```
+
+Use this when a fine-tune only changes dense/head tensors after export. The
+first gate is `net-diff`; if input/L1 exported tensors still do not move, do
+not spend time on replay or SPRT.
+
 To train an Enyo-owned net from scratch instead of fine-tuning the current
 reference net, set `init_net` to `null` in `build.json` or pass an empty
 `--init-net` value and choose an initializer:
@@ -226,6 +244,9 @@ Inspect a run:
 --grad-norm-every N
 --patience N
 --select-metric loss|mse|mae|sign
+--input-lr-mult X
+--l1-lr-mult X
+--dense-lr-mult X
 --trainable all|input|float-head|output
 
 --pairwise-scores-csv PATH
