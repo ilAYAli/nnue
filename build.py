@@ -444,6 +444,72 @@ def create_config(args: argparse.Namespace) -> dict:
                 "command": train_command,
             },
         ])
+    elif args.backend == "search-aware":
+        if not args.search_targets_jsonl:
+            raise SystemExit("backend=search-aware requires --search-targets-jsonl")
+
+        train_command = [
+            str(expand_user(args.python)),
+            tool("train/train_search_aware.py"),
+            "--data", "{pack}/train",
+            "--targets", str(expand_path(args.search_targets_jsonl)),
+            "--out", f"{candidate_dir}/model.pt",
+            "--out-nn", f"{candidate_dir}/model.nn",
+            "--forward", args.forward,
+            "--epochs", str(args.epochs),
+            "--batch-size", str(args.batch_size),
+            "--search-target-batch-size", str(args.search_target_batch_size),
+            "--lr", str(args.lr),
+            "--weight-decay", str(args.weight_decay),
+            "--input-lr-mult", str(args.input_lr_mult),
+            "--l1-lr-mult", str(args.l1_lr_mult),
+            "--dense-lr-mult", str(args.dense_lr_mult),
+            "--huber-beta", str(args.huber_beta),
+            "--target-clamp", str(args.target_clamp),
+            "--search-broad-weight", str(args.search_broad_weight),
+            "--search-broad-target", args.search_broad_target,
+            "--search-margin-weight", str(args.search_margin_weight),
+            "--search-policy-weight", str(args.search_policy_weight),
+            "--search-margin-beta", str(args.search_margin_beta),
+            "--search-policy-temperature-cp", str(args.search_policy_temperature_cp),
+            "--search-max-gap-cp", str(args.search_max_gap_cp),
+            "--search-max-moves", str(args.search_max_moves),
+            "--search-target-limit", str(args.search_target_limit),
+            "--device", args.device,
+            "--workers", str(args.workers),
+            "--max-rows", str(args.max_rows),
+            "--skip-rows", str(args.skip_rows),
+            "--grad-norm-every", str(args.grad_norm_every),
+            "--trainable", args.trainable,
+        ]
+        if args.init_net:
+            train_command.extend([
+                "--init-from-nn", str(expand_path(args.init_net)),
+            ])
+        else:
+            train_command.extend([
+                "--init", args.init,
+            ])
+
+        steps.extend([
+            {
+                "name": "pack",
+                "command": [
+                    tool("pack/pack.py"), "build",
+                    "--input", pack_input,
+                    "--out-dir", "{pack}/train",
+                    "--skip", str(args.pack_skip),
+                    "--limit", str(args.pack_limit),
+                    "--max-features", str(args.max_features),
+                    "--progress", str(args.pack_progress),
+                    "--python", str(expand_user(args.python)),
+                ],
+            },
+            {
+                "name": "train_search_aware",
+                "command": train_command,
+            },
+        ])
     elif args.backend == "bullet":
         bullet_text = "{pack}/bullet/enyo.txt"
         bullet_data = "{pack}/bullet/enyo.data"
@@ -636,11 +702,12 @@ def add_create_args(
     parser.add_argument(
         "--backend",
         default=value("backend", d.backend),
-        choices=["pytorch", "pairwise", "bullet", "material-head"],
+        choices=["pytorch", "pairwise", "search-aware", "bullet", "material-head"],
         help=(
             "Training backend. 'material-head' trains bucketed float heads; "
-            "'pairwise' fine-tunes Enyo .nn with "
-            "child-position ranking pairs. 'bullet' is experimental; "
+            "'pairwise' fine-tunes Enyo .nn with child-position ranking pairs; "
+            "'search-aware' blends broad scalar loss with multi-move "
+            "search-target ranking/policy loss. 'bullet' is experimental; "
             "mode=reckless emits Bullet checkpoints, mode=enyo emits model.nn."),
     )
     parser.add_argument("--bucket-mode", default=value("bucket_mode", d.bucket_mode),
@@ -721,6 +788,19 @@ def add_create_args(
     parser.add_argument("--pairwise-loss-weight-by-cp", action="store_true", default=value("pairwise_loss_weight_by_cp", d.pairwise_loss_weight_by_cp))
     parser.add_argument("--pairwise-broad-target", default=value("pairwise_broad_target", d.pairwise_broad_target),
                         choices=["teacher", "init"])
+
+    parser.add_argument("--search-targets-jsonl", default=value("search_targets_jsonl", d.search_targets_jsonl))
+    parser.add_argument("--search-target-batch-size", type=int, default=value("search_target_batch_size", d.search_target_batch_size))
+    parser.add_argument("--search-broad-weight", type=float, default=value("search_broad_weight", d.search_broad_weight))
+    parser.add_argument("--search-broad-target", default=value("search_broad_target", d.search_broad_target),
+                        choices=["teacher", "init"])
+    parser.add_argument("--search-margin-weight", type=float, default=value("search_margin_weight", d.search_margin_weight))
+    parser.add_argument("--search-policy-weight", type=float, default=value("search_policy_weight", d.search_policy_weight))
+    parser.add_argument("--search-margin-beta", type=float, default=value("search_margin_beta", d.search_margin_beta))
+    parser.add_argument("--search-policy-temperature-cp", type=float, default=value("search_policy_temperature_cp", d.search_policy_temperature_cp))
+    parser.add_argument("--search-max-gap-cp", type=float, default=value("search_max_gap_cp", d.search_max_gap_cp))
+    parser.add_argument("--search-max-moves", type=int, default=value("search_max_moves", d.search_max_moves))
+    parser.add_argument("--search-target-limit", type=int, default=value("search_target_limit", d.search_target_limit))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
     parser.add_argument("--bullet-mode", default=value("bullet_mode", d.bullet_mode),

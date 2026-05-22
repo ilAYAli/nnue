@@ -106,6 +106,18 @@ class CandidateDefaults:
     pairwise_loss_weight_by_cp: bool = False
     pairwise_broad_target: str = "teacher"
 
+    search_targets_jsonl: str = ""
+    search_target_batch_size: int = 16
+    search_broad_weight: float = 1.0
+    search_broad_target: str = "teacher"
+    search_margin_weight: float = 1.0
+    search_policy_weight: float = 0.25
+    search_margin_beta: float = 100.0
+    search_policy_temperature_cp: float = 200.0
+    search_max_gap_cp: float = 800.0
+    search_max_moves: int = 0
+    search_target_limit: int = 0
+
     bullet_rows: int = 0
     bullet_mode: str = "reckless"
     bullet_max_abs_cp: int = 1600

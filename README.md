@@ -35,7 +35,9 @@ posgen -> score -> pack -> train
 
 The default backend is the Enyo PyTorch trainer. A pairwise backend trains the
 normal Enyo `.nn` format from child-position ranking pairs, for move-choice
-experiments where scalar cp fitting is not enough.
+experiments where scalar cp fitting is not enough. A search-aware backend keeps
+the broad scalar loss but adds multi-move margin and soft-policy losses from
+search-aware target JSONL.
 
 An experimental Bullet backend uses the same `posgen -> score` front half, then
 switches to:
@@ -135,6 +137,25 @@ Pairwise move-choice fine-tune:
 
 This exports a normal Enyo `model.nn`. It should be gated on the same
 move-choice positions before any SPRT.
+
+Search-aware target fine-tune:
+
+```sh
+./build.py create \
+  --name search-aware-smoke \
+  --backend search-aware \
+  --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl \
+  --search-targets-jsonl runs/search-aware-targets/search_aware_targets.jsonl \
+  --forward quantized \
+  --search-margin-weight 1.0 \
+  --search-policy-weight 0.25 \
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+```
+
+This is the preferred interface once the target set is built with
+`tools/validate/validate.py search-targets`. Start with a small committed
+`build.json` smoke and require `net-diff`, static validation, search-gate, and
+failure-suite gates before any SPRT.
 
 Pairwise sparse/input movement probe:
 
