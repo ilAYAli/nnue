@@ -210,6 +210,22 @@ def create_config(args: argparse.Namespace) -> dict:
             ],
         })
 
+    if args.blend_extra_jsonl:
+        blended_input = "{assets}/labeled_blend.jsonl"
+        steps.append({
+            "name": "blend_labeled",
+            "command": [
+                tool("posgen/blend_labeled_jsonl.py"),
+                "--base", pack_input,
+                "--extra", str(expand_path(args.blend_extra_jsonl)),
+                "--output", blended_input,
+                "--base-limit", str(args.blend_base_limit),
+                "--extra-repeat", str(args.blend_extra_repeat),
+                "--shuffle-seed", str(args.blend_shuffle_seed),
+            ],
+        })
+        pack_input = blended_input
+
     if args.backend == "pytorch":
         train_command = [
             tool("train/train.py"), "run",
@@ -520,6 +536,10 @@ def add_create_args(
     parser.add_argument("--pack-skip", type=int, default=value("pack_skip", d.pack_skip))
     parser.add_argument("--pack-limit", type=int, default=value("pack_limit", d.pack_limit))
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))
+    parser.add_argument("--blend-extra-jsonl", default=value("blend_extra_jsonl", d.blend_extra_jsonl))
+    parser.add_argument("--blend-extra-repeat", type=int, default=value("blend_extra_repeat", d.blend_extra_repeat))
+    parser.add_argument("--blend-base-limit", type=int, default=value("blend_base_limit", d.blend_base_limit))
+    parser.add_argument("--blend-shuffle-seed", type=int, default=value("blend_shuffle_seed", d.blend_shuffle_seed))
 
     parser.add_argument(
         "--init-net", default=value("init_net", d.init_net),
