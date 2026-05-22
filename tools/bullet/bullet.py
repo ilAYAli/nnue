@@ -9,6 +9,21 @@ import shutil
 import subprocess
 import sys
 
+ENYO_FEATURES = 32 * 12 * 64
+ENYO_HIDDEN = 1024
+ENYO_L1 = 2 * ENYO_HIDDEN
+ENYO_L2 = 16
+ENYO_L3 = 32
+ENYO_NETWORK_SIZE = (
+    ENYO_FEATURES * ENYO_HIDDEN * 2
+    + ENYO_HIDDEN * 2
+    + ENYO_L1 * ENYO_L2
+    + ENYO_L2 * 4
+    + ENYO_L2 * ENYO_L3 * 4
+    + ENYO_L3 * 4
+    + ENYO_L3 * 4
+    + 4
+)
 
 def expand_path(value: str | Path) -> Path:
     return Path(os.path.expandvars(str(value))).expanduser().resolve()
@@ -224,7 +239,17 @@ def cmd_train(args: argparse.Namespace) -> int:
             raise SystemExit(f"no Bullet quantised.bin checkpoints found under {out_dir}")
         checkpoints.sort(key=lambda path: path.stat().st_mtime)
         model_path = out_dir.parent / "model.nn"
-        shutil.copy2(checkpoints[-1], model_path)
+        raw = checkpoints[-1].read_bytes()
+        if len(raw) < ENYO_NETWORK_SIZE:
+            raise SystemExit(
+                f"{checkpoints[-1]} is {len(raw)} bytes, expected at least {ENYO_NETWORK_SIZE}")
+        if len(raw) > ENYO_NETWORK_SIZE:
+            trailer = raw[ENYO_NETWORK_SIZE:]
+            if trailer != (b"bullet" * ((len(trailer) + 5) // 6))[:len(trailer)]:
+                raise SystemExit(
+                    f"{checkpoints[-1]} has unexpected {len(trailer)} byte trailer")
+            raw = raw[:ENYO_NETWORK_SIZE]
+        model_path.write_bytes(raw)
         print(f"wrote {model_path}", flush=True)
     return 0
 

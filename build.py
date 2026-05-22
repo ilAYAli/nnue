@@ -391,6 +391,21 @@ def create_config(args: argparse.Namespace) -> dict:
         if args.bullet_cuda_path:
             bullet_train.extend(["--cuda-path", str(expand_user(args.bullet_cuda_path))])
 
+        if args.bullet_mode == "enyo":
+            steps.append({
+                "name": "pack",
+                "command": [
+                    tool("pack/pack.py"), "build",
+                    "--input", pack_input,
+                    "--out-dir", "{pack}/train",
+                    "--skip", str(args.pack_skip),
+                    "--limit", str(args.bullet_rows),
+                    "--max-features", str(args.max_features),
+                    "--progress", str(args.pack_progress),
+                    "--python", str(expand_user(args.python)),
+                ],
+            })
+
         steps.extend([
             {
                 "name": "bullet_text",
