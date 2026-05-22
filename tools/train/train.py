@@ -48,6 +48,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--batch-size", str(args.batch_size),
         "--lr", str(args.lr),
         "--weight-decay", str(args.weight_decay),
+        "--input-lr-mult", str(args.input_lr_mult),
+        "--l1-lr-mult", str(args.l1_lr_mult),
+        "--dense-lr-mult", str(args.dense_lr_mult),
         "--target-clamp", str(args.target_clamp),
         "--device", args.device,
         "--workers", str(args.workers),
@@ -121,6 +124,9 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--batch-size", type=int, default=4096)
     train.add_argument("--lr", type=float, default=1e-5)
     train.add_argument("--weight-decay", type=float, default=1e-6)
+    train.add_argument("--input-lr-mult", type=float, default=1.0)
+    train.add_argument("--l1-lr-mult", type=float, default=1.0)
+    train.add_argument("--dense-lr-mult", type=float, default=1.0)
     train.add_argument("--target-clamp", type=float, default=0.0)
     train.add_argument("--device", default="cpu")
     train.add_argument("--workers", type=int, default=0)
