@@ -61,11 +61,23 @@ Current active tooling branch:
     `reference_better=113`, `capped_sum_diff_cp=-15433`.
   - Decision: no failure-suite, no SPRT. The objective is wired, but this
     pressure is still dense/head-only after export and behaviorally worse.
-- `build.json` now names the second small preflight recipe:
-  `search-aware-sparseprobe-init-in800-l1x1000-e2`. It keeps existing Enyo
-  weights, uses quantized forward, distills broad positions back to the init
-  net, freezes dense/head LR, and applies stronger input/L1 LR multipliers to
-  test whether exported sparse movement can be made intentional.
+- Second preflight `search-aware-sparseprobe-init-in800-l1x1000-e2` completed
+  and was also rejected before search-gate/failure-suite/SPRT:
+  - training used init distillation for broad rows, dense LR `0`, input LR
+    multiplier `800`, and L1 LR multiplier `1000`.
+  - float checkpoint moved sparse tensors, but still below export thresholds:
+    input max delta `0.156982`, input-bias max `0.139053`, L1 max
+    `0.208619`, L1-bias max `0.168335`.
+  - exported `.nn` was identical to the initializer:
+    `total=0/25200209`, so static was exactly reference-like
+    (`mae=136.060`, `sign=92.20%`).
+  - Decision: no search-gate, no failure-suite, no SPRT. This confirmed the
+    sparse objective produces float movement but not exported movement at this
+    pressure.
+- `build.json` now names the third small preflight recipe:
+  `search-aware-sparsecross-init-in3000-l1x3000-e2`. It keeps the same
+  init-distilled broad objective and dense/head LR `0`, but raises input/L1 LR
+  multipliers to test deliberate export-threshold crossing.
 - Required post-train checks remain `net-diff`, static validation, search-gate,
   and failure-suite replay only if cheap gates are not already dead. No SPRT
   unless those are clean.
@@ -1058,13 +1070,13 @@ Normal candidate creation:
 
 Current `build.json` state:
 
-- Active recipe: `search-aware-sparseprobe-init-in800-l1x1000-e2`.
+- Active recipe: `search-aware-sparsecross-init-in3000-l1x3000-e2`.
 - Lane: `nnue_reckless`; no engine change; existing Enyo/Berserk-derived init
   weights.
-- Hypothesis: the first search-aware preflight was too weak and exported only
-  dense/head changes. This probe uses init distillation plus dense LR `0` and
-  stronger input/L1 LR multipliers to test sparse export movement without
-  allowing the dense head to absorb the update.
+- Hypothesis: the second search-aware preflight moved sparse floats but stayed
+  below export rounding thresholds. This crossing probe keeps dense LR `0` and
+  uses stronger input/L1 LR multipliers to test whether deliberate sparse
+  export movement can be achieved without immediate broad/static collapse.
 - Validation gates: `net-diff`, static validation, search-gate, and only then
   failure-suite replay. No SPRT from this probe unless every gate is clean.
 
