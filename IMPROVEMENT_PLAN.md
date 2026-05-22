@@ -71,6 +71,14 @@ Current gate status:
     positions and found zero candidate/reference move disagreements. That makes
     it unsuitable as a new move-choice target source; the match failure is
     probably not captured by that shallow re-search setup.
+  - A follow-up speed diagnostic compared the same check-bucket engine with the
+    reference net and the mask2 net on startpos. The PVs, scores, nodes, and
+    evalnet checksum were identical in that sample, so it did not explain the
+    match loss as a simple move-choice difference. The single-run evalnet bench
+    was slower for mask2 (`6.87M eps` versus `9.45M eps`), but because the code
+    path is identical and this was one short run, treat it as an unfavorable
+    warning rather than proof. Either way, it exceeds the normal 3-5% NPS budget
+    if reproduced.
   - Decision: close this check-state output-bucket lane. It produced useful
     diagnostics but failed the written pre-SPRT gate and then matched negative.
 - Split-gate diagnosis shows why the remaining existing-weight deltas are still
@@ -909,6 +917,11 @@ Immediate next branch:
   - Failed-smoke mining produced zero low-node candidate/reference
     disagreements from 872 candidate positions, so it did not generate a useful
     target set.
+  - Startpos speed diagnostic with the same check-bucket engine produced
+    identical PVs/scores/nodes/checksum for reference and mask2, but the mask2
+    net was slower in the one evalnet bench sample (`6.87M eps` versus
+    `9.45M eps`). Do not overfit to that noisy single benchmark, but also do
+    not ignore that this is well outside the NPS budget if reproducible.
   - Decision: close this check-state bucket lane unless a future idea changes
     the selector or search guard materially; do not keep retuning this same
     split.

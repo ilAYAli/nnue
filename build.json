@@ -1,7 +1,7 @@
 {
-  "description": "Active Enyo NNUE improvement-run config. This file is the reviewed source of truth for the current candidate recipe.",
-  "experiment": "Reckless lane conservative check-state output buckets",
-  "goal": "Retest the same small existing-weight check-state output-bucket delta with a lower LR/shorter fit after the first run improved non-mate targets but failed mate-like tails.",
+  "description": "Reviewed Enyo NNUE improvement-run config. The last active check-bucket recipe is rejected; update this file before launching a new candidate.",
+  "experiment": "Reckless lane check-state output buckets (rejected)",
+  "goal": "Closed: the mask2 salvage passed some cheap gates but failed the written tail threshold and then matched negative in a smoke check. Do not keep retuning this same bucket split.",
   "track": "nnue_reckless",
   "engine_branch": "feature/nnue-reckless-check-bucket",
   "nnue_branch": "feature/nnue-reckless-check-bucket",
@@ -33,7 +33,7 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "pending",
+    "status": "rejected",
     "required_before_training": [
       "engine builds with ENYO_ENABLE_CHECK_BUCKET_NNUE=OFF and ON",
       "copied-head bucketed net loads and is parity with the single-head net",
@@ -44,6 +44,36 @@
       "composite move-choice gate does not show a tactical-tail collapse",
       "mate-like and mined SPRT-failure slices do not regress",
       "SPRT only if cheap gates are clean"
-    ]
+    ],
+    "result": {
+      "best_candidate": "reckless-check-bucket-mask2-lr1e6-e4",
+      "composite_gate": {
+        "top1": "106/213",
+        "top3": "172/213",
+        "candidate_better": 55,
+        "reference_better": 27,
+        "cap200_sum_diff_cp": 1135,
+        "worst_regression_cp": -303
+      },
+      "smoke": {
+        "games": 456,
+        "elo": -29.8,
+        "ci": 22.4,
+        "llr": -0.85,
+        "los_percent": 0.4,
+        "draw_percent": 50.7,
+        "stopped_reason": "clearly negative cheap smoke"
+      },
+      "failure_mine": {
+        "pgn_candidate_positions": 872,
+        "targets": 0
+      },
+      "speed_diag": {
+        "reference_evalnet_eps": 9449652,
+        "candidate_evalnet_eps": 6866434,
+        "note": "single startpos sample; PV/scores/nodes/checksum identical, so treat as warning rather than proof"
+      }
+    },
+    "next": "No active reckless recipe is approved. The next build.json change must name a genuinely different existing-weight-compatible hypothesis on a new feature branch."
   }
 }
