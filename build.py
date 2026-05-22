@@ -308,6 +308,11 @@ def create_config(args: argparse.Namespace) -> dict:
             train_command.extend([
                 "--scores-csv", str(expand_path(args.pairwise_scores_csv)),
             ])
+        if args.pairwise_candidate_moves_csv:
+            train_command.extend([
+                "--candidate-moves-csv",
+                str(expand_path(args.pairwise_candidate_moves_csv)),
+            ])
         if args.pairwise_pairs_jsonl:
             train_command.extend([
                 "--pairs", str(expand_path(args.pairwise_pairs_jsonl)),
@@ -549,6 +554,7 @@ def add_create_args(
 
     parser.add_argument("--pairwise-scores-csv", default=value("pairwise_scores_csv", d.pairwise_scores_csv))
     parser.add_argument("--pairwise-pairs-jsonl", default=value("pairwise_pairs_jsonl", d.pairwise_pairs_jsonl))
+    parser.add_argument("--pairwise-candidate-moves-csv", default=value("pairwise_candidate_moves_csv", d.pairwise_candidate_moves_csv))
     parser.add_argument("--pairwise-pair-batch-size", type=int, default=value("pairwise_pair_batch_size", d.pairwise_pair_batch_size))
     parser.add_argument("--pairwise-pair-weight", type=float, default=value("pairwise_pair_weight", d.pairwise_pair_weight))
     parser.add_argument("--pairwise-pair-beta", type=float, default=value("pairwise_pair_beta", d.pairwise_pair_beta))
