@@ -195,6 +195,69 @@ def cmd_sprt(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_search_targets(args: argparse.Namespace) -> int:
+    script = tools_root() / "validate" / "build_search_targets.py"
+    output_path = expand_user(args.output)
+    run_dir = event_run_dir(args.run, output_path.parent)
+    command = [sys.executable, str(script), "--output", str(output_path)]
+    for score in args.scores:
+        command += ["--scores", score]
+    if args.summary:
+        command += ["--summary", str(expand_user(args.summary))]
+    if args.dedupe_fen:
+        command.append("--dedupe-fen")
+    command += [
+        "--max-moves", str(args.max_moves),
+        "--policy-temperature-cp", str(args.policy_temperature_cp),
+        "--mate-gap-cp", str(args.mate_gap_cp),
+    ]
+    emit_event(
+        run_dir, "phase_start", stage="build_search_targets", status="running",
+        command=command, hook_command=args.event_command or "",
+    )
+    rc = run(command)
+    emit_event(
+        run_dir, "phase_done" if rc == 0 else "fail",
+        stage="build_search_targets", status="ok" if rc == 0 else "failed",
+        rc=rc, command=command, hook_command=args.event_command or "",
+    )
+    return rc
+
+
+def cmd_search_gate(args: argparse.Namespace) -> int:
+    script = tools_root() / "validate" / "search_target_gate.py"
+    out_dir = expand_user(args.out_dir)
+    run_dir = event_run_dir(args.run, out_dir)
+    command = [
+        sys.executable,
+        str(script),
+        "--targets", str(expand_user(args.targets)),
+        "--engine", str(expand_user(args.engine)),
+        "--out-dir", str(out_dir),
+        "--nodes", str(args.nodes),
+        "--threads", str(args.threads),
+        "--hash", str(args.hash),
+        "--limit", str(args.limit),
+        "--cap", str(args.cap),
+    ]
+    if args.candidate_net:
+        command += ["--candidate-net", str(expand_user(args.candidate_net))]
+    if args.reference_engine:
+        command += ["--reference-engine", str(expand_user(args.reference_engine))]
+    if args.reference_net:
+        command += ["--reference-net", str(expand_user(args.reference_net))]
+    emit_event(
+        run_dir, "phase_start", stage="search_target_gate", status="running",
+        command=command, hook_command=args.event_command or "",
+    )
+    rc = run(command)
+    emit_event(
+        run_dir, "phase_done" if rc == 0 else "fail",
+        stage="search_target_gate", status="ok" if rc == 0 else "failed",
+        rc=rc, command=command, hook_command=args.event_command or "",
+    )
+    return rc
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Validate Enyo NNUE candidates.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -272,6 +335,41 @@ def build_parser() -> argparse.ArgumentParser:
     sprt.add_argument("--ntfy-url")
     sprt.add_argument("--event-command")
     sprt.set_defaults(func=cmd_sprt)
+
+    search_targets = subparsers.add_parser(
+        "search-targets",
+        help="Build unified search-aware JSONL targets from scored move CSVs.",
+    )
+    search_targets.add_argument("--scores", action="append", required=True,
+                                help="NAME=PATH legal-move score CSV. Can be repeated.")
+    search_targets.add_argument("--output", required=True)
+    search_targets.add_argument("--summary")
+    search_targets.add_argument("--dedupe-fen", action="store_true")
+    search_targets.add_argument("--max-moves", type=int, default=0)
+    search_targets.add_argument("--policy-temperature-cp", type=float, default=200.0)
+    search_targets.add_argument("--mate-gap-cp", type=int, default=30000)
+    search_targets.add_argument("--run")
+    search_targets.add_argument("--event-command")
+    search_targets.set_defaults(func=cmd_search_targets)
+
+    search_gate = subparsers.add_parser(
+        "search-gate",
+        help="Run an engine on unified search-aware targets.",
+    )
+    search_gate.add_argument("--targets", required=True)
+    search_gate.add_argument("--engine", required=True)
+    search_gate.add_argument("--candidate-net")
+    search_gate.add_argument("--reference-engine")
+    search_gate.add_argument("--reference-net")
+    search_gate.add_argument("--out-dir", required=True)
+    search_gate.add_argument("--nodes", type=int, default=100000)
+    search_gate.add_argument("--threads", type=int, default=1)
+    search_gate.add_argument("--hash", type=int, default=128)
+    search_gate.add_argument("--limit", type=int, default=0)
+    search_gate.add_argument("--cap", type=int, default=200)
+    search_gate.add_argument("--run")
+    search_gate.add_argument("--event-command")
+    search_gate.set_defaults(func=cmd_search_gate)
 
     return parser
 

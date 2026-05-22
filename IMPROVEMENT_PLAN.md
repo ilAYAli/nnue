@@ -10,6 +10,36 @@ kind of Stockfish-labeled Enyo self-play.
 
 No trained Enyo net is currently a keeper.
 
+Strategic conclusion: the current Berserk-derived Enyo net appears locally
+saturated for ordinary fine-tuning. Head/output tweaks can move narrow gates,
+but they keep failing broad move-choice, mate-like, or smoke tests. Sparse
+input/L1 fine-tunes do receive gradients, but normal runs do not cross exported
+quantization thresholds; forcing sparse movement damages broad behavior. Scratch
+training works technically, but the current Enyo self-play data volume has not
+been enough to recover the move-choice knowledge in the reference.
+
+The next real decision is therefore not another LR/objective sweep. It is
+search-aware target construction first, then export-aware training that can move
+the representation intentionally without destroying broad behavior. Scratch/native
+work remains useful, but only as a background provenance lane until it has larger
+and more diverse data plus search-aware supervision.
+
+Current active tooling branch:
+
+- `feature/nnue-search-aware-targets` adds a reusable search-aware target schema
+  and gate. It is tooling only; no new candidate training is approved by this
+  branch.
+- The builder combines existing legal-move score CSVs into JSONL rows with FEN,
+  top legal moves, score/gap, soft policy weight, source tags, phase tags, and
+  mate-like/non-mate tags.
+- Smoke target set: `232` positions and `5,345` scored move rows from stable
+  failures, repeated tails, and two failed-SPRT mined sets.
+- Reference-vs-reference `search-gate` check over all `232` targets produced
+  zero candidate/reference diffs, so the compare math and wrapper path are sane.
+- Next implementation step, after this is committed, is a training loader and
+  objective that consumes these targets. Do not launch another scalar-only net
+  run as a substitute.
+
 Current gate status:
 
 - The 1M-node composite false-positive gate now combines the stable historical
@@ -979,11 +1009,13 @@ Anti-confounding rule:
 
 Gate action:
 
-- Use `search_failure_move_scores_20260522.csv` as the first scratch-repair
-  move-choice gate.
-- Current reference is strong on this set; scratch26 is not. A scratch-repair
-  candidate must improve sharply over scratch26 before any replay gate.
-- Run `tools/validate/move_choice_gate.py` before SPRT.
+- Use `tools/validate/validate.py search-targets` to build the unified
+  search-aware JSONL target set from the stable, repeated-tail, and failed-SPRT
+  legal-move score CSVs.
+- Use `tools/validate/validate.py search-gate` for candidate/reference top1,
+  top3, capped gap, mate-like, and non-mate comparisons before SPRT.
+- A scratch/native repair must improve sharply over the current scratch nets on
+  this unified gate before replay or match testing.
 - Add no-op export checks (`validate.py net-diff`) before static/replay gates.
 
 ## Candidate Workflow
@@ -994,23 +1026,15 @@ Normal candidate creation:
 ./build.py -c build.json
 ```
 
-Current `build.json` intent:
+Current `build.json` state:
 
-- candidate name:
-  `native-bullet-enyo-scratch-full-eval400-sb16384`.
-- selected branch: `feature/nnue-native-bullet-scratch-full`.
-- selected lane: `nnue_native`, a clean Enyo-owned scratch net with no Berserk
-  initialization.
-- backend: `bullet`, `bullet_mode=enyo`, exporting a normal Enyo `model.nn`.
-- initializer: empty `init_net`, so this is scratch/native rather than an
-  existing-weight delta.
-- broad source:
-  `runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl`.
-- schedule: `3M` rows, hidden `1024`, L2 `16`, batch `4096`, batches `64`,
-  superbatches `16384`, lr `0.001 -> 0.00005`, eval scale `400`.
-- result: rejected by static/composite gates and checkpoint sweep. No SPRT.
-- next `build.json` change must name a new branch/lane and should be committed
-  before launch.
+- No active recipe is approved.
+- The committed file records the last `nnue_reckless` check-state output-bucket
+  experiment as rejected.
+- The next `build.json` change must name a new feature branch, lane, hypothesis,
+  data source, and validation gates before launch.
+- Do not leave `build.json` pointing at an already-rejected run as if it were
+  pending.
 
 Rules:
 
@@ -1091,39 +1115,37 @@ SPRT:
 - A `+10 Elo` smoke is direction only, not proof.
 - Promote only after a longer screen confirms the signal.
 
-## Architecture Sequence
+## Next Decision Sequence
 
-Use this sequence for the next serious attempt:
+Use this sequence before any new serious attempt:
 
-1. Freeze the current reference net, validation commands, and failure-suite
-   input.
-2. Implement exactly one branch: proper king-bucket refinement.
-3. Add known-FEN feature activation checks:
-   `tools/validate/<branch>_features.py`.
-   Required cases:
-   - both kings in each bucket.
-   - castling before and after.
-   - mirrored positions.
-   - king near a bucket boundary.
-   - quiet non-king move should not change the king bucket.
-   - king move across a boundary should change only the expected bucket and
-     trigger only the expected accumulator refresh.
-4. Add export/load/roundtrip checks:
-   `tools/validate/roundtrip.py`.
-5. Benchmark NPS before training; do not continue if the branch costs more
-   than about `3-5%` NPS without optimization.
-6. Train one candidate with `build.py`.
-7. Run static validation plus failure-suite/move-choice gates.
-8. Start SPRT only if gates are clean.
+1. Pick one lane explicitly: `nnue_reckless` for a small existing-weight delta,
+   or `nnue_native` for a scratch Enyo-owned baseline.
+2. Write the hypothesis into `build.json` and commit it before launch. The diff
+   must make the intended change obvious.
+3. For `nnue_reckless`, do not reuse the rejected families: ordinary head-only
+   fitting, material/phase heads, king-pressure heads, check-state buckets,
+   current king-bucket splits, or composite-pairwise repair. The new idea must
+   be structurally different and existing-weight-compatible.
+4. For `nnue_native`, do not treat the current 26M-row Enyo self-play results as
+   a final verdict on the architecture family. They show that scratch training
+   is technically alive but underfed. A fair native attempt needs substantially
+   larger and more diverse external/prepared data before match testing.
+5. Before training, freeze the reference net, validation commands, failure-suite
+   input, composite gate, and NPS benchmark. Add known-FEN activation checks for
+   any new feature or bucket.
+6. Add export/load/roundtrip and `net-diff` checks. If the exported `.nn` is a
+   no-op, stop before replay or SPRT.
+7. Benchmark NPS before training; do not continue if the branch costs more than
+   about `3-5%` NPS without optimization.
+8. Train one candidate with `build.py`; run static validation plus
+   failure-suite/composite move-choice gates.
+9. Start SPRT only if gates are clean across non-mate and mate-like subsets.
 
-If this architecture branch fails gates or SPRT:
-
-- Do not launch another bulk candidate immediately.
-- First inspect whether the failure came from implementation, NPS cost, sparse
-  buckets, bad bucket geometry, quantization/export mismatch, or true lack of
-  signal.
-- If that analysis still points to true lack of signal, reassess base net,
-  architecture family, and teacher source before widening the net.
+If the next branch fails gates or SPRT, do not launch another bulk candidate
+immediately. First decide whether the failure was implementation, NPS,
+quantization/export, sparse-weight immobility, data insufficiency, or true lack
+of signal.
 
 ## Historical Notes
 
