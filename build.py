@@ -279,6 +279,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--data", "{pack}/train",
             "--out", f"{candidate_dir}/model.pt",
             "--out-nn", f"{candidate_dir}/model.nn",
+            "--forward", args.forward,
             "--epochs", str(args.epochs),
             "--batch-size", str(args.batch_size),
             "--pair-batch-size", str(args.pairwise_pair_batch_size),
