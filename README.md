@@ -86,6 +86,22 @@ This verifies Bullet conversion/training under the normal pipeline/event
 machinery. It writes Bullet `quantised.bin` checkpoints. The experimental Enyo
 loader can load those directly, but they are not normal Enyo `model.nn` files.
 
+Experimental Bullet-trained Enyo-format smoke:
+
+```sh
+./build.py create \
+  --name bullet-enyo-format-smoke \
+  --backend bullet \
+  --bullet-mode enyo \
+  --labeled-jsonl runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl \
+  --bullet-rows 100000 \
+  --bullet-superbatches 2 \
+  --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+```
+
+This uses Bullet for training but writes a normal Enyo `model.nn`. Treat it as
+a trainer/export feasibility smoke first; validate it before any replay/SPRT.
+
 Pairwise move-choice fine-tune:
 
 ```sh
