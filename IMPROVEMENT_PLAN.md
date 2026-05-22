@@ -23,8 +23,10 @@ The main failure pattern is:
 - scratch/native training works technically, but current Enyo self-play volume
   has not recovered reference move-choice strength.
 
-Current `build.json` state: no active recipe is approved. It must be updated and
-committed before launching the next candidate.
+Current `build.json` state: approved for a proven-data Bullet preflight in the
+`nnue_reckless` lane. It starts from the existing Enyo/Berserk-derived net and
+trains directly from the available Stockfish NNUE binpack instead of generating
+more Enyo self-play labels.
 
 ## Track Definitions
 
@@ -69,6 +71,20 @@ Decision: stop search-aware sparse LR/multiplier sweeps. If this lane continues,
 change target construction or objective so success is measured by engine-search
 move choice, not only child-eval ranking.
 
+## Active Experiment
+
+`build.json` now defines `bullet-sfbinpack-existing-init-preflight`.
+
+Purpose:
+
+- use a proven external Stockfish NNUE binpack as the next data source.
+- keep the near-term lane existing-weight based.
+- avoid another Enyo self-play or JSONL relabeling cycle.
+- use Bullet directly on SF binpack data, then export normal Enyo `.nn`.
+
+This is a preflight, not a promotion candidate. It must pass `net-diff`, static,
+composite search/move, and failure-suite gates before any SPRT.
+
 ## Hard Rejections
 
 Do not restart these as near-term Elo lanes:
@@ -105,14 +121,14 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Redesign the search-aware target/objective around engine-search behavior.
-   The current child-eval ranking objective can move tensors but does not improve
-   engine search choices.
-2. Improve native/scratch with substantially broader external/prepared data and
-   search-aware supervision. Treat this as a background lane until move-choice
-   gates approach reference.
-3. Propose one genuinely new `nnue_reckless` structural hypothesis that is
-   compatible with existing weights and has copied-net parity before training.
+1. Run the `build.json` Bullet/SF-binpack preflight in `nnue_reckless`.
+2. Gate the exported net; stop immediately if it only improves scalar metrics or
+   creates a broad/mate-like tail regression.
+3. If the proven-data preflight fails, redesign search-aware target/objective
+   around engine-search behavior instead of launching another scalar training
+   recipe.
+4. Keep native/scratch as a background lane that needs substantially broader
+   prepared data before it is considered a promotion path.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.

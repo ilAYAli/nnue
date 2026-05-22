@@ -15,7 +15,13 @@ use bullet_lib::{
         schedule::{TrainingSchedule, TrainingSteps, lr, wdl},
         settings::LocalSettings,
     },
-    value::{ValueTrainerBuilder, loader::DirectSequentialDataLoader},
+    value::{
+        ValueTrainerBuilder,
+        loader::{
+            DirectSequentialDataLoader, SfBinpackLoader,
+            sfbinpack::{MoveType, PieceType, TrainingDataEntry},
+        },
+    },
 };
 
 fn env_string(name: &str, default: &str) -> String {
@@ -27,6 +33,36 @@ fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> T {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
+}
+
+fn dataset_paths(dataset: &str) -> Vec<String> {
+    dataset
+        .split(';')
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+fn sfbinpack_filter(entry: &TrainingDataEntry) -> bool {
+    let min_ply = env_parse("ENYO_BULLET_SFBINPACK_MIN_PLY", 16u16);
+    let max_abs_cp = env_parse("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", 10000u32);
+    let quiet_only = env_parse("ENYO_BULLET_SFBINPACK_QUIET_ONLY", 1usize) != 0;
+
+    if entry.ply < min_ply {
+        return false;
+    }
+    if i32::from(entry.score).unsigned_abs() > max_abs_cp {
+        return false;
+    }
+    if entry.pos.is_checked(entry.pos.side_to_move()) {
+        return false;
+    }
+    if quiet_only {
+        return entry.mv.mtype() == MoveType::Normal
+            && entry.pos.piece_at(entry.mv.to()).piece_type() == PieceType::None;
+    }
+    true
 }
 
 fn enyo_affine<'a>(
@@ -299,8 +335,22 @@ fn train_enyo(
         batch_queue_size: 16,
     };
 
-    let dataloader = DirectSequentialDataLoader::new(&[&dataset]);
-    trainer.run(&schedule, &settings, &dataloader);
+    let loader = env_string("ENYO_BULLET_LOADER", "direct");
+    let paths = dataset_paths(&dataset);
+    let path_refs = paths.iter().map(String::as_str).collect::<Vec<_>>();
+    match loader.as_str() {
+        "direct" => {
+            let dataloader = DirectSequentialDataLoader::new(&path_refs);
+            trainer.run(&schedule, &settings, &dataloader);
+        }
+        "sfbinpack" => {
+            let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
+            let dataloader =
+                SfBinpackLoader::new_concat_multiple(&path_refs, buffer_mb, threads, sfbinpack_filter);
+            trainer.run(&schedule, &settings, &dataloader);
+        }
+        _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
+    }
 }
 
 fn main() {
@@ -461,6 +511,20 @@ fn main() {
         batch_queue_size: 16,
     };
 
-    let dataloader = DirectSequentialDataLoader::new(&[&dataset]);
-    trainer.run(&schedule, &settings, &dataloader);
+    let loader = env_string("ENYO_BULLET_LOADER", "direct");
+    let paths = dataset_paths(&dataset);
+    let path_refs = paths.iter().map(String::as_str).collect::<Vec<_>>();
+    match loader.as_str() {
+        "direct" => {
+            let dataloader = DirectSequentialDataLoader::new(&path_refs);
+            trainer.run(&schedule, &settings, &dataloader);
+        }
+        "sfbinpack" => {
+            let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
+            let dataloader =
+                SfBinpackLoader::new_concat_multiple(&path_refs, buffer_mb, threads, sfbinpack_filter);
+            trainer.run(&schedule, &settings, &dataloader);
+        }
+        _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
+    }
 }

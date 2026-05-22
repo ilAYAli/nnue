@@ -118,6 +118,12 @@ class CandidateDefaults:
     search_max_moves: int = 0
     search_target_limit: int = 0
 
+    bullet_data: str = ""
+    bullet_loader: str = "direct"
+    bullet_sfbinpack_buffer_mb: int = 1024
+    bullet_sfbinpack_min_ply: int = 16
+    bullet_sfbinpack_max_abs_cp: int = 10000
+    bullet_sfbinpack_quiet_only: bool = True
     bullet_rows: int = 0
     bullet_mode: str = "reckless"
     bullet_max_abs_cp: int = 1600
