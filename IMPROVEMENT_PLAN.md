@@ -350,15 +350,22 @@ Reason:
 - The rejected `sb112` checkpoint was bad on actual failed-SPRT move choices:
   candidate `top1=3/60`, `top3=19/60`, `sum_gap=6567`; reference `top1=30/60`,
   `top3=46/60`, `sum_gap=841`.
-- This is a concrete search-aware signal. Train one candidate against it, then
-  stop again if the broader gate does not improve.
+- The first broader targeted run (`sb128`) improved top-3 but not top-1/tail:
+  best checkpoint `sb070` reached `top1=9/60`, `top3=26/60`,
+  `sum_gap=5025`, `worst=585`.
+- Static child-margin check still showed only `6/60` oracle-best preferences
+  for `sb070`, so the target signal was not learned cleanly.
+- This is still a concrete search-aware signal, but the first schedule was too
+  short for an 8.06M-row blend. Run one longer schedule, then stop again if the
+  broader gate does not improve.
 
 Immediate action:
 
 - Generate child rows from the scored SPRT-failure legal moves.
 - Blend those rows with the broad d12/d16 pool.
-- Train one 512-hidden Bullet candidate through `./build.py -c build.json`.
-- Sweep checkpoints against the SPRT-failure gate before considering any SPRT.
+- Train one longer 512-hidden Bullet candidate through `./build.py -c build.json`.
+- Sweep selected checkpoints against the SPRT-failure gate before considering
+  any SPRT.
 
 Deferred Bullet decisions:
 
@@ -403,7 +410,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `bullet-reckless-512h-sprtfail-wdl0-sb128`
+- candidate name: `bullet-reckless-512h-sprtfail-wdl0-sb512`
 - selected branch: Bullet/Reckless-like SPRT-failure move-choice/broad blend
 - self-play depth: `12`
 - self-play seed: `2026052111`
@@ -415,7 +422,7 @@ Current `build.json` intent:
 - Bullet architecture: `512` hidden, `16` L2, pairwise-mul hidden, material
   bucketed head
 - row input: broad d12/d16 labels plus repeated scored failed-SPRT child rows
-- schedule: `64` batches per superbatch, `128` superbatches, lr `0.001 ->
+- schedule: `64` batches per superbatch, `512` superbatches, lr `0.001 ->
   0.0001`
 
 Rules:
