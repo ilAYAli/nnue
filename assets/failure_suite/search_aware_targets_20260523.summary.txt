@@ -1,0 +1,4 @@
+targets=232
+moves=5345
+sources=repeated:13,sprt_material:80,sprt_output:80,stable:59
+tags=mate_like:104,non_mate:128,phase:endgame:51,phase:late:71,phase:midgame:76,phase:opening:34,source:repeated:13,source:sprt_material:80,source:sprt_output:80,source:stable:59
