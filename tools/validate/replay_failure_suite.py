@@ -36,7 +36,7 @@ def int_field(row: dict[str, str], key: str) -> int:
         return 0
 
 
-def run_replay(args: argparse.Namespace, logs: list[str]) -> str:
+def replay_command(args: argparse.Namespace, logs: list[str]) -> list[str]:
     cmd = [
         args.replay,
         "--candidate", args.candidate,
@@ -54,16 +54,70 @@ def run_replay(args: argparse.Namespace, logs: list[str]) -> str:
     if args.count > 0:
         cmd.extend(["--count", str(args.count)])
     cmd.extend(logs)
+    return cmd
+
+
+def run_command(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     proc = subprocess.run(
         cmd, check=False, text=True, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
+    return proc
+
+
+def csv_without_header(csv_text: str) -> str:
+    lines = csv_text.splitlines()
+    if not lines:
+        return ""
+    return "\n".join(lines[1:])
+
+
+def run_replay(args: argparse.Namespace, logs: list[str]) -> str:
+    cmd = replay_command(args, logs)
+    proc = run_command(cmd)
     if args.stderr:
         args.stderr.parent.mkdir(parents=True, exist_ok=True)
         args.stderr.write_text(proc.stderr)
-    if proc.returncode != 0:
+    if proc.returncode == 0:
+        return proc.stdout
+    if len(logs) <= 1:
         print(proc.stderr, file=sys.stderr)
         raise SystemExit(proc.returncode)
-    return proc.stdout
+
+    # A single stale/empty bot log should not invalidate a whole failure-suite
+    # gate. Fall back to per-log replay so invalid logs can be skipped while
+    # real replay/engine failures still stop the run.
+    outputs: list[str] = []
+    stderr_parts = [proc.stderr]
+    skipped: list[str] = []
+    for log in logs:
+        one = run_command(replay_command(args, [log]))
+        stderr_parts.append(one.stderr)
+        if one.returncode == 0:
+            if not outputs:
+                outputs.append(one.stdout.rstrip("\n"))
+            else:
+                body = csv_without_header(one.stdout).strip()
+                if body:
+                    outputs.append(body)
+            continue
+        if "No UCI go/bestmove pairs found" in one.stderr:
+            skipped.append(log)
+            continue
+        print(one.stderr, file=sys.stderr)
+        raise SystemExit(one.returncode)
+
+    if args.stderr:
+        args.stderr.write_text("\n".join(stderr_parts))
+    if skipped:
+        print(
+            "skipped invalid logs: " + ", ".join(skipped),
+            file=sys.stderr,
+            flush=True,
+        )
+    if not outputs:
+        print("no replay rows after skipping invalid logs", file=sys.stderr)
+        raise SystemExit(1)
+    return "\n".join(outputs) + "\n"
 
 
 def summarize(csv_text: str) -> tuple[list[dict[str, str]], dict[str, object]]:

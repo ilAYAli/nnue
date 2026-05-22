@@ -149,9 +149,20 @@ Rejected lanes:
     search gate dramatically but still failed promotion gates: `top1=16/60`,
     `top3=27/60`, `sum_gap_cp=5259`, `worst_gap_cp=555`. It only moved the
     dense head relative to qmid and introduced a `-301cp` static tail.
-  - Conclusion: pairwise can create the intended static eval preference, but the
-    scored target set must follow the moves a candidate actually chooses in
-    search, and tail risk remains the veto. Do not SPRT qmid/qmid2.
+  - qmid3 targeted qmid2's actual search-selected bad moves with lower weight,
+    lower LR, and capped margins. The narrow search gate improved again:
+    `top1=21/60`, `top3=34/60`, `sum_gap_cp=2715`,
+    `worst_gap_cp=387`.
+  - qmid3 failed broader gates badly. Static validation over 100k rows was weak:
+    `mae=125.009`, `sign=73.09%`, `corr=0.700`. Repeated-tail gate regressed:
+    `top1=1/13`, `top3=4/13`, `sum_gap_cp=33613`,
+    `worst_gap_cp=31311`. Clean replay failure suite was clearly negative:
+    `positions=913`, `candidate_better=101`, `reference_better=225`,
+    `sum_diff_cp=-12207`, `worst_regression_cp=-881`.
+  - Conclusion: pairwise can create the intended local static/search preference,
+    but narrow target following is not enough. The qmid loop is suspended. Do
+    not SPRT qmid/qmid2/qmid3, and do not launch qmid4 without a broader target
+    set that includes repeated-tail and failure-suite regressions.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -358,34 +369,30 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run one iterative hard-negative pairwise candidate.
+Run one broad-tail pairwise diagnostic from the current reference.
 
 Next branch:
 
-- Enyo `.nn` pairwise fine-tune from the qmid2 candidate.
-- Active recipe: `build.json` points at broad d12/d16 labels, the scored
-  legal-move table from the rejected Bullet SPRT positions, and qmid2's own
-  `move_choice_gate.csv` as `pairwise_candidate_moves_csv`.
+- Enyo `.nn` pairwise fine-tune from the current reference net.
+- Active recipe: `build.json` points at a combined legal-move score table:
+  original SPRT-failure targets plus repeated-tail targets.
+- This is not qmid4 and does not initialize from qmid/qmid2/qmid3.
 
 Reason:
 
-- qmid proved the static pairwise direction can be learned, but search chose
-  new bad moves not represented by the previous candidate-move column.
-- qmid2 reduced the search gate gap substantially (`sum_gap_cp=5259`,
-  `worst_gap_cp=555`) but still trails reference and introduced a new
-  `-301cp` static tail.
-- The next useful test is whether a smaller pass against qmid2's actual search
-  choices keeps the search gain while reducing tail risk.
-- This is still a diagnostic. No SPRT unless the fixed static gate and search
-  move-choice gate both become clean.
+- qmid/qmid2/qmid3 show that training can chase the currently selected bad move,
+  but then moves the problem elsewhere.
+- qmid3 improved the narrow SPRT-failure gate while getting much worse on
+  repeated-tail and replay failure-suite gates.
+- The next useful diagnostic is whether a broader pairwise target set can avoid
+  the qmid tail collapse when starting from the clean reference.
 
 Immediate action:
 
-- Run `./build.py -c build.json` on pwa-5090.
-- Gate the result with `net_diff`, fixed `eval_move_gate`, and
-  `move_choice_gate`.
-- Reject without SPRT unless search move-choice improves materially over qmid2
-  and moves toward reference.
+- Make the failure-suite validator robust to stale/empty logs.
+- Train `pairwise-broadtail-ref-w8-lr5e4-e16` with `./build.py -c build.json`.
+- Reject without SPRT unless repeated-tail and failure-suite gates are clean,
+  not merely the narrow SPRT-failure gate.
 
 Deferred Bullet decisions:
 
@@ -430,22 +437,20 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `pairwise-sprtfail-qmid3-w10-lr5e4-e20`
-- selected branch: Enyo `.nn` iterative hard-negative pairwise diagnostic.
+- candidate name: `pairwise-broadtail-ref-w8-lr5e4-e16`.
+- selected branch: broad-tail pairwise diagnostic from current reference.
 - labeled input: existing imported `fresh_d12self18h64_d16_labels` JSONL.
 - label provenance: Stockfish depth `16`; `build.py` skips scoring because
   `labeled_jsonl` is set.
 - backend: `pairwise`
-- initializer: qmid2 candidate
-  `runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/.../model.nn`.
+- initializer: current reference net
+  `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`.
 - pairwise score table:
-  `runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv`.
-- candidate-move overlay:
-  `runs/pairwise-sprtfail-qmid2-w25-lr1e3-e20/validate/sprtfail_gate_20260522_030827/move_choice_gate.csv`.
-- schedule: quantized forward, lr `0.0005`, epochs `20`, pair weight `10`,
-  target margin cap `600`, max rows `100000`.
-- expected result: diagnostic only; no SPRT unless fixed static and search
-  move-choice gates become clean.
+  `assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv`.
+- schedule: quantized forward, lr `0.0005`, epochs `16`, pair weight `8`,
+  target margin cap `600`, max rows `100000`, pack limit `100000`.
+- expected result: diagnostic only; no SPRT unless repeated-tail and replay
+  failure-suite gates become clean.
 
 Rules:
 
