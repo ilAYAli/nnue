@@ -10,7 +10,8 @@ notify() {
 NET="${NET:?set NET to the candidate .nn file}"
 TAG="${TAG:-$(basename "$(dirname "$NET")")}"
 RUN="${RUN:-$(dirname "$(dirname "$NET")")}"
-ENGINE="${ENGINE:-$HOME/code/cpp/chess/assets/engines/reference}"
+DEFAULT_ENGINE="$HOME/code/cpp/chess/assets/engines/reference"
+ENGINE="${ENGINE:-$DEFAULT_ENGINE}"
 INIT="${INIT:-$HOME/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn}"
 SPRT="${SPRT:-$HOME/code/cpp/chess/sprt/sprt}"
 BOOK="${BOOK:-$HOME/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd}"
@@ -34,6 +35,13 @@ for required in "$NET" "$ENGINE" "$INIT" "$SPRT" "$BOOK"; do
     exit 1
   fi
 done
+
+net_size=$(wc -c <"$NET" | tr -d ' ')
+init_size=$(wc -c <"$INIT" | tr -d ' ')
+if [ "$ENGINE" = "$DEFAULT_ENGINE" ] && [ "$net_size" != "$init_size" ]; then
+  notify "Enyo NNUE SPRT refused $TAG: candidate net size $net_size differs from reference size $init_size, pass --engine to a compatible Enyo build"
+  exit 1
+fi
 
 notify "Enyo NNUE SPRT start $TAG games=$GAMES net=$NET"
 

@@ -215,7 +215,17 @@ def cmd_train(args: argparse.Namespace) -> int:
         "ENYO_BULLET_WDL": str(args.wdl),
         "ENYO_BULLET_LR": str(args.lr),
         "ENYO_BULLET_FINAL_LR": str(args.final_lr),
+        "ENYO_BULLET_ENYO_L0_STD": str(args.enyo_l0_std),
+        "ENYO_BULLET_ENYO_L1_STD": str(args.enyo_l1_std),
+        "ENYO_BULLET_ENYO_L1_EXPORT_SCALE": str(args.enyo_l1_export_scale),
+        "ENYO_BULLET_EVAL_SCALE": str(args.eval_scale),
+        "ENYO_BULLET_SAVE_RATE": str(args.save_rate),
+        "ENYO_BULLET_EXPORT_INIT_ONLY": "1" if args.export_init_only else "0",
+        "ENYO_BULLET_TRAINABLE": args.trainable,
+        "ENYO_BULLET_WEIGHT_DECAY": str(args.weight_decay),
     })
+    if args.init_weights:
+        env["ENYO_BULLET_INIT_WEIGHTS"] = str(expand_path(args.init_weights))
     if args.cuda_path:
         env["CUDA_PATH"] = str(expand_path(args.cuda_path))
     elif args.accelerator == "cuda":
@@ -283,6 +293,23 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--wdl", type=float, default=0.75)
     train.add_argument("--lr", type=float, default=1e-3)
     train.add_argument("--final-lr", type=float, default=3e-4)
+    train.add_argument("--enyo-l0-std", type=float, default=8.0)
+    train.add_argument("--enyo-l1-std", type=float, default=1.0)
+    train.add_argument("--enyo-l1-export-scale", type=float, default=1.0)
+    train.add_argument("--eval-scale", type=float, default=400.0)
+    train.add_argument("--save-rate", type=int, default=1)
+    train.add_argument("--init-weights", default="")
+    train.add_argument(
+        "--trainable",
+        choices=["all", "input", "float-head", "output"],
+        default="all",
+    )
+    train.add_argument("--weight-decay", type=float, default=0.0)
+    train.add_argument(
+        "--export-init-only",
+        action="store_true",
+        help="Load --init-weights, export checkpoint 0, and exit before training.",
+    )
     train.set_defaults(func=cmd_train)
     return parser
 

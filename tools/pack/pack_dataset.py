@@ -61,6 +61,9 @@ def main() -> None:
         out / "wdl.npy", mode="w+", dtype=np.float32, shape=(rows,))
     phase_scales = np.lib.format.open_memmap(
         out / "phase_scale.npy", mode="w+", dtype=np.float32, shape=(rows,))
+    king_pressure_buckets = np.lib.format.open_memmap(
+        out / "king_pressure_bucket.npy", mode="w+", dtype=np.uint8,
+        shape=(rows,))
     source_ids = np.lib.format.open_memmap(
         out / "source_id.npy", mode="w+", dtype=np.uint16, shape=(rows,))
 
@@ -95,6 +98,9 @@ def main() -> None:
             scores[written] = float(row["score"])
             wdls[written] = float(row.get("wdl", 0.5))
             phase_scales[written] = nn2.phase_scale_from_pieces(pieces)
+            king_pressure_buckets[written] = (
+                nn2.king_pressure_bucket_from_pieces(pieces, stm)
+            )
             source_name = str(
                 row.get("source_type") or row.get("teacher") or "unknown")
             if source_name not in source_map:
@@ -114,6 +120,7 @@ def main() -> None:
         "limit": args.limit,
         "max_features": args.max_features,
         "max_features_seen": max_seen,
+        "bucket_arrays": ["material_piece_count", "king_pressure_bucket"],
         "source_map": source_map,
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")

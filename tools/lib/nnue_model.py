@@ -134,17 +134,27 @@ class EnyoNNUE(nn_pt.Module):
 
 def load_model_from_nn(path: str | Path, device: str = "cpu") -> EnyoNNUE:
     net = nn2.load_net(path)
+    l2_weights = net.l2_weights[0] if net.l2_weights.ndim == 3 else net.l2_weights
+    l2_biases = net.l2_biases[0] if net.l2_biases.ndim == 2 else net.l2_biases
+    output_weights = (
+        net.output_weights[0] if net.output_weights.ndim == 2 else net.output_weights
+    )
+    output_bias = (
+        float(net.output_bias[0])
+        if isinstance(net.output_bias, np.ndarray)
+        else float(net.output_bias)
+    )
     model = EnyoNNUE(init="kaiming")
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
         model.input_bias.copy_(torch.from_numpy(net.input_biases.astype(np.float32)))
         model.l1_weight.copy_(torch.from_numpy(net.l1_weights.astype(np.float32)))
         model.l1_bias.copy_(torch.from_numpy(net.l1_biases.astype(np.float32)))
-        model.l2.weight.copy_(torch.from_numpy(net.l2_weights.astype(np.float32)))
-        model.l2.bias.copy_(torch.from_numpy(net.l2_biases.astype(np.float32)))
+        model.l2.weight.copy_(torch.from_numpy(l2_weights.astype(np.float32)))
+        model.l2.bias.copy_(torch.from_numpy(l2_biases.astype(np.float32)))
         model.output.weight.copy_(
-            torch.from_numpy(net.output_weights.astype(np.float32)).view(1, -1))
-        model.output.bias.copy_(torch.tensor([net.output_bias], dtype=torch.float32))
+            torch.from_numpy(output_weights.astype(np.float32)).view(1, -1))
+        model.output.bias.copy_(torch.tensor([output_bias], dtype=torch.float32))
     return model.to(device)
 
 

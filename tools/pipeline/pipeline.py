@@ -144,15 +144,34 @@ def checkpoint_index(path: Path) -> int:
         return -1
 
 
+def _create_args(run_dir: Path) -> dict[str, Any]:
+    config_path = run_dir / "config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        config = load_config(config_path)
+    except SystemExit:
+        return {}
+    create_args = config.get("create_args", {})
+    return create_args if isinstance(create_args, dict) else {}
+
+
 def validation_commands(run_dir: Path, net: Path) -> list[str]:
     validate = repo_root() / "tools" / "validate" / "validate.py"
     python = Path(DEFAULTS.python).expanduser()
     tag = f"{run_dir.name}_smoke"
     event_command = f'"{repo_root() / "tools" / "events" / "nnue_event_ntfy.sh"}"'
+    create_args = _create_args(run_dir)
+    bucket_mode = str(create_args.get("bucket_mode", "material"))
+    bucket_arg = (
+        f" --bucket-mode {bucket_mode}"
+        if bucket_mode and bucket_mode != "material" else ""
+    )
     return [
         (
             f"{python} {validate} static --net {net} --data {run_dir / 'pack' / 'train'} "
-            f"--rows 100000 --buckets --event-command {event_command} --python {python}"
+            f"--rows 100000 --buckets{bucket_arg} --event-command {event_command} "
+            f"--python {python}"
         ),
         (
             f"{python} {validate} sprt --net {net} --run {run_dir} --games 1000 "

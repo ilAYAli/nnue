@@ -13,7 +13,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "train"))
 
 from lib.nnue_dataset import load_score_dataset
+from lib import enyo_nnue as nn2
 from lib.nnue_model import load_model_from_nn
+from train_material_head import (
+    MaterialHeadNNUE,
+    PackedMaterialDataset,
+    collate_material,
+)
 from train_impl import MPE_EXPONENT, MPE_SCALE
 
 
@@ -111,17 +117,33 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=4096)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--target-clamp", type=float, default=0.0)
+    ap.add_argument("--bucket-mode", default="material",
+                    choices=["material", "king-pressure"])
     ap.add_argument("--buckets", action="store_true",
                     help="Print metrics grouped by absolute target score.")
     ap.add_argument("--sources", action="store_true",
                     help="Print metrics grouped by source id/name.")
     args = ap.parse_args()
 
-    ds, collate_fn = load_score_dataset(
-        args.data, limit=args.rows, skip=args.skip)
-    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
-                        collate_fn=collate_fn)
-    model = load_model_from_nn(args.net, device=args.device)
+    net = nn2.load_net(args.net)
+    bucketed_head = getattr(net.l2_weights, "ndim", 0) == 3
+    if bucketed_head:
+        if not Path(args.data).is_dir():
+            raise SystemExit("bucketed-head validation requires packed data dir")
+        ds = PackedMaterialDataset(
+            args.data, limit=args.rows, skip=args.skip,
+            bucket_mode=args.bucket_mode)
+        loader = DataLoader(
+            ds, batch_size=args.batch_size, shuffle=False,
+            collate_fn=lambda batch: collate_material(
+                batch, bucket_mode=args.bucket_mode))
+        model = MaterialHeadNNUE(net, trainable="output").to(args.device)
+    else:
+        ds, collate_fn = load_score_dataset(
+            args.data, limit=args.rows, skip=args.skip)
+        loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
+                            collate_fn=collate_fn)
+        model = load_model_from_nn(args.net, device=args.device)
     model.eval()
 
     overall = empty_stats()
@@ -132,7 +154,12 @@ def main() -> None:
          "pred": 0.0, "target": 0.0}
         for _ in BUCKETS
     ]
-    for w, b, w_off, b_off, stm, y, _wdl, phase_scale, source_ids in loader:
+    for batch in loader:
+        if bucketed_head:
+            w, b, w_off, b_off, stm, y, _wdl, phase_scale, buckets = batch
+            source_ids = torch.zeros_like(stm)
+        else:
+            w, b, w_off, b_off, stm, y, _wdl, phase_scale, source_ids = batch
         w = w.to(args.device)
         b = b.to(args.device)
         w_off = w_off.to(args.device)
@@ -143,7 +170,11 @@ def main() -> None:
         source_ids = source_ids.to(args.device)
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-        pred = model(w, b, w_off, b_off, stm, phase_scale)
+        if bucketed_head:
+            buckets = buckets.to(args.device)
+            pred = model(w, b, w_off, b_off, stm, phase_scale, buckets)
+        else:
+            pred = model(w, b, w_off, b_off, stm, phase_scale)
         err = pred - y
         sign_mask = y != 0
         update_stats(overall, pred, y)

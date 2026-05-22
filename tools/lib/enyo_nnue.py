@@ -28,6 +28,8 @@ N_L1 = 2 * N_HIDDEN
 N_L2 = 16
 N_L3 = 32
 N_OUTPUT = 1
+N_OUTPUT_BUCKETS = 8
+N_THREAT_FEATURES = N_PIECE_TYPES * N_PIECE_TYPES * N_SQUARES
 
 QUANT1_BITS = 5
 EVAL_DIVISOR = 32.0
@@ -53,6 +55,30 @@ LEGACY_NETWORK_SIZE = (
     + N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
     + N_OUTPUT * np.dtype(np.float32).itemsize
 )
+
+BUCKETED_HEAD_NETWORK_SIZE = (
+    N_FEATURES * N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_L1 * N_L2 * np.dtype(np.int8).itemsize
+    + N_L2 * np.dtype(np.int32).itemsize
+    + N_OUTPUT_BUCKETS * N_L2 * N_L3 * np.dtype(np.float32).itemsize
+    + N_OUTPUT_BUCKETS * N_L3 * np.dtype(np.float32).itemsize
+    + N_OUTPUT_BUCKETS * N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+    + N_OUTPUT_BUCKETS * np.dtype(np.float32).itemsize
+)
+
+LEGACY_BUCKETED_HEAD_NETWORK_SIZE = (
+    LEGACY_N_FEATURES * N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_HIDDEN * np.dtype(np.int16).itemsize
+    + N_L1 * N_L2 * np.dtype(np.int8).itemsize
+    + N_L2 * np.dtype(np.int32).itemsize
+    + N_OUTPUT_BUCKETS * N_L2 * N_L3 * np.dtype(np.float32).itemsize
+    + N_OUTPUT_BUCKETS * N_L3 * np.dtype(np.float32).itemsize
+    + N_OUTPUT_BUCKETS * N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+    + N_OUTPUT_BUCKETS * np.dtype(np.float32).itemsize
+)
+
+THREAT_WEIGHTS_SIZE = N_THREAT_FEATURES * N_HIDDEN * np.dtype(np.int8).itemsize
 
 KING_BUCKETS: tuple[int, ...] = (
     31, 30, 29, 28, 28, 29, 30, 31,
@@ -88,10 +114,11 @@ class Net:
     input_biases: np.ndarray    # (N_HIDDEN,) int16
     l1_weights: np.ndarray      # (N_L2, N_L1) int8
     l1_biases: np.ndarray       # (N_L2,) int32
-    l2_weights: np.ndarray      # (N_L3, N_L2) float32
-    l2_biases: np.ndarray       # (N_L3,) float32
-    output_weights: np.ndarray  # (N_L3,) float32
-    output_bias: float
+    l2_weights: np.ndarray      # (N_L3, N_L2) or (buckets, N_L3, N_L2)
+    l2_biases: np.ndarray       # (N_L3,) or (buckets, N_L3)
+    output_weights: np.ndarray  # (N_L3,) or (buckets, N_L3)
+    output_bias: float | np.ndarray
+    threat_weights: np.ndarray | None = None  # optional (N_THREAT_FEATURES, N_HIDDEN) int8
 
 
 def to_berserk_sq(enyo_sq: int) -> int:
@@ -155,13 +182,145 @@ def phase_scale_from_pieces(pieces: Sequence[tuple[int, int, int]]) -> float:
     return (128.0 + float(phase)) / 128.0
 
 
+def _rank(sq: int) -> int:
+    return sq // 8
+
+
+def _file(sq: int) -> int:
+    return 7 - (sq % 8)
+
+
+def _sq(rank: int, file_idx: int) -> int:
+    return rank * 8 + (7 - file_idx)
+
+
+def _on_board(rank: int, file_idx: int) -> bool:
+    return 0 <= rank < 8 and 0 <= file_idx < 8
+
+
+def _step_attacks(sq: int, deltas: Sequence[tuple[int, int]]) -> int:
+    r = _rank(sq)
+    f = _file(sq)
+    attacks = 0
+    for dr, df in deltas:
+        rr = r + dr
+        ff = f + df
+        if _on_board(rr, ff):
+            attacks |= 1 << _sq(rr, ff)
+    return attacks
+
+
+def _slide_attacks(
+    sq: int,
+    occ: int,
+    deltas: Sequence[tuple[int, int]],
+) -> int:
+    r = _rank(sq)
+    f = _file(sq)
+    attacks = 0
+    for dr, df in deltas:
+        rr = r + dr
+        ff = f + df
+        while _on_board(rr, ff):
+            dst = _sq(rr, ff)
+            attacks |= 1 << dst
+            if occ & (1 << dst):
+                break
+            rr += dr
+            ff += df
+    return attacks
+
+
+def attacks_from_piece(piece_type: int, color: int, sq: int, occ: int) -> int:
+    if piece_type == PAWN:
+        direction = 1 if color == WHITE else -1
+        return _step_attacks(sq, ((direction, -1), (direction, 1)))
+    if piece_type == KNIGHT:
+        return _step_attacks(
+            sq,
+            ((2, 1), (2, -1), (1, 2), (1, -2),
+             (-1, 2), (-1, -2), (-2, 1), (-2, -1)),
+        )
+    if piece_type == BISHOP:
+        return _slide_attacks(sq, occ, ((1, 1), (1, -1), (-1, 1), (-1, -1)))
+    if piece_type == ROOK:
+        return _slide_attacks(sq, occ, ((1, 0), (-1, 0), (0, 1), (0, -1)))
+    if piece_type == QUEEN:
+        return attacks_from_piece(BISHOP, color, sq, occ) | attacks_from_piece(
+            ROOK, color, sq, occ)
+    if piece_type == KING:
+        return _step_attacks(
+            sq,
+            ((1, 1), (1, 0), (1, -1), (0, 1),
+             (0, -1), (-1, 1), (-1, 0), (-1, -1)),
+        )
+    return 0
+
+
+def king_pressure_bucket_from_pieces(
+    pieces: Sequence[tuple[int, int, int]],
+    stm: int,
+) -> int:
+    """Mirror ENYO_ENABLE_KING_PRESSURE_BUCKETS MaterialBucket()."""
+    them = BLACK if stm == WHITE else WHITE
+    king_sq = next(sq for pt, color, sq in pieces
+                   if pt == KING and color == stm)
+    occ = 0
+    for _pt, _color, sq in pieces:
+        occ |= 1 << sq
+    king_zone = attacks_from_piece(KING, stm, king_sq, occ) | (1 << king_sq)
+
+    pressure = 0
+    for pt, color, sq in pieces:
+        if color != them or pt == KING:
+            continue
+        if attacks_from_piece(pt, color, sq, occ) & king_zone:
+            if pt == PAWN:
+                pressure += 1
+            elif pt in (KNIGHT, BISHOP):
+                pressure += 2
+            elif pt == ROOK:
+                pressure += 3
+            else:
+                pressure += 4
+    return max(0, min(pressure, N_OUTPUT_BUCKETS - 1))
+
+
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
-    if len(data) not in (LEGACY_NETWORK_SIZE, NETWORK_SIZE):
+    valid_sizes = (
+        LEGACY_NETWORK_SIZE,
+        NETWORK_SIZE,
+        LEGACY_BUCKETED_HEAD_NETWORK_SIZE,
+        BUCKETED_HEAD_NETWORK_SIZE,
+        LEGACY_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+    )
+    if len(data) not in valid_sizes:
         raise ValueError(
             f"{path}: size {len(data)} != expected "
-            f"{LEGACY_NETWORK_SIZE} or {NETWORK_SIZE}")
-    legacy_layout = len(data) == LEGACY_NETWORK_SIZE
+            f"{', '.join(str(v) for v in valid_sizes)}")
+    legacy_layout = len(data) in (
+        LEGACY_NETWORK_SIZE,
+        LEGACY_BUCKETED_HEAD_NETWORK_SIZE,
+        LEGACY_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+    )
+    bucketed_head = len(data) in (
+        LEGACY_BUCKETED_HEAD_NETWORK_SIZE,
+        BUCKETED_HEAD_NETWORK_SIZE,
+        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+    )
+    threat_layout = len(data) in (
+        LEGACY_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+    )
+    head_buckets = N_OUTPUT_BUCKETS if bucketed_head else 1
 
     off = 0
 
@@ -187,13 +346,27 @@ def load_net(path: str | Path) -> Net:
     ib = take(np.int16, N_HIDDEN)
     l1w = take(np.int8, N_L1 * N_L2).reshape(N_L2, N_L1)
     l1b = take(np.int32, N_L2)
-    l2w = take(np.float32, N_L2 * N_L3).reshape(N_L3, N_L2)
-    l2b = take(np.float32, N_L3)
-    ow = take(np.float32, N_L3)
-    ob = struct.unpack_from("<f", data, off)[0]
-    off += 4
+    if bucketed_head:
+        l2w = take(np.float32, head_buckets * N_L2 * N_L3).reshape(
+            head_buckets, N_L3, N_L2)
+        l2b = take(np.float32, head_buckets * N_L3).reshape(
+            head_buckets, N_L3)
+        ow = take(np.float32, head_buckets * N_L3).reshape(
+            head_buckets, N_L3)
+        ob = take(np.float32, head_buckets)
+    else:
+        l2w = take(np.float32, N_L2 * N_L3).reshape(N_L3, N_L2)
+        l2b = take(np.float32, N_L3)
+        ow = take(np.float32, N_L3)
+        ob = struct.unpack_from("<f", data, off)[0]
+        off += 4
+    threat_weights = None
+    if threat_layout:
+        threat_weights = take(np.int8, N_THREAT_FEATURES * N_HIDDEN).reshape(
+            N_THREAT_FEATURES, N_HIDDEN)
     assert off == len(data)
-    return Net(iw, ib, l1w, l1b, l2w, l2b, ow, float(ob))
+    return Net(iw, ib, l1w, l1b, l2w, l2b, ow,
+               ob if bucketed_head else float(ob), threat_weights)
 
 
 def write_net(net: Net, path: str | Path) -> None:
@@ -206,7 +379,21 @@ def write_net(net: Net, path: str | Path) -> None:
         f.write(np.asarray(net.l2_weights, dtype=np.float32).tobytes(order="C"))
         f.write(np.asarray(net.l2_biases, dtype=np.float32).tobytes(order="C"))
         f.write(np.asarray(net.output_weights, dtype=np.float32).tobytes(order="C"))
-        f.write(struct.pack("<f", float(net.output_bias)))
+        output_bias = np.asarray(net.output_bias, dtype=np.float32)
+        if output_bias.ndim == 0:
+            f.write(struct.pack("<f", float(output_bias)))
+        else:
+            f.write(output_bias.tobytes(order="C"))
+        if net.threat_weights is not None:
+            f.write(np.asarray(net.threat_weights, dtype=np.int8).tobytes(order="C"))
     size = out.stat().st_size
-    if size != NETWORK_SIZE:
-        raise RuntimeError(f"wrote {size} bytes, expected {NETWORK_SIZE}")
+    valid_sizes = (
+        NETWORK_SIZE,
+        BUCKETED_HEAD_NETWORK_SIZE,
+        NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+    )
+    if size not in valid_sizes:
+        raise RuntimeError(
+            f"wrote {size} bytes, expected "
+            f"{', '.join(str(v) for v in valid_sizes)}")

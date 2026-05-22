@@ -237,6 +237,18 @@ def gate_summary(rows: list[dict[str, object]]) -> dict[str, int]:
     }
 
 
+def capped_delta_summary(diffs: list[int], cap: int) -> dict[str, int]:
+    capped = [max(-cap, min(cap, diff)) for diff in diffs]
+    return {
+        "cap": cap,
+        "sum_diff_cp": sum(capped),
+        "candidate_better": sum(1 for diff in capped if diff > 0),
+        "reference_better": sum(1 for diff in capped if diff < 0),
+        "worst_regression_cp": min(capped) if capped else 0,
+        "best_gain_cp": max(capped) if capped else 0,
+    }
+
+
 def write_gate(path: Path, rows: list[dict[str, object]]) -> None:
     fieldnames = [
         "log",
@@ -271,8 +283,10 @@ def write_summary(
     sum_diff = 0
     worst_regression = 0
     best_gain = 0
+    diffs: list[int] = []
     for c_row, r_row in zip(candidate_rows, reference_rows):
         diff = int(r_row["gap_cp"]) - int(c_row["gap_cp"])
+        diffs.append(diff)
         sum_diff += diff
         if diff > 0:
             candidate_better += 1
@@ -304,6 +318,16 @@ def write_summary(
         f"worst_regression_cp={worst_regression}",
         f"best_gain_cp={best_gain}",
     ]
+    for cap in (100, 200, 500, 1000):
+        capped = capped_delta_summary(diffs, cap)
+        lines.append(
+            f"capped_{cap}cp "
+            f"candidate_better={capped['candidate_better']} "
+            f"reference_better={capped['reference_better']} "
+            f"sum_diff_cp={capped['sum_diff_cp']} "
+            f"worst_regression_cp={capped['worst_regression_cp']} "
+            f"best_gain_cp={capped['best_gain_cp']}"
+        )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines), flush=True)
 

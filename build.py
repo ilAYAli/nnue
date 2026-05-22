@@ -287,6 +287,60 @@ def create_config(args: argparse.Namespace) -> dict:
                 "command": train_command,
             },
         ])
+    elif args.backend == "material-head":
+        if not args.init_net:
+            raise SystemExit("backend=material-head requires --init-net")
+        material_trainable = "output" if args.trainable == "all" else args.trainable
+        if material_trainable not in {"output", "float-head"}:
+            raise SystemExit(
+                "backend=material-head supports --trainable output|float-head")
+        train_command = [
+            str(expand_user(args.python)),
+            tool("train/train_material_head.py"),
+            "--data", "{pack}/train",
+            "--init-from-nn", str(expand_path(args.init_net)),
+            "--out", f"{candidate_dir}/model.pt",
+            "--out-nn", f"{candidate_dir}/model.nn",
+            "--bucket-mode", args.bucket_mode,
+            "--trainable", material_trainable,
+            "--objective", args.objective,
+            "--huber-beta", str(args.huber_beta),
+            "--select-metric", args.select_metric,
+            "--wdl-lambda", str(args.wdl_lambda),
+            "--sign-loss-weight", str(args.sign_loss_weight),
+            "--sign-loss-scale", str(args.sign_loss_scale),
+            "--epochs", str(args.epochs),
+            "--batch-size", str(args.batch_size),
+            "--lr", str(args.lr),
+            "--weight-decay", str(args.weight_decay),
+            "--target-clamp", str(args.target_clamp),
+            "--device", args.device,
+            "--workers", str(args.workers),
+            "--patience", str(args.patience),
+            "--max-rows", str(args.max_rows),
+            "--skip-rows", str(args.skip_rows),
+            "--val-rows", str(args.val_rows),
+        ]
+
+        steps.extend([
+            {
+                "name": "pack",
+                "command": [
+                    tool("pack/pack.py"), "build",
+                    "--input", pack_input,
+                    "--out-dir", "{pack}/train",
+                    "--skip", str(args.pack_skip),
+                    "--limit", str(args.pack_limit),
+                    "--max-features", str(args.max_features),
+                    "--progress", str(args.pack_progress),
+                    "--python", str(expand_user(args.python)),
+                ],
+            },
+            {
+                "name": "train_material_head",
+                "command": train_command,
+            },
+        ])
     elif args.backend == "pairwise":
         if not args.pairwise_scores_csv and not args.pairwise_pairs_jsonl:
             raise SystemExit(
@@ -308,6 +362,8 @@ def create_config(args: argparse.Namespace) -> dict:
             "--l1-lr-mult", str(args.l1_lr_mult),
             "--dense-lr-mult", str(args.dense_lr_mult),
             "--huber-beta", str(args.huber_beta),
+            "--broad-weight", str(args.pairwise_broad_weight),
+            "--broad-target", str(args.pairwise_broad_target),
             "--pair-beta", str(args.pairwise_pair_beta),
             "--pair-weight", str(args.pairwise_pair_weight),
             "--target-clamp", str(args.target_clamp),
@@ -387,7 +443,32 @@ def create_config(args: argparse.Namespace) -> dict:
             "--wdl", str(args.bullet_wdl),
             "--lr", str(args.bullet_lr),
             "--final-lr", str(args.bullet_final_lr),
+            "--enyo-l0-std", str(args.bullet_enyo_l0_std),
+            "--enyo-l1-std", str(args.bullet_enyo_l1_std),
+            "--enyo-l1-export-scale", str(args.bullet_enyo_l1_export_scale),
+            "--eval-scale", str(args.bullet_eval_scale),
+            "--save-rate", str(args.bullet_save_rate),
+            "--trainable", str(args.trainable),
+            "--weight-decay", str(args.weight_decay),
         ]
+        if args.init_net and args.bullet_mode == "enyo":
+            bullet_init_weights = "{assets}/bullet_init_weights.bin"
+            steps.append({
+                "name": "bullet_init_weights",
+                "command": [
+                    str(expand_user(args.python)),
+                    tool("bullet/enyo_nn_to_bullet_weights.py"),
+                    "--input", str(expand_path(args.init_net)),
+                    "--output", bullet_init_weights,
+                    "--eval-scale", str(args.bullet_eval_scale),
+                    "--l1-export-scale", str(args.bullet_enyo_l1_export_scale),
+                ],
+            })
+            bullet_train.extend(["--init-weights", bullet_init_weights])
+        elif args.init_net and args.bullet_mode != "enyo":
+            raise SystemExit(
+                "Bullet init-net is currently supported only for bullet-mode=enyo; "
+                "Reckless-like checkpoint layout cannot preserve Enyo .nn weights yet.")
         if args.bullet_cuda_path:
             bullet_train.extend(["--cuda-path", str(expand_user(args.bullet_cuda_path))])
 
@@ -415,7 +496,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--output", bullet_text,
                     "--limit", str(args.bullet_rows),
                     "--max-abs-cp", str(args.bullet_max_abs_cp),
-                ],
+                ] + (["--enyo-runtime-target"] if args.bullet_mode == "enyo" else []),
             },
             {
                 "name": "bullet_format",
@@ -528,12 +609,15 @@ def add_create_args(
     parser.add_argument(
         "--backend",
         default=value("backend", d.backend),
-        choices=["pytorch", "pairwise", "bullet"],
+        choices=["pytorch", "pairwise", "bullet", "material-head"],
         help=(
-            "Training backend. 'pairwise' fine-tunes Enyo .nn with "
+            "Training backend. 'material-head' trains bucketed float heads; "
+            "'pairwise' fine-tunes Enyo .nn with "
             "child-position ranking pairs. 'bullet' is experimental; "
             "mode=reckless emits Bullet checkpoints, mode=enyo emits model.nn."),
     )
+    parser.add_argument("--bucket-mode", default=value("bucket_mode", d.bucket_mode),
+                        choices=["material", "king-pressure"])
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
     parser.add_argument("--selfplay-shard-games", type=int, default=value("selfplay_shard_games", d.selfplay_shard_games))
@@ -602,11 +686,14 @@ def add_create_args(
     parser.add_argument("--pairwise-pairs-jsonl", default=value("pairwise_pairs_jsonl", d.pairwise_pairs_jsonl))
     parser.add_argument("--pairwise-candidate-moves-csv", default=value("pairwise_candidate_moves_csv", d.pairwise_candidate_moves_csv))
     parser.add_argument("--pairwise-pair-batch-size", type=int, default=value("pairwise_pair_batch_size", d.pairwise_pair_batch_size))
+    parser.add_argument("--pairwise-broad-weight", type=float, default=value("pairwise_broad_weight", d.pairwise_broad_weight))
     parser.add_argument("--pairwise-pair-weight", type=float, default=value("pairwise_pair_weight", d.pairwise_pair_weight))
     parser.add_argument("--pairwise-pair-beta", type=float, default=value("pairwise_pair_beta", d.pairwise_pair_beta))
     parser.add_argument("--pairwise-min-target-margin", type=float, default=value("pairwise_min_target_margin", d.pairwise_min_target_margin))
     parser.add_argument("--pairwise-max-target-margin", type=float, default=value("pairwise_max_target_margin", d.pairwise_max_target_margin))
     parser.add_argument("--pairwise-loss-weight-by-cp", action="store_true", default=value("pairwise_loss_weight_by_cp", d.pairwise_loss_weight_by_cp))
+    parser.add_argument("--pairwise-broad-target", default=value("pairwise_broad_target", d.pairwise_broad_target),
+                        choices=["teacher", "init"])
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
     parser.add_argument("--bullet-mode", default=value("bullet_mode", d.bullet_mode),
@@ -625,6 +712,11 @@ def add_create_args(
     parser.add_argument("--bullet-wdl", type=float, default=value("bullet_wdl", d.bullet_wdl))
     parser.add_argument("--bullet-lr", type=float, default=value("bullet_lr", d.bullet_lr))
     parser.add_argument("--bullet-final-lr", type=float, default=value("bullet_final_lr", d.bullet_final_lr))
+    parser.add_argument("--bullet-enyo-l0-std", type=float, default=value("bullet_enyo_l0_std", d.bullet_enyo_l0_std))
+    parser.add_argument("--bullet-enyo-l1-std", type=float, default=value("bullet_enyo_l1_std", d.bullet_enyo_l1_std))
+    parser.add_argument("--bullet-enyo-l1-export-scale", type=float, default=value("bullet_enyo_l1_export_scale", d.bullet_enyo_l1_export_scale))
+    parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
+    parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
