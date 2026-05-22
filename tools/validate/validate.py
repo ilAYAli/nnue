@@ -18,6 +18,10 @@ def expand_path(value: str | Path) -> Path:
     return Path(value).expanduser().resolve()
 
 
+def expand_user(value: str | Path) -> Path:
+    return Path(os.path.expandvars(str(value))).expanduser()
+
+
 def tools_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -43,7 +47,7 @@ def cmd_static(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "eval_dataset.py"
     run_dir = event_run_dir(args.run, expand_path(args.data).parents[1])
     command = [
-        str(expand_path(args.python)),
+        str(expand_user(args.python)),
         str(script),
         "--net", str(expand_path(args.net)),
         "--data", str(expand_path(args.data)),
