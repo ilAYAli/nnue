@@ -57,6 +57,12 @@ Current gate status:
   - Static eval parity on the worst mask2 row was clean for the root and
     immediate child positions, so the remaining tail is search-coupled rather
     than a basic net-format or square-orientation bug.
+  - Runtime delta-clamp probe `feature/nnue-reckless-bucket-delta-clamp`
+    compiled and passed tests with `ENYO_CHECK_BUCKET_DELTA_CLAMP_CP=200`, but
+    the composite gate was bit-for-bit unchanged from mask2:
+    all `top1=106/213`, `top3=172/213`, cap200 `+1135`,
+    `worst_regression_cp=-303`. The guard did not address the actual search
+    tail and adds extra head work when active.
   - Decision: no SPRT. Close this check-state output-bucket lane. It produced
     useful diagnostics but did not satisfy the written pre-SPRT gate.
 - Split-gate diagnosis shows why the remaining existing-weight deltas are still
@@ -886,6 +892,10 @@ Immediate next branch:
   - Static eval parity on the worst row was clean at the root and immediate
     children, so the remaining tail is real search coupling from deeper bucket
     use, not copied-net parity, square-index, or net-format failure.
+  - A runtime delta-clamp guard (`feature/nnue-reckless-bucket-delta-clamp`,
+    clamp=200cp) built and passed tests, but the composite gate was unchanged
+    from mask2 and still had `worst_regression_cp=-303`. Do not pursue this
+    guard; it does not fix the tail and costs extra output-head work.
   - Decision: no SPRT. Close this check-state bucket lane unless a future idea
     changes the selector or search guard materially; do not keep retuning this
     same split.
