@@ -86,6 +86,15 @@ class CandidateDefaults:
     weight_decay: float = 1e-6
     trainable: str = "all"
 
+    pairwise_scores_csv: str = ""
+    pairwise_pairs_jsonl: str = ""
+    pairwise_pair_batch_size: int = 64
+    pairwise_pair_weight: float = 1.0
+    pairwise_pair_beta: float = 100.0
+    pairwise_min_target_margin: float = 1.0
+    pairwise_max_target_margin: float = 800.0
+    pairwise_loss_weight_by_cp: bool = False
+
     bullet_rows: int = 0
     bullet_max_abs_cp: int = 1600
     bullet_manifest: str = "~/source/bullet/Cargo.toml"

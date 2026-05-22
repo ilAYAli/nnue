@@ -268,6 +268,71 @@ def create_config(args: argparse.Namespace) -> dict:
                 "command": train_command,
             },
         ])
+    elif args.backend == "pairwise":
+        if not args.pairwise_scores_csv and not args.pairwise_pairs_jsonl:
+            raise SystemExit(
+                "backend=pairwise requires pairwise_scores_csv or pairwise_pairs_jsonl")
+
+        train_command = [
+            str(expand_user(args.python)),
+            tool("train/train_pairwise.py"),
+            "--data", "{pack}/train",
+            "--out", f"{candidate_dir}/model.pt",
+            "--out-nn", f"{candidate_dir}/model.nn",
+            "--epochs", str(args.epochs),
+            "--batch-size", str(args.batch_size),
+            "--pair-batch-size", str(args.pairwise_pair_batch_size),
+            "--lr", str(args.lr),
+            "--weight-decay", str(args.weight_decay),
+            "--huber-beta", str(args.huber_beta),
+            "--pair-beta", str(args.pairwise_pair_beta),
+            "--pair-weight", str(args.pairwise_pair_weight),
+            "--target-clamp", str(args.target_clamp),
+            "--min-target-margin", str(args.pairwise_min_target_margin),
+            "--max-target-margin", str(args.pairwise_max_target_margin),
+            "--device", args.device,
+            "--workers", str(args.workers),
+            "--max-rows", str(args.max_rows),
+            "--skip-rows", str(args.skip_rows),
+        ]
+        if args.init_net:
+            train_command.extend([
+                "--init-from-nn", str(expand_path(args.init_net)),
+            ])
+        else:
+            train_command.extend([
+                "--init", args.init,
+            ])
+        if args.pairwise_scores_csv:
+            train_command.extend([
+                "--scores-csv", str(expand_path(args.pairwise_scores_csv)),
+            ])
+        if args.pairwise_pairs_jsonl:
+            train_command.extend([
+                "--pairs", str(expand_path(args.pairwise_pairs_jsonl)),
+            ])
+        if args.pairwise_loss_weight_by_cp:
+            train_command.append("--loss-weight-by-cp")
+
+        steps.extend([
+            {
+                "name": "pack",
+                "command": [
+                    tool("pack/pack.py"), "build",
+                    "--input", pack_input,
+                    "--out-dir", "{pack}/train",
+                    "--skip", str(args.pack_skip),
+                    "--limit", str(args.pack_limit),
+                    "--max-features", str(args.max_features),
+                    "--progress", str(args.pack_progress),
+                    "--python", str(expand_user(args.python)),
+                ],
+            },
+            {
+                "name": "train_pairwise",
+                "command": train_command,
+            },
+        ])
     elif args.backend == "bullet":
         bullet_text = "{pack}/bullet/enyo.txt"
         bullet_data = "{pack}/bullet/enyo.data"
@@ -418,8 +483,11 @@ def add_create_args(
     parser.add_argument(
         "--backend",
         default=value("backend", d.backend),
-        choices=["pytorch", "bullet"],
-        help="Training backend. 'bullet' is experimental and currently emits Bullet checkpoints, not Enyo .nn files.",
+        choices=["pytorch", "pairwise", "bullet"],
+        help=(
+            "Training backend. 'pairwise' fine-tunes Enyo .nn with "
+            "child-position ranking pairs. 'bullet' is experimental and "
+            "currently emits Bullet checkpoints, not Enyo .nn files."),
     )
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
@@ -477,6 +545,15 @@ def add_create_args(
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "input", "float-head", "output"])
+
+    parser.add_argument("--pairwise-scores-csv", default=value("pairwise_scores_csv", d.pairwise_scores_csv))
+    parser.add_argument("--pairwise-pairs-jsonl", default=value("pairwise_pairs_jsonl", d.pairwise_pairs_jsonl))
+    parser.add_argument("--pairwise-pair-batch-size", type=int, default=value("pairwise_pair_batch_size", d.pairwise_pair_batch_size))
+    parser.add_argument("--pairwise-pair-weight", type=float, default=value("pairwise_pair_weight", d.pairwise_pair_weight))
+    parser.add_argument("--pairwise-pair-beta", type=float, default=value("pairwise_pair_beta", d.pairwise_pair_beta))
+    parser.add_argument("--pairwise-min-target-margin", type=float, default=value("pairwise_min_target_margin", d.pairwise_min_target_margin))
+    parser.add_argument("--pairwise-max-target-margin", type=float, default=value("pairwise_max_target_margin", d.pairwise_max_target_margin))
+    parser.add_argument("--pairwise-loss-weight-by-cp", action="store_true", default=value("pairwise_loss_weight_by_cp", d.pairwise_loss_weight_by_cp))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
     parser.add_argument("--bullet-max-abs-cp", type=int, default=value("bullet_max_abs_cp", d.bullet_max_abs_cp))
