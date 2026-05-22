@@ -1,17 +1,17 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-sprt-failure-quantized-export-visible-preflight",
-  "goal": "Diagnostic pairwise run with aggressive LR/weight and tiny broad slice to force export-visible integer/L1 movement. Not a keeper attempt and not for SPRT.",
+  "experiment": "pairwise-sprt-failure-quantized-mid-preflight",
+  "goal": "Mid-strength export-aware pairwise diagnostic after qforce proved integer movement but destroyed the move-choice gate. Keep quantized forward, lower LR/weight, and use more broad rows to find a non-destructive pairwise setting. Still no SPRT.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv"
   },
   "create": {
-    "name": "pairwise-sprtfail-qforce-w100-lr1e2-e40",
+    "name": "pairwise-sprtfail-qmid-w50-lr3e3-e30",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "pairwise_pair_weight": 100.0,
+    "pairwise_pair_weight": 50.0,
     "pairwise_pair_batch_size": 64,
     "pairwise_pair_beta": 100,
     "pairwise_min_target_margin": 20,
@@ -20,22 +20,22 @@
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.01,
-    "epochs": 40,
+    "lr": 0.003,
+    "epochs": 30,
     "batch_size": 8192,
-    "max_rows": 10000,
+    "max_rows": 100000,
     "device": "cuda",
     "workers": 2,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "forward": "quantized"
   },
   "validation": {
-    "status": "forced export-visible pairwise diagnostic; reject unless integer weights and gates move safely",
+    "status": "mid-strength export-aware pairwise diagnostic; require non-destructive move-choice gate",
     "success_condition": [
-      "net_diff shows input_weights/l1_weights or biases changed after export",
-      "eval_move_gate margins differ from baseline",
-      "candidate_prefers_best improves without catastrophic broad collapse",
-      "do not run SPRT; use result to tune sane export-aware schedule"
+      "net_diff shows some exported integer movement",
+      "move_choice_gate improves over failed qforce and does not trail reference badly",
+      "broad_mae does not collapse like qforce",
+      "no SPRT unless gates become clearly positive"
     ],
     "next_after_success": [
       "run failed-SPRT eval_move_gate against model.nn",
