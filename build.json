@@ -1,17 +1,17 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-sprt-failure-quantized-preflight",
-  "goal": "Diagnostic pairwise run using quantized/STE forward so training optimizes what model.nn exports. This follows the float pairwise preflight, which moved PyTorch metrics but left exported evals unchanged. Still no SPRT; gate first.",
+  "experiment": "pairwise-sprt-failure-quantized-export-visible-preflight",
+  "goal": "Diagnostic pairwise run with aggressive LR/weight and tiny broad slice to force export-visible integer/L1 movement. Not a keeper attempt and not for SPRT.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv"
   },
   "create": {
-    "name": "pairwise-sprtfail-qaggr-w20-lr1e4-e20",
+    "name": "pairwise-sprtfail-qforce-w100-lr1e2-e40",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "pairwise_pair_weight": 20.0,
+    "pairwise_pair_weight": 100.0,
     "pairwise_pair_batch_size": 64,
     "pairwise_pair_beta": 100,
     "pairwise_min_target_margin": 20,
@@ -20,23 +20,22 @@
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 0.0001,
-    "epochs": 20,
+    "lr": 0.01,
+    "epochs": 40,
     "batch_size": 8192,
-    "max_rows": 100000,
+    "max_rows": 10000,
     "device": "cuda",
     "workers": 2,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "forward": "quantized"
   },
   "validation": {
-    "status": "quantized pairwise preflight; prove exported eval movement before tuning",
+    "status": "forced export-visible pairwise diagnostic; reject unless integer weights and gates move safely",
     "success_condition": [
-      "pair_correct improves materially under quantized forward",
-      "net_diff shows input/L1 or exported integer-relevant values moved",
+      "net_diff shows input_weights/l1_weights or biases changed after export",
       "eval_move_gate margins differ from baseline",
-      "candidate_prefers_best improves on failed-SPRT child cases",
-      "do not run SPRT; use result to choose sane pairwise settings"
+      "candidate_prefers_best improves without catastrophic broad collapse",
+      "do not run SPRT; use result to tune sane export-aware schedule"
     ],
     "next_after_success": [
       "run failed-SPRT eval_move_gate against model.nn",
