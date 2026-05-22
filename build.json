@@ -1,17 +1,17 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "pairwise-sprt-failure-movechoice-current-nn",
-  "goal": "Test an objective change after the Bullet scalar child-target lane stalled. This run keeps the current Enyo .nn architecture and broad d12/d16 labels, but adds pairwise child-position ranking loss from the failed Bullet SPRT positions: candidate child versus oracle-best child. It exports a normal Enyo model.nn and must pass move-choice gates before any SPRT.",
+  "experiment": "pairwise-sprt-failure-aggressive-preflight",
+  "goal": "Diagnostic pairwise run: use a much stronger pairwise loss and LR on a small broad slice to prove the ranking objective changes exported Enyo evals. This is not a keeper attempt and must not go to SPRT.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv"
   },
   "create": {
-    "name": "pairwise-sprtfail-current-w025-e4",
+    "name": "pairwise-sprtfail-aggr-w20-lr1e4-e20",
     "backend": "pairwise",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pairwise_scores_csv": "~/code/cpp/chess/nnue/runs/bullet-sprt-failure-diagnostics-20260522/movechoice_sb112_20260522_015057/out/scores.csv",
-    "pairwise_pair_weight": 0.25,
+    "pairwise_pair_weight": 20.0,
     "pairwise_pair_batch_size": 64,
     "pairwise_pair_beta": 100,
     "pairwise_min_target_margin": 20,
@@ -20,21 +20,21 @@
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
-    "lr": 7e-7,
-    "epochs": 4,
+    "lr": 0.0001,
+    "epochs": 20,
     "batch_size": 8192,
-    "max_rows": 1000000,
+    "max_rows": 100000,
     "device": "cuda",
     "workers": 2,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "normal Enyo .nn pairwise/ranking fine-tune on failed-SPRT move choices",
+    "status": "aggressive pairwise preflight; prove exported eval movement before tuning",
     "success_condition": [
-      "train pair_correct improves without broad_mae collapse",
-      "eval_move_gate improves candidate-vs-best margins on failed-SPRT positions",
-      "move_choice_gate does not introduce a worse tail than the reference",
-      "no SPRT unless move-choice gates are clearly cleaner"
+      "pair_correct improves materially",
+      "eval_move_gate margins differ from baseline",
+      "candidate_prefers_best improves on failed-SPRT child cases",
+      "do not run SPRT; use result to choose sane pairwise settings"
     ],
     "next_after_success": [
       "run failed-SPRT eval_move_gate against model.nn",
