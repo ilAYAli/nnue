@@ -1,47 +1,40 @@
 {
   "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe.",
-  "experiment": "current-reference broad sparse refresh probe",
-  "goal": "Test whether broad scalar Stockfish labels can move exported input/L1 tensors with dense/head frozen, without the pairwise tail damage seen in the sparse-cross diagnostic. Diagnostic only; no SPRT unless gates are clean.",
+  "experiment": "Bullet-trained Enyo-format feasibility spike",
+  "goal": "Test whether Bullet can train and export Enyo's normal .nn layout, using the current feature map and runtime format. Diagnostic only; no SPRT from this smoke artifact.",
   "inputs": {
     "broad": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
   },
   "create": {
-    "name": "broad-ref-sparse-huber-cp800-lr5e6-in800-l1800-d0-e8",
-    "backend": "pytorch",
+    "name": "bullet-enyo-format-smoke-100k",
+    "backend": "bullet",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "objective": "huber",
-    "target_clamp": 800,
-    "huber_beta": 200,
-    "lr": 0.000005,
-    "input_lr_mult": 800.0,
-    "l1_lr_mult": 800.0,
-    "dense_lr_mult": 0.0,
-    "epochs": 8,
-    "batch_size": 8192,
-    "max_rows": 100000,
-    "pack_limit": 100000,
-    "val_rows": 0,
-    "device": "cuda",
-    "workers": 2,
-    "grad_norm_every": 1024,
+    "bullet_rows": 100000,
+    "bullet_mode": "enyo",
+    "bullet_hidden": 1024,
+    "bullet_l2": 16,
+    "bullet_batch_size": 4096,
+    "bullet_batches": 64,
+    "bullet_superbatches": 2,
+    "bullet_threads": 4,
+    "bullet_wdl": 0.0,
+    "bullet_lr": 0.001,
+    "bullet_final_lr": 0.0003,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
-    "forward": "quantized",
-    "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
+    "init_net": ""
   },
   "validation": {
-    "status": "current-reference broad sparse refresh probe",
+    "status": "Bullet-trained Enyo-format feasibility spike",
     "success_condition": [
-      "net_diff shows nonzero input/L1 exported movement",
-      "static validation does not collapse",
-      "repeated-tail move-choice gate does not collapse",
-      "failure-suite replay gate is non-negative with controlled tail versus the current reference",
-      "no SPRT unless broad gates become clean"
+      "Bullet trainer can map features to Enyo's current 32-bucket indices",
+      "Bullet trainer can write a byte-compatible Enyo model.nn",
+      "exported model.nn loads in Enyo and validate.py",
+      "static smoke metrics are sane for a tiny diagnostic run"
     ],
     "next_after_success": [
-      "run net_diff against the current reference net",
-      "run repeated-tail move-choice gate",
-      "run replay failure-suite gate",
-      "only then consider a 1000-game smoke SPRT"
+      "run a larger Bullet-Enyo scratch run",
+      "compare static speed/quality against the PyTorch scratch baseline",
+      "only consider replay/SPRT after normal gates are clean"
     ]
   }
 }

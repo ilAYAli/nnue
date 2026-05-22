@@ -190,6 +190,7 @@ def cmd_train(args: argparse.Namespace) -> int:
         "ENYO_BULLET_DATA": str(data),
         "ENYO_BULLET_OUT": str(out_dir),
         "ENYO_BULLET_NET_ID": args.net_id,
+        "ENYO_BULLET_MODE": args.mode,
         "ENYO_BULLET_HIDDEN": str(args.hidden),
         "ENYO_BULLET_L2": str(args.l2),
         "ENYO_BULLET_BATCH_SIZE": str(args.batch_size),
@@ -217,6 +218,14 @@ def cmd_train(args: argparse.Namespace) -> int:
         str(manifest),
     ]
     run(command, env=env)
+    if args.mode == "enyo":
+        checkpoints = sorted(out_dir.glob(f"{args.net_id}-*/quantised.bin"))
+        if not checkpoints:
+            raise SystemExit(f"no Bullet quantised.bin checkpoints found under {out_dir}")
+        checkpoints.sort(key=lambda path: path.stat().st_mtime)
+        model_path = out_dir.parent / "model.nn"
+        shutil.copy2(checkpoints[-1], model_path)
+        print(f"wrote {model_path}", flush=True)
     return 0
 
 
@@ -236,6 +245,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--out-dir", required=True)
     train.add_argument("--net-id", required=True)
     train.add_argument("--cargo-target-dir", required=True)
+    train.add_argument("--mode", choices=["reckless", "enyo"], default="reckless")
     train.add_argument("--accelerator", choices=["cuda", "rocm"], default="cuda")
     train.add_argument("--cuda-path", default="")
     train.add_argument("--cuda-arch", default="auto")

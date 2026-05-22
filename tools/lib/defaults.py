@@ -104,6 +104,7 @@ class CandidateDefaults:
     pairwise_loss_weight_by_cp: bool = False
 
     bullet_rows: int = 0
+    bullet_mode: str = "reckless"
     bullet_max_abs_cp: int = 1600
     bullet_manifest: str = "~/source/bullet/Cargo.toml"
     bullet_cuda_path: str = ""

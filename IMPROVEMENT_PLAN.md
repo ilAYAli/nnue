@@ -317,6 +317,19 @@ Rejected lanes:
     `worst_regression_cp=-923`, `best_gain_cp=465`.
   - Decision: no SPRT. Crossing sparse export thresholds is possible, but the
     repeated-tail pairwise objective is not usable at this pressure.
+- current-reference broad sparse refresh probe:
+  - `broad-ref-sparse-huber-cp800-lr5e6-in800-l1800-d0-e8` used broad
+    Stockfish-d16 labels instead of repeated-tail pairs, with dense/head LR
+    frozen and input/L1 multipliers set to `800`.
+  - Training gradients were nonzero for input and L1, but the exported `.nn`
+    was identical to the initializer:
+    `input_weights changed=0/25165824`, `input_biases changed=0/1024`,
+    `l1_weights changed=0/32768`, `l1_biases changed=0/16`,
+    total `0/25200209`.
+  - Train MAE stayed flat at `135.95` across all 8 epochs.
+  - Decision: no replay gate and no SPRT. The current-reference sparse
+    fine-tune lane is exhausted: broad scalar labels do not cross export
+    thresholds, while forced sparse movement damages broad behavior.
 - scratch/Kaiming `1e-5` preflight:
   - 10k train rows, 2k validation rows, Huber cp800, 10 epochs.
   - Gradient norms were nonzero for input, L1, L2, and output, so the training
@@ -523,15 +536,17 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run one broad-label sparse refresh probe.
+Build a Bullet-trained Enyo-format feasibility spike.
 
 Next branch:
 
 - Do not run another same-shape pairwise/scalar child blend from scratch26.
-- Do not run another current-reference pairwise fine-tune that lets the dense
-  head absorb the change.
-- Do not run another repeated-tail pairwise sparse-cross probe: it moved sparse
-  tensors, but broad replay was overwhelmingly worse than the current reference.
+- Do not run another current-reference sparse fine-tune. The sparse lane now has
+  both answers: normal labels do not move exported input/L1 tensors, and forced
+  sparse movement breaks broad behavior.
+- Do not run another Bullet/Reckless-like SPRT until the gate improves broadly;
+  the current Bullet checkpoints are playable only as architecture diagnostics
+  and are too slow/weak as Enyo candidates.
 
 Reason:
 
@@ -551,31 +566,28 @@ Reason:
   low value.
 - Sparse-LR multipliers did not change that: gradients reached input/L1, but
   exported tensors stayed identical.
-- The measured float deltas were far below export rounding thresholds, so the
-  sparse-cross diagnostic intentionally froze dense/head and pushed sparse
-  tensors hard.
-- The sparse-cross diagnostic answered the export question but failed the
-  behavior question. The remaining useful question for this lane is whether
-  broad scalar labels can move sparse tensors without the pairwise tail damage.
+- The measured float deltas were far below export rounding thresholds. The
+  sparse-cross diagnostic proved that exported sparse movement can be forced,
+  but the resulting broad behavior was unusable.
+- The broad sparse refresh answered the final sparse-lane question: broad
+  scalar labels did not move exported input/L1 tensors at all.
+- Bullet training is much faster than the PyTorch path, but the current
+  Bullet/Reckless-like runtime checkpoint is not a normal Enyo `.nn` and is
+  too slow in search. The useful next question is whether Bullet can train and
+  export exactly Enyo's current `.nn` layout, giving faster iteration without
+  changing the engine runtime.
 
 Immediate action:
 
-- Do not SPRT any scratch26 repair from this lane.
-- Train one current-reference broad Huber probe with dense/head LR `0`,
-  input/L1 multipliers `800`, and first gate by `net-diff`.
-- If input/L1 do not move after export, stop this lane.
-- If input/L1 move but gates are bad, stop this lane and move to a fresh-net or
-  architecture-format branch.
-- If broad sparse refresh somehow passes cheap gates, run replay failure-suite
-  before any SPRT.
-
-Deferred Bullet decisions:
-
-- Either add a search-aware/ranking objective around Bullet training.
-- Or configure Bullet to train exactly Enyo's current `.nn` layout, which gives
-  faster training tooling but not a Reckless-like architecture test.
-- Or pause Bullet and return to the Enyo-owned scratch baseline once a better
-  move-choice dataset exists.
+- Add a Bullet trainer mode that uses Enyo's 32-king-bucket feature map and
+  Enyo's exported tensor order.
+- First prove feature-index parity against the Python/engine Enyo feature map.
+- First output is a smoke artifact, not a candidate: train a small row slice,
+  export a normal Enyo `.nn`, run `net-diff`, static validation, and
+  `evalnet`/roundtrip checks.
+- If Bullet cannot reproduce Enyo's quantized forward/export semantics cleanly,
+  stop the Bullet-Enyo-format lane and return to the scratch baseline or a
+  genuinely different architecture/teacher source.
 
 Anti-confounding rule:
 
