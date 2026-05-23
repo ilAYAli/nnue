@@ -23,13 +23,12 @@ The main failure pattern is:
 - scratch/native training works technically, but current Enyo self-play volume
   has not recovered reference move-choice strength.
 
-Current `build.json` state: last completed run is the proven-data Bullet
-SF-binpack float-head preflight in the `nnue_reckless` lane. It started from
-the existing Enyo/Berserk-derived net and trained directly from the available
-Stockfish NNUE binpack instead of generating more Enyo self-play labels. The
-Bullet Enyo export must stay in the current reference-compatible
-16-king-bucket `.nn` layout; 32-bucket expansion is an architecture experiment,
-not an existing-weight delta.
+Current `build.json` state: active next run is
+`search-aware-mateguard-initdistill-lr5e7-e4` in the `nnue_reckless` lane. It
+starts from the existing Enyo/Berserk-derived net, distills broad positions back
+to that init net, and up-weights mate-like engine-search targets. This tests
+whether the recent broad SF-binpack signal can be converted into tail-safe
+search behavior instead of another head-only or scalar-only recipe.
 
 ## Track Definitions
 
@@ -139,6 +138,19 @@ Decision: no SPRT. Stop SF-binpack float-head delta scaling as a near-term Elo
 lane. It contains some broad signal, but repeatedly creates or preserves
 unacceptable mate/endgame tails.
 
+## Active Next Run
+
+`search-aware-mateguard-initdistill-lr5e7-e4`
+
+Purpose:
+
+- keep the lane existing-weight based (`nnue_reckless`).
+- use broad init-net distillation to avoid broad drift.
+- weight `mate_like` search targets higher than `non_mate` targets.
+- require exported movement plus clean search/failure gates before SPRT.
+
+This run is a target/objective test, not a new data-generation cycle.
+
 ## Hard Rejections
 
 Do not restart these as near-term Elo lanes:
@@ -177,8 +189,9 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Redesign search-aware target/objective around engine-search behavior instead
-   of launching another scalar or head-only training recipe.
+1. Run the committed search-aware mateguard preflight from `build.json`.
+   Reject it before SPRT unless it passes net-diff, search/move gate, and
+   failure-suite replay.
 2. Keep native/scratch as a background lane that needs substantially broader
    prepared data before it is considered a promotion path.
 
