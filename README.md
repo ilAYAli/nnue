@@ -88,6 +88,11 @@ The Bullet backend is optional. It uses a Cargo git dependency pinned by
 `tools/bullet/spike_trainer/Cargo.lock`, so it is not tracked as a git
 submodule. Backend-specific details live in `tools/bullet/README.md`.
 
+Large training runs should prefer direct binpack input through
+`bullet_loader=sfbinpack`. JSONL is still supported for small generated sets,
+target construction, and older workflows, but it is being phased out as the
+default bulk-training format.
+
 Candidate creation usually runs:
 
 ```text
