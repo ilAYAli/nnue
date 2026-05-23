@@ -1,33 +1,64 @@
 {
-  "description": "Native lane: rebuild search-aware targets with marked moves preserved past the top-K cutoff.",
+  "description": "Native lane: v3 search-aware movement audit from the best Enyo-owned SF-binpack checkpoint.",
   "metadata": {
-    "experiment": "native-searchaware-targets-v3",
+    "experiment": "native-searchaware-v3-movement-audit",
     "track": "nnue_native",
-    "hypothesis": "The v2 target set was contaminated by top-K truncation that dropped known oracle/reference/candidate moves before tagging. Rebuild targets after preserving marked moves and inspect the distribution before any further training.",
-    "status": "target-build-only",
-    "no_training": true,
-    "no_sprt": true
+    "hypothesis": "The cleaned v3 target set and loader fix should let the search-aware objective move exported input/L1 tensors intentionally. This run is an audit only: no SPRT, no promotion decision, and no target-best rollback.",
+    "source_targets": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v3-20260523/search_aware_targets_v3_deduped.jsonl",
+    "init_checkpoint": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
+    "no_sprt": true,
+    "first_gate": "Run net-diff against init checkpoint. If input/L1 still do not move after export, stop this lane before broader search validation."
   },
-  "target_build": {
-    "output_full": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v3-20260523/search_aware_targets_v3_full.jsonl",
-    "output_deduped": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v3-20260523/search_aware_targets_v3_deduped.jsonl",
-    "max_moves": 8,
-    "policy_temperature_cp": 200.0,
-    "mate_gap_cp": 30000,
-    "sources": {
-      "stable": "/home/petter/code/cpp/chess/nnue/runs/stable-move-gate-20260522_190231/stable_move_scores_nodes1m.csv",
-      "repeated": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/repeated_tail_move_scores_20260521.csv",
-      "sprt_material": "/home/petter/code/cpp/chess/nnue/runs/deep-score-sprt-fail-targets-20260522_190538/material_mask_sprt_fail_move_scores_nodes1m.csv",
-      "sprt_output": "/home/petter/code/cpp/chess/nnue/runs/deep-score-sprt-fail-targets-20260522_190538/output_signfit_sprt_fail_move_scores_nodes1m.csv",
-      "pairwise_sprtfail": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv"
-    }
+  "create": {
+    "name": "native-searchaware-v3-moveaudit-cpu-lr1e6-in300-l1x300-e4",
+    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
+    "python": "~/.venv/bin/python",
+    "labeled_jsonl": "/home/petter/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
+    "backend": "search-aware",
+    "max_features": 32,
+    "pack_limit": 100000,
+    "pack_progress": 50000,
+    "init_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
+    "forward": "quantized",
+    "target_clamp": 800,
+    "huber_beta": 200,
+    "lr": 1e-6,
+    "input_lr_mult": 300.0,
+    "l1_lr_mult": 300.0,
+    "dense_lr_mult": 1.0,
+    "epochs": 4,
+    "batch_size": 4096,
+    "device": "cpu",
+    "workers": 0,
+    "max_rows": 100000,
+    "grad_norm_every": 20,
+    "weight_decay": 0.0,
+    "trainable": "all",
+    "search_targets_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v3-20260523/search_aware_targets_v3_deduped.jsonl",
+    "search_target_batch_size": 32,
+    "search_broad_weight": 0.2,
+    "search_broad_target": "init",
+    "search_broad_target_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
+    "search_margin_weight": 1.0,
+    "search_policy_weight": 0.25,
+    "search_margin_beta": 50.0,
+    "search_policy_temperature_cp": 150.0,
+    "search_score_mode": "child-low",
+    "search_max_gap_cp": 400.0,
+    "search_max_moves": 8,
+    "search_target_limit": 0,
+    "search_target_shuffle": true,
+    "search_required_tags": "non_mate",
+    "search_tag_weights": "non_mate=4,source:stable=4,source:pairwise_sprtfail=2,source:sprt_material=1,source:sprt_output=1,mate_like=0.25",
+    "search_model_gate_device": "cpu",
+    "search_model_gate_min_top1": 0
   },
   "validation": {
     "tmux": "nnue_native",
     "required_checks": [
-      "build full and deduped v3 JSONL target files",
-      "compare v2 vs v3 target and move counts",
-      "inspect mate_like/non_mate distribution before training"
+      "training/model gate must use CPU semantics",
+      "net-diff must show intentional exported input/L1 movement",
+      "no SPRT from this audit run"
     ]
   }
 }
