@@ -61,13 +61,20 @@ def target_weight(tags: list[str], tag_weights: dict[str, float]) -> float:
     return max((tag_weights.get(tag, 1.0) for tag in tags), default=1.0)
 
 
+def parse_required_tags(text: str) -> list[str]:
+    return [tag.strip() for tag in text.split(",") if tag.strip()]
+
+
 class SearchAwareTargetDataset(Dataset):
     def __init__(self, rows: list[dict], *, max_moves: int,
-                 max_gap_cp: float, tag_weights: dict[str, float]) -> None:
+                 max_gap_cp: float, tag_weights: dict[str, float],
+                 required_tags: list[str], limit: int) -> None:
         self.items: list[tuple[str, list[str], float, list[ChildMove]]] = []
         for row in rows:
             fen = str(row["fen"])
             tags = [str(tag) for tag in row.get("tags", [])]
+            if required_tags and not all(tag in tags for tag in required_tags):
+                continue
             board = chess.Board(fen)
             children: list[ChildMove] = []
             moves = sorted(row.get("moves", []), key=lambda item: int(item.get("rank", 999)))
@@ -113,20 +120,22 @@ class SearchAwareTargetDataset(Dataset):
                 target_weight(tags, tag_weights),
                 children,
             ))
+            if limit > 0 and len(self.items) >= limit:
+                break
 
     @classmethod
     def from_jsonl(cls, path: str | Path, *, limit: int, max_moves: int,
                    max_gap_cp: float,
-                   tag_weights: dict[str, float]) -> "SearchAwareTargetDataset":
+                   tag_weights: dict[str, float],
+                   required_tags: list[str]) -> "SearchAwareTargetDataset":
         rows = []
         with Path(path).expanduser().open(encoding="utf-8") as handle:
             for line in handle:
                 if line.strip():
                     rows.append(json.loads(line))
-                if limit > 0 and len(rows) >= limit:
-                    break
         return cls(rows, max_moves=max_moves, max_gap_cp=max_gap_cp,
-                   tag_weights=tag_weights)
+                   tag_weights=tag_weights, required_tags=required_tags,
+                   limit=limit)
 
     def __len__(self) -> int:
         return len(self.items)
@@ -367,12 +376,16 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             "search tag weights: "
             + ",".join(f"{tag}={weight:g}" for tag, weight in sorted(tag_weights.items())),
             flush=True)
+    required_tags = parse_required_tags(args.search_required_tags)
+    if required_tags:
+        print("search required tags: " + ",".join(required_tags), flush=True)
     target_set = SearchAwareTargetDataset.from_jsonl(
         args.targets,
         limit=args.search_target_limit,
         max_moves=args.search_max_moves,
         max_gap_cp=args.search_max_gap_cp,
-        tag_weights=tag_weights)
+        tag_weights=tag_weights,
+        required_tags=required_tags)
     if len(target_set) == 0:
         raise SystemExit("no search-aware targets after filtering")
     print(f"broad rows: {len(broad_set)}", flush=True)
@@ -522,6 +535,8 @@ def main() -> None:
     ap.add_argument("--search-max-gap-cp", type=float, default=800.0)
     ap.add_argument("--search-max-moves", type=int, default=0)
     ap.add_argument("--search-target-limit", type=int, default=0)
+    ap.add_argument("--search-required-tags", default="",
+                    help="Comma-separated tags every selected search target must have")
     ap.add_argument("--search-tag-weights", default="",
                     help="Comma-separated target tag weights, e.g. mate_like=8,non_mate=1")
     ap.add_argument("--device", default="cpu")

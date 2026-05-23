@@ -235,12 +235,17 @@ Follow-up search-aware plumbing audits:
   warmup/ramp attempt. It still failed to cross the target-choice boundary
   (`1/16` final top1), ended with broad MAE `39.89cp`, and exported only
   dense/output movement (`165/25200209` total changed; no input/L1 movement).
+- `native-searchaware-stagewarmup-strong16-lr3e5-e96`: stronger staged
+  warmup/ramp moved exported input/L1 (`169656/25200209` total changed), but
+  still ended at `1/16` top1 with broad MAE about `2398cp`. This exposed a
+  tooling gap: `search_target_limit=16` selected the first 16 mixed targets,
+  not the intended first 16 non-mate targets.
 
 Decision: search-aware training plumbing can learn tiny target sets, including
 the quantized/export-aware forward path. The blocker is scaling the objective
 without destroying broad behavior, not another LR multiplier sweep. The next
-test is a stronger staged schedule using the proven target-only pressure:
-target warmup first, then ramp broad init-net distillation back in.
+test must filter targets by tag so the committed `build.json` matches the
+manual non-mate audit before drawing conclusions from staged scheduling.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -309,6 +314,9 @@ Do not restart these as near-term Elo lanes:
 - weak staged search-aware warmup as a candidate recipe:
   `native-searchaware-stagewarmup-audit16-lr3e6-e24` still moved only
   dense/output floats and ended at `1/16` top1.
+- mixed-target strong staged search-aware warmup as a candidate recipe:
+  `native-searchaware-stagewarmup-strong16-lr3e5-e96` moved sparse/L1 but
+  targeted the wrong mixed 16-row subset and still ended at `1/16` top1.
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -333,8 +341,9 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run `native-searchaware-stagewarmup-strong16-lr3e5-e96` from `build.json`.
-   This is a bounded stronger staged warmup/ramp audit, not a candidate.
+1. Rerun `native-searchaware-stagewarmup-strong16-lr3e5-e96` from `build.json`
+   with `search_required_tags=non_mate`. This is still a bounded audit, not a
+   candidate.
 2. If strong staged warmup preserves most target gains after broad ramp, add the
    exported-movement gate and scale one step up. If not, redesign the objective
    before any more training.

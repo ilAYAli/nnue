@@ -481,6 +481,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--search-max-gap-cp", str(args.search_max_gap_cp),
             "--search-max-moves", str(args.search_max_moves),
             "--search-target-limit", str(args.search_target_limit),
+            "--search-required-tags", str(args.search_required_tags),
             "--search-tag-weights", str(args.search_tag_weights),
             "--device", args.device,
             "--workers", str(args.workers),
@@ -820,6 +821,7 @@ def add_create_args(
     parser.add_argument("--search-max-gap-cp", type=float, default=value("search_max_gap_cp", d.search_max_gap_cp))
     parser.add_argument("--search-max-moves", type=int, default=value("search_max_moves", d.search_max_moves))
     parser.add_argument("--search-target-limit", type=int, default=value("search_target_limit", d.search_target_limit))
+    parser.add_argument("--search-required-tags", default=value("search_required_tags", d.search_required_tags))
     parser.add_argument("--search-tag-weights", default=value("search_tag_weights", d.search_tag_weights))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
