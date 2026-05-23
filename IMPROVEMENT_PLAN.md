@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-searchaware-cpurecover16-w0p001-lr1e6-e80`.
-This is a CPU-only recovery audit from the verified 16-target net. It tests
-whether a very small broad distillation term can reduce broad drift while
-retaining `16/16` exported target choices.
+`reckless-existing-output-signfit-1m-lr5e6-e8`.
+This is the least-bad zero-runtime-overhead existing-weight delta. The next
+live work is a validation-only delta-scale sweep of that net against the
+current reference before considering any SPRT.
 
 ## Track Definitions
 
@@ -271,6 +271,20 @@ forward path is independently fixed. CPU quantized validation matches exported
 tiny target audits. For the next small search-aware audit, train on CPU too, so
 training metrics and exported validation use the same semantics.
 
+Follow-up CPU recovery audit:
+
+- `native-searchaware-cpurecover16-w0p001-lr1e6-e80`: retained the tiny target
+  set on CPU after export (`16/16` top1/top3), and intentionally moved exported
+  sparse/L1 values (`176432/25200209` total changed). Broad behavior collapsed:
+  static `mae=745.077`, `sign=57.47%`; fresh-hash `300k` search gate was
+  `top1=40/232`, `candidate_better=32`, `reference_better=151`,
+  `capped_sum_diff_cp=-19669`, `worst_regression_cp=-31924`. Non-mate was
+  especially bad (`top1=11/128`, `reference_better=106`).
+
+Decision: no SPRT. Stop the direct child-eval search-aware recovery lane for
+now. Passing tiny target retention is not enough; broad engine-search behavior
+must be part of the objective/gate before this lane resumes.
+
 ## Latest Result: Native SF-binpack Scratch
 
 `native-bullet-sfbinpack-scratch-eval400-sb4096`
@@ -350,6 +364,9 @@ Do not restart these as near-term Elo lanes:
 - `native-searchaware-targetonly-exportcheck16-lr3e5-e240` as a candidate
   recipe: it is a 16-target plumbing audit only. CPU exported validation passes,
   but the run has no broad-preservation evidence and is not a promotion path.
+- `native-searchaware-cpurecover16-w0p001-lr1e6-e80`: CPU target retention
+  passed, but broad static/search behavior collapsed (`top1=40/232`,
+  `capped_sum_diff_cp=-19669`, `worst_regression_cp=-31924`).
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -374,13 +391,15 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run `native-searchaware-cpurecover16-w0p001-lr1e6-e80` from `build.json`.
-   It must retain `16/16` CPU target top1 after export.
-2. If target retention fails, stop this direct child-eval recovery lane and
-   redesign targets around actual engine-search behavior.
-3. If target retention passes and broad MAE improves, run a broad search-gate
-   diagnosis only. Do not SPRT.
-4. No SPRT from the current search-aware runs.
+1. In `nnue_reckless`, run a delta-scale gate sweep of
+   `reckless-existing-output-signfit-1m-lr5e6-e8`. This is output-only, keeps
+   existing weights, and has no runtime overhead.
+2. Require net-diff, broad search-gate, and failure-suite replay before any
+   match testing.
+3. In `nnue_native`, do not launch another direct child-eval recovery run. The
+   next native step must redesign the target/objective around engine-search
+   behavior and broad preservation together.
+4. No SPRT from the current search-aware native runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
