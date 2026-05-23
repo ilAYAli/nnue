@@ -123,6 +123,7 @@ class CandidateDefaults:
     search_target_limit: int = 0
     search_required_tags: str = ""
     search_tag_weights: str = ""
+    search_model_gate_min_top1: int = 0
 
     bullet_data: str = ""
     bullet_loader: str = "direct"

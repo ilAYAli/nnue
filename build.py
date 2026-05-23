@@ -522,6 +522,26 @@ def create_config(args: argparse.Namespace) -> dict:
                 "name": "train_search_aware",
                 "command": train_command,
             },
+            {
+                "name": "validate_search_targets_model",
+                "command": [
+                    str(expand_user(args.python)),
+                    tool("validate/search_target_model_gate.py"),
+                    "--targets", str(expand_path(args.search_targets_jsonl)),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--pt", f"{candidate_dir}/model.pt",
+                    "--forward", args.forward,
+                    "--device", args.device,
+                    "--batch-size", str(args.search_target_batch_size),
+                    "--target-limit", str(args.search_target_limit),
+                    "--required-tags", str(args.search_required_tags),
+                    "--tag-weights", str(args.search_tag_weights),
+                    "--max-moves", str(args.search_max_moves),
+                    "--max-gap-cp", str(args.search_max_gap_cp),
+                    "--fail-if-net-top1-below", str(args.search_model_gate_min_top1),
+                    "--fail-if-pt-top1-below", str(args.search_model_gate_min_top1),
+                ],
+            },
         ])
     elif args.backend == "bullet":
         bullet_text = "{pack}/bullet/enyo.txt"
@@ -829,6 +849,7 @@ def add_create_args(
     parser.add_argument("--search-target-limit", type=int, default=value("search_target_limit", d.search_target_limit))
     parser.add_argument("--search-required-tags", default=value("search_required_tags", d.search_required_tags))
     parser.add_argument("--search-tag-weights", default=value("search_tag_weights", d.search_tag_weights))
+    parser.add_argument("--search-model-gate-min-top1", type=int, default=value("search_model_gate_min_top1", d.search_model_gate_min_top1))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
     parser.add_argument(

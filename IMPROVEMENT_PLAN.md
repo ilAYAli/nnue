@@ -245,14 +245,19 @@ Follow-up search-aware plumbing audits:
   heavily (`2802198/25200209` total changed), but ended at `0/16` top1,
   `1/16` top3, and broad MAE about `150cp`. The schedule is destructive:
   sparse movement alone is not useful if it does not learn the search targets.
+- `native-searchaware-recover16-w002-lr1e6-e80`: initialized from the previous
+  target-fit checkpoint and distilled broad rows against the separate native
+  checkpoint. It recovered broad MAE from about `2032cp` to `597cp`, but target
+  choice stayed at `0/16` top1 and `1/16` top3. Direct reload checks showed the
+  supposed target-fit checkpoint itself now evaluates as `0/16` from exported
+  `.nn` and `0/16` from saved `.pt` quantized forward on the same targets.
 
 Decision: search-aware training plumbing can learn tiny target sets, including
-the quantized/export-aware forward path. The blocker is scaling the objective
-without destroying broad behavior, not another LR multiplier sweep. The next
-test is phase-B recovery: initialize from the successful `16/16` target-fit
-net, but distill broad rows against a separate pre-search-aware native
-checkpoint. This requires a distinct broad-target net instead of reusing
-`init_net` for both roles.
+the quantized/export-aware forward path in a live training log, but saved/exported
+artifacts are not yet proven. The blocker is now export-persistent target
+learning: do not run recovery, broad preservation, or scale-up until the
+pipeline validates saved `.pt` and exported `.nn` target metrics immediately
+after training.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -327,6 +332,9 @@ Do not restart these as near-term Elo lanes:
 - tag-filtered strong staged search-aware warmup as a candidate recipe:
   `native-searchaware-stagewarmup-strong16-lr3e5-e96` moved sparse/L1 heavily,
   but ended at `0/16` top1 on the intended non-mate subset.
+- `native-searchaware-recover16-w002-lr1e6-e80` as a candidate recipe:
+  broad behavior recovered, but target top1 stayed `0/16`; the input
+  target-fit checkpoint was not export-persistent.
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -351,13 +359,13 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run `native-searchaware-recover16-w002-lr1e6-e80` from `build.json`. This is
-   a phase-B recovery audit, not a candidate: initialize from the `16/16`
-   target-fit checkpoint and distill broad rows against the earlier native
-   checkpoint via `search_broad_target_net`.
-2. If recovery keeps meaningful target top1 while reducing broad drift, add a
-   proper two-phase build workflow. If target top1 collapses again, stop this
-   objective family and redesign the search-aware loss.
+1. Run `native-searchaware-targetonly-exportcheck16-lr3e5-e240` from
+   `build.json`. This is an export-persistence audit, not a candidate: target
+   training must pass the same target gate after saving `.pt` and exporting
+   `.nn`.
+2. If saved/exported target top1 fails, debug persistence/export/reload before
+   any more recovery or scale-up runs. If it passes, rerun phase-B recovery
+   from that verified checkpoint.
 3. No SPRT from the current search-aware runs.
 
 Do not launch another training run until `build.json` names the lane,
