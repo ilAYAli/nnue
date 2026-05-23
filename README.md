@@ -49,7 +49,7 @@ For target configs or older runs, pass the run path explicitly:
     "name": "candidate-name",
     "backend": "pytorch",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/current-reference.nn",
     "objective": "huber",
     "huber_beta": 200,
     "target_clamp": 800,

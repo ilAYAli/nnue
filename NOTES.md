@@ -198,7 +198,7 @@ The training target attached to a position, usually a teacher centipawn score.
 
 `teacher`
 
-The engine or source that supplies target scores, usually Stockfish.
+The engine or source that supplies target scores, often Stockfish as oracle.
 
 `batch`
 
@@ -669,7 +669,7 @@ Output: source_signed.jsonl
 Step 4, teacher labeling:
 
 ```text
-Ask Stockfish for stronger scores, usually depth 16 or 18.
+Ask Stockfish or another oracle for deeper scores, usually depth 16 or 18.
 Output: labeled.jsonl or shards/label.*.jsonl
 ```
 

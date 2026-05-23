@@ -80,7 +80,7 @@ tools/validate/validate.py search-gate \
   --targets runs/search-aware-targets/search_aware_targets.jsonl \
   --engine ~/code/cpp/chess/assets/engines/reference \
   --candidate-net runs/candidate/train/candidate/model.nn \
-  --reference-net ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --reference-net ~/code/cpp/chess/enyo/nnue/current-reference.nn \
   --out-dir runs/candidate/validate/search_gate
 ```
 

@@ -25,7 +25,7 @@ Typical flow:
 ```sh
 tools/posgen/posgen.py selfplay \
   --engine ~/code/cpp/chess/assets/engines/reference \
-  --nnue-file ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --nnue-file ~/code/cpp/chess/enyo/nnue/current-reference.nn \
   --book ~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd \
   --games 160000 \
   --depth 8 \
@@ -46,4 +46,3 @@ tools/posgen/posgen.py sample \
 ```
 
 Then continue with teacher labeling, packing, training, and validation.
-
