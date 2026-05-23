@@ -215,6 +215,29 @@ useful native baseline. The next work is to fix search-aware objective behavior
 so it can improve training-set move choice and move intended exported tensors;
 do not launch another weighted-search config with the current plumbing.
 
+Follow-up search-aware plumbing audits:
+
+- `search-aware-target-overfit-audit-20260523_063642`: 16 non-mate targets,
+  quantized target-only, no broad loss. It moved exported input/L1/dense values
+  (`183835/25200209` total changed), but only reached `8/16` top1 after 80
+  epochs and damaged broad init-net agreement. This proves exported sparse
+  movement is possible, but the schedule is not yet a usable candidate recipe.
+- `search-aware-4target-forward-audit-20260523_063827`: 4 non-mate targets,
+  target-only. Float and quantized paths both overfit from `0/4` to `4/4`.
+  This rules out a simple sign/orientation bug in the child-eval target loss.
+- `search-aware-16target-quantized-audit-20260523_064051`: 16 non-mate
+  targets, quantized target-only. It overfit from `0/16` to `16/16`, but broad
+  init-net MAE drifted to about `1653cp`.
+- `search-aware-16target-preserve-audit-20260523_064326`: simultaneous broad
+  init-net preservation pins the targets. `w=0.05` ended at `1/16` top1 with
+  broad MAE `8.10cp`; `w=0.20` ended at `1/16` top1 with broad MAE `28.15cp`.
+
+Decision: search-aware training plumbing can learn tiny target sets, including
+the quantized/export-aware forward path. The blocker is scaling the objective
+without destroying broad behavior, not another LR multiplier sweep. The next
+test is a staged schedule: target warmup first, then ramp broad init-net
+distillation back in.
+
 ## Latest Result: Native SF-binpack Scratch
 
 `native-bullet-sfbinpack-scratch-eval400-sb4096`
@@ -273,6 +296,12 @@ Do not restart these as near-term Elo lanes:
 - `native-searchaware-nonmate-initdistill-w8-lr1e6-e6`: only L2 exported floats
   moved, internal target choice did not improve, and fresh-hash search gate
   collapsed (`capped_sum_diff_cp=-20372`).
+- `search-aware-target-overfit-audit-20260523_063642` as a candidate recipe:
+  it can move exported sparse/L1 tensors, but only reached `8/16` training-set
+  top1 and caused very large broad init-net drift.
+- simultaneous search-aware broad preservation as a candidate recipe:
+  `search-aware-16target-preserve-audit-20260523_064326` kept broad drift small
+  but did not cross the target-choice boundary.
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -297,12 +326,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Audit `train_search_aware.py` on a tiny target-only overfit case. It must
-   improve target top1/top3 before another full run.
-2. Add or use an export-aware movement check during training so a search-aware
-   run cannot finish with only incidental L2 float movement.
-3. Only after that, update `build.json` with a new hypothesis. No SPRT from the
-   current search-aware run.
+1. Run `native-searchaware-stagewarmup-audit16-lr3e6-e24` from `build.json`.
+   This is a bounded staged warmup/ramp audit, not a candidate.
+2. If staged warmup preserves most target gains after broad ramp, add the
+   exported-movement gate and scale one step up. If not, redesign the objective
+   before any more training.
+3. No SPRT from the current search-aware runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
