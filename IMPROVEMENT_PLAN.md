@@ -23,12 +23,13 @@ The main failure pattern is:
 - scratch/native training works technically, but current Enyo self-play volume
   has not recovered reference move-choice strength.
 
-Current `build.json` state: approved for a proven-data Bullet preflight in the
-`nnue_reckless` lane. It starts from the existing Enyo/Berserk-derived net and
-trains directly from the available Stockfish NNUE binpack instead of generating
-more Enyo self-play labels. The Bullet Enyo export must stay in the current
-reference-compatible 16-king-bucket `.nn` layout; 32-bucket expansion is an
-architecture experiment, not an existing-weight delta.
+Current `build.json` state: last completed run is the proven-data Bullet
+SF-binpack float-head preflight in the `nnue_reckless` lane. It started from
+the existing Enyo/Berserk-derived net and trained directly from the available
+Stockfish NNUE binpack instead of generating more Enyo self-play labels. The
+Bullet Enyo export must stay in the current reference-compatible
+16-king-bucket `.nn` layout; 32-bucket expansion is an architecture experiment,
+not an existing-weight delta.
 
 ## Track Definitions
 
@@ -73,7 +74,7 @@ Decision: stop search-aware sparse LR/multiplier sweeps. If this lane continues,
 change target construction or objective so success is measured by engine-search
 move choice, not only child-eval ranking.
 
-## Active Experiment
+## Latest Result: Bullet SF-binpack
 
 `build.json` now defines `bullet-sfbinpack-legacy-floathead-lr1e7-sb1`.
 
@@ -111,11 +112,21 @@ Rejected lower-pressure all-weight setting:
 - non-mate subset was mixed (`candidate_better=32`, `reference_better=26`,
   worst regression `-155`), but top1 still regressed (`49/128` vs `53/128`).
 
-The current preflight freezes sparse/L1 weights and trains only the float head
-on the same SF binpack. It tests whether the external data has useful broad
-signal without triggering exported input-threshold crossings. It is not a
-promotion candidate and still needs `net-diff`, search/move, and failure-suite
-gates before any SPRT.
+Rejected float-head setting:
+
+- `bullet-sfbinpack-legacy-floathead-lr1e7-sb1`: one superbatch,
+  `lr=1e-7 -> 2e-8`, no weight decay, `trainable=float-head`.
+- `net-diff` was intentional: sparse/L1 stayed identical; dense/output floats
+  moved.
+- search gate improved top1 overall (`91/232` vs reference baseline `89/232`)
+  and non-mate top1 (`60/128` vs `53/128`), but failed mate-like behavior.
+- failure-suite replay rejected it: `positions=913`, `candidate_better=73`,
+  `reference_better=68`, `sum_diff_cp=-627`, `worst_regression_cp=-512`.
+
+Decision: no SPRT. The only remaining cheap diagnostic for this exact signal is
+to scale/clamp the float-head delta and rerun the search/failure gates. If a
+smaller delta still has mate-like or failure-suite tails, stop this SF-binpack
+float-head lane.
 
 ## Hard Rejections
 
@@ -127,6 +138,7 @@ Do not restart these as near-term Elo lanes:
 - bulk d18/d20 relabeling.
 - head-only/output-only LR/objective sweeps.
 - material/phase head masks.
+- raw SF-binpack float-head update without tail scaling.
 - current king-bucket split variants.
 - current king-pressure/check-state output bucket variants.
 - target-only sparse multiplier sweeps.
@@ -153,12 +165,13 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run the `build.json` Bullet/SF-binpack preflight in `nnue_reckless`.
-2. Gate the exported net; stop immediately if it only improves scalar metrics or
-   creates a broad/mate-like tail regression.
-3. If the proven-data preflight fails, redesign search-aware target/objective
-   around engine-search behavior instead of launching another scalar training
-   recipe.
+1. Run a cheap float-head delta-scale sweep from the rejected SF-binpack
+   candidate (`25%`, `50%`, `75%`) against the same search/failure gates.
+2. If no scaled delta passes broad and mate-like gates, stop SF-binpack
+   float-head updates as a near-term lane.
+3. If the proven-data lane fails after scaling, redesign search-aware
+   target/objective around engine-search behavior instead of launching another
+   scalar training recipe.
 4. Keep native/scratch as a background lane that needs substantially broader
    prepared data before it is considered a promotion path.
 

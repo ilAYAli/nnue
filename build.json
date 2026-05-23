@@ -39,7 +39,10 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "ready_for_lower_pressure_preflight",
+    "status": "rejected_by_failure_suite",
+    "search_gate": "overall/non-mate top1 improved, mate-like tail regressed",
+    "failure_suite": "sum_diff_cp=-627, worst_regression_cp=-512",
+    "next": "float-head delta-scale sweep before any further training",
     "tmux": "nnue_reckless"
   }
 }
