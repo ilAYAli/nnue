@@ -153,9 +153,14 @@ def dedupe_groups(groups: list[TargetGroup]) -> list[TargetGroup]:
 
 def row_for_group(group: TargetGroup, *, max_moves: int, policy_temperature_cp: float,
                   mate_gap_cp: int) -> dict[str, object]:
-    moves = sorted(group.moves.values(), key=lambda item: (item.rank, -item.score_cp))
+    all_moves = sorted(group.moves.values(), key=lambda item: (item.rank, -item.score_cp))
+    marked = group.oracle_moves | group.reference_moves | group.candidate_moves
     if max_moves > 0:
-        moves = moves[:max_moves]
+        selected = {move.uci for move in all_moves[:max_moves]}
+        selected.update(move for move in marked if move in group.moves)
+        moves = [move for move in all_moves if move.uci in selected]
+    else:
+        moves = all_moves
     for move in moves:
         if move.uci in group.oracle_moves:
             move.flags.add("oracle")

@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "tools"))
 
 from lib.defaults import DEFAULTS, repo_root
+from lib.events import emit_event
 
 
 def expand_path(value: str | Path) -> Path:
@@ -65,7 +66,17 @@ def create_config_path(argv: list[str]) -> str | None:
 
 def normalize_argv(argv: list[str]) -> list[str]:
     if len(argv) > 1 and (argv[1] in {"-c", "--config"} or argv[1].startswith("--config=")):
-        return [argv[0], "create", *argv[1:]]
+        config_path = None
+        if argv[1].startswith("--config="):
+            config_path = argv[1].split("=", 1)[1]
+        elif len(argv) > 2:
+            config_path = argv[2]
+        command = "create"
+        if config_path:
+            data = json.loads(expand_path(config_path).read_text(encoding="utf-8"))
+            if "target_build" in data and "create" not in data and "create_args" not in data:
+                command = "target-build"
+        return [argv[0], command, *argv[1:]]
     return argv
 
 
@@ -716,6 +727,135 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def target_build_run_dir(config: dict) -> Path:
+    metadata = config.get("metadata", {})
+    target_build = config.get("target_build", {})
+    if not isinstance(metadata, dict) or not isinstance(target_build, dict):
+        raise SystemExit("build config requires metadata and target_build objects")
+    run_dir = metadata.get("run_dir") or target_build.get("run_dir")
+    if run_dir:
+        return expand_path(str(run_dir))
+    output = target_build.get("output_deduped") or target_build.get("output_full")
+    if output:
+        return expand_path(str(output)).parent
+    experiment = metadata.get("experiment", "target-build")
+    return expand_path(DEFAULTS.run_base) / str(experiment)
+
+
+def target_build_command(
+    target_build: dict,
+    *,
+    output_key: str,
+    summary_key: str,
+    run_dir: Path,
+    dedupe: bool,
+    event_command: str,
+) -> list[str]:
+    output = target_build.get(output_key)
+    if not output:
+        raise SystemExit(f"target_build.{output_key} is required")
+    summary = target_build.get(summary_key) or str(Path(str(output)).with_suffix(".summary.txt"))
+    sources = target_build.get("sources")
+    if not isinstance(sources, dict) or not sources:
+        raise SystemExit("target_build.sources must be a non-empty object")
+    command = [
+        sys.executable,
+        tool("validate/validate.py"),
+        "search-targets",
+        "--output", str(expand_path(str(output))),
+        "--summary", str(expand_path(str(summary))),
+        "--max-moves", str(target_build.get("max_moves", 0)),
+        "--policy-temperature-cp", str(target_build.get("policy_temperature_cp", 200.0)),
+        "--mate-gap-cp", str(target_build.get("mate_gap_cp", 30000)),
+        "--run", str(run_dir),
+    ]
+    if event_command:
+        command += ["--event-command", event_command]
+    if dedupe:
+        command.append("--dedupe-fen")
+    for name, path in sources.items():
+        command += ["--scores", f"{name}={expand_user(str(path))}"]
+    return command
+
+
+def cmd_target_build(args: argparse.Namespace) -> int:
+    config_path = expand_path(args.config or default_build_config_path())
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    target_build = config.get("target_build")
+    if not isinstance(target_build, dict):
+        raise SystemExit(f"{config_path}: target_build object is required")
+    run_dir = target_build_run_dir(config)
+    event_command = args.event_command or str(config.get("event_command", ""))
+    if not event_command:
+        hooks = config.get("hooks", {})
+        if isinstance(hooks, dict):
+            event_command = str(hooks.get("event_command", ""))
+    if args.dry_run:
+        for output_key, summary_key, dedupe in [
+            ("output_full", "summary_full", False),
+            ("output_deduped", "summary_deduped", True),
+        ]:
+            print(" ".join(target_build_command(
+                target_build,
+                output_key=output_key,
+                summary_key=summary_key,
+                run_dir=run_dir,
+                dedupe=dedupe,
+                event_command=event_command,
+            )))
+        return 0
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "config.json").write_text(
+        json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    emit_event(
+        run_dir, "phase_start", stage="target_build", status="running",
+        message="building search-aware targets", hook_command=event_command,
+    )
+    rc = 0
+    for output_key, summary_key, dedupe in [
+        ("output_full", "summary_full", False),
+        ("output_deduped", "summary_deduped", True),
+    ]:
+        command = target_build_command(
+            target_build,
+            output_key=output_key,
+            summary_key=summary_key,
+            run_dir=run_dir,
+            dedupe=dedupe,
+            event_command=event_command,
+        )
+        rc = run(command, echo=True)
+        if rc != 0:
+            emit_event(
+                run_dir, "fail", stage="target_build", status="failed",
+                rc=rc, command=command, hook_command=event_command,
+            )
+            return rc
+
+    parts = []
+    for label, output_key, summary_key in [
+        ("full", "output_full", "summary_full"),
+        ("deduped", "output_deduped", "summary_deduped"),
+    ]:
+        output = target_build.get(output_key)
+        summary = target_build.get(summary_key) or str(Path(str(output)).with_suffix(".summary.txt"))
+        summary_path = expand_path(str(summary))
+        if summary_path.exists():
+            parts.append(label)
+            parts.append(summary_path.read_text(encoding="utf-8").strip())
+            parts.append("")
+    summary_path = run_dir / "summary.txt"
+    summary_path.write_text("\n".join(parts).rstrip() + "\n", encoding="utf-8")
+    emit_event(
+        run_dir, "done", stage="target_build", status="ok", rc=0,
+        log=summary_path, message="target build complete",
+        hook_command=event_command,
+    )
+    print(summary_path.read_text(encoding="utf-8"), end="")
+    return 0
+
+
 def add_create_args(
     parser: argparse.ArgumentParser,
     overrides: dict[str, object] | None = None,
@@ -934,6 +1074,19 @@ def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.A
     report.add_argument("run", nargs="?")
     report.add_argument("--tail", type=int, default=20)
     report.set_defaults(func=cmd_report)
+
+    target_build = subparsers.add_parser(
+        "target-build",
+        help="Build search-aware target files from build.json target_build.",
+    )
+    target_build.add_argument("-c", "--config", default=None)
+    target_build.add_argument("--dry-run", action="store_true")
+    target_build.add_argument(
+        "--event-command",
+        default=None,
+        help="Optional event hook command.",
+    )
+    target_build.set_defaults(func=cmd_target_build)
 
     return parser
 

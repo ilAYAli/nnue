@@ -430,6 +430,19 @@ Do not restart these as near-term Elo lanes:
   `201 non_mate`, `78 mate_like`, with sources
   `pairwise_sprtfail:73`, `sprt_material:80`, `sprt_output:80`, `stable:46`.
   This is suitable for a preflight, but not proof that training will improve.
+- `native-searchaware-v2-initdistill-w2-lr5e7-e8` as a native candidate:
+  rejected. The internal target model gate improved to `42/201`, but exported
+  movement was only `l2` (`214/25200209` parameters) and the broad `300k`
+  gate lost to the native init checkpoint (`candidate_better=28`,
+  `reference_better=36`, `capped_sum_diff_cp=-1605`; non-mate
+  `candidate_better=25`, `reference_better=29`,
+  `capped_sum_diff_cp=-1671`). Do not SPRT.
+- target-builder issue:
+  the v2 target builder truncated to top-8 moves before preserving known
+  oracle/reference/candidate moves. That can misclassify rows as `non_mate`
+  and then make `search_target_gate` assign synthetic `32000cp` gaps to
+  previously scored moves. Fix target construction before another
+  search-aware training run.
 
 ## Promotion Gates
 
@@ -452,12 +465,9 @@ The next action should be one of these, in order:
 
 1. Stop near-term reckless output-only work unless a new architecture hypothesis
    changes more than the final dense/output terms.
-2. In `nnue_native`, run
-   `native-searchaware-v2-initdistill-w2-lr5e7-e8` from the best native
-   continuation checkpoint. It uses the deduped v2 non-mate targets, strong
-   broad init distillation, and conservative search-aware pressure. The goal is
-   to see whether target top1 can improve without collapsing broad `300k`
-   non-mate/stable behavior.
+2. Rebuild the v2 search-aware target set after fixing marked-move
+   preservation. Inspect whether the `non_mate` set still contains synthetic
+   `32000cp` gap failures before any new training run.
 3. Do not launch another tiny target-only child-eval recovery run.
 4. No SPRT from the current search-aware native or reckless output-delta runs.
 
