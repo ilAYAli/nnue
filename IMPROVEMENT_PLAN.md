@@ -403,6 +403,13 @@ Do not restart these as near-term Elo lanes:
   signal (`candidate_better=29`, `reference_better=33`,
   `capped_sum_diff_cp=-173`, mate-like `worst_regression_cp=-31084`).
   It has non-mate signal, but the mate-like tail is still a hard veto.
+- shared mate-like tail diagnosis:
+  `reckless-shared-tail-diagnosis-20260523_085539` showed the worst FEN is a
+  horizon/target mismatch for Enyo search. Stockfish ranks `e5e6` clearly best
+  and marks `b8d8`/`e4f3` as mate-losing, but Enyo forced searches at
+  `100k`/`300k`/`1M` score the watched moves almost identically near `-2045cp`.
+  Treat these mate-like oracle tails as diagnostic, not automatic SPRT
+  blockers, unless repeated match evidence confirms them.
 
 ## Promotion Gates
 
@@ -423,10 +430,11 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. In `nnue_reckless`, diagnose the shared catastrophic mate-like FEN that
-   vetoed both mask2 and delta020. Compare reference, mask2, and delta020 root
-   choices, forced-move search scores, and child static evals.
-2. Do not start another reckless training run until that tail is understood.
+1. In `nnue_reckless`, run the remaining output-signfit delta scales
+   (`0.05`, `0.10`, `0.15`, plus the existing `0.20` result) on the current
+   broad `300k` search-aware gate.
+2. If no scale is positive after capped broad comparison and failure-suite
+   replay, stop near-term reckless output-only work.
 3. In `nnue_native`, do not launch another direct child-eval recovery run. The
    next native step must redesign the target/objective around engine-search
    behavior and broad preservation together.
