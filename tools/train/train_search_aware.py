@@ -234,6 +234,26 @@ def optimizer_param_groups(model: EnyoNNUE, args: argparse.Namespace):
     return out
 
 
+def effective_broad_weight(epoch: int, args: argparse.Namespace) -> float:
+    final = args.search_broad_weight
+    warmup_epochs = max(0, args.search_target_warmup_epochs)
+    ramp_epochs = max(0, args.search_broad_ramp_epochs)
+    warmup = args.search_warmup_broad_weight
+
+    if warmup_epochs == 0 and ramp_epochs == 0:
+        return final
+    if epoch < warmup_epochs:
+        return warmup
+    if ramp_epochs == 0:
+        return final
+
+    ramp_index = epoch - warmup_epochs
+    if ramp_index >= ramp_epochs:
+        return final
+    frac = float(ramp_index + 1) / float(ramp_epochs)
+    return warmup + frac * (final - warmup)
+
+
 def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
                             best_indices: torch.Tensor, gaps: torch.Tensor,
                             policies: torch.Tensor, group_weights: torch.Tensor,
@@ -394,6 +414,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     opt = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
 
     for epoch in range(args.epochs):
+        broad_weight = effective_broad_weight(epoch, args)
         broad_mae_sum = 0.0
         broad_n = 0
         target_n = 0
@@ -424,7 +445,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                 group_weights, args)
 
             loss = (
-                args.search_broad_weight * broad_loss
+                broad_weight * broad_loss
                 + args.search_margin_weight * margin_loss
                 + args.search_policy_weight * policy_loss)
             opt.zero_grad()
@@ -452,6 +473,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         metrics = search_metrics(model, target_loader, args)
         print(
             f"epoch {epoch:4d}"
+            f" broad_w={broad_weight:g}"
             f" broad_mae={broad_mae_sum / max(1, broad_n):7.2f}"
             f" target_batch_top1={100.0 * target_top1 / max(1, target_n):5.1f}%"
             f" target_batch_top3={100.0 * target_top3 / max(1, target_n):5.1f}%"
@@ -487,6 +509,12 @@ def main() -> None:
     ap.add_argument("--target-clamp", type=float, default=800.0)
     ap.add_argument("--search-broad-weight", type=float, default=1.0)
     ap.add_argument("--search-broad-target", default="teacher", choices=["teacher", "init"])
+    ap.add_argument("--search-target-warmup-epochs", type=int, default=0,
+                    help="Epochs to train search targets before using final broad weight")
+    ap.add_argument("--search-warmup-broad-weight", type=float, default=0.0,
+                    help="Broad weight during target warmup")
+    ap.add_argument("--search-broad-ramp-epochs", type=int, default=0,
+                    help="Epochs to linearly ramp broad weight after target warmup")
     ap.add_argument("--search-margin-weight", type=float, default=1.0)
     ap.add_argument("--search-policy-weight", type=float, default=0.25)
     ap.add_argument("--search-margin-beta", type=float, default=100.0)

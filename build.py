@@ -471,6 +471,9 @@ def create_config(args: argparse.Namespace) -> dict:
             "--target-clamp", str(args.target_clamp),
             "--search-broad-weight", str(args.search_broad_weight),
             "--search-broad-target", args.search_broad_target,
+            "--search-target-warmup-epochs", str(args.search_target_warmup_epochs),
+            "--search-warmup-broad-weight", str(args.search_warmup_broad_weight),
+            "--search-broad-ramp-epochs", str(args.search_broad_ramp_epochs),
             "--search-margin-weight", str(args.search_margin_weight),
             "--search-policy-weight", str(args.search_policy_weight),
             "--search-margin-beta", str(args.search_margin_beta),
@@ -807,6 +810,9 @@ def add_create_args(
     parser.add_argument("--search-broad-weight", type=float, default=value("search_broad_weight", d.search_broad_weight))
     parser.add_argument("--search-broad-target", default=value("search_broad_target", d.search_broad_target),
                         choices=["teacher", "init"])
+    parser.add_argument("--search-target-warmup-epochs", type=int, default=value("search_target_warmup_epochs", d.search_target_warmup_epochs))
+    parser.add_argument("--search-warmup-broad-weight", type=float, default=value("search_warmup_broad_weight", d.search_warmup_broad_weight))
+    parser.add_argument("--search-broad-ramp-epochs", type=int, default=value("search_broad_ramp_epochs", d.search_broad_ramp_epochs))
     parser.add_argument("--search-margin-weight", type=float, default=value("search_margin_weight", d.search_margin_weight))
     parser.add_argument("--search-policy-weight", type=float, default=value("search_policy_weight", d.search_policy_weight))
     parser.add_argument("--search-margin-beta", type=float, default=value("search_margin_beta", d.search_margin_beta))

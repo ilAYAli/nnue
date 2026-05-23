@@ -110,6 +110,9 @@ class CandidateDefaults:
     search_target_batch_size: int = 16
     search_broad_weight: float = 1.0
     search_broad_target: str = "teacher"
+    search_target_warmup_epochs: int = 0
+    search_warmup_broad_weight: float = 0.0
+    search_broad_ramp_epochs: int = 0
     search_margin_weight: float = 1.0
     search_policy_weight: float = 0.25
     search_margin_beta: float = 100.0
