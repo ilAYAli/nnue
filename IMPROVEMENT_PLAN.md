@@ -24,11 +24,10 @@ The main failure pattern is:
   has not recovered reference move-choice strength.
 
 Current `build.json` state: active next run is
-`search-aware-mateguard-initdistill-lr5e7-e4` in the `nnue_reckless` lane. It
-starts from the existing Enyo/Berserk-derived net, distills broad positions back
-to that init net, and up-weights mate-like engine-search targets. This tests
-whether the recent broad SF-binpack signal can be converted into tail-safe
-search behavior instead of another head-only or scalar-only recipe.
+`native-bullet-sfbinpack-scratch-eval400-sb4096` in the `nnue_native` lane. It
+trains an Enyo-layout net from scratch with Bullet directly from the Stockfish
+NNUE binpack. This is not an existing-weight delta and does not use Berserk
+initialization.
 
 ## Track Definitions
 
@@ -140,16 +139,17 @@ unacceptable mate/endgame tails.
 
 ## Active Next Run
 
-`search-aware-mateguard-initdistill-lr5e7-e4`
+`native-bullet-sfbinpack-scratch-eval400-sb4096`
 
 Purpose:
 
-- keep the lane existing-weight based (`nnue_reckless`).
-- use broad init-net distillation to avoid broad drift.
-- weight `mate_like` search targets higher than `non_mate` targets.
-- require exported movement plus clean search/failure gates before SPRT.
+- switch to the native lane after another existing-weight objective failed.
+- use a proven external Stockfish NNUE binpack instead of more Enyo self-play.
+- train from scratch with no Berserk initialization.
+- save checkpoints for cheap move-gate sweeps before any SPRT.
 
-This run is a target/objective test, not a new data-generation cycle.
+This run is a provenance/native-baseline test, not a promotion candidate by
+default.
 
 ## Hard Rejections
 
@@ -169,6 +169,10 @@ Do not restart these as near-term Elo lanes:
 - Bullet/Reckless-like scratch checkpoints as a direct replacement candidate.
 - native scratch nets trained only on current Enyo self-play labels as promotion
   candidates.
+- search-aware mateguard with broad init distillation and `mate_like=8`: it
+  exported only dense/output changes and failed the search gate
+  (`candidate_better=39`, `reference_better=146`,
+  `capped_sum_diff_cp=-17929`).
 
 ## Promotion Gates
 
@@ -189,11 +193,10 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run the committed search-aware mateguard preflight from `build.json`.
-   Reject it before SPRT unless it passes net-diff, search/move gate, and
-   failure-suite replay.
-2. Keep native/scratch as a background lane that needs substantially broader
-   prepared data before it is considered a promotion path.
+1. Run the committed native SF-binpack scratch preflight from `build.json`.
+2. Sweep saved checkpoints against the search/move gate.
+3. Only continue native training if the checkpoint sweep is materially closer
+   to reference behavior than prior Enyo-self-play scratch nets.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
