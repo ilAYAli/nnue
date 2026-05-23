@@ -180,13 +180,15 @@ Decision: no SPRT. Stop scalar native SF-binpack continuation. The useful next
 diagnostic is non-mate search behavior, not another same-objective continuation
 run.
 
-Active diagnostic:
+Follow-up non-mate diagnostic:
 
 - `native-nonmate-deep-diagnosis-20260523_055831`
-- run the `128` non-mate search-aware targets at deeper nodes against the same
-  checkpoint and reference.
-- if non-mate remains negative at deeper search, the next native lane needs a
-  changed target/objective, not more scalar SF-binpack epochs.
+- `3M nodes` on the `128` non-mate targets:
+  `top1=42/128`, `candidate_better=21`, `reference_better=60`,
+  `capped_sum_diff_cp=-3397`, `median_nonzero_diff_cp=-23`.
+
+Decision: deeper search did not close the non-mate gap. The next native lane
+needs a changed target/objective, not more scalar SF-binpack epochs.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -240,6 +242,9 @@ Do not restart these as near-term Elo lanes:
   candidate: fresh-hash 1M validation improved mate-like behavior, but non-mate
   stayed strongly negative (`candidate_better=27`, `reference_better=57`,
   `capped_sum_diff_cp=-2939`).
+- scalar native SF-binpack continuation at deeper search: the `3M` non-mate
+  diagnostic stayed negative (`candidate_better=21`, `reference_better=60`,
+  `capped_sum_diff_cp=-3397`).
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -264,12 +269,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Finish `native-nonmate-deep-diagnosis-20260523_055831`.
-2. If deeper non-mate search remains negative, update `build.json` only for a
-   candidate with a changed target/objective. Do not run another scalar
+1. Design the next native candidate around a changed target/objective for
+   non-mate move choice. The current evidence does not justify another scalar
    SF-binpack continuation.
-3. If deeper non-mate search unexpectedly closes the gap, run failure-suite
-   replay before considering any SPRT.
+2. Keep `build.json` unchanged until that hypothesis is explicit enough to
+   review in one diff.
+3. No SPRT from the current native SF-binpack scratch/continuation nets.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
