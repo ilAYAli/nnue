@@ -1,5 +1,5 @@
 {
-  "description": "Reckless lane: check-state bucket sweep, rejected after smoke SPRT.",
+  "description": "Reckless lane: check-state bucket sweep, rejected after 4k confirmation SPRT.",
   "metadata": {
     "experiment": "reckless-checkbucket-bucket-sweep",
     "track": "nnue_reckless",
@@ -12,7 +12,7 @@
     "broad_300k": "bucket 6: all 9 vs 3, capped +99, worst -47; mate-like unchanged",
     "broad_1m": "bucket 6: all 7 vs 2, capped +98, worst -34; mate-like unchanged",
     "failure_suite": "bucket 6: positions 913, candidate 10 vs reference 7, sum +250, worst -27",
-    "sprt": "bucket 6 smoke: -13.9 +/- 15.0 Elo, LOS 3.5%, draw 51.4%",
+    "sprt": "bucket 6: smoke1 -13.9 +/- 15.0, smoke2 +4.9 +/- 15.1, confirm4k -4.5 +/- 7.7 Elo, LOS 12.4%, draw 49.5%",
     "status": "rejected"
   },
   "validation": {

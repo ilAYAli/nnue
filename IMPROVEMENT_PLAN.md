@@ -25,7 +25,7 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`reckless-checkbucket-bucket-sweep`, rejected after smoke SPRT.
+`reckless-checkbucket-bucket-sweep`, rejected after 4k confirmation SPRT.
 This was a reckless-lane diagnostic: keep existing weights, mix one trained
 check-state output bucket at a time into the copied bucketed base, and run
 broad gates before any SPRT.
@@ -33,7 +33,8 @@ broad gates before any SPRT.
 Active native background run:
 `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768` is still running.
 Checkpoint `12288` remains the best live gate so far by broad capped sum
-(`+1142`), but every checked checkpoint through `18432` is still vetoed by the
+(`+1142`), and checkpoint `24576` has the best top-1 score so far
+(`80/232`). Every checked checkpoint through `26624` is still vetoed by the
 mate-like tail (`-31kcp` class worst regression). No native checkpoint is an
 SPRT candidate yet.
 
@@ -75,15 +76,20 @@ Rejected `reckless-checkbucket-bucket-sweep-20260523_162724` /
   `positions=913`, `candidate_better=10`, `reference_better=7`,
   `sum_diff_cp=+250`, `median_nonzero_diff_cp=12`,
   `worst_regression_cp=-27`, `best_gain_cp=92`.
-- Despite those clean gates, the 1000-game smoke SPRT failed:
-  `Elo -13.9 +/- 15.0`, `LLR -1.59/2.94 (-54%)`, `LOS 3.5%`,
-  draw `51.4%`.
+- Despite those clean gates, match testing rejected it:
+  - 1000-game smoke: `Elo -13.9 +/- 15.0`,
+    `LLR -1.59/2.94 (-54%)`, `LOS 3.5%`, draw `51.4%`.
+  - 1000-game repeat smoke: `Elo +4.9 +/- 15.1`,
+    `LLR 0.20/2.94 (7%)`, `LOS 73.7%`, draw `51.2%`.
+  - 4000-game confirmation:
+    `Elo -4.5 +/- 7.7`, `LLR -1.47/2.94 (-50%)`, `LOS 12.4%`,
+    draw `49.5%`.
 
 Decision: reject. Bucket `6` is the cleanest pre-SPRT result from the
-check-state-head family, but it still lost in match play. Do not launch another
-check-state bucket/head SPRT from this family without a new hypothesis that
-explains why broad search-target and failure-suite gates were positive while
-match Elo was negative.
+check-state-head family, but it did not produce match Elo. Do not launch
+another check-state bucket/head SPRT from this family without a new hypothesis
+that explains why broad search-target and failure-suite gates were positive
+while match Elo was neutral/negative.
 
 This also weakens the current promotion gate: passing broad search-targets and
 failure-suite replay is necessary, but not sufficient. The gate needs either a
