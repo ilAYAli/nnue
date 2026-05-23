@@ -12,6 +12,7 @@
   "validation": {
     "tmux": "nnue_reckless",
     "required_checks": [
+      "run tools/nnue/sweep_bucket_mix.py",
       "generate masked .nn files with tools/nnue/mix_material_head.py",
       "net-diff each masked net against the bucketed base",
       "broad search-target gate at 300k nodes",

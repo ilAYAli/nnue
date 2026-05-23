@@ -74,6 +74,8 @@ Next run:
 - Mix buckets `0` through `7` one at a time from
   `reckless-check-bucket-output-1m-lr1e6-e4` into the copied bucketed base.
 - Gate each masked net on the broad 300k-node search target set.
+- Use `tools/nnue/sweep_bucket_mix.py` so the run emits phase notifications and
+  leaves a single `summary.tsv`.
 - No SPRT unless all, non-mate, and mate-like splits are clean and tails are
   acceptable.
 
