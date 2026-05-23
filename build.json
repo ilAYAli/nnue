@@ -33,6 +33,7 @@
     "search_max_moves": 8,
     "search_target_batch_size": 16,
     "search_target_limit": 16,
+    "search_required_tags": "non_mate",
     "forward": "quantized",
     "trainable": "all",
     "lr": 0.00003,
