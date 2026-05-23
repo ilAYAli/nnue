@@ -410,6 +410,12 @@ Do not restart these as near-term Elo lanes:
   `100k`/`300k`/`1M` score the watched moves almost identically near `-2045cp`.
   Treat these mate-like oracle tails as diagnostic, not automatic SPRT
   blockers, unless repeated match evidence confirms them.
+- output-signfit delta scaling as a near-term reckless lane:
+  `reckless-floathead-delta-scale-300k-sweep-20260523_090331` rejected all
+  scales on the current broad `300k` gate:
+  `0.05 cap=-158`, `0.10 cap=-124`, `0.15 cap=-243`, `0.20 cap=-173`.
+  The non-mate subset has small signal at some scales, but the broad score is
+  not positive and this is not a SPRT candidate.
 
 ## Promotion Gates
 
@@ -430,15 +436,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. In `nnue_reckless`, run the remaining output-signfit delta scales
-   (`0.05`, `0.10`, `0.15`, plus the existing `0.20` result) on the current
-   broad `300k` search-aware gate.
-2. If no scale is positive after capped broad comparison and failure-suite
-   replay, stop near-term reckless output-only work.
-3. In `nnue_native`, do not launch another direct child-eval recovery run. The
-   next native step must redesign the target/objective around engine-search
-   behavior and broad preservation together.
-4. No SPRT from the current search-aware native runs.
+1. Stop near-term reckless output-only work unless a new architecture hypothesis
+   changes more than the final dense/output terms.
+2. In `nnue_native`, inspect the best scratch/current-reference broad-gate
+   failures and define the next search-aware objective around broad preservation
+   plus move choice. Do not launch another direct child-eval recovery run.
+3. No SPRT from the current search-aware native or reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
