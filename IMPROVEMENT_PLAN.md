@@ -20,14 +20,13 @@ The main failure pattern is:
   quantization thresholds.
 - forced sparse movement is possible, but has not improved engine-search move
   choice.
-- scratch/native training works technically, but current Enyo self-play volume
-  has not recovered reference move-choice strength.
+- scratch/native training works technically. Current Enyo self-play volume has
+  not recovered reference move-choice strength, but the first Stockfish-binpack
+  native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state: active next run is
-`native-bullet-sfbinpack-scratch-eval400-sb4096` in the `nnue_native` lane. It
-trains an Enyo-layout net from scratch with Bullet directly from the Stockfish
-NNUE binpack. This is not an existing-weight delta and does not use Berserk
-initialization.
+`native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096` in the `nnue_native`
+lane. It continues from the Enyo-owned SF-binpack scratch net, not from Berserk.
 
 ## Track Definitions
 
@@ -139,17 +138,47 @@ unacceptable mate/endgame tails.
 
 ## Active Next Run
 
-`native-bullet-sfbinpack-scratch-eval400-sb4096`
+`native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096`
 
 Purpose:
 
-- switch to the native lane after another existing-weight objective failed.
-- use a proven external Stockfish NNUE binpack instead of more Enyo self-play.
-- train from scratch with no Berserk initialization.
-- save checkpoints for cheap move-gate sweeps before any SPRT.
+- continue the native SF-binpack lane after the first run showed clear
+  baseline-building progress but failed promotion gates.
+- initialize from the Enyo-owned
+  `native-bullet-sfbinpack-scratch-eval400-sb4096/model.nn`.
+- keep the data source and architecture fixed.
+- use a lower continuation LR and save checkpoints for the same cheap move-gate
+  sweep before any broader validation.
 
 This run is a provenance/native-baseline test, not a promotion candidate by
 default.
+
+## Latest Result: Native SF-binpack Scratch
+
+`native-bullet-sfbinpack-scratch-eval400-sb4096`
+
+Completed with Bullet directly on the Stockfish NNUE binpack:
+
+- no Berserk initialization.
+- final training loss: about `0.0266`.
+- training time: `0h 41m 47s`.
+- checkpoints: `1024`, `2048`, `3072`, `4096`.
+
+Checkpoint search-gate sweep:
+
+- `1024`: `top1=62/232`, `candidate_better=46`,
+  `reference_better=89`, `capped_sum_diff_cp=-5341`.
+- `2048`: `top1=56/232`, `candidate_better=51`,
+  `reference_better=95`, `capped_sum_diff_cp=-6724`.
+- `3072`: `top1=64/232`, `candidate_better=53`,
+  `reference_better=93`, `capped_sum_diff_cp=-5359`.
+- `4096`: `top1=64/232`, `candidate_better=56`,
+  `reference_better=91`, `capped_sum_diff_cp=-4663`.
+
+Decision: no SPRT. This is not close to the reference, and every checkpoint
+keeps the `-31814cp` mate-like tail. It is still materially better than prior
+native Enyo-selfplay scratch checkpoints, so continue once with lower LR from
+this Enyo-owned checkpoint before changing architecture or data again.
 
 ## Hard Rejections
 
@@ -169,6 +198,9 @@ Do not restart these as near-term Elo lanes:
 - Bullet/Reckless-like scratch checkpoints as a direct replacement candidate.
 - native scratch nets trained only on current Enyo self-play labels as promotion
   candidates.
+- `native-bullet-sfbinpack-scratch-eval400-sb4096` as a promotion candidate:
+  best checkpoint was still `top1=64/232`, `candidate_better=56`,
+  `reference_better=91`, `capped_sum_diff_cp=-4663`.
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -195,8 +227,11 @@ The next action should be one of these, in order:
 
 1. Run the committed native SF-binpack scratch preflight from `build.json`.
 2. Sweep saved checkpoints against the search/move gate.
-3. Only continue native training if the checkpoint sweep is materially closer
-   to reference behavior than prior Enyo-self-play scratch nets.
+3. Continue once from the Enyo-owned SF-binpack checkpoint with lower LR because
+   it is materially closer than prior Enyo-selfplay scratch nets.
+4. If the continuation still does not materially close the search-gate gap, stop
+   native scalar SF-binpack continuation and reassess data/objective before
+   spending more GPU time.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.

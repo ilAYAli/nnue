@@ -1,18 +1,19 @@
 {
-  "description": "Native Enyo NNUE experiment: scratch Enyo-layout Bullet training directly from the proven Stockfish NNUE binpack, with no Berserk initialization.",
-  "experiment": "native-bullet-sfbinpack-scratch-eval400-sb4096",
+  "description": "Native Enyo NNUE continuation: keep the SF-binpack data source and Enyo layout fixed, initialize from the previous Enyo-owned scratch net, and continue at lower LR.",
+  "experiment": "native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096",
   "track": "nnue_native",
-  "hypothesis": "The existing-weight lane is saturated and recent target/objective repairs still move only dense head tensors. A native Enyo net needs a broader proven data source than Enyo self-play; train from scratch on the SF binpack with Bullet and gate saved checkpoints.",
+  "hypothesis": "The first native SF-binpack scratch run is far below the reference but materially better than prior native Enyo-selfplay scratch nets. A controlled lower-LR continuation may improve move-choice without changing data, architecture, or using Berserk initialization.",
   "data_source": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
+  "previous_run": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-scratch-eval400-sb4096",
   "gates": [
     "model must export as Enyo-compatible .nn",
-    "checkpoint sweep must show move-gate progress toward the current reference",
+    "checkpoint sweep must materially improve over the previous best search gate",
+    "mate-like tail must improve; no SPRT with the -31814cp tail",
     "static validation is a rejection filter, not proof",
-    "failure-suite replay must not introduce an unacceptable tail",
-    "SPRT only if cheap gates are clean"
+    "failure-suite replay must be clean before any SPRT"
   ],
   "create": {
-    "name": "native-bullet-sfbinpack-scratch-eval400-sb4096",
+    "name": "native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096",
     "backend": "bullet",
     "bullet_mode": "enyo",
     "bullet_loader": "sfbinpack",
@@ -21,15 +22,15 @@
     "bullet_sfbinpack_min_ply": 16,
     "bullet_sfbinpack_max_abs_cp": 10000,
     "bullet_sfbinpack_quiet_only": true,
-    "init_net": "",
+    "init_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-scratch-eval400-sb4096/train/native-bullet-sfbinpack-scratch-eval400-sb4096/model.nn",
     "trainable": "all",
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
     "bullet_superbatches": 4096,
     "bullet_threads": 4,
     "bullet_wdl": 0.75,
-    "bullet_lr": 0.001,
-    "bullet_final_lr": 0.00005,
+    "bullet_lr": 0.0002,
+    "bullet_final_lr": 0.00002,
     "bullet_eval_scale": 400.0,
     "bullet_enyo_l0_std": 8.0,
     "bullet_enyo_l1_std": 1.0,
@@ -41,6 +42,6 @@
   "validation": {
     "status": "planned",
     "tmux": "nnue_native",
-    "next": "run native SF-binpack scratch preflight and checkpoint sweep; continue only if move-gate progress is materially better than prior Enyo-selfplay scratch nets"
+    "next": "run native SF-binpack lower-LR continuation and checkpoint sweep; stop this scalar continuation lane if the search gate does not materially improve"
   }
 }
