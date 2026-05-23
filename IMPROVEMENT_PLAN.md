@@ -24,11 +24,12 @@ The main failure pattern is:
   not recovered reference move-choice strength, but the first Stockfish-binpack
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
-Current `build.json` state: the native SF-binpack lower-LR continuation is
-complete and rejected as a promotion path. It was still useful diagnostically:
-fresh UCI-state validation showed the mate-like catastrophic tail was mostly a
-measurement/search-context issue, while non-mate move choice remained far below
-the reference.
+Current `build.json` state: active next run is
+`native-searchaware-nonmate-initdistill-w8-lr1e6-e6` in the `nnue_native` lane.
+It starts from the best Enyo-owned SF-binpack checkpoint and changes the
+objective, not the scalar data recipe: broad init-net distillation is the
+guardrail, while the search-aware loss is weighted toward the non-mate targets
+that remained bad at 1M and 3M nodes.
 
 ## Track Definitions
 
@@ -269,12 +270,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Design the next native candidate around a changed target/objective for
-   non-mate move choice. The current evidence does not justify another scalar
-   SF-binpack continuation.
-2. Keep `build.json` unchanged until that hypothesis is explicit enough to
-   review in one diff.
-3. No SPRT from the current native SF-binpack scratch/continuation nets.
+1. Run `native-searchaware-nonmate-initdistill-w8-lr1e6-e6` from the committed
+   `build.json`.
+2. Validate with `net-diff` and the fresh-hash search gate before any broader
+   replay.
+3. If the exported net is identical, or if non-mate stays negative while
+   mate-like reopens tails, reject it without SPRT.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
