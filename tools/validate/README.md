@@ -13,6 +13,7 @@ tools/validate/validate.py failure-suite --help
 tools/validate/validate.py sprt --help
 tools/validate/validate.py search-targets --help
 tools/validate/validate.py search-gate --help
+tools/validate/checkpoint_sweep.py --help
 tools/validate/extract_tail_targets.py --help
 tools/validate/score_tail_targets.py --help
 tools/validate/move_choice_gate.py --help
@@ -82,6 +83,19 @@ tools/validate/validate.py search-gate \
   --candidate-net runs/candidate/train/candidate/model.nn \
   --reference-net ~/code/cpp/chess/enyo/nnue/current-reference.nn \
   --out-dir runs/candidate/validate/search_gate
+```
+
+Sweep Bullet Enyo checkpoints by exporting each checkpoint to `.nn` and running
+the same search gate:
+
+```sh
+tools/validate/checkpoint_sweep.py \
+  --checkpoint-dir runs/native/train/native/checkpoints \
+  --targets assets/failure_suite/search_aware_targets_20260523.jsonl \
+  --engine ../enyo/build/enyo \
+  --reference-net runs/native-base/train/native-base/model.nn \
+  --out-dir runs/native/validate/checkpoint_sweep \
+  --event-command tools/events/nnue_event_ntfy.sh
 ```
 
 With the generic event hook:
