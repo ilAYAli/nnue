@@ -1,7 +1,6 @@
 # Native Enyo NNUE
 
-This file documents the normal Enyo `.nn` runtime design. It is not the
-experimental Bullet runtime and not a Reckless copy.
+This file documents the normal Enyo `.nn` runtime design.
 
 Source of truth in Enyo is currently `src/nnue_model.hpp`.
 
@@ -85,7 +84,7 @@ training should target the current 32-bucket format.
 ```text
 init_net = null or an Enyo-native checkpoint
 runtime  = Enyo .nn
-goal     = replace inherited Berserk-derived weights over time
+goal     = produce and improve Enyo-owned weights over time
 ```
 
 Bullet may be used as a faster trainer, but native experiments must export a
@@ -98,7 +97,7 @@ The engine has experimental support for:
 ```text
 bucketed output heads
 threat branch weights
-Bullet/Reckless-like runtime loading
+alternate runtime loading
 ```
 
 Those are not the baseline native design. Treat them as gated architecture
