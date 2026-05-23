@@ -48,8 +48,9 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "planned",
+    "status": "rejected",
     "tmux": "nnue_native",
-    "next": "run build.py -c build.json in nnue_native; after export, run net-diff and fresh-hash search gate before considering broader validation"
+    "result": "rejected; net-diff moved only 191/512 L2 weights and 24/32 L2 biases, target top1 stayed around 32-33/232, and fresh-hash 300k search gate collapsed: candidate_better=31, reference_better=151, capped_sum_diff_cp=-20372",
+    "next": "audit train_search_aware.py on a tiny target-only overfit before changing build.json again; no SPRT"
   }
 }
