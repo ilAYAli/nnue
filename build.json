@@ -1,39 +1,30 @@
 {
-  "description": "Native lane: inspect scratch/current-reference broad-gate failures before the next search-aware objective change.",
-  "experiment": "native-searchaware-failure-inspection",
+  "description": "Native lane: build broader v2 search-aware move-choice targets before the next objective change.",
+  "experiment": "native-searchaware-targets-v2",
   "track": "nnue_native",
-  "hypothesis": "Near-term reckless output-only deltas are exhausted. The next useful work is to compare native scratch/current-reference failures and design the next search-aware objective around broad preservation plus move choice, not another direct child-eval recovery run.",
-  "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-  "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/train/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/checkpoints/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048/quantised.bin",
+  "hypothesis": "Native scratch/continuation failures are dominated by broad non-mate/stable move-choice loss. Before another training run, build a broader top-N target set that includes pairwise SPRT-fail positions in addition to the current stable/repeated/SPRT scored move CSVs.",
+  "target_build": {
+    "output_full": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v2-20260523/search_aware_targets_v2_full.jsonl",
+    "output_deduped": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v2-20260523/search_aware_targets_v2_deduped.jsonl",
+    "max_moves": 8,
+    "policy_temperature_cp": 200.0,
+    "mate_gap_cp": 30000,
+    "sources": {
+      "stable": "/home/petter/code/cpp/chess/nnue/runs/stable-move-gate-20260522_190231/stable_move_scores_nodes1m.csv",
+      "repeated": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/repeated_tail_move_scores_20260521.csv",
+      "sprt_material": "/home/petter/code/cpp/chess/nnue/runs/deep-score-sprt-fail-targets-20260522_190538/material_mask_sprt_fail_move_scores_nodes1m.csv",
+      "sprt_output": "/home/petter/code/cpp/chess/nnue/runs/deep-score-sprt-fail-targets-20260522_190538/output_signfit_sprt_fail_move_scores_nodes1m.csv",
+      "pairwise_sprtfail": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv"
+    }
+  },
   "validation": {
     "status": "pending",
     "tmux": "nnue_native",
-    "targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
-    "nodes": 300000,
     "required_checks": [
-      "compare best native scratch checkpoint against reference by source/tag",
-      "identify whether losses are mate-like, non-mate, or broad positional",
-      "produce the next objective design before launching training"
+      "build full and deduped v2 JSONL target files",
+      "report targets, move rows, source distribution, tag distribution",
+      "do not train until the target distribution is reviewed"
     ],
-    "next": "analysis only; no training and no SPRT"
-  },
-  "create": {
-    "name": "reckless-check-bucket-mask2-lr1e6-e4",
-    "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "backend": "material-head",
-    "bucket_mode": "check-state",
-    "init_net": "/home/petter/code/cpp/chess/nnue/runs/reckless-check-bucket-mask2-lr1e6-e4/base_bucketed.nn",
-    "forward": "quantized",
-    "trainable": "output",
-    "objective": "huber",
-    "target_clamp": 800,
-    "huber_beta": 200,
-    "wdl_lambda": 0.0,
-    "lr": 0.000001,
-    "epochs": 4,
-    "pack_limit": 1000000,
-    "weight_decay": 0.0,
-    "select_metric": "mae",
-    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+    "next": "target build only; no training and no SPRT"
   }
 }
