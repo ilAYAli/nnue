@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-sfbinpack-continue2-eval400-lr5e5-sb8192`.
-This is the harder native path: continue the best SF-binpack native checkpoint
-with Bullet on the external SF-binpack data, save checkpoints, then gate
-checkpoints before any SPRT.
+`native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096`.
+This is the conservative native SF-binpack retry: start again from the best
+previous native checkpoint, lower LR, remove weight decay, shorten the run, save
+more frequent checkpoints, then gate checkpoints before any SPRT.
 
 ## Track Definitions
 
@@ -47,6 +47,26 @@ checkpoints before any SPRT.
 - currently useful for background experiments, not promotion.
 
 ## Latest Result
+
+Rejected native SF-binpack continuation:
+
+- `native-bullet-sfbinpack-continue2-eval400-lr5e5-sb8192` continued the best
+  previous native checkpoint on external SF-binpack data for `8192`
+  superbatches.
+- shallow checkpoint sweep showed target top1/top3 gains, but the deeper
+  1M-node gate rejected both plausible checkpoints.
+- checkpoint `5120`: all split was neutral by counts (`36` vs `36`) with
+  positive capped sum (`+677`), but non-mate regressed (`23` vs `26`,
+  capped `-320`, worst `-305cp`).
+- checkpoint `7168`: better by counts (`41` vs `36`) but failed capped/tail
+  behavior (`capped=-71`, worst `-397cp`); non-mate was also negative
+  (`28` vs `26`, capped `-598`, worst `-397cp`).
+
+Decision: no SPRT. The run learned some search-target signal, but too much
+pressure still creates broad/non-mate regressions. Retry only once with a more
+conservative continuation (`lr=1e-5 -> 1e-6`, no weight decay, `4096`
+superbatches, checkpoints every `512`); if that also fails deep gates, stop this
+native SF-binpack continuation family and reassess architecture/data scale.
 
 Rejected native broad-target search-aware run:
 
