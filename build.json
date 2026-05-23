@@ -1,10 +1,10 @@
 {
-  "description": "Near-term reckless lane: broad current search-gate audit for the bucketed-head mask2 existing-weight delta.",
-  "experiment": "reckless-check-bucket-mask2-broad-gate",
+  "description": "Near-term reckless lane: broad current search-gate audit for the scaled output-signfit existing-weight delta.",
+  "experiment": "reckless-floathead-delta020-broad-gate",
   "track": "nnue_reckless",
-  "hypothesis": "The mask2 bucketed-head candidate had the best old composite gate but failed smoke testing. Runtime is now confirmed acceptable, so validate it against the current broad search-aware target gate before any further SPRT.",
+  "hypothesis": "Mask2 is rejected by the current broad gate. The scaled output-signfit delta020 net is the only remaining existing-weight delta with a positive broad capped score in prior 100k testing; recheck it at 300k before considering any further validation.",
   "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-  "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/reckless-check-bucket-mask2-lr1e6-e4/model.nn",
+  "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_020.nn",
   "validation": {
     "status": "pending",
     "tmux": "nnue_reckless",
@@ -13,8 +13,8 @@
     "required_checks": [
       "fixed-node broad search gate against current search-aware targets",
       "compare candidate and reference top1/top3 and capped cp gap",
-      "reject mask2 if broad gate is negative despite old composite gate",
-      "do not start SPRT unless broad gate and failure-suite behavior are clean"
+      "reject delta020 if broad gate is not positive at 300k",
+      "do not start SPRT unless broad gate remains positive and failure-suite tail is improved or explained"
     ],
     "next": "run broad current search-gate audit only; no training and no SPRT"
   },
