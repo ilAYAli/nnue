@@ -53,7 +53,11 @@ class UciEngine:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
 
-    def bestmove(self, fen: str, nodes: int) -> tuple[str, int]:
+    def bestmove(self, fen: str, nodes: int, *, reset_game: bool) -> tuple[str, int]:
+        if reset_game:
+            send(self.proc, "ucinewgame")
+            send(self.proc, "isready")
+            read_until(self.proc, "readyok")
         send(self.proc, f"position fen {fen}")
         send(self.proc, f"go nodes {nodes}")
         nodes_seen = 0
@@ -94,12 +98,14 @@ def move_info(target: dict[str, object], move: str) -> dict[str, object]:
 
 
 def run_engine(engine: Path, net: Path | None, targets: list[dict[str, object]],
-               *, nodes: int, threads: int, hash_mb: int) -> list[dict[str, object]]:
+               *, nodes: int, threads: int, hash_mb: int,
+               reset_game: bool) -> list[dict[str, object]]:
     uci = UciEngine(engine, nnue_file=net, threads=threads, hash_mb=hash_mb)
     rows: list[dict[str, object]] = []
     try:
         for target in targets:
-            move, nodes_seen = uci.bestmove(str(target["fen"]), nodes)
+            move, nodes_seen = uci.bestmove(
+                str(target["fen"]), nodes, reset_game=reset_game)
             info = move_info(target, move)
             rows.append({
                 "id": target["id"],
@@ -220,6 +226,11 @@ def main() -> int:
     parser.add_argument("--hash", type=int, default=128)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--cap", type=int, default=200)
+    parser.add_argument(
+        "--reuse-hash",
+        action="store_true",
+        help="Do not send ucinewgame/isready before each target.",
+    )
     args = parser.parse_args()
 
     targets = load_targets(args.targets.expanduser(), args.limit)
@@ -228,7 +239,7 @@ def main() -> int:
     candidate = run_engine(args.engine.expanduser(),
                            args.candidate_net.expanduser() if args.candidate_net else None,
                            targets, nodes=args.nodes, threads=args.threads,
-                           hash_mb=args.hash)
+                           hash_mb=args.hash, reset_game=not args.reuse_hash)
     write_csv(out_dir / "candidate.csv", candidate)
     lines: list[str] = []
     for name, rows in sorted(split_rows(candidate).items()):
@@ -240,7 +251,7 @@ def main() -> int:
         reference = run_engine(ref_engine,
                                args.reference_net.expanduser() if args.reference_net else None,
                                targets, nodes=args.nodes, threads=args.threads,
-                               hash_mb=args.hash)
+                               hash_mb=args.hash, reset_game=not args.reuse_hash)
         write_csv(out_dir / "reference.csv", reference)
         comparisons = compare_rows(candidate, reference, cap=args.cap)
         write_csv(out_dir / "compare.csv", comparisons)
