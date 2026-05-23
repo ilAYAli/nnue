@@ -388,6 +388,11 @@ Do not restart these as near-term Elo lanes:
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
   `capped_sum_diff_cp=-17929`).
+- mask2 speed as the explanation for the bad smoke SPRT:
+  `reckless-check-bucket-mask2-speed-audit-20260523_083628` measured the
+  bucketed base at `search_ratio=0.999` and mask2 at `search_ratio=0.997`
+  against reference. The earlier large slowdown was not reproducible, so
+  runtime is not the reason mask2 fell over in match testing.
 
 ## Promotion Gates
 
@@ -408,12 +413,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. In `nnue_reckless`, audit `reckless-check-bucket-mask2-lr1e6-e4` runtime
-   and parity. It had the best composite gate (`candidate_better=55`,
-   `reference_better=27`, `cap200=+1135`) but failed smoke SPRT and previously
-   measured about `27%` slower in `evalnet bench`.
-2. Do not train or SPRT another bucketed-head candidate until the speed loss is
-   confirmed, fixed, or proven irrelevant to search speed.
+1. In `nnue_reckless`, run `reckless-check-bucket-mask2-lr1e6-e4` against the
+   current broad search-aware target gate at fixed nodes. It had the best old
+   composite gate but failed smoke SPRT; runtime has now been ruled out.
+2. If that broad gate is negative, reject mask2 despite the old composite gate.
+   If it is positive, inspect the failed smoke PGN/mining path before any
+   further SPRT.
 3. In `nnue_native`, do not launch another direct child-eval recovery run. The
    next native step must redesign the target/objective around engine-search
    behavior and broad preservation together.
