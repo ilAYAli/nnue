@@ -24,12 +24,10 @@ The main failure pattern is:
   not recovered reference move-choice strength, but the first Stockfish-binpack
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
-Current `build.json` state: active next run is
-`native-searchaware-nonmate-initdistill-w8-lr1e6-e6` in the `nnue_native` lane.
-It starts from the best Enyo-owned SF-binpack checkpoint and changes the
-objective, not the scalar data recipe: broad init-net distillation is the
-guardrail, while the search-aware loss is weighted toward the non-mate targets
-that remained bad at 1M and 3M nodes.
+Current `build.json` state: `native-searchaware-nonmate-initdistill-w8-lr1e6-e6`
+is rejected. It changed only a tiny dense part of the exported net and made the
+fresh-hash search gate much worse. Do not tune this config; fix the
+search-aware objective/plumbing before another run.
 
 ## Track Definitions
 
@@ -191,6 +189,32 @@ Follow-up non-mate diagnostic:
 Decision: deeper search did not close the non-mate gap. The next native lane
 needs a changed target/objective, not more scalar SF-binpack epochs.
 
+## Latest Result: Native Search-Aware Non-Mate
+
+`native-searchaware-nonmate-initdistill-w8-lr1e6-e6`
+
+Purpose was to start from the best Enyo-owned SF-binpack checkpoint and train a
+non-mate-weighted search-aware objective with broad init-net distillation as a
+guardrail.
+
+Result:
+
+- training finished quickly, but internal target metrics did not improve:
+  `target_top1` stayed around `32-33/232`.
+- `net-diff`: exported input/L1/output tensors did not move. Only
+  `191/512` L2 weights and `24/32` L2 biases changed.
+- fresh-hash `300k` search gate failed badly:
+  `top1=39/232`, `candidate_better=31`, `reference_better=151`,
+  `capped_sum_diff_cp=-20372`.
+- `non_mate`: `top1=12/128`, `candidate_better=13`,
+  `reference_better=108`, `capped_sum_diff_cp=-15887`.
+- `mate_like`: `capped_sum_diff_cp=-4485`, with reopened `-31924cp` tail.
+
+Decision: no SPRT and no broader replay. This is not an Elo candidate and not a
+useful native baseline. The next work is to fix search-aware objective behavior
+so it can improve training-set move choice and move intended exported tensors;
+do not launch another weighted-search config with the current plumbing.
+
 ## Latest Result: Native SF-binpack Scratch
 
 `native-bullet-sfbinpack-scratch-eval400-sb4096`
@@ -246,6 +270,9 @@ Do not restart these as near-term Elo lanes:
 - scalar native SF-binpack continuation at deeper search: the `3M` non-mate
   diagnostic stayed negative (`candidate_better=21`, `reference_better=60`,
   `capped_sum_diff_cp=-3397`).
+- `native-searchaware-nonmate-initdistill-w8-lr1e6-e6`: only L2 exported floats
+  moved, internal target choice did not improve, and fresh-hash search gate
+  collapsed (`capped_sum_diff_cp=-20372`).
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -270,12 +297,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run `native-searchaware-nonmate-initdistill-w8-lr1e6-e6` from the committed
-   `build.json`.
-2. Validate with `net-diff` and the fresh-hash search gate before any broader
-   replay.
-3. If the exported net is identical, or if non-mate stays negative while
-   mate-like reopens tails, reject it without SPRT.
+1. Audit `train_search_aware.py` on a tiny target-only overfit case. It must
+   improve target top1/top3 before another full run.
+2. Add or use an export-aware movement check during training so a search-aware
+   run cannot finish with only incidental L2 float movement.
+3. Only after that, update `build.json` with a new hypothesis. No SPRT from the
+   current search-aware run.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
