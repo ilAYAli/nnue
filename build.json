@@ -1,49 +1,21 @@
 {
-  "description": "Native lane: true SF-binpack scratch data-scale run.",
+  "description": "Reckless lane: scale the check-bucket-mask2 existing-weight delta before broad gates.",
   "metadata": {
-    "experiment": "native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768",
-    "track": "nnue_native",
-    "hypothesis": "A materially longer no-init SF-binpack run may build native sparse representation instead of repeatedly nudging a weak checkpoint into dense-only or destructive sparse movement.",
-    "rejected_parent": "native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096",
+    "experiment": "reckless-checkbucket-mask2-delta-scale",
+    "track": "nnue_reckless",
+    "hypothesis": "The full check-bucket-mask2 delta had useful narrow/non-mate signal but broad mate-like tails. Smaller exported deltas may preserve useful move-choice changes while avoiding tail blowups.",
+    "base_net": "runs/reckless-check-bucket-mask2-lr1e6-e4/base_bucketed.nn",
+    "candidate_net": "runs/reckless-check-bucket-mask2-lr1e6-e4/model.nn",
+    "scales": [0.025, 0.05, 0.075, 0.10, 0.15, 0.20, 0.25, 0.35],
     "no_sprt": true
   },
-  "create": {
-    "name": "native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768",
-    "backend": "bullet",
-    "python": "~/.venv/bin/python",
-    "init_net": null,
-    "trainable": "all",
-    "weight_decay": 1e-6,
-    "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
-    "bullet_loader": "sfbinpack",
-    "bullet_sfbinpack_buffer_mb": 1024,
-    "bullet_sfbinpack_min_ply": 16,
-    "bullet_sfbinpack_max_abs_cp": 10000,
-    "bullet_sfbinpack_quiet_only": true,
-    "bullet_mode": "enyo",
-    "bullet_hidden": 1024,
-    "bullet_l2": 16,
-    "bullet_batch_size": 4096,
-    "bullet_batches": 64,
-    "bullet_superbatches": 32768,
-    "bullet_threads": 4,
-    "bullet_wdl": 0.75,
-    "bullet_lr": 0.001,
-    "bullet_final_lr": 0.000005,
-    "bullet_enyo_l0_std": 8.0,
-    "bullet_enyo_l1_std": 1.0,
-    "bullet_enyo_l1_export_scale": 1.0,
-    "bullet_eval_scale": 400.0,
-    "bullet_save_rate": 2048,
-    "bullet_cuda_arch": "auto"
-  },
   "validation": {
-    "tmux": "nnue_native",
-    "required_checks_after_training": [
-      "checkpoint sweep over saved Bullet checkpoints",
-      "net-diff against scratch checkpoint 0",
-      "static validation",
-      "broad search gate before any SPRT"
+    "tmux": "nnue_reckless",
+    "required_checks": [
+      "generate scaled .nn files with tools/nnue/scale_net_delta.py",
+      "net-diff each scaled net against the bucketed base",
+      "broad search-target gate at 300k nodes",
+      "no SPRT unless all, non-mate, and mate-like splits are clean"
     ]
   }
 }
