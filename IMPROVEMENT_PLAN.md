@@ -25,11 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-searchaware-broadtargets-teacher-w10-lr2e7-e6`.
-This native run reuses the broad non-mate target set, but restores broad scalar
-supervision to teacher labels. It is a controlled check for whether the target
-set has useful search signal without repeating the init-net preservation
-mistake.
+`native-bullet-sfbinpack-continue2-eval400-lr5e5-sb8192`.
+This is the harder native path: continue the best SF-binpack native checkpoint
+with Bullet on the external SF-binpack data, save checkpoints, then gate
+checkpoints before any SPRT.
 
 ## Track Definitions
 
@@ -66,6 +65,23 @@ Rejected native broad-target search-aware run:
 Decision: no SPRT. The broad target set is useful, but this objective/config is
 not. Native search-aware training must preserve teacher static behavior and
 produce intentional exported representation movement before another candidate.
+
+Rejected teacher-preserved broad-target retry:
+
+- `native-searchaware-broadtargets-teacher-w10-lr2e7-e6` restored broad scalar
+  supervision to teacher labels and reduced search-target pressure.
+- internal model gate did not improve (`top1=66/244`, `top3=126/244`,
+  `sum_gap_cp=12811`).
+- export again moved only dense L2 floats (`210/25200209` changed; input/L1
+  unchanged).
+- static remained rejection-level (`mae=753.923`, `sign=74.00%`,
+  `bias=-200.817`).
+- broad 300k-node search gate failed (`candidate_better=42`,
+  `reference_better=53`, `capped_sum_diff_cp=-346`,
+  `worst_regression_cp=-32000`).
+
+Decision: stop this search-aware/native config family. Do not spend more runs
+on LR/objective/weight tweaks around the same broad target JSONL.
 
 Search-aware target construction and training are implemented on
 `feature/nnue-search-aware-targets`:
@@ -501,13 +517,12 @@ The next action should be one of these, in order:
    changes more than the final dense/output terms.
 2. Stop sparse/input LR multiplier sweeps on the small failure-derived target
    set. It is too small and too brittle to move exported representation safely.
-3. If search-aware training continues, build a broader move-choice target set
-   from ordinary non-mate training positions with Stockfish-scored legal child
-   moves, then use that as the next source of policy/ranking signal. This has
-   now been done once; the next attempt must pair it with teacher static
-   preservation rather than init-net preservation.
-4. Do not launch another tiny target-only child-eval recovery run.
-5. No SPRT from the current search-aware native or reckless output-delta runs.
+3. Stop the broad-target search-aware native config family after the teacher-
+   preserved retry also failed static and broad search gates.
+4. Continue the native baseline using larger Bullet/SF-binpack training and
+   checkpoint sweeps.
+5. Do not launch another tiny target-only child-eval recovery run.
+6. No SPRT from the current search-aware native or reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
