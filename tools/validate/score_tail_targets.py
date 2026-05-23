@@ -62,6 +62,14 @@ def reservoir_sample_positions(args: argparse.Namespace) -> list[dict[str, str]]
     seen: set[str] = set()
     with args.positions_jsonl.expanduser().open(encoding="utf-8", errors="replace") as handle:
         for index, line in enumerate(handle, start=1):
+            if args.scan_limit > 0 and index > args.scan_limit:
+                break
+            if args.scan_progress > 0 and index % args.scan_progress == 0:
+                print(
+                    f"sampled scan={index} accepted={accepted} "
+                    f"kept={len(targets)}",
+                    flush=True,
+                )
             if not line.strip():
                 continue
             row = json.loads(line)
@@ -118,6 +126,9 @@ def main() -> int:
     parser.add_argument("--max-targets", type=int, default=0)
     parser.add_argument("--max-abs-cp", type=int, default=0)
     parser.add_argument("--min-ply", type=int, default=0)
+    parser.add_argument("--scan-limit", type=int, default=0)
+    parser.add_argument("--scan-progress", type=int, default=0)
+    parser.add_argument("--score-progress", type=int, default=0)
     parser.add_argument("--seed", type=int, default=1)
     args = parser.parse_args()
 
@@ -129,12 +140,17 @@ def main() -> int:
         if args.syzygy_path:
             options["SyzygyPath"] = str(Path(args.syzygy_path).expanduser())
         engine.configure(options)
-        for target in targets:
+        for index, target in enumerate(targets, start=1):
             board = chess.Board(target["fen"])
             scored = []
             for move in board.legal_moves:
                 cp = analyze_move(engine, board, move, args.nodes)
                 scored.append((move.uci(), cp))
+            if args.score_progress > 0 and index % args.score_progress == 0:
+                print(
+                    f"scored targets={index}/{len(targets)} rows={len(rows)}",
+                    flush=True,
+                )
             scored.sort(key=lambda item: item[1], reverse=True)
             best_score = scored[0][1] if scored else 0
             for rank, (move, cp) in enumerate(scored, start=1):
