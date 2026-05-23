@@ -498,6 +498,11 @@ def create_config(args: argparse.Namespace) -> dict:
             train_command.extend([
                 "--init", args.init,
             ])
+        if args.search_broad_target_net:
+            train_command.extend([
+                "--search-broad-target-net",
+                str(expand_path(args.search_broad_target_net)),
+            ])
 
         steps.extend([
             {
@@ -811,6 +816,7 @@ def add_create_args(
     parser.add_argument("--search-broad-weight", type=float, default=value("search_broad_weight", d.search_broad_weight))
     parser.add_argument("--search-broad-target", default=value("search_broad_target", d.search_broad_target),
                         choices=["teacher", "init"])
+    parser.add_argument("--search-broad-target-net", default=value("search_broad_target_net", d.search_broad_target_net))
     parser.add_argument("--search-target-warmup-epochs", type=int, default=value("search_target_warmup_epochs", d.search_target_warmup_epochs))
     parser.add_argument("--search-warmup-broad-weight", type=float, default=value("search_warmup_broad_weight", d.search_warmup_broad_weight))
     parser.add_argument("--search-broad-ramp-epochs", type=int, default=value("search_broad_ramp_epochs", d.search_broad_ramp_epochs))
