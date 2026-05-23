@@ -1,10 +1,11 @@
 {
-  "description": "Near-term Enyo NNUE experiment: train the existing Enyo-format net with Bullet directly from a proven Stockfish NNUE binpack instead of generating more Enyo self-play.",
-  "experiment": "bullet-sfbinpack-existing-init-preflight",
+  "description": "Near-term Enyo NNUE preflight: prove Bullet can export the existing legacy-layout Enyo net without changing runtime behavior before any SF-binpack training.",
+  "experiment": "bullet-sfbinpack-legacy-init-parity",
   "track": "nnue_reckless",
   "hypothesis": "A high-quality external Stockfish NNUE binpack plus Bullet training may provide useful broad signal while preserving the current Enyo/Berserk-derived starting weights.",
   "data_source": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
   "gates": [
+    "init-export parity must match the current reference before training is trusted",
     "net-diff must show intended exported movement",
     "static validation must not clearly regress sign/MAE",
     "composite search/move gate must improve capped gap or top-move behavior without mate-like regression",
@@ -12,7 +13,7 @@
     "SPRT only if cheap gates are clean"
   ],
   "create": {
-    "name": "bullet-sfbinpack-existing-init-preflight",
+    "name": "bullet-sfbinpack-legacy-init-parity",
     "backend": "bullet",
     "bullet_mode": "enyo",
     "bullet_loader": "sfbinpack",
@@ -33,6 +34,7 @@
     "bullet_eval_scale": 400.0,
     "bullet_enyo_l1_export_scale": 1.0,
     "bullet_save_rate": 1,
+    "bullet_export_init_only": true,
     "weight_decay": 0.000001,
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },

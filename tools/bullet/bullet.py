@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 
-ENYO_FEATURES = 32 * 12 * 64
+ENYO_FEATURES = 16 * 12 * 64
 ENYO_HIDDEN = 1024
 ENYO_L1 = 2 * ENYO_HIDDEN
 ENYO_L2 = 16

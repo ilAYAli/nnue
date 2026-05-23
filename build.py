@@ -551,6 +551,8 @@ def create_config(args: argparse.Namespace) -> dict:
             "--trainable", str(args.trainable),
             "--weight-decay", str(args.weight_decay),
         ]
+        if args.bullet_export_init_only:
+            bullet_train.append("--export-init-only")
         if args.init_net and args.bullet_mode == "enyo":
             bullet_init_weights = "{assets}/bullet_init_weights.bin"
             steps.append({
@@ -562,6 +564,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--output", bullet_init_weights,
                     "--eval-scale", str(args.bullet_eval_scale),
                     "--l1-export-scale", str(args.bullet_enyo_l1_export_scale),
+                    "--legacy-inputs",
                 ],
             })
             bullet_train.extend(["--init-weights", bullet_init_weights])
@@ -852,6 +855,8 @@ def add_create_args(
     parser.add_argument("--bullet-enyo-l1-export-scale", type=float, default=value("bullet_enyo_l1_export_scale", d.bullet_enyo_l1_export_scale))
     parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
     parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
+    parser.add_argument("--bullet-export-init-only", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_export_init_only", d.bullet_export_init_only))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

@@ -145,6 +145,7 @@ class CandidateDefaults:
     bullet_enyo_l1_export_scale: float = 1.0
     bullet_eval_scale: float = 400.0
     bullet_save_rate: int = 10
+    bullet_export_init_only: bool = False
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

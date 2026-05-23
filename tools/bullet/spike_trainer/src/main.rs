@@ -94,11 +94,11 @@ struct EnyoInputs;
 
 #[rustfmt::skip]
 const ENYO_KING_BUCKETS: [usize; 64] = [
-    31, 30, 29, 28, 28, 29, 30, 31,
-    27, 26, 25, 24, 24, 25, 26, 27,
-    23, 22, 21, 20, 20, 21, 22, 23,
-    19, 18, 17, 16, 16, 17, 18, 19,
-    15, 14, 13, 12, 12, 13, 14, 15,
+    15, 15, 14, 14, 14, 14, 15, 15,
+    15, 15, 14, 14, 14, 14, 15, 15,
+    13, 13, 12, 12, 12, 12, 13, 13,
+    13, 13, 12, 12, 12, 12, 13, 13,
+    11, 10,  9,  8,  8,  9, 10, 11,
     11, 10,  9,  8,  8,  9, 10, 11,
      7,  6,  5,  4,  4,  5,  6,  7,
      3,  2,  1,  0,  0,  1,  2,  3,
@@ -122,7 +122,7 @@ impl SparseInputType for EnyoInputs {
     type RequiredDataType = ChessBoard;
 
     fn num_inputs(&self) -> usize {
-        32 * 12 * 64
+        16 * 12 * 64
     }
 
     fn max_active(&self) -> usize {
@@ -142,11 +142,11 @@ impl SparseInputType for EnyoInputs {
     }
 
     fn shorthand(&self) -> String {
-        "enyo-32kb".to_string()
+        "enyo-16kb".to_string()
     }
 
     fn description(&self) -> String {
-        "Enyo 32-king-bucket exported NNUE inputs".to_string()
+        "Enyo 16-king-bucket exported NNUE inputs".to_string()
     }
 }
 
@@ -231,7 +231,7 @@ fn train_enyo(
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
         .build(|builder, stm_inputs, ntm_inputs| {
             let mut l0 = maybe_frozen(builder, !train_input, || {
-                enyo_affine(builder, "l0", 32 * 12 * 64, hidden, l0_stdev)
+                enyo_affine(builder, "l0", 16 * 12 * 64, hidden, l0_stdev)
             });
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);

@@ -118,19 +118,21 @@ Experimental Bullet-trained Enyo-format smoke:
   --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 ```
 
-This uses Bullet for training but writes a normal Enyo `model.nn`. Treat it as
-a trainer/export feasibility smoke first; validate it before any replay/SPRT.
+This uses Bullet for training but writes a normal Enyo `model.nn` in the
+current reference-compatible 16-king-bucket layout. Treat it as a
+trainer/export feasibility smoke first; validate it before any replay/SPRT.
 
 Experimental Bullet training directly from Stockfish NNUE binpack:
 
 ```sh
 ./build.py create \
-  --name bullet-sfbinpack-existing-init-preflight \
+  --name bullet-sfbinpack-legacy-init-parity \
   --backend bullet \
   --bullet-mode enyo \
   --bullet-loader sfbinpack \
   --bullet-data /home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack \
   --init-net /home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --bullet-export-init-only \
   --bullet-batch-size 16384 \
   --bullet-superbatches 2 \
   --bullet-lr 1e-6 \
@@ -140,7 +142,9 @@ Experimental Bullet training directly from Stockfish NNUE binpack:
 
 This skips Enyo self-play, scoring, and JSONL-to-Bullet conversion. Use it when
 the intended experiment is direct training from a prepared SF binpack while
-preserving Enyo-format export.
+preserving the current reference-compatible Enyo export layout. Keep
+`--bullet-export-init-only` enabled until the exported init net is proven
+search-equivalent to the current reference.
 
 Pairwise move-choice fine-tune:
 

@@ -26,7 +26,9 @@ The main failure pattern is:
 Current `build.json` state: approved for a proven-data Bullet preflight in the
 `nnue_reckless` lane. It starts from the existing Enyo/Berserk-derived net and
 trains directly from the available Stockfish NNUE binpack instead of generating
-more Enyo self-play labels.
+more Enyo self-play labels. The Bullet Enyo export must stay in the current
+reference-compatible 16-king-bucket `.nn` layout; 32-bucket expansion is an
+architecture experiment, not an existing-weight delta.
 
 ## Track Definitions
 
@@ -73,17 +75,21 @@ move choice, not only child-eval ranking.
 
 ## Active Experiment
 
-`build.json` now defines `bullet-sfbinpack-existing-init-preflight`.
+`build.json` now defines `bullet-sfbinpack-legacy-init-parity`.
 
 Purpose:
 
 - use a proven external Stockfish NNUE binpack as the next data source.
 - keep the near-term lane existing-weight based.
 - avoid another Enyo self-play or JSONL relabeling cycle.
-- use Bullet directly on SF binpack data, then export normal Enyo `.nn`.
+- use Bullet directly on SF binpack data after first proving the legacy-layout
+  Enyo init export is behaviorally identical to the reference.
 
-This is a preflight, not a promotion candidate. It must pass `net-diff`, static,
-composite search/move, and failure-suite gates before any SPRT.
+This is a preflight, not a promotion candidate. `bullet_export_init_only` stays
+enabled until init-export parity passes against the current reference net. Then
+the committed `build.json` may switch to real SF-binpack training, which still
+must pass `net-diff`, static, composite search/move, and failure-suite gates
+before any SPRT.
 
 ## Hard Rejections
 
