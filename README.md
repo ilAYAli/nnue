@@ -14,12 +14,11 @@ Change `build.json`, commit it, then launch:
 ./build.py -c build.json
 ```
 
-On pwa-5090, use the event hook so every phase reports progress:
+Use the tracked event hook when phase notifications are needed:
 
 ```sh
-NNUE_AI_STDIN_EVENTS=phase_done,done,fail \
-  ./build.py -c build.json \
-  --event-command /home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh
+./build.py -c build.json \
+  --event-command ./tools/events/nnue_event_ntfy.sh
 ```
 
 Re-running the same command resumes the same run by skipping phases with
@@ -49,7 +48,7 @@ For target configs or older runs, pass the run path explicitly:
     "name": "candidate-name",
     "backend": "pytorch",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/current-reference.nn",
+    "init_net": "../enyo/nnue/current-reference.nn",
     "objective": "huber",
     "huber_beta": 200,
     "target_clamp": 800,
