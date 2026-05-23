@@ -393,6 +393,11 @@ Do not restart these as near-term Elo lanes:
   bucketed base at `search_ratio=0.999` and mask2 at `search_ratio=0.997`
   against reference. The earlier large slowdown was not reproducible, so
   runtime is not the reason mask2 fell over in match testing.
+- `reckless-check-bucket-mask2-lr1e6-e4` as a promotion candidate:
+  the current broad `300k` search-aware gate rejected it
+  (`candidate_better=8`, `reference_better=17`,
+  `capped_sum_diff_cp=-1242`, mate-like `worst_regression_cp=-31082`).
+  The old composite gate was a false positive.
 
 ## Promotion Gates
 
@@ -413,12 +418,13 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. In `nnue_reckless`, run `reckless-check-bucket-mask2-lr1e6-e4` against the
-   current broad search-aware target gate at fixed nodes. It had the best old
-   composite gate but failed smoke SPRT; runtime has now been ruled out.
-2. If that broad gate is negative, reject mask2 despite the old composite gate.
-   If it is positive, inspect the failed smoke PGN/mining path before any
-   further SPRT.
+1. In `nnue_reckless`, recheck `floathead_delta_020.nn` from
+   `bullet-sfbinpack-legacy-floathead-lr1e7-sb1` on the current broad `300k`
+   search-aware gate. It is the only remaining near-term existing-weight delta
+   with a positive broad capped score in prior `100k` testing.
+2. Do not SPRT it unless the `300k` broad gate remains positive and the
+   failure-suite tail is explained or improved. Its current failure-suite tail
+   is still too large (`worst_regression_cp=-512`).
 3. In `nnue_native`, do not launch another direct child-eval recovery run. The
    next native step must redesign the target/objective around engine-search
    behavior and broad preservation together.
