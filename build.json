@@ -1,5 +1,5 @@
 {
-  "description": "Reckless lane: sweep individual check-state bucket deltas before broad gates.",
+  "description": "Reckless lane: check-state bucket sweep, rejected after smoke SPRT.",
   "metadata": {
     "experiment": "reckless-checkbucket-bucket-sweep",
     "track": "nnue_reckless",
@@ -7,7 +7,13 @@
     "base_net": "runs/reckless-check-bucket-mask2-lr1e6-e4/base_bucketed.nn",
     "candidate_net": "runs/reckless-check-bucket-output-1m-lr1e6-e4/train/reckless-check-bucket-output-1m-lr1e6-e4/model.nn",
     "bucket_sets": ["0", "1", "2", "3", "4", "5", "6", "7"],
-    "no_sprt": true
+    "best_bucket": "6",
+    "best_bucket_net": "runs/reckless-checkbucket-bucket-sweep-20260523_162724/nets/bucket_6.nn",
+    "broad_300k": "bucket 6: all 9 vs 3, capped +99, worst -47; mate-like unchanged",
+    "broad_1m": "bucket 6: all 7 vs 2, capped +98, worst -34; mate-like unchanged",
+    "failure_suite": "bucket 6: positions 913, candidate 10 vs reference 7, sum +250, worst -27",
+    "sprt": "bucket 6 smoke: -13.9 +/- 15.0 Elo, LOS 3.5%, draw 51.4%",
+    "status": "rejected"
   },
   "validation": {
     "tmux": "nnue_reckless",
@@ -16,7 +22,9 @@
       "generate masked .nn files with tools/nnue/mix_material_head.py",
       "net-diff each masked net against the bucketed base",
       "broad search-target gate at 300k nodes",
-      "no SPRT unless all, non-mate, and mate-like splits are clean"
+      "stronger 1M-node broad gate for the best bucket",
+      "failure-suite replay before SPRT",
+      "1000-game smoke SPRT only after clean gates"
     ]
   }
 }

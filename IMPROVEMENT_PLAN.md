@@ -25,10 +25,17 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`reckless-checkbucket-bucket-sweep`.
-This is a reckless-lane diagnostic: keep existing weights, mix one trained
-check-state output bucket at a time into the copied bucketed base, and run the
-broad 300k-node search gate before any SPRT.
+`reckless-checkbucket-bucket-sweep`, rejected after smoke SPRT.
+This was a reckless-lane diagnostic: keep existing weights, mix one trained
+check-state output bucket at a time into the copied bucketed base, and run
+broad gates before any SPRT.
+
+Active native background run:
+`native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768` is still running.
+Checkpoint `12288` remains the best live gate so far by broad capped sum
+(`+1142`), but every checked checkpoint through `18432` is still vetoed by the
+mate-like tail (`-31kcp` class worst regression). No native checkpoint is an
+SPRT candidate yet.
 
 ## Track Definitions
 
@@ -46,38 +53,42 @@ broad 300k-node search gate before any SPRT.
 - may borrow architecture ideas, but the result is native to Enyo.
 - currently useful for background experiments, not promotion.
 
-## Latest Result: Reckless Check-Bucket Delta Scaling
+## Latest Result: Reckless Check-Bucket Bucket Sweep
 
-Rejected `reckless-checkbucket-mask2-delta-scale-20260523_155150`:
+Rejected `reckless-checkbucket-bucket-sweep-20260523_162724` /
+`reckless-checkbucket-bucket6-stronggate-20260523_165548`:
 
-- The previous bucket-2 check-state mask looked promising on the older
-  composite gate, but failed smoke SPRT around `-30 Elo` and failed the newer
-  broad search gate.
-- Scaling that exported delta across `0.025`, `0.05`, `0.075`, `0.10`,
-  `0.15`, `0.20`, `0.25`, and `0.35` did not produce a keeper.
-- Best/least-bad scale was `0.05`, but it was still negative/neutral:
-  all `6` vs `6`, capped `-100`; mate-like `3` vs `3`, capped `-52`;
-  non-mate `3` vs `3`, capped `-48`; worst regression `-207cp`.
-- Larger scales repeatedly hit mate-like cliffs, including
-  `-31084cp`/`-31168cp` worst regressions.
-- Net diff showed the scaled nets changed only `30/25204248` exported values,
-  all output weights; input, L1, and L2 tensors did not move.
-
-Decision: no SPRT. Global scaling of this head-only bucket-2 delta is not a
-near-term Elo path. The only remaining useful check-state diagnostic is to
-sweep individual trained buckets from the full check-state head; if no single
-bucket clears the broad gate, stop this check-state-head family.
-
-Next run:
-
-- `reckless-checkbucket-bucket-sweep`.
-- Mix buckets `0` through `7` one at a time from
+- The bucket sweep mixed buckets `0` through `7` one at a time from
   `reckless-check-bucket-output-1m-lr1e6-e4` into the copied bucketed base.
-- Gate each masked net on the broad 300k-node search target set.
-- Use `tools/nnue/sweep_bucket_mix.py` so the run emits phase notifications and
-  leaves a single `summary.tsv`.
-- No SPRT unless all, non-mate, and mate-like splits are clean and tails are
-  acceptable.
+- Bucket `6` was the best 300k-node broad-gate result:
+  all `9` vs `3`, capped `+99`, median nonzero `+9.5cp`,
+  worst regression `-47cp`; mate-like unchanged; non-mate `9` vs `3`,
+  capped `+99`.
+- Bucket `7` was also positive but weaker:
+  all `3` vs `2`, capped `+47`, worst regression `-15cp`.
+- Bucket `4` was weak-positive but less clean:
+  all `14` vs `10`, capped `+82`, worst regression `-211cp`.
+- Bucket `6` survived the stronger 1M-node broad gate:
+  all `7` vs `2`, capped `+98`, median nonzero `+11cp`,
+  worst regression `-34cp`; mate-like unchanged.
+- Bucket `6` also survived failure-suite replay:
+  `positions=913`, `candidate_better=10`, `reference_better=7`,
+  `sum_diff_cp=+250`, `median_nonzero_diff_cp=12`,
+  `worst_regression_cp=-27`, `best_gain_cp=92`.
+- Despite those clean gates, the 1000-game smoke SPRT failed:
+  `Elo -13.9 +/- 15.0`, `LLR -1.59/2.94 (-54%)`, `LOS 3.5%`,
+  draw `51.4%`.
+
+Decision: reject. Bucket `6` is the cleanest pre-SPRT result from the
+check-state-head family, but it still lost in match play. Do not launch another
+check-state bucket/head SPRT from this family without a new hypothesis that
+explains why broad search-target and failure-suite gates were positive while
+match Elo was negative.
+
+This also weakens the current promotion gate: passing broad search-targets and
+failure-suite replay is necessary, but not sufficient. The gate needs either a
+broader opening-distribution slice, direct smoke-SPRT mining, or a search metric
+that better predicts match Elo.
 
 ## Previous Result
 
