@@ -824,6 +824,9 @@ def target_score_command(target_score: dict) -> list[str]:
         "max_targets": "--max-targets",
         "max_abs_cp": "--max-abs-cp",
         "min_ply": "--min-ply",
+        "scan_limit": "--scan-limit",
+        "scan_progress": "--scan-progress",
+        "score_progress": "--score-progress",
         "seed": "--seed",
     }
     for key, flag in optional_args.items():
