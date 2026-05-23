@@ -26,6 +26,13 @@ builds the configured search-aware target files:
 ./build.py -c build.json
 ```
 
+When `build.json` contains `target_score`, it first scores legal child moves
+for the configured target positions, then builds a search-aware target JSONL:
+
+```sh
+./build.py -c build.json
+```
+
 `status` and `report` use `build.json` by default. Pass an explicit run path
 only when inspecting an older run:
 
