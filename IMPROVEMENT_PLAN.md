@@ -75,7 +75,7 @@ move choice, not only child-eval ranking.
 
 ## Active Experiment
 
-`build.json` now defines `bullet-sfbinpack-legacy-existing-init-preflight`.
+`build.json` now defines `bullet-sfbinpack-legacy-lr1e7-sb1-nodecay`.
 
 Purpose:
 
@@ -91,9 +91,20 @@ Init-export parity passed:
 - all integer tensors matched; only four output floats differed by `1.49e-08`.
 - search-gate compare was exactly zero on all/mate-like/non-mate subsets.
 
-The current preflight is real SF-binpack training, not a promotion candidate.
-It must pass `net-diff`, static, composite search/move, and failure-suite gates
-before any SPRT.
+Rejected SF-binpack pressure setting:
+
+- `bullet-sfbinpack-legacy-existing-init-preflight`: two-superbatch
+  `lr=1e-6 -> 2e-7`, weight decay `1e-6`.
+- exported movement: `505` input weights, no L1 movement, dense/output moved.
+- search gate failed (`top1=84/232`, `capped_sum_diff_cp=-2749`,
+  mate-like worst regression `-31591`).
+- checkpoint 1 was also rejected (`top1=87/232`, `capped_sum_diff_cp=-2788`,
+  mate-like worst regression `-31591`).
+
+The current preflight tests much lower pressure: one superbatch,
+`lr=1e-7 -> 2e-8`, no weight decay. It is not a promotion candidate. It must
+pass `net-diff`, static, composite search/move, and failure-suite gates before
+any SPRT.
 
 ## Hard Rejections
 
