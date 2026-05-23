@@ -1,20 +1,22 @@
 {
-  "description": "Near-term reckless lane: runtime/parity audit for the bucketed-head mask2 existing-weight delta.",
-  "experiment": "reckless-check-bucket-mask2-speed-audit",
+  "description": "Near-term reckless lane: broad current search-gate audit for the bucketed-head mask2 existing-weight delta.",
+  "experiment": "reckless-check-bucket-mask2-broad-gate",
   "track": "nnue_reckless",
-  "hypothesis": "The mask2 bucketed-head candidate had the best composite gate but failed smoke testing. Before changing training, verify whether the prior evalnet speed loss is real, reproducible, and caused by bucketed-head runtime rather than measurement noise.",
+  "hypothesis": "The mask2 bucketed-head candidate had the best old composite gate but failed smoke testing. Runtime is now confirmed acceptable, so validate it against the current broad search-aware target gate before any further SPRT.",
   "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
   "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/reckless-check-bucket-mask2-lr1e6-e4/model.nn",
   "validation": {
     "status": "pending",
     "tmux": "nnue_reckless",
+    "targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
+    "nodes": 300000,
     "required_checks": [
-      "repeat evalnet bench alternating candidate/reference to measure variance",
-      "compare fixed-node search speed on the same starting position",
-      "confirm copied bucketed base parity stays identical to reference",
-      "do not start SPRT unless runtime is acceptable and gates remain clean"
+      "fixed-node broad search gate against current search-aware targets",
+      "compare candidate and reference top1/top3 and capped cp gap",
+      "reject mask2 if broad gate is negative despite old composite gate",
+      "do not start SPRT unless broad gate and failure-suite behavior are clean"
     ],
-    "next": "run speed/parity audit only; no training and no SPRT"
+    "next": "run broad current search-gate audit only; no training and no SPRT"
   },
   "create": {
     "name": "reckless-check-bucket-mask2-lr1e6-e4",
