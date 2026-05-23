@@ -450,6 +450,14 @@ Do not restart these as near-term Elo lanes:
   marked moves in v2. The training/model-gate loader must preserve marked moves
   across its own top-K filter too; otherwise `search_max_moves=8` partially
   reintroduces the same blind spot.
+- `native-searchaware-v3-moveaudit-cpu-lr1e6-in300-l1x300-e4` as a native
+  candidate or audit continuation: rejected. The loader fix and cleaned v3
+  targets did not improve target choice (`38/200` top1, `90/200` top3), and
+  exported `input_weights`, `input_biases`, `l1_weights`, and `l1_biases` were
+  still identical to the init checkpoint. Float input/L1 deltas existed but
+  stayed far below export thresholds (`max_abs` about `0.04`, no values
+  `>=0.1`, none `>=0.5`). Only small L2 float changes exported
+  (`166/25200209` total values).
 
 ## Promotion Gates
 
@@ -472,12 +480,13 @@ The next action should be one of these, in order:
 
 1. Stop near-term reckless output-only work unless a new architecture hypothesis
    changes more than the final dense/output terms.
-2. Run one native v3 movement audit from the best native SF-binpack checkpoint:
-   CPU validation, v3 targets, no target-best checkpoint rollback, and no SPRT.
-   First gate is `net-diff`; exported input/L1 movement must be intentional and
-   measured before any broader search validation matters.
-3. Do not launch another tiny target-only child-eval recovery run.
-4. No SPRT from the current search-aware native or reckless output-delta runs.
+2. Stop sparse/input LR multiplier sweeps on the small failure-derived target
+   set. It is too small and too brittle to move exported representation safely.
+3. If search-aware training continues, build a broader move-choice target set
+   from ordinary non-mate training positions with Stockfish-scored legal child
+   moves, then use that as the next source of policy/ranking signal.
+4. Do not launch another tiny target-only child-eval recovery run.
+5. No SPRT from the current search-aware native or reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
