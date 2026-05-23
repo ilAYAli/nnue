@@ -19,6 +19,13 @@ experiment. Change that file, commit it, then run the command above. The many
 files under `tools/` are phase helpers and library modules used by `build.py`;
 they are not the normal interface for creating a candidate.
 
+When `build.json` contains `target_build` instead of `create`, the same command
+builds the configured search-aware target files:
+
+```sh
+./build.py -c build.json
+```
+
 `status` and `report` use `build.json` by default. Pass an explicit run path
 only when inspecting an older run:
 
@@ -177,10 +184,10 @@ Search-aware target fine-tune:
   --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
 ```
 
-This is the preferred interface once the target set is built with
-`tools/validate/validate.py search-targets`. Start with a small committed
-`build.json` smoke and require `net-diff`, static validation, search-gate, and
-failure-suite gates before any SPRT.
+Build target sets through committed `build.json` target-build configs rather
+than direct helper calls. Start with a small committed `build.json` smoke and
+require `net-diff`, static validation, search-gate, and failure-suite gates
+before any SPRT.
 
 Pairwise sparse/input movement probe:
 
