@@ -25,9 +25,8 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768`.
-This is a true native scratch/data-scale run: no inherited net, direct
-SF-binpack input, longer schedule, and checkpoint gates before any SPRT.
+`native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096`.
+This run is rejected by checkpoint gates and should not be extended.
 
 ## Track Definitions
 
@@ -44,6 +43,31 @@ SF-binpack input, longer schedule, and checkpoint gates before any SPRT.
 - train an Enyo-owned net from scratch.
 - may borrow architecture ideas, but the result is native to Enyo.
 - currently useful for background experiments, not promotion.
+
+## Active Decision: 2026-05-24
+
+Waste-control rule: do not start another NNUE training family until the active
+SPRT either justifies confirmation or rejects the candidate.
+
+Native lane:
+
+- `native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096` is rejected.
+- every checkpoint is worse than the parent gate; `4096` ended at
+  `41` vs `97`, capped `-6335`, with mate-like worst regression `-31814cp`.
+- stop tailmix, search-aware patching, and same-architecture LR continuation.
+- next native work requires a new data-scale plan or an export-visible
+  architecture hypothesis before any more GPU time.
+
+Reckless lane:
+
+- bucket 6 is rejected by confirmation:
+  `-4.5 +/- 7.7 Elo`, `LOS=12.4%`, `draw=49.5%` over `4000` games.
+- bucket 7 is the only gate-clean checkbucket candidate:
+  1M search gate `2` vs `0`, capped `+25`, worst regression `0`;
+  failure-suite replay is exact parity over `913` positions.
+- run exactly one `1000` game smoke SPRT for bucket 7.
+- if the smoke is not positive, close the checkbucket family.
+- run a `4000` game confirmation only if the smoke is clearly positive.
 
 ## Latest Result
 
