@@ -240,12 +240,19 @@ Follow-up search-aware plumbing audits:
   still ended at `1/16` top1 with broad MAE about `2398cp`. This exposed a
   tooling gap: `search_target_limit=16` selected the first 16 mixed targets,
   not the intended first 16 non-mate targets.
+- `native-searchaware-stagewarmup-strong16-lr3e5-e96` tag-filtered rerun:
+  correctly used the first 16 non-mate targets and moved exported sparse/L1
+  heavily (`2802198/25200209` total changed), but ended at `0/16` top1,
+  `1/16` top3, and broad MAE about `150cp`. The schedule is destructive:
+  sparse movement alone is not useful if it does not learn the search targets.
 
 Decision: search-aware training plumbing can learn tiny target sets, including
 the quantized/export-aware forward path. The blocker is scaling the objective
 without destroying broad behavior, not another LR multiplier sweep. The next
-test must filter targets by tag so the committed `build.json` matches the
-manual non-mate audit before drawing conclusions from staged scheduling.
+test is phase-B recovery: initialize from the successful `16/16` target-fit
+net, but distill broad rows against a separate pre-search-aware native
+checkpoint. This requires a distinct broad-target net instead of reusing
+`init_net` for both roles.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -317,6 +324,9 @@ Do not restart these as near-term Elo lanes:
 - mixed-target strong staged search-aware warmup as a candidate recipe:
   `native-searchaware-stagewarmup-strong16-lr3e5-e96` moved sparse/L1 but
   targeted the wrong mixed 16-row subset and still ended at `1/16` top1.
+- tag-filtered strong staged search-aware warmup as a candidate recipe:
+  `native-searchaware-stagewarmup-strong16-lr3e5-e96` moved sparse/L1 heavily,
+  but ended at `0/16` top1 on the intended non-mate subset.
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -341,12 +351,13 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Rerun `native-searchaware-stagewarmup-strong16-lr3e5-e96` from `build.json`
-   with `search_required_tags=non_mate`. This is still a bounded audit, not a
-   candidate.
-2. If strong staged warmup preserves most target gains after broad ramp, add the
-   exported-movement gate and scale one step up. If not, redesign the objective
-   before any more training.
+1. Run `native-searchaware-recover16-w002-lr1e6-e80` from `build.json`. This is
+   a phase-B recovery audit, not a candidate: initialize from the `16/16`
+   target-fit checkpoint and distill broad rows against the earlier native
+   checkpoint via `search_broad_target_net`.
+2. If recovery keeps meaningful target top1 while reducing broad drift, add a
+   proper two-phase build workflow. If target top1 collapses again, stop this
+   objective family and redesign the search-aware loss.
 3. No SPRT from the current search-aware runs.
 
 Do not launch another training run until `build.json` names the lane,

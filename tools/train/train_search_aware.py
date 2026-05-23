@@ -397,13 +397,16 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         model = EnyoNNUE(init=args.init).to(args.device)
     init_model = None
     if args.search_broad_target == "init":
-        if not args.init_from_nn:
-            raise SystemExit("--search-broad-target init requires --init-from-nn")
-        init_model = load_model_from_nn(args.init_from_nn, device=args.device)
+        broad_target_net = args.search_broad_target_net or args.init_from_nn
+        if not broad_target_net:
+            raise SystemExit(
+                "--search-broad-target init requires --init-from-nn "
+                "or --search-broad-target-net")
+        init_model = load_model_from_nn(broad_target_net, device=args.device)
         init_model.eval()
         for param in init_model.parameters():
             param.requires_grad_(False)
-        print("broad target: init net distillation", flush=True)
+        print(f"broad target: init net distillation {broad_target_net}", flush=True)
     else:
         print("broad target: teacher labels", flush=True)
 
@@ -522,6 +525,8 @@ def main() -> None:
     ap.add_argument("--target-clamp", type=float, default=800.0)
     ap.add_argument("--search-broad-weight", type=float, default=1.0)
     ap.add_argument("--search-broad-target", default="teacher", choices=["teacher", "init"])
+    ap.add_argument("--search-broad-target-net", default="",
+                    help="Optional .nn used as broad init-distillation target")
     ap.add_argument("--search-target-warmup-epochs", type=int, default=0,
                     help="Epochs to train search targets before using final broad weight")
     ap.add_argument("--search-warmup-broad-weight", type=float, default=0.0,
