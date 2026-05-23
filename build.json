@@ -1,38 +1,38 @@
 {
-  "description": "Near-term reckless lane: output-only existing-weight signfit net, used as the source for a validation-only delta-scale sweep.",
-  "experiment": "reckless-existing-output-signfit-delta-scale",
+  "description": "Near-term reckless lane: runtime/parity audit for the bucketed-head mask2 existing-weight delta.",
+  "experiment": "reckless-check-bucket-mask2-speed-audit",
   "track": "nnue_reckless",
-  "hypothesis": "The output-only signfit candidate has zero runtime overhead and the least-bad failure-suite/search behavior among existing-weight deltas. Scaling its exported delta may keep the useful non-mate signal while reducing mate-like tails.",
+  "hypothesis": "The mask2 bucketed-head candidate had the best composite gate but failed smoke testing. Before changing training, verify whether the prior evalnet speed loss is real, reproducible, and caused by bucketed-head runtime rather than measurement noise.",
   "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-  "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/reckless-existing-output-signfit-1m-lr5e6-e8/train/reckless-existing-output-signfit-1m-lr5e6-e8/model.nn",
+  "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/reckless-check-bucket-mask2-lr1e6-e4/model.nn",
   "validation": {
     "status": "pending",
     "tmux": "nnue_reckless",
-    "scales": [0.25, 0.5, 0.75, 1.0, 1.25],
-    "required_gates": [
-      "net-diff only changes the intended float/output tensors",
-      "broad search-gate has positive capped diff without reopening mate tails",
-      "failure-suite worst_regression_cp stays above -250 before any SPRT"
+    "required_checks": [
+      "repeat evalnet bench alternating candidate/reference to measure variance",
+      "compare fixed-node search speed on the same starting position",
+      "confirm copied bucketed base parity stays identical to reference",
+      "do not start SPRT unless runtime is acceptable and gates remain clean"
     ],
-    "next": "run delta-scale gates only; do not start SPRT unless broad search and failure-suite gates are clean"
+    "next": "run speed/parity audit only; no training and no SPRT"
   },
   "create": {
-    "name": "reckless-existing-output-signfit-1m-lr5e6-e8",
+    "name": "reckless-check-bucket-mask2-lr1e6-e4",
     "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
-    "backend": "pytorch",
-    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "backend": "material-head",
+    "bucket_mode": "check-state",
+    "init_net": "/home/petter/code/cpp/chess/nnue/runs/reckless-check-bucket-mask2-lr1e6-e4/base_bucketed.nn",
     "forward": "quantized",
     "trainable": "output",
     "objective": "huber",
     "target_clamp": 800,
     "huber_beta": 200,
     "wdl_lambda": 0.0,
-    "sign_loss_weight": 0.5,
-    "lr": 0.000005,
-    "epochs": 8,
+    "lr": 0.000001,
+    "epochs": 4,
     "pack_limit": 1000000,
     "weight_decay": 0.0,
-    "select_metric": "sign",
+    "select_metric": "mae",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   }
 }
