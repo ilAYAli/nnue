@@ -1,20 +1,19 @@
 {
-  "description": "Native lane: conservative SF-binpack continuation from the best native checkpoint.",
+  "description": "Native lane: true SF-binpack scratch data-scale run.",
   "metadata": {
-    "experiment": "native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096",
+    "experiment": "native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768",
     "track": "nnue_native",
-    "hypothesis": "Lower LR and shorter continuation may keep the SF-binpack top1/top3 gains without the broad non-mate/tail regressions seen in continue2.",
-    "previous_checkpoint": "runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
-    "rejected_parent": "native-bullet-sfbinpack-continue2-eval400-lr5e5-sb8192",
+    "hypothesis": "A materially longer no-init SF-binpack run may build native sparse representation instead of repeatedly nudging a weak checkpoint into dense-only or destructive sparse movement.",
+    "rejected_parent": "native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096",
     "no_sprt": true
   },
   "create": {
-    "name": "native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096",
+    "name": "native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768",
     "backend": "bullet",
     "python": "~/.venv/bin/python",
-    "init_net": "runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
+    "init_net": null,
     "trainable": "all",
-    "weight_decay": 0.0,
+    "weight_decay": 1e-6,
     "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
     "bullet_loader": "sfbinpack",
     "bullet_sfbinpack_buffer_mb": 1024,
@@ -26,23 +25,23 @@
     "bullet_l2": 16,
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
-    "bullet_superbatches": 4096,
+    "bullet_superbatches": 32768,
     "bullet_threads": 4,
     "bullet_wdl": 0.75,
-    "bullet_lr": 1e-5,
-    "bullet_final_lr": 1e-6,
+    "bullet_lr": 0.001,
+    "bullet_final_lr": 0.000005,
     "bullet_enyo_l0_std": 8.0,
     "bullet_enyo_l1_std": 1.0,
     "bullet_enyo_l1_export_scale": 1.0,
     "bullet_eval_scale": 400.0,
-    "bullet_save_rate": 512,
+    "bullet_save_rate": 2048,
     "bullet_cuda_arch": "auto"
   },
   "validation": {
     "tmux": "nnue_native",
     "required_checks_after_training": [
       "checkpoint sweep over saved Bullet checkpoints",
-      "net-diff against init checkpoint",
+      "net-diff against scratch checkpoint 0",
       "static validation",
       "broad search gate before any SPRT"
     ]
