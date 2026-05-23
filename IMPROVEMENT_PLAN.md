@@ -424,6 +424,12 @@ Do not restart these as near-term Elo lanes:
   `stable` source (`candidate_better=8`, `reference_better=58`,
   `capped_sum_diff_cp=-5696`). The problem is broad move choice, not only
   mate-like tails.
+- native search-aware v2 targets:
+  `native-searchaware-targets-v2-20260523` built a broader target set. The
+  deduped file has `279` targets and `2022` move rows:
+  `201 non_mate`, `78 mate_like`, with sources
+  `pairwise_sprtfail:73`, `sprt_material:80`, `sprt_output:80`, `stable:46`.
+  This is suitable for a preflight, but not proof that training will improve.
 
 ## Promotion Gates
 
@@ -446,13 +452,13 @@ The next action should be one of these, in order:
 
 1. Stop near-term reckless output-only work unless a new architecture hypothesis
    changes more than the final dense/output terms.
-2. In `nnue_native`, build a larger v2 search-aware target file before any new
-   training. Include the existing stable/repeated/SPRT-fail scored move CSVs
-   plus `pairwise_sprtfail`, and inspect both full and deduped target
-   distributions.
-3. The next training objective, if launched, must preserve broad reference move
-   ordering while applying move-choice pressure. Do not launch another tiny
-   target-only child-eval recovery run.
+2. In `nnue_native`, run
+   `native-searchaware-v2-initdistill-w2-lr5e7-e8` from the best native
+   continuation checkpoint. It uses the deduped v2 non-mate targets, strong
+   broad init distillation, and conservative search-aware pressure. The goal is
+   to see whether target top1 can improve without collapsing broad `300k`
+   non-mate/stable behavior.
+3. Do not launch another tiny target-only child-eval recovery run.
 4. No SPRT from the current search-aware native or reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
