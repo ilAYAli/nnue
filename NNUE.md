@@ -3,14 +3,69 @@
 `README.md` describes the current candidate creation workflow and command-line
 entry points.
 
-This file explains what those steps mean for the NNUE itself: weights, hidden
-neurons, king buckets, packed tensors, accumulator updates, export, validation,
-and SPRT.
+This file explains what those steps mean for the NNUE itself: native Enyo
+architecture, weights, hidden neurons, king buckets, packed tensors,
+accumulator updates, export, validation, and SPRT.
+
+## Current Native Enyo Design
+
+This is the normal Enyo `.nn` runtime layout, not the experimental Bullet
+runtime and not a Reckless copy.
+
+Source of truth in Enyo is currently `src/nnue_model.hpp`.
+
+```text
+king buckets                 = 32
+legacy king buckets          = 16, accepted by loader and expanded
+piece/color types            = 12
+squares                      = 64
+input feature rows           = 32 * 12 * 64 = 24576
+accumulator width            = 1024 per perspective
+perspectives                 = 2
+dense-head input             = 2048
+dense hidden layer 1         = 16
+dense hidden layer 2         = 32
+output                       = 1 centipawn score
+optional output buckets      = 8, only for bucketed-head files
+optional threat branch       = compile-time experiment, disabled by default
+```
+
+Data path:
+
+```text
+active sparse features
+  -> two 1024-wide perspective accumulators
+  -> side-to-move accumulator + opponent accumulator = 2048 values
+  -> 2048 -> 16
+  -> 16 -> 32
+  -> 32 -> 1
+  -> output / 32
+  -> phase scale and search-side eval handling in Enyo
+```
+
+Stored weights in the current 32-king-bucket native file:
+
+```text
+input weights        = 24576 * 1024 = 25165824 int16 values
+input biases         = 1024 int16 values
+L1 weights           = 2048 * 16 = 32768 int8 values
+L1 biases            = 16 int32 values
+L2 weights           = 16 * 32 = 512 float values
+L2 biases            = 32 float values
+output weights       = 32 float values
+output bias          = 1 float value
+total trained values = 25200209
+.nn payload size     = 50368836 bytes, about 48.0 MiB
+```
+
+The current native lane is Enyo-owned: it is intended to train/export Enyo's
+own `.nn` format. Bullet may be used as a faster trainer, but `--bullet-mode
+enyo` must export a normal Enyo `model.nn` for this lane.
 
 ## Vocabulary
 
 The concrete values below are the current Enyo NNUE architecture values from
-the Enyo source tree, currently `src/nnue.hpp`.
+the Enyo source tree, currently `src/nnue_model.hpp`.
 
 `NNUE`
 
@@ -26,17 +81,17 @@ input-weight table.
 Actual Enyo NNUE values:
 
 ```text
-king buckets                 = 16
+king buckets                 = 32
 piece/color types            = 12
 squares                      = 64
-input feature rows           = 16 * 12 * 64 = 12288
+input feature rows           = 32 * 12 * 64 = 24576
 active feature rows per view = up to one row per piece on the board
 ```
 
 `active feature`
 
 One input feature that is actually present in a specific FEN. The full network
-has 12288 possible feature rows, but a normal position activates only the rows
+has 24576 possible feature rows, but a normal position activates only the rows
 for pieces currently on the board.
 
 Actual Enyo behavior:
@@ -57,8 +112,8 @@ piece/square use different weights depending on king placement.
 Actual Enyo NNUE value:
 
 ```text
-king bucket ids = 16
-king squares    = 64 squares mapped into those 16 ids
+king bucket ids = 32
+king squares    = 64 squares mapped into those 32 ids
 ```
 
 `weight`
@@ -69,10 +124,10 @@ search reads fixed weights.
 Actual Enyo NNUE trained values:
 
 ```text
-input feature rows   = 12288
+input feature rows   = 24576
 input row width      = 1024
-input weights        = 12288 * 1024 = 12582912 int16 values
-                     = 12,582,912 input weights
+input weights        = 24576 * 1024 = 25165824 int16 values
+                     = 25,165,824 input weights
 input biases         = 1024 int16 values
 L1 weights           = 2048 * 16 = 32768 int8 values
 L1 biases            = 16 int32 values
@@ -80,8 +135,8 @@ L2 weights           = 16 * 32 = 512 float values
 L2 biases            = 32 float values
 output weights       = 32 float values
 output bias          = 1 float value
-total trained values = 12617297
-.nn payload size     = 25203012 bytes, about 24.0 MiB
+total trained values = 25200209
+.nn payload size     = 50368836 bytes, about 48.0 MiB
 ```
 
 `hidden neuron`
@@ -289,28 +344,29 @@ feature =
 Current shape:
 
 ```text
-king buckets      = 16
+king buckets      = 32
 piece/color types = 12
 squares           = 64
-input features    = 16 * 12 * 64 = 12288
+input features    = 32 * 12 * 64 = 24576
 ```
 
 ### Active Feature
 
 An active feature is a feature row that is used for the current FEN.
 
-The network has 12288 possible feature rows, but most are inactive for any one
+The network has 24576 possible feature rows, but most are inactive for any one
 position. Enyo walks the board, finds every piece, and creates one feature row
 per piece for each perspective.
 
-In code terms, `enumerate_pieces()` in Enyo's `src/nnue_board.cpp` emits:
+In code terms, `enumerate_pieces()` in Enyo's `src/nnue_model_board.cpp`
+emits:
 
 ```text
 (piece_type + piece_color, square)
 ```
 
 for every occupied square. Then `ResetAccumulator()` in
-Enyo's `src/nnue.hpp` turns each entry into a feature index:
+Enyo's `src/nnue_model.hpp` turns each entry into a feature index:
 
 ```text
 feature = FeatureIdx(piece_type, piece_color, piece_square, view_king_square, view)
