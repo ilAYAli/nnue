@@ -41,10 +41,30 @@ def fen_features(fen: str) -> tuple[list[int], list[int], int, float]:
     )
 
 
+def parse_tag_weights(text: str) -> dict[str, float]:
+    weights: dict[str, float] = {}
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "=" not in part:
+            raise SystemExit(
+                f"bad --search-tag-weights entry {part!r}; expected tag=value")
+        tag, value = part.split("=", 1)
+        weights[tag.strip()] = float(value)
+    return weights
+
+
+def target_weight(tags: list[str], tag_weights: dict[str, float]) -> float:
+    if not tag_weights:
+        return 1.0
+    return max((tag_weights.get(tag, 1.0) for tag in tags), default=1.0)
+
+
 class SearchAwareTargetDataset(Dataset):
     def __init__(self, rows: list[dict], *, max_moves: int,
-                 max_gap_cp: float) -> None:
-        self.items: list[tuple[str, list[str], list[ChildMove]]] = []
+                 max_gap_cp: float, tag_weights: dict[str, float]) -> None:
+        self.items: list[tuple[str, list[str], float, list[ChildMove]]] = []
         for row in rows:
             fen = str(row["fen"])
             tags = [str(tag) for tag in row.get("tags", [])]
@@ -87,11 +107,17 @@ class SearchAwareTargetDataset(Dataset):
             else:
                 for child in children:
                     child.policy = max(0.0, child.policy) / policy_sum
-            self.items.append((str(row.get("id", "")), tags, children))
+            self.items.append((
+                str(row.get("id", "")),
+                tags,
+                target_weight(tags, tag_weights),
+                children,
+            ))
 
     @classmethod
     def from_jsonl(cls, path: str | Path, *, limit: int, max_moves: int,
-                   max_gap_cp: float) -> "SearchAwareTargetDataset":
+                   max_gap_cp: float,
+                   tag_weights: dict[str, float]) -> "SearchAwareTargetDataset":
         rows = []
         with Path(path).expanduser().open(encoding="utf-8") as handle:
             for line in handle:
@@ -99,7 +125,8 @@ class SearchAwareTargetDataset(Dataset):
                     rows.append(json.loads(line))
                 if limit > 0 and len(rows) >= limit:
                     break
-        return cls(rows, max_moves=max_moves, max_gap_cp=max_gap_cp)
+        return cls(rows, max_moves=max_moves, max_gap_cp=max_gap_cp,
+                   tag_weights=tag_weights)
 
     def __len__(self) -> int:
         return len(self.items)
@@ -135,12 +162,14 @@ def collate_targets(batch):
     best_indices = []
     gaps = []
     policies = []
+    weights = []
     tag_sets = []
     ids = []
     moves = []
-    for target_id, tags, children in batch:
+    for target_id, tags, weight, children in batch:
         ids.append(target_id)
         tag_sets.append(";".join(tags))
+        weights.append(float(weight))
         start = group_offsets[-1]
         best_local = 0
         for i, child in enumerate(children):
@@ -158,6 +187,7 @@ def collate_targets(batch):
         torch.tensor(best_indices, dtype=torch.long),
         torch.tensor(gaps, dtype=torch.float32),
         torch.tensor(policies, dtype=torch.float32),
+        torch.tensor(weights, dtype=torch.float32),
         ids,
         tag_sets,
         moves,
@@ -206,9 +236,11 @@ def optimizer_param_groups(model: EnyoNNUE, args: argparse.Namespace):
 
 def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
                             best_indices: torch.Tensor, gaps: torch.Tensor,
-                            policies: torch.Tensor, args: argparse.Namespace):
+                            policies: torch.Tensor, group_weights: torch.Tensor,
+                            args: argparse.Namespace):
     margin_losses = []
     policy_losses = []
+    weight_total = pred.new_tensor(0.0)
     chosen_gaps = []
     top1 = 0
     top3 = 0
@@ -218,15 +250,18 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
         group_pred = pred[start:end]
         group_gaps = gaps[start:end]
         group_policy = policies[start:end]
+        weight = group_weights[i].clamp_min(0.0)
+        weight_total = weight_total + weight
         best = int(best_indices[i]) - start
         best_pred = group_pred[best]
-        margin_losses.append(F.smooth_l1_loss(
+        margin_losses.append(weight * F.smooth_l1_loss(
             group_pred - best_pred,
             group_gaps,
             beta=args.search_margin_beta,
             reduction="mean"))
         logits = -group_pred / max(args.search_policy_temperature_cp, 1e-6)
-        policy_losses.append(-(group_policy * F.log_softmax(logits, dim=0)).sum())
+        policy_losses.append(
+            weight * (-(group_policy * F.log_softmax(logits, dim=0)).sum()))
         order = torch.argsort(group_pred)
         selected = int(order[0])
         if selected == best:
@@ -234,8 +269,13 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
         if best in {int(v) for v in order[:min(3, len(order))]}:
             top3 += 1
         chosen_gaps.append(float(group_gaps[selected].detach().cpu()))
-    margin_loss = torch.stack(margin_losses).mean() if margin_losses else pred.sum() * 0.0
-    policy_loss = torch.stack(policy_losses).mean() if policy_losses else pred.sum() * 0.0
+    if margin_losses:
+        normalizer = weight_total.clamp_min(1e-6)
+        margin_loss = torch.stack(margin_losses).sum() / normalizer
+        policy_loss = torch.stack(policy_losses).sum() / normalizer
+    else:
+        margin_loss = pred.sum() * 0.0
+        policy_loss = pred.sum() * 0.0
     metrics = {
         "top1": top1,
         "top3": top3,
@@ -261,9 +301,10 @@ def search_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
         w, b, w_off, b_off, stm, phase_scale, group_offsets, best_indices = tensors
         gaps = batch[8].to(args.device)
         policies = batch[9].to(args.device)
+        group_weights = batch[10].to(args.device)
         pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
         _margin, _policy, metrics = target_loss_and_metrics(
-            pred, group_offsets, best_indices, gaps, policies, args)
+            pred, group_offsets, best_indices, gaps, policies, group_weights, args)
         total += metrics["targets"]
         top1 += metrics["top1"]
         top3 += metrics["top3"]
@@ -300,11 +341,18 @@ def set_trainable(model: EnyoNNUE, trainable: str) -> None:
 def train(args: argparse.Namespace) -> EnyoNNUE:
     broad_set, broad_collate = load_score_dataset(
         args.data, limit=args.max_rows, skip=args.skip_rows)
+    tag_weights = parse_tag_weights(args.search_tag_weights)
+    if tag_weights:
+        print(
+            "search tag weights: "
+            + ",".join(f"{tag}={weight:g}" for tag, weight in sorted(tag_weights.items())),
+            flush=True)
     target_set = SearchAwareTargetDataset.from_jsonl(
         args.targets,
         limit=args.search_target_limit,
         max_moves=args.search_max_moves,
-        max_gap_cp=args.search_max_gap_cp)
+        max_gap_cp=args.search_max_gap_cp,
+        tag_weights=tag_weights)
     if len(target_set) == 0:
         raise SystemExit("no search-aware targets after filtering")
     print(f"broad rows: {len(broad_set)}", flush=True)
@@ -369,9 +417,11 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             tw, tb, two, tbo, tstm, tphase, group_offsets, best_indices = tensors
             gaps = target_batch[8].to(args.device)
             policies = target_batch[9].to(args.device)
+            group_weights = target_batch[10].to(args.device)
             target_pred = predict(model, args, tw, tb, two, tbo, tstm, tphase)
             margin_loss, policy_loss, target_metrics = target_loss_and_metrics(
-                target_pred, group_offsets, best_indices, gaps, policies, args)
+                target_pred, group_offsets, best_indices, gaps, policies,
+                group_weights, args)
 
             loss = (
                 args.search_broad_weight * broad_loss
@@ -444,6 +494,8 @@ def main() -> None:
     ap.add_argument("--search-max-gap-cp", type=float, default=800.0)
     ap.add_argument("--search-max-moves", type=int, default=0)
     ap.add_argument("--search-target-limit", type=int, default=0)
+    ap.add_argument("--search-tag-weights", default="",
+                    help="Comma-separated target tag weights, e.g. mate_like=8,non_mate=1")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--max-rows", type=int, default=0)

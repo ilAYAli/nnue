@@ -117,6 +117,7 @@ class CandidateDefaults:
     search_max_gap_cp: float = 800.0
     search_max_moves: int = 0
     search_target_limit: int = 0
+    search_tag_weights: str = ""
 
     bullet_data: str = ""
     bullet_loader: str = "direct"

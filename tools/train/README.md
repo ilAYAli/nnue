@@ -45,5 +45,8 @@ moves. The trainer pushes those moves, evaluates child positions, and trains:
 - a soft-policy loss: the net should rank child moves according to the target
   policy distribution.
 
+`--search-tag-weights mate_like=8,non_mate=1` can up-weight specific target
+tags without changing the default unweighted behavior.
+
 Use this through `./build.py create --backend search-aware`; direct invocation is
 for debugging the backend only.
