@@ -75,7 +75,7 @@ move choice, not only child-eval ranking.
 
 ## Active Experiment
 
-`build.json` now defines `bullet-sfbinpack-legacy-lr1e7-sb1-nodecay`.
+`build.json` now defines `bullet-sfbinpack-legacy-floathead-lr1e7-sb1`.
 
 Purpose:
 
@@ -101,10 +101,21 @@ Rejected SF-binpack pressure setting:
 - checkpoint 1 was also rejected (`top1=87/232`, `capped_sum_diff_cp=-2788`,
   mate-like worst regression `-31591`).
 
-The current preflight tests much lower pressure: one superbatch,
-`lr=1e-7 -> 2e-8`, no weight decay. It is not a promotion candidate. It must
-pass `net-diff`, static, composite search/move, and failure-suite gates before
-any SPRT.
+Rejected lower-pressure all-weight setting:
+
+- `bullet-sfbinpack-legacy-lr1e7-sb1-nodecay`: one superbatch,
+  `lr=1e-7 -> 2e-8`, no weight decay.
+- exported movement still crossed `505` input weights, plus dense/output moved.
+- search gate failed (`top1=82/232`, `capped_sum_diff_cp=-928`,
+  mate-like worst regression `-31248`).
+- non-mate subset was mixed (`candidate_better=32`, `reference_better=26`,
+  worst regression `-155`), but top1 still regressed (`49/128` vs `53/128`).
+
+The current preflight freezes sparse/L1 weights and trains only the float head
+on the same SF binpack. It tests whether the external data has useful broad
+signal without triggering exported input-threshold crossings. It is not a
+promotion candidate and still needs `net-diff`, search/move, and failure-suite
+gates before any SPRT.
 
 ## Hard Rejections
 
