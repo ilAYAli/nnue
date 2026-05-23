@@ -42,7 +42,7 @@
   "validation": {
     "status": "rejected",
     "tmux": "nnue_native",
-    "result": "completed; fresh-hash 1M gate improved mate-like behavior but failed non-mate move choice: candidate_better=27, reference_better=57, capped_sum_diff_cp=-2939",
-    "next": "finish native-nonmate-deep-diagnosis-20260523_055831; do not run another scalar SF-binpack continuation unless build.json is changed to a new target/objective hypothesis"
+    "result": "completed; fresh-hash 1M gate improved mate-like behavior but failed non-mate move choice: candidate_better=27, reference_better=57, capped_sum_diff_cp=-2939. A 3M non-mate diagnostic also failed: candidate_better=21, reference_better=60, capped_sum_diff_cp=-3397",
+    "next": "do not run another scalar SF-binpack continuation; next build.json change must describe a changed target/objective hypothesis for non-mate move choice"
   }
 }
