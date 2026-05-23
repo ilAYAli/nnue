@@ -402,7 +402,7 @@ tools/validate/validate.py sprt \
 ## Important Docs
 
 ```text
-NNUE.md              NNUE architecture, weights, accumulators, and training concepts
+NNUE.md              Native Enyo NNUE design, weights, accumulators, and training concepts
 IMPROVEMENT_PLAN.md  Current experiment plan and lessons from failed runs
 tools/README.md      Lower-level phase tool overview
 ```
