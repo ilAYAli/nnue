@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`reckless-existing-output-signfit-1m-lr5e6-e8`.
-This is the least-bad zero-runtime-overhead existing-weight delta. The next
-live work is a validation-only delta-scale sweep of that net against the
-current reference before considering any SPRT.
+`reckless-check-bucket-mask2-speed-audit`.
+This is a validation-only runtime/parity audit for the one reckless existing-
+weight lane that showed a positive composite gate. It must explain the prior
+speed loss before any more SPRT time is spent on bucketed-head variants.
 
 ## Track Definitions
 
@@ -137,6 +137,21 @@ Scaled float-head deltas were also rejected:
 Decision: no SPRT. Stop SF-binpack float-head delta scaling as a near-term Elo
 lane. It contains some broad signal, but repeatedly creates or preserves
 unacceptable mate/endgame tails.
+
+Rejected output-only signfit delta scaling:
+
+- `reckless-output-signfit-delta-scale2-20260523_080836`: scales `0.25`,
+  `0.50`, `0.75`, `1.00`, and `1.25` were bit-equivalent in engine-search
+  behavior on the broad search gate: `top1=46/232`,
+  `candidate_better=36`, `reference_better=140`,
+  `capped_sum_diff_cp=-18244`, `worst_regression_cp=-31837`.
+- The least-bad scale then failed failure-suite replay:
+  `positions=913`, `candidate_better=78`, `reference_better=497`,
+  `sum_diff_cp=-123658`, `median_nonzero_diff_cp=-179`,
+  `worst_regression_cp=-923`.
+
+Decision: no SPRT. Output-only deltas are too weak for the current broad gate
+and can make failure-suite behavior much worse despite zero runtime overhead.
 
 ## Latest Result: Native SF-binpack Continuation
 
@@ -324,6 +339,8 @@ Do not restart these as near-term Elo lanes:
 - material/phase head masks.
 - raw SF-binpack float-head update without tail scaling.
 - SF-binpack float-head delta scaling.
+- output-only signfit delta scaling: all tested scales failed the broad gate
+  identically and the least-bad scale failed failure-suite by `-123658cp`.
 - current king-bucket split variants.
 - current king-pressure/check-state output bucket variants.
 - target-only sparse multiplier sweeps.
@@ -391,11 +408,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. In `nnue_reckless`, run a delta-scale gate sweep of
-   `reckless-existing-output-signfit-1m-lr5e6-e8`. This is output-only, keeps
-   existing weights, and has no runtime overhead.
-2. Require net-diff, broad search-gate, and failure-suite replay before any
-   match testing.
+1. In `nnue_reckless`, audit `reckless-check-bucket-mask2-lr1e6-e4` runtime
+   and parity. It had the best composite gate (`candidate_better=55`,
+   `reference_better=27`, `cap200=+1135`) but failed smoke SPRT and previously
+   measured about `27%` slower in `evalnet bench`.
+2. Do not train or SPRT another bucketed-head candidate until the speed loss is
+   confirmed, fixed, or proven irrelevant to search speed.
 3. In `nnue_native`, do not launch another direct child-eval recovery run. The
    next native step must redesign the target/objective around engine-search
    behavior and broad preservation together.
