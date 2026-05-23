@@ -1,8 +1,8 @@
 {
-  "description": "Native Enyo search-aware export-persistence audit: prove that target-only training survives saved PT and exported NN reload.",
-  "experiment": "native-searchaware-targetonly-exportcheck16-lr3e5-e240",
+  "description": "Native Enyo search-aware root-polarity persistence audit: prove that target-only training survives saved PT and exported NN reload.",
+  "experiment": "native-searchaware-rootpolarity-exportcheck16-lr3e5-e80",
   "track": "nnue_native",
-  "hypothesis": "The previous target-only audit logged 16/16 in-memory target top1, but the saved PT and exported NN now evaluate as 0/16. Before any recovery or scale-up, target-only training must prove that saved/exported artifacts preserve the learned search target choices.",
+  "hypothesis": "The child-low target-only export audit failed at 0/16 after save/export. A manual root-high diagnostic can overfit the same 16 targets, so this run checks whether root-pov high-is-good scoring persists through saved PT and exported NN artifacts. This is a plumbing audit, not an Elo candidate.",
   "base_checkpoint": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
   "broad_guard_data": "/home/petter/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
   "search_targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
@@ -14,12 +14,12 @@
     "no SPRT; this only validates target-training/export plumbing"
   ],
   "create": {
-    "name": "native-searchaware-targetonly-exportcheck16-lr3e5-e240",
+    "name": "native-searchaware-rootpolarity-exportcheck16-lr3e5-e80",
     "backend": "search-aware",
     "labeled_jsonl": "/home/petter/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "init_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
     "search_targets_jsonl": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
-    "search_tag_weights": "non_mate=1,mate_like=0.5",
+    "search_tag_weights": "non_mate=1",
     "search_broad_target": "init",
     "search_broad_target_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
     "search_broad_weight": 0.0,
@@ -30,19 +30,21 @@
     "search_policy_weight": 1.0,
     "search_margin_beta": 100.0,
     "search_policy_temperature_cp": 200.0,
+    "search_score_mode": "root-high",
     "search_max_gap_cp": 800.0,
     "search_max_moves": 8,
     "search_target_batch_size": 16,
     "search_target_limit": 16,
     "search_required_tags": "non_mate",
     "search_model_gate_min_top1": 16,
+    "search_select_best_target": true,
     "forward": "quantized",
     "trainable": "all",
     "lr": 0.00003,
     "input_lr_mult": 1000.0,
     "l1_lr_mult": 1000.0,
     "dense_lr_mult": 10.0,
-    "epochs": 240,
+    "epochs": 80,
     "batch_size": 16,
     "max_rows": 16,
     "pack_limit": 16,
@@ -52,12 +54,13 @@
     "device": "cuda",
     "workers": 0,
     "grad_norm_every": 0,
+    "selfplay_seed": 2026052302,
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "status": "pending",
     "tmux": "nnue_native",
     "result": "not run yet",
-    "next": "run the export-persistence audit; if saved/exported top1 fails, debug save/export before any recovery run"
+    "next": "run the root-polarity export-persistence audit; use the result to decide whether direct child-eval targets are salvageable or should be abandoned"
   }
 }

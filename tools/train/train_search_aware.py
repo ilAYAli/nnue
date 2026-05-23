@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import statistics
 import sys
 from dataclasses import dataclass
@@ -220,6 +221,15 @@ def predict(model: EnyoNNUE, args, w_feats: torch.Tensor, b_feats: torch.Tensor,
     return model(w_feats, b_feats, w_offsets, b_offsets, stm, phase_scale)
 
 
+def best_score(metrics: dict[str, float]) -> tuple[float, float, float, float]:
+    return (
+        metrics["top1"],
+        metrics["top3"],
+        -metrics["sum_gap"],
+        -metrics["worst_gap"],
+    )
+
+
 def grad_norm(param: torch.Tensor) -> float:
     if param.grad is None:
         return 0.0
@@ -283,15 +293,21 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
         weight_total = weight_total + weight
         best = int(best_indices[i]) - start
         best_pred = group_pred[best]
+        if args.search_score_mode == "root-high":
+            margin_values = best_pred - group_pred
+            logits = group_pred / max(args.search_policy_temperature_cp, 1e-6)
+            order = torch.argsort(group_pred, descending=True)
+        else:
+            margin_values = group_pred - best_pred
+            logits = -group_pred / max(args.search_policy_temperature_cp, 1e-6)
+            order = torch.argsort(group_pred)
         margin_losses.append(weight * F.smooth_l1_loss(
-            group_pred - best_pred,
+            margin_values,
             group_gaps,
             beta=args.search_margin_beta,
             reduction="mean"))
-        logits = -group_pred / max(args.search_policy_temperature_cp, 1e-6)
         policy_losses.append(
             weight * (-(group_policy * F.log_softmax(logits, dim=0)).sum()))
-        order = torch.argsort(group_pred)
         selected = int(order[0])
         if selected == best:
             top1 += 1
@@ -368,6 +384,11 @@ def set_trainable(model: EnyoNNUE, trainable: str) -> None:
 
 
 def train(args: argparse.Namespace) -> EnyoNNUE:
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
+
     broad_set, broad_collate = load_score_dataset(
         args.data, limit=args.max_rows, skip=args.skip_rows)
     tag_weights = parse_tag_weights(args.search_tag_weights)
@@ -419,7 +440,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         collate_fn=broad_collate, num_workers=args.workers,
         pin_memory=args.device.startswith("cuda"))
     target_loader = DataLoader(
-        target_set, batch_size=args.search_target_batch_size, shuffle=True,
+        target_set,
+        batch_size=args.search_target_batch_size,
+        shuffle=args.search_target_shuffle,
         collate_fn=collate_targets, num_workers=0,
         pin_memory=args.device.startswith("cuda"))
     target_iter = cycle(target_loader)
@@ -428,6 +451,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     for group in param_groups:
         print(f"optimizer group {group['name']} lr={group['lr']}", flush=True)
     opt = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
+    best_state = None
+    best_epoch = -1
+    best_metrics: dict[str, float] | None = None
 
     for epoch in range(args.epochs):
         broad_weight = effective_broad_weight(epoch, args)
@@ -499,6 +525,25 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             f" target_sum_gap={metrics['sum_gap']:.0f}"
             f" target_worst_gap={metrics['worst_gap']:.0f}",
             flush=True)
+        if args.search_select_best_target:
+            if best_metrics is None or best_score(metrics) > best_score(best_metrics):
+                best_metrics = metrics
+                best_epoch = epoch
+                best_state = {
+                    key: value.detach().cpu().clone()
+                    for key, value in model.state_dict().items()
+                }
+
+    if args.search_select_best_target and best_state is not None:
+        model.load_state_dict(best_state)
+        print(
+            "selected target-best checkpoint "
+            f"epoch={best_epoch} "
+            f"top1={int(best_metrics['top1'])}/{int(best_metrics['targets'])} "
+            f"top3={int(best_metrics['top3'])}/{int(best_metrics['targets'])} "
+            f"sum_gap={best_metrics['sum_gap']:.0f} "
+            f"worst_gap={best_metrics['worst_gap']:.0f}",
+            flush=True)
 
     return model
 
@@ -537,9 +582,16 @@ def main() -> None:
     ap.add_argument("--search-policy-weight", type=float, default=0.25)
     ap.add_argument("--search-margin-beta", type=float, default=100.0)
     ap.add_argument("--search-policy-temperature-cp", type=float, default=200.0)
+    ap.add_argument("--search-score-mode", default="child-low",
+                    choices=["child-low", "root-high"],
+                    help="Whether rank-1 child should score lowest or highest")
     ap.add_argument("--search-max-gap-cp", type=float, default=800.0)
     ap.add_argument("--search-max-moves", type=int, default=0)
     ap.add_argument("--search-target-limit", type=int, default=0)
+    ap.add_argument("--search-target-shuffle", action="store_true",
+                    help="Shuffle search targets during training")
+    ap.add_argument("--search-select-best-target", action="store_true",
+                    help="Save the epoch with best target top1/top3/gap metrics")
     ap.add_argument("--search-required-tags", default="",
                     help="Comma-separated tags every selected search target must have")
     ap.add_argument("--search-tag-weights", default="",
@@ -549,6 +601,7 @@ def main() -> None:
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
     ap.add_argument("--grad-norm-every", type=int, default=0)
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--trainable", default="all",
                     choices=["all", "input", "float-head", "output"])
     args = ap.parse_args()

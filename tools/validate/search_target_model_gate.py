@@ -48,6 +48,8 @@ def main() -> int:
     parser.add_argument("--net", required=True, help="Exported .nn model")
     parser.add_argument("--pt", default="", help="Optional PyTorch state dict")
     parser.add_argument("--forward", default="quantized", choices=["float", "quantized"])
+    parser.add_argument("--search-score-mode", default="child-low",
+                        choices=["child-low", "root-high"])
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--target-limit", type=int, default=0)
@@ -81,6 +83,7 @@ def main() -> int:
         forward=args.forward,
         search_margin_beta=100.0,
         search_policy_temperature_cp=200.0,
+        search_score_mode=args.search_score_mode,
     )
 
     rc = 0
