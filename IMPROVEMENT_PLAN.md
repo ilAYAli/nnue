@@ -26,9 +26,8 @@ The main failure pattern is:
 
 Current `build.json` state:
 `native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096`.
-This is the conservative native SF-binpack retry: start again from the best
-previous native checkpoint, lower LR, remove weight decay, shorten the run, save
-more frequent checkpoints, then gate checkpoints before any SPRT.
+This run is complete and rejected. Do not rerun it as a candidate recipe.
+`build.json` must be replaced before the next training attempt.
 
 ## Track Definitions
 
@@ -47,6 +46,43 @@ more frequent checkpoints, then gate checkpoints before any SPRT.
 - currently useful for background experiments, not promotion.
 
 ## Latest Result
+
+Rejected conservative native SF-binpack retry:
+
+- `native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096` retried the same
+  native SF-binpack continuation with lower pressure: `lr=1e-5 -> 1e-6`, no
+  weight decay, `4096` superbatches, checkpoints every `512`.
+- checkpoint `0` was exact parity, so init/export was correct.
+- no checkpoint passed the 300k-node search gate.
+- best broad-looking checkpoint was `1536`: all split `37` vs `36`,
+  capped `+144`; non-mate `29` vs `24`, capped `+323`; but mate-like failed
+  `8` vs `12`, capped `-179`, worst `-7098cp`.
+- checkpoint `3072` had the strongest non-mate split (`30` vs `21`,
+  capped `+247`) but failed overall (`capped=-727`) and mate-like
+  (`5` vs `15`, capped `-974`, worst `-7098cp`).
+- checkpoint `4096` had positive non-mate capped sum (`+309`) but failed all
+  (`35` vs `39`, capped `-181`) and mate-like (`11` vs `16`,
+  capped `-490`, worst `-7098cp`).
+- net-diff shows the low-pressure retry was dense-only after export:
+  checkpoints `1536`, `3072`, and `4096` changed `0` input weights,
+  `0` input biases, `0` L1 weights, and `0` L1 biases; only L2/output tensors
+  moved (`577/25200209` exported values).
+
+Comparison to the rejected higher-pressure continuation:
+
+- `continue2` checkpoints crossed sparse export thresholds:
+  `5120` changed `41767` input weights and `450` L1 weights; `7168` changed
+  `82197` input weights and `576` L1 weights.
+- those sparse-moving checkpoints still failed the deeper 1M-node gate:
+  `5120` lost non-mate (`23` vs `26`, capped `-320`, worst `-305cp`);
+  `7168` failed all (`capped=-71`, worst `-397cp`) and non-mate
+  (`capped=-598`, worst `-397cp`).
+
+Decision: no SPRT. Stop this native SF-binpack continuation family. The result
+is the same structural tradeoff seen elsewhere: exported sparse movement is
+possible, but destructive; conservative training is exported dense-only and
+cannot fix the search tails. The next training attempt needs a different
+architecture/data-scale plan, not another LR continuation.
 
 Rejected native SF-binpack continuation:
 
