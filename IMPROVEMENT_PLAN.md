@@ -24,9 +24,11 @@ The main failure pattern is:
   not recovered reference move-choice strength, but the first Stockfish-binpack
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
-Current `build.json` state: active next run is
-`native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096` in the `nnue_native`
-lane. It continues from the Enyo-owned SF-binpack scratch net, not from Berserk.
+Current `build.json` state: the native SF-binpack lower-LR continuation is
+complete and rejected as a promotion path. It was still useful diagnostically:
+fresh UCI-state validation showed the mate-like catastrophic tail was mostly a
+measurement/search-context issue, while non-mate move choice remained far below
+the reference.
 
 ## Track Definitions
 
@@ -136,11 +138,11 @@ Decision: no SPRT. Stop SF-binpack float-head delta scaling as a near-term Elo
 lane. It contains some broad signal, but repeatedly creates or preserves
 unacceptable mate/endgame tails.
 
-## Active Next Run
+## Latest Result: Native SF-binpack Continuation
 
 `native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096`
 
-Purpose:
+Purpose was to:
 
 - continue the native SF-binpack lane after the first run showed clear
   baseline-building progress but failed promotion gates.
@@ -152,6 +154,39 @@ Purpose:
 
 This run is a provenance/native-baseline test, not a promotion candidate by
 default.
+
+Checkpoint sweep selected `2048` as the least-bad checkpoint, but it still
+failed the original search gate:
+
+- `top1=68/232`, `candidate_better=58`, `reference_better=86`,
+  `capped_sum_diff_cp=-4925`.
+- the old gate showed a repeated `-31814cp` mate-like tail.
+
+The search gate was then fixed to send `ucinewgame`/`isready` before each target
+instead of reusing one UCI game/hash across unrelated positions. Fresh-hash
+validation for checkpoint `2048` gave:
+
+- `300k nodes`: `top1=65/232`, `candidate_better=39`,
+  `reference_better=86`, `capped_sum_diff_cp=-5202`.
+- `1M nodes`: `top1=78/232`, `candidate_better=48`,
+  `reference_better=73`, `capped_sum_diff_cp=-2436`,
+  `worst_regression_cp=-276`.
+- `1M mate-like`: `candidate_better=21`, `reference_better=16`,
+  `capped_sum_diff_cp=+503`, `worst_regression_cp=-237`.
+- `1M non-mate`: `candidate_better=27`, `reference_better=57`,
+  `capped_sum_diff_cp=-2939`, `median_nonzero_diff_cp=-25`.
+
+Decision: no SPRT. Stop scalar native SF-binpack continuation. The useful next
+diagnostic is non-mate search behavior, not another same-objective continuation
+run.
+
+Active diagnostic:
+
+- `native-nonmate-deep-diagnosis-20260523_055831`
+- run the `128` non-mate search-aware targets at deeper nodes against the same
+  checkpoint and reference.
+- if non-mate remains negative at deeper search, the next native lane needs a
+  changed target/objective, not more scalar SF-binpack epochs.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -201,6 +236,10 @@ Do not restart these as near-term Elo lanes:
 - `native-bullet-sfbinpack-scratch-eval400-sb4096` as a promotion candidate:
   best checkpoint was still `top1=64/232`, `candidate_better=56`,
   `reference_better=91`, `capped_sum_diff_cp=-4663`.
+- `native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096` as a promotion
+  candidate: fresh-hash 1M validation improved mate-like behavior, but non-mate
+  stayed strongly negative (`candidate_better=27`, `reference_better=57`,
+  `capped_sum_diff_cp=-2939`).
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -225,13 +264,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run the committed native SF-binpack scratch preflight from `build.json`.
-2. Sweep saved checkpoints against the search/move gate.
-3. Continue once from the Enyo-owned SF-binpack checkpoint with lower LR because
-   it is materially closer than prior Enyo-selfplay scratch nets.
-4. If the continuation still does not materially close the search-gate gap, stop
-   native scalar SF-binpack continuation and reassess data/objective before
-   spending more GPU time.
+1. Finish `native-nonmate-deep-diagnosis-20260523_055831`.
+2. If deeper non-mate search remains negative, update `build.json` only for a
+   candidate with a changed target/objective. Do not run another scalar
+   SF-binpack continuation.
+3. If deeper non-mate search unexpectedly closes the gap, run failure-suite
+   replay before considering any SPRT.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.

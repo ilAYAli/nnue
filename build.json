@@ -40,8 +40,9 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "planned",
+    "status": "rejected",
     "tmux": "nnue_native",
-    "next": "run native SF-binpack lower-LR continuation and checkpoint sweep; stop this scalar continuation lane if the search gate does not materially improve"
+    "result": "completed; fresh-hash 1M gate improved mate-like behavior but failed non-mate move choice: candidate_better=27, reference_better=57, capped_sum_diff_cp=-2939",
+    "next": "finish native-nonmate-deep-diagnosis-20260523_055831; do not run another scalar SF-binpack continuation unless build.json is changed to a new target/objective hypothesis"
   }
 }
