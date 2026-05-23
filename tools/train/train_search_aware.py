@@ -80,7 +80,20 @@ class SearchAwareTargetDataset(Dataset):
             children: list[ChildMove] = []
             moves = sorted(row.get("moves", []), key=lambda item: int(item.get("rank", 999)))
             if max_moves > 0:
-                moves = moves[:max_moves]
+                marked = {
+                    str(move).lower()
+                    for key in ("oracle_moves", "reference_moves", "candidate_moves")
+                    for move in row.get(key, [])
+                    if str(move)
+                }
+                selected = {str(item.get("uci", "")).lower() for item in moves[:max_moves]}
+                selected.update(
+                    str(item.get("uci", "")).lower()
+                    for item in moves
+                    if str(item.get("uci", "")).lower() in marked)
+                moves = [
+                    item for item in moves
+                    if str(item.get("uci", "")).lower() in selected]
             for item in moves:
                 uci = str(item.get("uci", "")).lower()
                 if not uci:
