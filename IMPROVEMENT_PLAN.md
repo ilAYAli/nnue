@@ -75,7 +75,7 @@ move choice, not only child-eval ranking.
 
 ## Active Experiment
 
-`build.json` now defines `bullet-sfbinpack-legacy-init-parity`.
+`build.json` now defines `bullet-sfbinpack-legacy-existing-init-preflight`.
 
 Purpose:
 
@@ -85,10 +85,14 @@ Purpose:
 - use Bullet directly on SF binpack data after first proving the legacy-layout
   Enyo init export is behaviorally identical to the reference.
 
-This is a preflight, not a promotion candidate. `bullet_export_init_only` stays
-enabled until init-export parity passes against the current reference net. Then
-the committed `build.json` may switch to real SF-binpack training, which still
-must pass `net-diff`, static, composite search/move, and failure-suite gates
+Init-export parity passed:
+
+- exported net size matched the current reference exactly (`25203012` bytes).
+- all integer tensors matched; only four output floats differed by `1.49e-08`.
+- search-gate compare was exactly zero on all/mate-like/non-mate subsets.
+
+The current preflight is real SF-binpack training, not a promotion candidate.
+It must pass `net-diff`, static, composite search/move, and failure-suite gates
 before any SPRT.
 
 ## Hard Rejections
