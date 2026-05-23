@@ -1,27 +1,21 @@
 {
-  "description": "Near-term reckless lane: 300k broad gate sweep for scaled output-signfit existing-weight deltas.",
-  "experiment": "reckless-floathead-delta-scale-300k-sweep",
-  "track": "nnue_reckless",
-  "hypothesis": "The shared mate-like tail is a horizon-sensitive diagnostic rather than an automatic SPRT blocker. Recheck the remaining scaled output-signfit deltas at 300k to see whether any existing-weight output-only scale has a positive broad capped signal.",
+  "description": "Native lane: inspect scratch/current-reference broad-gate failures before the next search-aware objective change.",
+  "experiment": "native-searchaware-failure-inspection",
+  "track": "nnue_native",
+  "hypothesis": "Near-term reckless output-only deltas are exhausted. The next useful work is to compare native scratch/current-reference failures and design the next search-aware objective around broad preservation plus move choice, not another direct child-eval recovery run.",
   "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-  "candidate_nets": {
-    "delta005": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_005.nn",
-    "delta010": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_010.nn",
-    "delta015": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_015.nn",
-    "delta020": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_020.nn"
-  },
+  "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/train/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/checkpoints/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048/quantised.bin",
   "validation": {
     "status": "pending",
-    "tmux": "nnue_reckless",
+    "tmux": "nnue_native",
     "targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
     "nodes": 300000,
     "required_checks": [
-      "run broad 300k search gate for delta005, delta010, delta015, and delta020",
-      "compare capped cp gap and candidate/reference better counts",
-      "run failure-suite replay only for the best positive scale",
-      "do not start SPRT unless the broad gate and failure suite are both acceptable"
+      "compare best native scratch checkpoint against reference by source/tag",
+      "identify whether losses are mate-like, non-mate, or broad positional",
+      "produce the next objective design before launching training"
     ],
-    "next": "run 300k scale sweep only; no training and no SPRT"
+    "next": "analysis only; no training and no SPRT"
   },
   "create": {
     "name": "reckless-check-bucket-mask2-lr1e6-e4",
