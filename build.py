@@ -478,6 +478,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--search-policy-weight", str(args.search_policy_weight),
             "--search-margin-beta", str(args.search_margin_beta),
             "--search-policy-temperature-cp", str(args.search_policy_temperature_cp),
+            "--search-score-mode", args.search_score_mode,
             "--search-max-gap-cp", str(args.search_max_gap_cp),
             "--search-max-moves", str(args.search_max_moves),
             "--search-target-limit", str(args.search_target_limit),
@@ -488,8 +489,13 @@ def create_config(args: argparse.Namespace) -> dict:
             "--max-rows", str(args.max_rows),
             "--skip-rows", str(args.skip_rows),
             "--grad-norm-every", str(args.grad_norm_every),
+            "--seed", str(args.selfplay_seed),
             "--trainable", args.trainable,
         ]
+        if args.search_target_shuffle:
+            train_command.append("--search-target-shuffle")
+        if args.search_select_best_target:
+            train_command.append("--search-select-best-target")
         if args.init_net:
             train_command.extend([
                 "--init-from-nn", str(expand_path(args.init_net)),
@@ -531,6 +537,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--net", f"{candidate_dir}/model.nn",
                     "--pt", f"{candidate_dir}/model.pt",
                     "--forward", args.forward,
+                    "--search-score-mode", args.search_score_mode,
                     "--device", args.device,
                     "--batch-size", str(args.search_target_batch_size),
                     "--target-limit", str(args.search_target_limit),
@@ -844,9 +851,13 @@ def add_create_args(
     parser.add_argument("--search-policy-weight", type=float, default=value("search_policy_weight", d.search_policy_weight))
     parser.add_argument("--search-margin-beta", type=float, default=value("search_margin_beta", d.search_margin_beta))
     parser.add_argument("--search-policy-temperature-cp", type=float, default=value("search_policy_temperature_cp", d.search_policy_temperature_cp))
+    parser.add_argument("--search-score-mode", default=value("search_score_mode", d.search_score_mode),
+                        choices=["child-low", "root-high"])
     parser.add_argument("--search-max-gap-cp", type=float, default=value("search_max_gap_cp", d.search_max_gap_cp))
     parser.add_argument("--search-max-moves", type=int, default=value("search_max_moves", d.search_max_moves))
     parser.add_argument("--search-target-limit", type=int, default=value("search_target_limit", d.search_target_limit))
+    parser.add_argument("--search-target-shuffle", action="store_true", default=value("search_target_shuffle", d.search_target_shuffle))
+    parser.add_argument("--search-select-best-target", action="store_true", default=value("search_select_best_target", d.search_select_best_target))
     parser.add_argument("--search-required-tags", default=value("search_required_tags", d.search_required_tags))
     parser.add_argument("--search-tag-weights", default=value("search_tag_weights", d.search_tag_weights))
     parser.add_argument("--search-model-gate-min-top1", type=int, default=value("search_model_gate_min_top1", d.search_model_gate_min_top1))

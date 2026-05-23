@@ -118,9 +118,12 @@ class CandidateDefaults:
     search_policy_weight: float = 0.25
     search_margin_beta: float = 100.0
     search_policy_temperature_cp: float = 200.0
+    search_score_mode: str = "child-low"
     search_max_gap_cp: float = 800.0
     search_max_moves: int = 0
     search_target_limit: int = 0
+    search_target_shuffle: bool = False
+    search_select_best_target: bool = False
     search_required_tags: str = ""
     search_tag_weights: str = ""
     search_model_gate_min_top1: int = 0

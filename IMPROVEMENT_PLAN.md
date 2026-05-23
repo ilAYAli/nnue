@@ -24,10 +24,11 @@ The main failure pattern is:
   not recovered reference move-choice strength, but the first Stockfish-binpack
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
-Current `build.json` state: `native-searchaware-nonmate-initdistill-w8-lr1e6-e6`
-is rejected. It changed only a tiny dense part of the exported net and made the
-fresh-hash search gate much worse. Do not tune this config; fix the
-search-aware objective/plumbing before another run.
+Current `build.json` state:
+`native-searchaware-rootpolarity-exportcheck16-lr3e5-e80`.
+This is a search-aware plumbing audit, not a candidate. It exists to prove or
+disprove saved/exported target-gate persistence after the child-low audit
+failed.
 
 ## Track Definitions
 
@@ -251,13 +252,20 @@ Follow-up search-aware plumbing audits:
   choice stayed at `0/16` top1 and `1/16` top3. Direct reload checks showed the
   supposed target-fit checkpoint itself now evaluates as `0/16` from exported
   `.nn` and `0/16` from saved `.pt` quantized forward on the same targets.
+- `native-searchaware-targetonly-exportcheck16-lr3e5-e240`: failed the
+  required saved/exported target gate. Training stayed at `0/16` top1,
+  `1/16` top3, `sum_gap_cp=1926`, `worst_gap_cp=544`; saved `.pt` and exported
+  `.nn` matched that failure. The first 16 non-mate target IDs and first 8
+  moves matched the earlier audit, so this was not a target-file mismatch.
+- Reloading the old `search-aware-16target-quantized-audit-20260523_064051`
+  artifacts also gives `0/16`, despite the old train log claiming `16/16`.
+  Treat that old success as non-persistent and unusable.
 
-Decision: search-aware training plumbing can learn tiny target sets, including
-the quantized/export-aware forward path in a live training log, but saved/exported
-artifacts are not yet proven. The blocker is now export-persistent target
-learning: do not run recovery, broad preservation, or scale-up until the
-pipeline validates saved `.pt` and exported `.nn` target metrics immediately
-after training.
+Decision: direct child-low search-aware training is not a valid candidate lane.
+The next audit uses `search_score_mode=root-high` because a manual diagnostic
+can overfit the same 16 targets under root-pov high-is-good scoring. Passing
+that audit would only prove target-training/export plumbing; it would not make
+root-high child-position training semantically correct for Elo.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -335,6 +343,9 @@ Do not restart these as near-term Elo lanes:
 - `native-searchaware-recover16-w002-lr1e6-e80` as a candidate recipe:
   broad behavior recovered, but target top1 stayed `0/16`; the input
   target-fit checkpoint was not export-persistent.
+- `native-searchaware-targetonly-exportcheck16-lr3e5-e240` as a candidate
+  recipe: the child-low target-only objective failed even the 16-target
+  saved/exported gate.
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -359,14 +370,15 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run `native-searchaware-targetonly-exportcheck16-lr3e5-e240` from
-   `build.json`. This is an export-persistence audit, not a candidate: target
-   training must pass the same target gate after saving `.pt` and exporting
-   `.nn`.
-2. If saved/exported target top1 fails, debug persistence/export/reload before
-   any more recovery or scale-up runs. If it passes, rerun phase-B recovery
-   from that verified checkpoint.
-3. No SPRT from the current search-aware runs.
+1. Run `native-searchaware-rootpolarity-exportcheck16-lr3e5-e80` from
+   `build.json`. This is an export-persistence and polarity audit, not a
+   candidate.
+2. If it fails, stop direct child-eval target training. The search-aware lane
+   needs a different target/objective measured by actual engine-search behavior.
+3. If it passes, record that target-training/export persistence works under
+   root-high scoring, then decide whether the objective can be made
+   semantically valid before any recovery or scale-up run.
+4. No SPRT from the current search-aware runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
