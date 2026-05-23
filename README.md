@@ -84,6 +84,10 @@ search-aware  scalar loss plus search-target move-margin/policy losses
 material-head bucketed/material head experiments
 ```
 
+The Bullet backend is optional. It uses a Cargo git dependency pinned by
+`tools/bullet/spike_trainer/Cargo.lock`, so it is not tracked as a git
+submodule. Backend-specific details live in `tools/bullet/README.md`.
+
 Candidate creation usually runs:
 
 ```text
