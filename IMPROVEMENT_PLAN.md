@@ -443,6 +443,13 @@ Do not restart these as near-term Elo lanes:
   and then make `search_target_gate` assign synthetic `32000cp` gaps to
   previously scored moves. Fix target construction before another
   search-aware training run.
+- native search-aware v3 targets:
+  `native-searchaware-targets-v3-20260523` rebuilt the same source set after
+  preserving marked moves. Deduped v3 is `279` targets and `2123` move rows:
+  `200 non_mate`, `79 mate_like`, with `missing_marked=0` versus `101` missing
+  marked moves in v2. The training/model-gate loader must preserve marked moves
+  across its own top-K filter too; otherwise `search_max_moves=8` partially
+  reintroduces the same blind spot.
 
 ## Promotion Gates
 
@@ -465,9 +472,10 @@ The next action should be one of these, in order:
 
 1. Stop near-term reckless output-only work unless a new architecture hypothesis
    changes more than the final dense/output terms.
-2. Rebuild the v2 search-aware target set after fixing marked-move
-   preservation. Inspect whether the `non_mate` set still contains synthetic
-   `32000cp` gap failures before any new training run.
+2. Run one native v3 movement audit from the best native SF-binpack checkpoint:
+   CPU validation, v3 targets, no target-best checkpoint rollback, and no SPRT.
+   First gate is `net-diff`; exported input/L1 movement must be intentional and
+   measured before any broader search validation matters.
 3. Do not launch another tiny target-only child-eval recovery run.
 4. No SPRT from the current search-aware native or reckless output-delta runs.
 
