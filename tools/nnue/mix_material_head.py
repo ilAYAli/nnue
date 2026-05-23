@@ -71,8 +71,10 @@ def main() -> int:
         out.output_weights[bucket] = cand.output_weights[bucket]
         out.output_bias[bucket] = cand.output_bias[bucket]
 
-    nnue.write_net(out, args.output)
-    print(f"wrote {args.output}")
+    output = Path(args.output).expanduser()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    nnue.write_net(out, output)
+    print(f"wrote {output}")
     print("candidate_buckets=" + ",".join(map(str, args.candidate_buckets)))
     return 0
 
