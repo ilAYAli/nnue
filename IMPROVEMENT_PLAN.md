@@ -398,6 +398,11 @@ Do not restart these as near-term Elo lanes:
   (`candidate_better=8`, `reference_better=17`,
   `capped_sum_diff_cp=-1242`, mate-like `worst_regression_cp=-31082`).
   The old composite gate was a false positive.
+- `floathead_delta_020.nn` as a promotion candidate:
+  the current broad `300k` search-aware gate did not confirm the old `100k`
+  signal (`candidate_better=29`, `reference_better=33`,
+  `capped_sum_diff_cp=-173`, mate-like `worst_regression_cp=-31084`).
+  It has non-mate signal, but the mate-like tail is still a hard veto.
 
 ## Promotion Gates
 
@@ -418,13 +423,10 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. In `nnue_reckless`, recheck `floathead_delta_020.nn` from
-   `bullet-sfbinpack-legacy-floathead-lr1e7-sb1` on the current broad `300k`
-   search-aware gate. It is the only remaining near-term existing-weight delta
-   with a positive broad capped score in prior `100k` testing.
-2. Do not SPRT it unless the `300k` broad gate remains positive and the
-   failure-suite tail is explained or improved. Its current failure-suite tail
-   is still too large (`worst_regression_cp=-512`).
+1. In `nnue_reckless`, diagnose the shared catastrophic mate-like FEN that
+   vetoed both mask2 and delta020. Compare reference, mask2, and delta020 root
+   choices, forced-move search scores, and child static evals.
+2. Do not start another reckless training run until that tail is understood.
 3. In `nnue_native`, do not launch another direct child-eval recovery run. The
    next native step must redesign the target/objective around engine-search
    behavior and broad preservation together.
