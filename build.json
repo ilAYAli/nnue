@@ -1,30 +1,56 @@
 {
-  "description": "Native lane: build broader v2 search-aware move-choice targets before the next objective change.",
-  "experiment": "native-searchaware-targets-v2",
-  "track": "nnue_native",
-  "hypothesis": "Native scratch/continuation failures are dominated by broad non-mate/stable move-choice loss. Before another training run, build a broader top-N target set that includes pairwise SPRT-fail positions in addition to the current stable/repeated/SPRT scored move CSVs.",
-  "target_build": {
-    "output_full": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v2-20260523/search_aware_targets_v2_full.jsonl",
-    "output_deduped": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v2-20260523/search_aware_targets_v2_deduped.jsonl",
-    "max_moves": 8,
-    "policy_temperature_cp": 200.0,
-    "mate_gap_cp": 30000,
-    "sources": {
-      "stable": "/home/petter/code/cpp/chess/nnue/runs/stable-move-gate-20260522_190231/stable_move_scores_nodes1m.csv",
-      "repeated": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/repeated_tail_move_scores_20260521.csv",
-      "sprt_material": "/home/petter/code/cpp/chess/nnue/runs/deep-score-sprt-fail-targets-20260522_190538/material_mask_sprt_fail_move_scores_nodes1m.csv",
-      "sprt_output": "/home/petter/code/cpp/chess/nnue/runs/deep-score-sprt-fail-targets-20260522_190538/output_signfit_sprt_fail_move_scores_nodes1m.csv",
-      "pairwise_sprtfail": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/pairwise_sprtfail_repeated_tail_scores_20260522.csv"
-    }
+  "description": "Native lane: v2 search-aware preflight from the best Enyo-native continuation checkpoint.",
+  "metadata": {
+    "experiment": "native-searchaware-v2-preflight",
+    "track": "nnue_native",
+    "hypothesis": "The v2 target set should improve non-mate move choice only if broad init-distillation keeps the native continuation net from losing stable 300k search behavior. This is not a promotion candidate and not a SPRT run.",
+    "source_targets": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v2-20260523/search_aware_targets_v2_deduped.jsonl",
+    "init_checkpoint": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
+    "post_training_gate": "Run the broad search-aware gate at 300k nodes against the same init checkpoint before considering any further work."
   },
-  "validation": {
-    "status": "pending",
-    "tmux": "nnue_native",
-    "required_checks": [
-      "build full and deduped v2 JSONL target files",
-      "report targets, move rows, source distribution, tag distribution",
-      "do not train until the target distribution is reviewed"
-    ],
-    "next": "target build only; no training and no SPRT"
+  "create": {
+    "name": "native-searchaware-v2-initdistill-w2-lr5e7-e8",
+    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
+    "python": "~/.venv/bin/python",
+    "labeled_jsonl": "/home/petter/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
+    "backend": "search-aware",
+    "max_features": 32,
+    "pack_limit": 1000000,
+    "pack_progress": 250000,
+    "init_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
+    "forward": "quantized",
+    "target_clamp": 800,
+    "huber_beta": 200,
+    "lr": 5e-7,
+    "input_lr_mult": 50.0,
+    "l1_lr_mult": 50.0,
+    "dense_lr_mult": 1.0,
+    "epochs": 8,
+    "batch_size": 8192,
+    "device": "cuda",
+    "workers": 2,
+    "max_rows": 1000000,
+    "grad_norm_every": 100,
+    "weight_decay": 0.0,
+    "trainable": "all",
+    "search_targets_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-searchaware-targets-v2-20260523/search_aware_targets_v2_deduped.jsonl",
+    "search_target_batch_size": 32,
+    "search_broad_weight": 2.0,
+    "search_broad_target": "init",
+    "search_broad_target_net": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096/validate/checkpoint_sweep_20260523_044030/nets/native-bullet-sfbinpack-continue-eval400-lr2e4-sb4096-2048.nn",
+    "search_margin_weight": 1.0,
+    "search_policy_weight": 0.25,
+    "search_margin_beta": 50.0,
+    "search_policy_temperature_cp": 150.0,
+    "search_score_mode": "child-low",
+    "search_max_gap_cp": 400.0,
+    "search_max_moves": 8,
+    "search_target_limit": 0,
+    "search_target_shuffle": true,
+    "search_select_best_target": true,
+    "search_required_tags": "non_mate",
+    "search_tag_weights": "non_mate=4,source:stable=4,source:pairwise_sprtfail=2,source:sprt_material=1,source:sprt_output=1,mate_like=0.25",
+    "search_model_gate_device": "cpu",
+    "search_model_gate_min_top1": 0
   }
 }
