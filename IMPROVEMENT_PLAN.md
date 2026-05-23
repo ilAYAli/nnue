@@ -25,9 +25,9 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-sfbinpack-continue3-eval400-lr1e5-sb4096`.
-This run is complete and rejected. Do not rerun it as a candidate recipe.
-`build.json` must be replaced before the next training attempt.
+`native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768`.
+This is a true native scratch/data-scale run: no inherited net, direct
+SF-binpack input, longer schedule, and checkpoint gates before any SPRT.
 
 ## Track Definitions
 
@@ -83,6 +83,17 @@ is the same structural tradeoff seen elsewhere: exported sparse movement is
 possible, but destructive; conservative training is exported dense-only and
 cannot fix the search tails. The next training attempt needs a different
 architecture/data-scale plan, not another LR continuation.
+
+Next run:
+
+- `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768`.
+- no `init_net`; this is an Enyo-owned native scratch run.
+- same native architecture (`1024` hidden, `16` L2) so the test isolates data
+  scale and scratch learning, not architecture.
+- `32768` superbatches, checkpoint every `2048`.
+- gate checkpoints before any SPRT; if it does not materially improve
+  move-choice gates over the shorter native scratch runs, stop same-architecture
+  native scratch and move to an architecture change.
 
 Rejected native SF-binpack continuation:
 
