@@ -1,30 +1,26 @@
 {
-  "description": "Reckless lane: check-state bucket sweep, rejected after 4k confirmation SPRT.",
+  "description": "Reckless lane: validate the cleaner check-state bucket-7 delta after bucket-6 failed confirmation.",
   "metadata": {
-    "experiment": "reckless-checkbucket-bucket-sweep",
+    "experiment": "reckless-checkbucket-bucket7-hardgate",
     "track": "nnue_reckless",
-    "hypothesis": "The full check-state head and bucket-2 mask failed broad gates. Individual bucket masks may isolate whether any existing-weight-compatible check-state bucket has useful broad signal without mate-like tail regressions.",
+    "hypothesis": "Bucket 6 was the strongest gate result but failed a 4k confirmation. Bucket 7 is smaller and cleaner in the broad sweep, with only +47 capped cp but worst -15 and no mate-like movement, so it may be a safer existing-weight delta.",
     "base_net": "runs/reckless-check-bucket-mask2-lr1e6-e4/base_bucketed.nn",
     "candidate_net": "runs/reckless-check-bucket-output-1m-lr1e6-e4/train/reckless-check-bucket-output-1m-lr1e6-e4/model.nn",
-    "bucket_sets": ["0", "1", "2", "3", "4", "5", "6", "7"],
-    "best_bucket": "6",
-    "best_bucket_net": "runs/reckless-checkbucket-bucket-sweep-20260523_162724/nets/bucket_6.nn",
-    "broad_300k": "bucket 6: all 9 vs 3, capped +99, worst -47; mate-like unchanged",
-    "broad_1m": "bucket 6: all 7 vs 2, capped +98, worst -34; mate-like unchanged",
-    "failure_suite": "bucket 6: positions 913, candidate 10 vs reference 7, sum +250, worst -27",
-    "sprt": "bucket 6: smoke1 -13.9 +/- 15.0, smoke2 +4.9 +/- 15.1, confirm4k -4.5 +/- 7.7 Elo, LOS 12.4%, draw 49.5%",
-    "status": "rejected"
+    "rejected_bucket": "6",
+    "rejected_bucket_net": "runs/reckless-checkbucket-bucket-sweep-20260523_162724/nets/bucket_6.nn",
+    "rejected_bucket_sprt": "bucket 6: confirm4k -4.5 +/- 7.7 Elo, LOS 12.4%, draw 49.5%",
+    "candidate_bucket": "7",
+    "candidate_bucket_net": "runs/reckless-checkbucket-bucket-sweep-20260523_162724/nets/bucket_7.nn",
+    "candidate_bucket_300k": "bucket 7: all 3 vs 2, capped +47, worst -15; mate-like unchanged",
+    "status": "active"
   },
   "validation": {
     "tmux": "nnue_reckless",
     "required_checks": [
-      "run tools/nnue/sweep_bucket_mix.py",
-      "generate masked .nn files with tools/nnue/mix_material_head.py",
-      "net-diff each masked net against the bucketed base",
-      "broad search-target gate at 300k nodes",
-      "stronger 1M-node broad gate for the best bucket",
+      "stronger 1M-node broad gate for bucket 7",
       "failure-suite replay before SPRT",
-      "1000-game smoke SPRT only after clean gates"
+      "1000-game smoke SPRT only after clean gates",
+      "4000-game confirmation only if smoke stays positive"
     ]
   }
 }
