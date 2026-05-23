@@ -59,7 +59,9 @@ For target configs or older runs, pass the run path explicitly:
 }
 ```
 
-For an Enyo-owned scratch/native run, use `init_net: null` and an initializer:
+For an Enyo-owned scratch/native bulk run, prefer direct binpack input. Use
+`init_net: null`; Bullet initializes the native Enyo weights from its configured
+standard deviations.
 
 ```json
 {
@@ -67,9 +69,13 @@ For an Enyo-owned scratch/native run, use `init_net: null` and an initializer:
     "name": "native-scratch",
     "backend": "bullet",
     "bullet_mode": "enyo",
+    "bullet_data": "/path/to/training.binpack",
+    "bullet_loader": "sfbinpack",
+    "bullet_sfbinpack_min_ply": 16,
+    "bullet_sfbinpack_quiet_only": true,
     "init_net": null,
-    "init": "kaiming",
-    "labeled_jsonl": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
+    "bullet_enyo_l0_std": 8.0,
+    "bullet_enyo_l1_std": 1.0
   }
 }
 ```
