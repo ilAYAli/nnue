@@ -1,19 +1,19 @@
 {
-  "description": "Reckless lane: scale the check-bucket-mask2 existing-weight delta before broad gates.",
+  "description": "Reckless lane: sweep individual check-state bucket deltas before broad gates.",
   "metadata": {
-    "experiment": "reckless-checkbucket-mask2-delta-scale",
+    "experiment": "reckless-checkbucket-bucket-sweep",
     "track": "nnue_reckless",
-    "hypothesis": "The full check-bucket-mask2 delta had useful narrow/non-mate signal but broad mate-like tails. Smaller exported deltas may preserve useful move-choice changes while avoiding tail blowups.",
+    "hypothesis": "The full check-state head and bucket-2 mask failed broad gates. Individual bucket masks may isolate whether any existing-weight-compatible check-state bucket has useful broad signal without mate-like tail regressions.",
     "base_net": "runs/reckless-check-bucket-mask2-lr1e6-e4/base_bucketed.nn",
-    "candidate_net": "runs/reckless-check-bucket-mask2-lr1e6-e4/model.nn",
-    "scales": [0.025, 0.05, 0.075, 0.10, 0.15, 0.20, 0.25, 0.35],
+    "candidate_net": "runs/reckless-check-bucket-output-1m-lr1e6-e4/train/reckless-check-bucket-output-1m-lr1e6-e4/model.nn",
+    "bucket_sets": ["0", "1", "2", "3", "4", "5", "6", "7"],
     "no_sprt": true
   },
   "validation": {
     "tmux": "nnue_reckless",
     "required_checks": [
-      "generate scaled .nn files with tools/nnue/scale_net_delta.py",
-      "net-diff each scaled net against the bucketed base",
+      "generate masked .nn files with tools/nnue/mix_material_head.py",
+      "net-diff each masked net against the bucketed base",
       "broad search-target gate at 300k nodes",
       "no SPRT unless all, non-mate, and mate-like splits are clean"
     ]

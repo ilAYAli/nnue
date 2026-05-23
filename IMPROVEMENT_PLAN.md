@@ -25,9 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768`.
-This is a true native scratch/data-scale run: no inherited net, direct
-SF-binpack input, longer schedule, and checkpoint gates before any SPRT.
+`reckless-checkbucket-bucket-sweep`.
+This is a reckless-lane diagnostic: keep existing weights, mix one trained
+check-state output bucket at a time into the copied bucketed base, and run the
+broad 300k-node search gate before any SPRT.
 
 ## Track Definitions
 
@@ -45,7 +46,38 @@ SF-binpack input, longer schedule, and checkpoint gates before any SPRT.
 - may borrow architecture ideas, but the result is native to Enyo.
 - currently useful for background experiments, not promotion.
 
-## Latest Result
+## Latest Result: Reckless Check-Bucket Delta Scaling
+
+Rejected `reckless-checkbucket-mask2-delta-scale-20260523_155150`:
+
+- The previous bucket-2 check-state mask looked promising on the older
+  composite gate, but failed smoke SPRT around `-30 Elo` and failed the newer
+  broad search gate.
+- Scaling that exported delta across `0.025`, `0.05`, `0.075`, `0.10`,
+  `0.15`, `0.20`, `0.25`, and `0.35` did not produce a keeper.
+- Best/least-bad scale was `0.05`, but it was still negative/neutral:
+  all `6` vs `6`, capped `-100`; mate-like `3` vs `3`, capped `-52`;
+  non-mate `3` vs `3`, capped `-48`; worst regression `-207cp`.
+- Larger scales repeatedly hit mate-like cliffs, including
+  `-31084cp`/`-31168cp` worst regressions.
+- Net diff showed the scaled nets changed only `30/25204248` exported values,
+  all output weights; input, L1, and L2 tensors did not move.
+
+Decision: no SPRT. Global scaling of this head-only bucket-2 delta is not a
+near-term Elo path. The only remaining useful check-state diagnostic is to
+sweep individual trained buckets from the full check-state head; if no single
+bucket clears the broad gate, stop this check-state-head family.
+
+Next run:
+
+- `reckless-checkbucket-bucket-sweep`.
+- Mix buckets `0` through `7` one at a time from
+  `reckless-check-bucket-output-1m-lr1e6-e4` into the copied bucketed base.
+- Gate each masked net on the broad 300k-node search target set.
+- No SPRT unless all, non-mate, and mate-like splits are clean and tails are
+  acceptable.
+
+## Previous Result
 
 Rejected conservative native SF-binpack retry:
 
