@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-searchaware-targetonly-exportcheck16-lr3e5-e240`.
-This reruns the previously failed search-target export gate with CPU validation
-semantics. It should skip completed pack/train phases and rerun only the failed
-gate.
+`native-searchaware-cpurecover16-w0p001-lr1e6-e80`.
+This is a CPU-only recovery audit from the verified 16-target net. It tests
+whether a very small broad distillation term can reduce broad drift while
+retaining `16/16` exported target choices.
 
 ## Track Definitions
 
@@ -268,7 +268,8 @@ Follow-up search-aware plumbing audits:
 Decision: exported search-target model gates must run on CPU unless the CUDA
 forward path is independently fixed. CPU quantized validation matches exported
 `.nn` semantics; CUDA validation currently gives misleading failures for these
-tiny target audits.
+tiny target audits. For the next small search-aware audit, train on CPU too, so
+training metrics and exported validation use the same semantics.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -373,14 +374,12 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Rerun `native-searchaware-targetonly-exportcheck16-lr3e5-e240` through
-   `build.py` with `search_model_gate_device=cpu`. This should verify the
-   saved/exported target fit without retraining.
-2. If the CPU gate passes, one controlled follow-up may try broad recovery from
-   that verified checkpoint. It must keep the same target subset and measure
-   both target retention and broader search-gate damage.
-3. If target retention collapses during recovery, stop this direct child-eval
-   search-aware lane and redesign targets around actual engine-search behavior.
+1. Run `native-searchaware-cpurecover16-w0p001-lr1e6-e80` from `build.json`.
+   It must retain `16/16` CPU target top1 after export.
+2. If target retention fails, stop this direct child-eval recovery lane and
+   redesign targets around actual engine-search behavior.
+3. If target retention passes and broad MAE improves, run a broad search-gate
+   diagnosis only. Do not SPRT.
 4. No SPRT from the current search-aware runs.
 
 Do not launch another training run until `build.json` names the lane,
