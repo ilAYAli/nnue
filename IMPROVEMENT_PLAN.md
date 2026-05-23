@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-searchaware-rootpolarity-exportcheck16-lr3e5-e80`.
-This is a search-aware plumbing audit, not a candidate. It exists to prove or
-disprove saved/exported target-gate persistence after the child-low audit
-failed.
+`native-searchaware-targetonly-exportcheck16-lr3e5-e240`.
+This reruns the previously failed search-target export gate with CPU validation
+semantics. It should skip completed pack/train phases and rerun only the failed
+gate.
 
 ## Track Definitions
 
@@ -249,23 +249,26 @@ Follow-up search-aware plumbing audits:
 - `native-searchaware-recover16-w002-lr1e6-e80`: initialized from the previous
   target-fit checkpoint and distilled broad rows against the separate native
   checkpoint. It recovered broad MAE from about `2032cp` to `597cp`, but target
-  choice stayed at `0/16` top1 and `1/16` top3. Direct reload checks showed the
-  supposed target-fit checkpoint itself now evaluates as `0/16` from exported
-  `.nn` and `0/16` from saved `.pt` quantized forward on the same targets.
-- `native-searchaware-targetonly-exportcheck16-lr3e5-e240`: failed the
-  required saved/exported target gate. Training stayed at `0/16` top1,
-  `1/16` top3, `sum_gap_cp=1926`, `worst_gap_cp=544`; saved `.pt` and exported
-  `.nn` matched that failure. The first 16 non-mate target IDs and first 8
-  moves matched the earlier audit, so this was not a target-file mismatch.
+  choice stayed at `0/16` top1 and `1/16` top3. Later CPU reload checks showed
+  the target-fit checkpoint was valid; the recovery run itself failed to retain
+  those target choices.
+- `native-searchaware-targetonly-exportcheck16-lr3e5-e240`: originally failed
+  the required saved/exported target gate because the gate used the CUDA audit
+  path. Manual CPU validation of the same saved `.pt` and exported `.nn`
+  artifacts passes at `16/16` top1, `16/16` top3, and zero gap for both
+  models. The first 16 non-mate target IDs and first 8 moves matched the
+  earlier audit, so this was not a target-file mismatch.
 - Reloading the old `search-aware-16target-quantized-audit-20260523_064051`
-  artifacts also gives `0/16`, despite the old train log claiming `16/16`.
-  Treat that old success as non-persistent and unusable.
+  artifacts also passes at `16/16` on CPU. The apparent `0/16` reload failure
+  was CUDA validation divergence, not non-persistent exported artifacts.
+- `native-searchaware-rootpolarity-exportcheck16-lr3e5-e80`: rejected. Best
+  selected checkpoint was only `6/16` in-run, and CPU revalidation reached only
+  `8/16`. Root-high scoring is not the path forward.
 
-Decision: direct child-low search-aware training is not a valid candidate lane.
-The next audit uses `search_score_mode=root-high` because a manual diagnostic
-can overfit the same 16 targets under root-pov high-is-good scoring. Passing
-that audit would only prove target-training/export plumbing; it would not make
-root-high child-position training semantically correct for Elo.
+Decision: exported search-target model gates must run on CPU unless the CUDA
+forward path is independently fixed. CPU quantized validation matches exported
+`.nn` semantics; CUDA validation currently gives misleading failures for these
+tiny target audits.
 
 ## Latest Result: Native SF-binpack Scratch
 
@@ -344,8 +347,8 @@ Do not restart these as near-term Elo lanes:
   broad behavior recovered, but target top1 stayed `0/16`; the input
   target-fit checkpoint was not export-persistent.
 - `native-searchaware-targetonly-exportcheck16-lr3e5-e240` as a candidate
-  recipe: the child-low target-only objective failed even the 16-target
-  saved/exported gate.
+  recipe: it is a 16-target plumbing audit only. CPU exported validation passes,
+  but the run has no broad-preservation evidence and is not a promotion path.
 - search-aware mateguard with broad init distillation and `mate_like=8`: it
   exported only dense/output changes and failed the search gate
   (`candidate_better=39`, `reference_better=146`,
@@ -370,14 +373,14 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run `native-searchaware-rootpolarity-exportcheck16-lr3e5-e80` from
-   `build.json`. This is an export-persistence and polarity audit, not a
-   candidate.
-2. If it fails, stop direct child-eval target training. The search-aware lane
-   needs a different target/objective measured by actual engine-search behavior.
-3. If it passes, record that target-training/export persistence works under
-   root-high scoring, then decide whether the objective can be made
-   semantically valid before any recovery or scale-up run.
+1. Rerun `native-searchaware-targetonly-exportcheck16-lr3e5-e240` through
+   `build.py` with `search_model_gate_device=cpu`. This should verify the
+   saved/exported target fit without retraining.
+2. If the CPU gate passes, one controlled follow-up may try broad recovery from
+   that verified checkpoint. It must keep the same target subset and measure
+   both target retention and broader search-gate damage.
+3. If target retention collapses during recovery, stop this direct child-eval
+   search-aware lane and redesign targets around actual engine-search behavior.
 4. No SPRT from the current search-aware runs.
 
 Do not launch another training run until `build.json` names the lane,

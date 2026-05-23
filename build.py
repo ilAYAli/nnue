@@ -538,7 +538,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--pt", f"{candidate_dir}/model.pt",
                     "--forward", args.forward,
                     "--search-score-mode", args.search_score_mode,
-                    "--device", args.device,
+                    "--device", args.search_model_gate_device,
                     "--batch-size", str(args.search_target_batch_size),
                     "--target-limit", str(args.search_target_limit),
                     "--required-tags", str(args.search_required_tags),
@@ -860,6 +860,8 @@ def add_create_args(
     parser.add_argument("--search-select-best-target", action="store_true", default=value("search_select_best_target", d.search_select_best_target))
     parser.add_argument("--search-required-tags", default=value("search_required_tags", d.search_required_tags))
     parser.add_argument("--search-tag-weights", default=value("search_tag_weights", d.search_tag_weights))
+    parser.add_argument("--search-model-gate-device", default=value("search_model_gate_device", d.search_model_gate_device),
+                        choices=["cpu", "cuda"])
     parser.add_argument("--search-model-gate-min-top1", type=int, default=value("search_model_gate_min_top1", d.search_model_gate_min_top1))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))

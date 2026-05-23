@@ -126,6 +126,7 @@ class CandidateDefaults:
     search_select_best_target: bool = False
     search_required_tags: str = ""
     search_tag_weights: str = ""
+    search_model_gate_device: str = "cpu"
     search_model_gate_min_top1: int = 0
 
     bullet_data: str = ""
