@@ -39,10 +39,10 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "status": "rejected_by_failure_suite",
-    "search_gate": "overall/non-mate top1 improved, mate-like tail regressed",
-    "failure_suite": "sum_diff_cp=-627, worst_regression_cp=-512",
-    "next": "float-head delta-scale sweep before any further training",
+    "status": "rejected_after_delta_scaling",
+    "search_gate": "25% and 20% deltas showed broad signal, but tails remained unsafe",
+    "failure_suite": "25%: sum_diff_cp=+1060 worst=-511; 20%: sum_diff_cp=-559 worst=-512",
+    "next": "redesign search-aware target/objective around engine-search behavior",
     "tmux": "nnue_reckless"
   }
 }
