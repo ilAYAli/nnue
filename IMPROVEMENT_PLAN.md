@@ -25,9 +25,11 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-searchaware-broadtargets-w2-lr5e7-e8`.
-This native run is rejected. Keep it as the committed record of the broad
-non-mate search-aware target experiment; do not rerun it as a candidate.
+`native-searchaware-broadtargets-teacher-w10-lr2e7-e6`.
+This native run reuses the broad non-mate target set, but restores broad scalar
+supervision to teacher labels. It is a controlled check for whether the target
+set has useful search signal without repeating the init-net preservation
+mistake.
 
 ## Track Definitions
 
