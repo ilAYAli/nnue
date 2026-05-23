@@ -1,11 +1,13 @@
 {
-  "description": "Near-term reckless lane: diagnose the shared mate-like tail that vetoed mask2 and delta020.",
-  "experiment": "reckless-shared-tail-diagnosis",
+  "description": "Near-term reckless lane: 300k broad gate sweep for scaled output-signfit existing-weight deltas.",
+  "experiment": "reckless-floathead-delta-scale-300k-sweep",
   "track": "nnue_reckless",
-  "hypothesis": "Both mask2 and delta020 fail the same mate-like search-aware FEN by about 31k cp. Before another training run, compare root choices, forced-move search scores, and child static evals to identify whether the tail is a search horizon issue, eval-net ordering issue, or target/gate artifact.",
+  "hypothesis": "The shared mate-like tail is a horizon-sensitive diagnostic rather than an automatic SPRT blocker. Recheck the remaining scaled output-signfit deltas at 300k to see whether any existing-weight output-only scale has a positive broad capped signal.",
   "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
   "candidate_nets": {
-    "mask2": "/home/petter/code/cpp/chess/nnue/runs/reckless-check-bucket-mask2-lr1e6-e4/model.nn",
+    "delta005": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_005.nn",
+    "delta010": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_010.nn",
+    "delta015": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_015.nn",
     "delta020": "/home/petter/code/cpp/chess/nnue/runs/bullet-sfbinpack-legacy-floathead-lr1e7-sb1/validate/floathead_delta_scale_20260523_031815/floathead_delta_020.nn"
   },
   "validation": {
@@ -14,12 +16,12 @@
     "targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
     "nodes": 300000,
     "required_checks": [
-      "extract the shared catastrophic FEN from current broad-gate compare CSVs",
-      "compare root choices at 100k, 300k, and 1M nodes",
-      "force-search oracle/reference/candidate moves with searchmoves",
-      "compare evalnet child scores from root POV"
+      "run broad 300k search gate for delta005, delta010, delta015, and delta020",
+      "compare capped cp gap and candidate/reference better counts",
+      "run failure-suite replay only for the best positive scale",
+      "do not start SPRT unless the broad gate and failure suite are both acceptable"
     ],
-    "next": "diagnose the shared tail only; no training and no SPRT"
+    "next": "run 300k scale sweep only; no training and no SPRT"
   },
   "create": {
     "name": "reckless-check-bucket-mask2-lr1e6-e4",
