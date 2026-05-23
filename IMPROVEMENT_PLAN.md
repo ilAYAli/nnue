@@ -25,10 +25,9 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`reckless-check-bucket-mask2-speed-audit`.
-This is a validation-only runtime/parity audit for the one reckless existing-
-weight lane that showed a positive composite gate. It must explain the prior
-speed loss before any more SPRT time is spent on bucketed-head variants.
+`native-searchaware-broadtargets-w2-lr5e7-e8`.
+This native run is rejected. Keep it as the committed record of the broad
+non-mate search-aware target experiment; do not rerun it as a candidate.
 
 ## Track Definitions
 
@@ -47,6 +46,24 @@ speed loss before any more SPRT time is spent on bucketed-head variants.
 - currently useful for background experiments, not promotion.
 
 ## Latest Result
+
+Rejected native broad-target search-aware run:
+
+- `native-searchaware-broadtargets-w2-lr5e7-e8` used `250` broad non-mate
+  move-choice targets built from ordinary training positions.
+- the internal model gate improved the target set (`top1=67/244`,
+  `top3=129/244`, `sum_gap_cp=11983`) and `.pt` matched exported `.nn`.
+- exported movement was still dense-only: `215/25200209` values changed, all in
+  L2 float tensors; input and L1 were unchanged.
+- static validation collapsed (`mae=784.736`, `sign=72.97%`,
+  `bias=-308.248`) on held-out packed rows.
+- broad 300k-node search gate was worse than the reference
+  (`candidate_better=34`, `reference_better=41`,
+  `capped_sum_diff_cp=-132`, `worst_regression_cp=-32000`).
+
+Decision: no SPRT. The broad target set is useful, but this objective/config is
+not. Native search-aware training must preserve teacher static behavior and
+produce intentional exported representation movement before another candidate.
 
 Search-aware target construction and training are implemented on
 `feature/nnue-search-aware-targets`:
@@ -484,7 +501,9 @@ The next action should be one of these, in order:
    set. It is too small and too brittle to move exported representation safely.
 3. If search-aware training continues, build a broader move-choice target set
    from ordinary non-mate training positions with Stockfish-scored legal child
-   moves, then use that as the next source of policy/ranking signal.
+   moves, then use that as the next source of policy/ranking signal. This has
+   now been done once; the next attempt must pair it with teacher static
+   preservation rather than init-net preservation.
 4. Do not launch another tiny target-only child-eval recovery run.
 5. No SPRT from the current search-aware native or reckless output-delta runs.
 

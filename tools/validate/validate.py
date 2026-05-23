@@ -128,7 +128,7 @@ def cmd_net_diff(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "net_diff.py"
     run_dir = event_run_dir(args.run, expand_path(args.candidate).parent)
     command = [
-        sys.executable,
+        str(expand_user(args.python)),
         str(script),
         "--candidate", str(expand_path(args.candidate)),
         "--reference", str(expand_path(args.reference)),
@@ -313,6 +313,11 @@ def build_parser() -> argparse.ArgumentParser:
     net_diff.add_argument("--run")
     net_diff.add_argument("--event-command")
     net_diff.add_argument("--fail-if-identical", action="store_true")
+    net_diff.add_argument(
+        "--python",
+        default=DEFAULTS.python,
+        help="Python executable used for net_diff.py; defaults to the project venv when present.",
+    )
     net_diff.set_defaults(func=cmd_net_diff)
 
     sprt = subparsers.add_parser("sprt", help="Run NNUE candidate SPRT.")
