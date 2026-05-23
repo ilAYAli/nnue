@@ -123,10 +123,21 @@ Rejected float-head setting:
 - failure-suite replay rejected it: `positions=913`, `candidate_better=73`,
   `reference_better=68`, `sum_diff_cp=-627`, `worst_regression_cp=-512`.
 
-Decision: no SPRT. The only remaining cheap diagnostic for this exact signal is
-to scale/clamp the float-head delta and rerun the search/failure gates. If a
-smaller delta still has mate-like or failure-suite tails, stop this SF-binpack
-float-head lane.
+Scaled float-head deltas were also rejected:
+
+- `25%` delta: search gate looked best (`top1=101/232`,
+  `candidate_better=57`, `reference_better=30`,
+  `capped_sum_diff_cp=+1301`), but failure-suite tail vetoed it
+  (`sum_diff_cp=+1060`, `worst_regression_cp=-511`).
+- `20%` delta: search gate stayed positive (`candidate_better=53`,
+  `reference_better=33`, `capped_sum_diff_cp=+933`), but failure-suite replay
+  rejected it (`sum_diff_cp=-559`, `worst_regression_cp=-512`).
+- `5%`, `10%`, `15%`, `50%`, and `75%` deltas did not improve the overall gate
+  enough to justify replay or SPRT.
+
+Decision: no SPRT. Stop SF-binpack float-head delta scaling as a near-term Elo
+lane. It contains some broad signal, but repeatedly creates or preserves
+unacceptable mate/endgame tails.
 
 ## Hard Rejections
 
@@ -139,6 +150,7 @@ Do not restart these as near-term Elo lanes:
 - head-only/output-only LR/objective sweeps.
 - material/phase head masks.
 - raw SF-binpack float-head update without tail scaling.
+- SF-binpack float-head delta scaling.
 - current king-bucket split variants.
 - current king-pressure/check-state output bucket variants.
 - target-only sparse multiplier sweeps.
@@ -165,14 +177,9 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Run a cheap float-head delta-scale sweep from the rejected SF-binpack
-   candidate (`25%`, `50%`, `75%`) against the same search/failure gates.
-2. If no scaled delta passes broad and mate-like gates, stop SF-binpack
-   float-head updates as a near-term lane.
-3. If the proven-data lane fails after scaling, redesign search-aware
-   target/objective around engine-search behavior instead of launching another
-   scalar training recipe.
-4. Keep native/scratch as a background lane that needs substantially broader
+1. Redesign search-aware target/objective around engine-search behavior instead
+   of launching another scalar or head-only training recipe.
+2. Keep native/scratch as a background lane that needs substantially broader
    prepared data before it is considered a promotion path.
 
 Do not launch another training run until `build.json` names the lane,
