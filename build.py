@@ -674,6 +674,9 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--min-depth", str(args.bullet_lichess_eval_min_depth),
                     "--min-knodes", str(args.bullet_lichess_eval_min_knodes),
                     "--max-abs-cp", str(args.bullet_max_abs_cp),
+                    "--min-ply", str(args.bullet_lichess_eval_min_ply),
+                    "--min-material-count", str(args.bullet_lichess_eval_min_material_count),
+                    "--max-material-count", str(args.bullet_lichess_eval_max_material_count),
                     "--max-input-rows", str(args.bullet_lichess_eval_max_input_rows),
                     "--seed", str(args.bullet_lichess_eval_seed),
                     "--progress", str(args.pack_progress),
@@ -839,6 +842,9 @@ def target_score_import_command(target_score: dict, run_dir: Path) -> list[str] 
         "--min-knodes", str(target_score.get("lichess_eval_min_knodes", 0)),
         "--max-abs-cp", str(target_score.get(
             "lichess_eval_max_abs_cp", target_score.get("max_abs_cp", 1600))),
+        "--min-ply", str(target_score.get("lichess_eval_min_ply", 0)),
+        "--min-material-count", str(target_score.get("lichess_eval_min_material_count", 0)),
+        "--max-material-count", str(target_score.get("lichess_eval_max_material_count", 32)),
         "--max-input-rows", str(target_score.get("lichess_eval_max_input_rows", 0)),
         "--seed", str(target_score.get("lichess_eval_seed", target_score.get("seed", 1))),
         "--progress", str(target_score.get("lichess_eval_progress", 100000)),
@@ -1245,6 +1251,11 @@ def add_create_args(
     parser.add_argument("--bullet-lichess-eval-buckets", default=value("bullet_lichess_eval_buckets", d.bullet_lichess_eval_buckets))
     parser.add_argument("--bullet-lichess-eval-min-depth", type=int, default=value("bullet_lichess_eval_min_depth", d.bullet_lichess_eval_min_depth))
     parser.add_argument("--bullet-lichess-eval-min-knodes", type=int, default=value("bullet_lichess_eval_min_knodes", d.bullet_lichess_eval_min_knodes))
+    parser.add_argument("--bullet-lichess-eval-min-ply", type=int, default=value("bullet_lichess_eval_min_ply", d.bullet_lichess_eval_min_ply))
+    parser.add_argument("--bullet-lichess-eval-min-material-count", type=int,
+                        default=value("bullet_lichess_eval_min_material_count", d.bullet_lichess_eval_min_material_count))
+    parser.add_argument("--bullet-lichess-eval-max-material-count", type=int,
+                        default=value("bullet_lichess_eval_max_material_count", d.bullet_lichess_eval_max_material_count))
     parser.add_argument("--bullet-lichess-eval-max-input-rows", type=int, default=value("bullet_lichess_eval_max_input_rows", d.bullet_lichess_eval_max_input_rows))
     parser.add_argument("--bullet-lichess-eval-unique-fen", action=argparse.BooleanOptionalAction,
                         default=value("bullet_lichess_eval_unique_fen", d.bullet_lichess_eval_unique_fen))
