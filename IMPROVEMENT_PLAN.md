@@ -6,6 +6,10 @@ This file is the active working plan. Long experiment notes are archived in
 Goal: produce a stronger Enyo net without repeating already-failed NNUE farming
 loops.
 
+Only `Current State`, `Closed Lanes`, `Active Theory`, and `Next Decision` are
+authoritative. Older result entries below are evidence, not invitations to
+restart a lane.
+
 ## Current State
 
 No trained Enyo net is currently a keeper.
@@ -25,19 +29,50 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-policy-overfit64-lichess-cpu-lr3e5-e240` passed as a native
-search-policy objective/export audit, not as a candidate. It reached `64/64`
-top1 on both `model.pt` and exported `.nn` on CPU, with zero gap. Exported
-movement was real and not head-only: `120691/25165824` input weights,
-`303/1024` input biases, and `3252/32768` L1 weights changed. The next rung
-must add broad/init preservation; target-only policy overfit is not a playable
-net.
 
-Current configured rung: `native-policy-preserve64-lichess-w005-lr3e6-e80`.
-It keeps the same 64 policy targets but adds 100k-row init-net distillation.
-Pass condition is exported CPU target retention of at least `60/64` top1 plus
-controlled broad MAE versus the native init checkpoint. If that fails, do not
-scale target count.
+- `native-policy-preserve64-lichess-w002-select-lr3e6-e80` is rejected.
+- Do not run the current `build.json`.
+- The last useful result was diagnostic only: target-only search-policy overfit
+  can move exported input/L1 and can exactly fit a 64-row policy slice, but
+  target preservation did not clear the predeclared gate and is not playable.
+
+## Closed Lanes
+
+These lanes are closed for the current architecture/export format unless a new
+mechanistic hypothesis is written before the run:
+
+- head-only, output-only, material-head, and float-head fitting.
+- sparse/input LR multiplier sweeps from existing exported weights.
+- pairwise/local repair loops and target-only policy preservation.
+- scalar child-row blends and same-data search-aware patching.
+- bucket-index sweeps without a new feature geometry and parity/NPS proof.
+- current same-architecture scratch scalar scaling as a promotion lane.
+- Reckless existing-weight deltas that only affect dense/head tensors or a
+  small bucket mask.
+
+## Active Theory
+
+The current bottleneck is not ordinary scalar training loss. The bottleneck is
+safe, export-visible representation movement plus search-aware supervision.
+
+Native work should now optimize for:
+
+1. exported sparse/input/L1 movement that is intentional and measured.
+2. broad move-choice and tactical-tail behavior before scalar MAE/sign.
+3. CP/WDL/policy supervision together, not scalar-only training.
+4. architecture/data hypotheses that reduce data starvation instead of adding
+   another local correction layer.
+
+Code audit status:
+
+- PyTorch Kaiming input init already uses active-feature fan-in
+  `sqrt(2 / 32)`, not full matrix fan-in.
+- scalar training already supports MPE/WDL blending.
+- search-aware training already supports ranking/policy targets, but the
+  target-only preservation family is closed.
+- remaining gap: define a scalable native training path that combines
+  CP/WDL/policy with export-aware sparse movement checks, and pair it with a
+  simpler/native feature geometry before spending GPU time.
 
 ## Track Definitions
 
@@ -57,12 +92,13 @@ scale target count.
 
 ## Active Decision: 2026-05-24
 
-Update: the one-bucket scale-up is rejected. The 16- and 8-bucket rungs
-failed, the 1-bucket smoke was only the least-bad signal, and the longer
-1-bucket run collapsed on the first 800-target checkpoint gate. Do not continue
-scalar bucket-count continuations. The next native work is an export-visible
-architecture hypothesis: a low-input-bucket, wider native net, with runtime
-parity and NPS checks before any training.
+Update: the one-bucket scale-up, same-architecture native scalar scaling, and
+target-only policy preservation are all rejected. Do not continue scalar
+bucket-count continuations, local search-aware patching, or preservation-weight
+sweeps. The next native work is not a training run; it is an architecture and
+objective implementation audit that must produce a concrete feature geometry,
+mixed CP/WDL/policy objective, and parity/NPS/quantization gates before any GPU
+time.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
@@ -918,24 +954,23 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Stop near-term reckless output-only work unless a new architecture hypothesis
-   changes more than the final dense/output terms.
-2. Stop sparse/input LR multiplier sweeps on the small failure-derived target
-   set. It is too small and too brittle to move exported representation safely.
-3. Stop target-only native policy preservation after
-   `native-policy-preserve64-lichess-w002-select-lr3e6-e80` missed the
-   predeclared exported model gate (`61/64`, required `62/64`).
-4. Stop the broad-target search-aware native config family after the teacher-
-   preserved retry also failed static and broad search gates.
-5. Do not continue the native baseline with the same architecture/data recipe.
-   Direct Lichess eval import and SF-binpack scalar training are available, but
-   the latest 1-bucket scale-up was a hard 800-target reject. Prepare an
-   export-visible architecture hypothesis before spending more GPU time.
-6. Do not launch another tiny target-only child-eval recovery run.
-7. No SPRT from the current search-aware native or reckless output-delta runs.
+1. Do not start a new training run from the current `build.json`.
+2. Write the native architecture/objective hypothesis before the next GPU run.
+   The hypothesis must choose the feature geometry, explain why it reduces data
+   starvation or improves representation learning, and list parity/NPS gates.
+3. Implement or verify a mixed native objective path:
+   CP/MPE-WDL plus policy/ranking from top-N child scores, with quantized
+   forward/export checks.
+4. Add preflight gates before scale-up:
+   10k-100k overfit, gradient reach, quantization-boundary scan after early
+   batches, exported `net-diff`, small move-choice gate, and tactical-tail gate.
+5. Only after those pass, run a larger Bullet/binpack native training job.
+6. Keep Reckless paused unless a new existing-weight-compatible architecture
+   hypothesis changes representation in a measurable way.
+7. No SPRT from current native/search-aware/reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
-hypothesis, data source, and gates.
+hypothesis, data source, objective, architecture/export change, and gates.
 
 ## Workflow Rules
 
