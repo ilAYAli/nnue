@@ -611,6 +611,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--enyo-l1-std", str(args.bullet_enyo_l1_std),
             "--enyo-l1-export-scale", str(args.bullet_enyo_l1_export_scale),
             "--enyo-input-buckets", str(args.bullet_enyo_input_buckets),
+            "--enyo-runtime-input-buckets", str(args.bullet_enyo_runtime_input_buckets),
             "--eval-scale", str(args.bullet_eval_scale),
             "--save-rate", str(args.bullet_save_rate),
             "--trainable", str(args.trainable),
@@ -1290,6 +1291,10 @@ def add_create_args(
     parser.add_argument("--bullet-enyo-l1-export-scale", type=float, default=value("bullet_enyo_l1_export_scale", d.bullet_enyo_l1_export_scale))
     parser.add_argument("--bullet-enyo-input-buckets", type=int, choices=[1, 2, 4, 8, 16, 32],
                         default=value("bullet_enyo_input_buckets", d.bullet_enyo_input_buckets))
+    parser.add_argument("--bullet-enyo-runtime-input-buckets", type=int,
+                        choices=[1, 2, 4, 8, 16, 32],
+                        default=value("bullet_enyo_runtime_input_buckets",
+                                      d.bullet_enyo_runtime_input_buckets))
     parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
     parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
     parser.add_argument("--bullet-export-init-only", action=argparse.BooleanOptionalAction,

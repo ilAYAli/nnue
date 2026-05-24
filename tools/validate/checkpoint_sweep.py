@@ -43,8 +43,21 @@ def checkpoint_files(checkpoint_dir: Path, selection: set[int] | None) -> list[P
     return files
 
 
-def export_enyo_net(checkpoint: Path, output: Path, input_buckets: int) -> None:
-    raw = expand_enyo_input_buckets(checkpoint.read_bytes(), input_buckets)
+def export_enyo_net(
+    checkpoint: Path,
+    output: Path,
+    input_buckets: int,
+    runtime_input_buckets: int,
+    hidden: int,
+    l2: int,
+) -> None:
+    raw = expand_enyo_input_buckets(
+        checkpoint.read_bytes(),
+        input_buckets,
+        runtime_input_buckets=runtime_input_buckets,
+        hidden=hidden,
+        l2=l2,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(raw)
 
@@ -129,6 +142,15 @@ def parse_args() -> argparse.Namespace:
         default=32,
         help="Input bucket layout used by the Bullet Enyo checkpoints.",
     )
+    parser.add_argument(
+        "--enyo-runtime-input-buckets",
+        type=int,
+        choices=list(ENYO_SUPPORTED_INPUT_BUCKETS),
+        default=32,
+        help="Runtime input bucket layout expected by the candidate engine.",
+    )
+    parser.add_argument("--hidden", type=int, default=1024)
+    parser.add_argument("--l2", type=int, default=16)
     parser.add_argument("--targets", required=True)
     parser.add_argument("--engine", required=True)
     parser.add_argument("--reference-net", required=True)
@@ -185,7 +207,14 @@ def main() -> int:
         net = nets_dir / f"{checkpoint.parent.name}.nn"
         stage = f"checkpoint_{idx}"
         try:
-            export_enyo_net(checkpoint, net, args.enyo_input_buckets)
+            export_enyo_net(
+                checkpoint,
+                net,
+                args.enyo_input_buckets,
+                args.enyo_runtime_input_buckets,
+                args.hidden,
+                args.l2,
+            )
         except SystemExit as exc:
             emit_event(
                 run_dir, "fail", stage=stage, status="failed",

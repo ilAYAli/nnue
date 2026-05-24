@@ -197,8 +197,11 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
     trainable: String,
     weight_decay: f32,
 ) {
-    if hidden != 1024 || l2_size != 16 {
-        panic!("Enyo mode writes the fixed Enyo .nn layout; hidden=1024 and l2=16 are required");
+    if !matches!(hidden, 1024 | 1280) || l2_size != 16 {
+        panic!(
+            "Enyo mode supports native layout hidden=1024 or 1280 with l2=16; \
+             engine parity/NPS support is required before using non-1024 nets"
+        );
     }
     if !matches!(INPUT_BUCKETS, 1 | 2 | 4 | 8 | 16 | 32) {
         panic!("Enyo mode supports only 1, 2, 4, 8, 16, or 32 input king buckets");
