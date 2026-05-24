@@ -30,14 +30,18 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-bullet-enyo1-sfbinpack-cap400-wdl075-buf64-smoke-eval400-lr1e3-sb1024`
-  is rejected.
-- Do not run the current `build.json`.
-- The WDL smoke was stopped after checkpoint 512 because the external gate was
-  much worse than the CP-only 1-bucket baseline: top1 `185/800`,
-  candidate_better `59` vs reference_better `532`, capped sum `-74484`, worst
-  regression `-32000`.
-- The last useful result remains diagnostic only: target-only search-policy
+- `native-bullet-enyo32-factorized-sfbinpack-smoke-eval400-lr1e3-sb1024`
+  is configured.
+- This is a native architecture smoke, not a WDL/data retune: true 32-bucket
+  Enyo input features plus a train-time shared `(piece,square)` input
+  factorizer folded into exported `l0w`.
+- The hypothesis is that previous native scratch runs starved bucket-specific
+  input features; a factorizer shares representation learning across buckets
+  while keeping the exported runtime `.nn` unchanged.
+- First gate: checkpoints `512` and `1024` on the 800-target Lichess-policy
+  gate using the cached reference CSV. No continuation or SPRT unless this
+  materially beats the prior true-32 smoke and does not retain mate-like tails.
+- The last useful prior result remains diagnostic only: target-only search-policy
   overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
   but target preservation did not clear the predeclared gate and is not
   playable.
@@ -101,13 +105,16 @@ Code audit status:
 
 ## Active Decision: 2026-05-24
 
-Update: the one-bucket scale-up, same-architecture native scalar scaling, and
-target-only policy preservation are all rejected. Do not continue scalar
-bucket-count continuations, local search-aware patching, or preservation-weight
-sweeps. The next native work is not a training run; it is an architecture and
-objective implementation audit that must produce a concrete feature geometry,
-mixed CP/WDL/policy objective, and parity/NPS/quantization gates before any GPU
-time.
+Update: the one-bucket scale-up, same-architecture native scalar scaling, WDL
+on test79, and target-only policy preservation are all rejected. Do not continue
+scalar bucket-count continuations, local search-aware patching, WDL retunes, or
+preservation-weight sweeps.
+
+The active native hypothesis is now an input-factorized 32-bucket Bullet Enyo
+smoke. The factorizer is train-time only and is folded into exported `l0w`, so
+the engine runtime format and NPS should not change. This is allowed because it
+is a concrete feature-geometry/training change aimed at bucket data starvation,
+not a same-architecture scalar continuation.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
