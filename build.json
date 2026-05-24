@@ -1,5 +1,5 @@
 {
-  "description": "Reckless lane: validate the cleaner check-state bucket-7 delta after bucket-6 failed confirmation.",
+  "description": "Reckless lane: check-state bucket deltas rejected after bucket-7 confirmation failed.",
   "metadata": {
     "experiment": "reckless-checkbucket-bucket7-hardgate",
     "track": "nnue_reckless",
@@ -12,7 +12,10 @@
     "candidate_bucket": "7",
     "candidate_bucket_net": "runs/reckless-checkbucket-bucket-sweep-20260523_162724/nets/bucket_7.nn",
     "candidate_bucket_300k": "bucket 7: all 3 vs 2, capped +47, worst -15; mate-like unchanged",
-    "status": "active"
+    "candidate_bucket_smoke_sprt": "bucket 7: smoke1k +5.2 +/- 15.2 Elo, LLR +0.23/2.94, LOS 75.0%, draw 50.5%",
+    "candidate_bucket_confirm_sprt": "bucket 7: confirm4k -1.7 +/- 7.5 Elo, LLR -0.83/2.94, LOS 32.4%, draw 51.9%",
+    "decision": "close checkbucket family; do not run bucket 8 or another bucket-index sweep without a new architecture hypothesis",
+    "status": "rejected"
   },
   "validation": {
     "tmux": "nnue_reckless",
@@ -20,7 +23,8 @@
       "stronger 1M-node broad gate for bucket 7",
       "failure-suite replay before SPRT",
       "1000-game smoke SPRT only after clean gates",
-      "4000-game confirmation only if smoke stays positive"
+      "4000-game confirmation only if smoke stays positive",
+      "completed: bucket 7 confirm4k rejected"
     ]
   }
 }
