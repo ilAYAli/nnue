@@ -77,9 +77,15 @@ Reckless lane:
 Current next action:
 
 - no active NNUE training run is justified.
-- choose a materially different plan before spending more compute: a larger
-  native data-scale run with a clear checkpoint curve, or a new export-visible
-  architecture change with parity/NPS checks before training.
+- audit/fix the Bullet Enyo layout before spending more compute. The Bullet
+  Enyo trainer was hard-coded to the legacy 16-king-bucket input layout while
+  the documented/runtime native design is 32 buckets. That means recent
+  "native" Bullet `.nn` runs produced legacy-layout payloads that Enyo expanded
+  at load time.
+- require `bullet_enyo_input_buckets=32` for future native Bullet runs; use 16
+  only for explicit legacy compatibility.
+- after the toolchain passes init/export parity for 32-bucket Bullet Enyo,
+  rerun only a short native checkpoint curve before considering more GPU time.
 
 ## Latest Result
 
