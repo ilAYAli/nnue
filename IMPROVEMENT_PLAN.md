@@ -25,9 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-no-active-training-20260524`.
-No training run is configured. Same-architecture native Bullet/SF-binpack
-runs are rejected pending a new architecture or data-scale plan.
+`native-lichess-policy-targets-800-mc26-20260524`.
+This is target construction only, not training. Same-architecture native
+Bullet/SF-binpack training remains rejected pending a stronger data/objective
+plan.
 
 ## Track Definitions
 
@@ -144,6 +145,34 @@ Decision:
 - configured smoke: `native-bullet-lichess-eval-smoke-46k-wdl0`, using direct
   Bullet text output from `import_lichess_eval.py`, categorical Bullet results,
   `bullet_wdl=0.0`, and the first-1M-row balanced bucket recipe.
+
+## Native Lichess Policy Targets
+
+Target construction is now available through `build.py target-score` with
+`target_score.lichess_eval_input`. The importer normalizes the Lichess eval
+DB four-field FENs to six-field FENs before legal-move scoring.
+
+Smoke results:
+
+- `native-lichess-policy-targets-smoke-20260524` was invalid: imported
+  `350` rows but scored `0` targets because four-field FENs were rejected by
+  `python-chess`.
+- `native-lichess-policy-targets-smoke2-20260524` fixed FEN normalization and
+  produced `120` targets / `3541` scored legal moves, but the source lacks true
+  ply counters and the sample was opening-heavy (`63/120` opening by material).
+- `native-lichess-policy-targets-smoke3-20260524` added
+  `max_material_count=26`; it produced `120` targets / `3488` scored legal
+  moves and removed opening-tagged targets: `70` midgame, `34` late,
+  `16` endgame, `9` mate-like.
+
+Decision:
+
+- material-count filtering is required for Lichess eval policy-target use; do
+  not rely on `min_ply` for this source.
+- current configured next run is
+  `native-lichess-policy-targets-800-mc26-20260524`, an `800` target
+  construction scale-up only. Do not train from it until the target distribution
+  has been inspected.
 
 ## Latest Result
 
