@@ -877,6 +877,19 @@ Do not restart these as near-term Elo lanes:
   far behind the reference on v3 search targets. Best checkpoint was `16` with
   `top1=48/279`, `candidate_better=44`, `reference_better=163`,
   `capped_sum_diff_cp=-22213`, `worst_regression_cp=-32000`.
+- native Lichess policy objective audit:
+  `native-policy-overfit64-lichess-cpu-lr3e5-e240` proved the current
+  search-aware objective/export path can exactly learn a tiny policy slice:
+  exported `model.nn` and `model.pt` both reached `64/64` top1 on 64 non-mate
+  Lichess policy targets. This is an objective/plumbing result, not a playable
+  net.
+- native Lichess policy preservation audit:
+  `native-policy-preserve64-lichess-w005-lr3e6-e80` kept broad init-net MAE
+  controlled by the final epoch (`broad_mae=72.33`) and moved exported
+  representation tensors (`input_weights changed=4041620/25165824`,
+  `l1_weights changed=2278/32768`), but the final exported policy gate missed
+  the required retention (`57/64`, required `60/64`). One lower-preservation
+  retry is allowed before stopping this family.
 
 ## Promotion Gates
 
@@ -901,14 +914,18 @@ The next action should be one of these, in order:
    changes more than the final dense/output terms.
 2. Stop sparse/input LR multiplier sweeps on the small failure-derived target
    set. It is too small and too brittle to move exported representation safely.
-3. Stop the broad-target search-aware native config family after the teacher-
+3. Run exactly one lower-preservation native policy retry:
+   `native-policy-preserve64-lichess-w002-select-lr3e6-e80`. It must pass the
+   CPU exported model gate at `62/64` before any broad engine gate. If it fails,
+   stop this target-only preservation family.
+4. Stop the broad-target search-aware native config family after the teacher-
    preserved retry also failed static and broad search gates.
-4. Do not continue the native baseline with the same architecture/data recipe.
+5. Do not continue the native baseline with the same architecture/data recipe.
    Direct Lichess eval import and SF-binpack scalar training are available, but
    the latest 1-bucket scale-up was a hard 800-target reject. Prepare an
    export-visible architecture hypothesis before spending more GPU time.
-5. Do not launch another tiny target-only child-eval recovery run.
-6. No SPRT from the current search-aware native or reckless output-delta runs.
+6. Do not launch another tiny target-only child-eval recovery run.
+7. No SPRT from the current search-aware native or reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
