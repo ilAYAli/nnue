@@ -2,13 +2,14 @@
 set -euo pipefail
 
 # Generic NNUE event hook. It reads a JSON event from NNUE_RUN_EVENT_JSON or
-# stdin, publishes a human status update, and nudges AI_stdin when a phase needs
-# follow-up attention.
+# stdin and publishes a human status update. AI_stdin is opt-in only because it
+# is a global input channel and may be consumed by unrelated sessions.
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 AI_STDIN_DRY_RUN=${NNUE_AI_STDIN_DRY_RUN:-$DRY_RUN}
+AI_STDIN_ENABLE=${NNUE_AI_STDIN_ENABLE:-0}
 AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-done,fail}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -174,18 +175,20 @@ else
 fi
 
 ai_http="skip"
-case ",$AI_STDIN_EVENTS," in
-    *,"$event_name",*)
-        if [ -n "$ai_prompt" ]; then
-            if [ "$AI_STDIN_DRY_RUN" = "1" ]; then
-                printf '\nAI_stdin\n  • %s\n' "$ai_prompt"
-                ai_http="dry-run"
-            else
-                ai_http=$(publish "$AI_STDIN_URL" "$ai_prompt" "Enyo NNUE $event_name" "$priority")
+if [ "$AI_STDIN_ENABLE" = "1" ]; then
+    case ",$AI_STDIN_EVENTS," in
+        *,"$event_name",*)
+            if [ -n "$ai_prompt" ]; then
+                if [ "$AI_STDIN_DRY_RUN" = "1" ]; then
+                    printf '\nAI_stdin\n  • %s\n' "$ai_prompt"
+                    ai_http="dry-run"
+                else
+                    ai_http=$(publish "$AI_STDIN_URL" "$ai_prompt" "Enyo NNUE $event_name" "$priority")
+                fi
             fi
-        fi
-        ;;
-esac
+            ;;
+    esac
+fi
 
 printf '%s event=%s nnue=%s ai_stdin=%s nnue_http=%s ai_http=%s\n' \
     "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NNUE_URL" "$AI_STDIN_URL" "$nnue_http" "$ai_http" >>"$LOG"
