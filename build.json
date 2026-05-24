@@ -1,26 +1,41 @@
 {
-  "description": "Reckless lane diagnostic complete: lr1e-5 moves raw Enyo32 input floats but not exported ints.",
+  "description": "Reckless lane diagnostic: scaled Enyo32 input threshold probe after the Bullet clamp fix.",
   "metadata": {
-    "experiment": "reckless-enyo32-input-threshold-clampfix-lr1e5-sb32",
+    "experiment": "reckless-enyo32-input-threshold-clampfix-lr2e4-sb16",
     "track": "nnue_reckless",
     "type": "diagnostic",
-    "result": "after clamp fix, checkpoint 0-32 exported input/L1/L2 tensors remain unchanged; raw l0 floats move only up to 0.0359 at checkpoint32, below the 0.5 export threshold",
-    "decision": "lr1e-5 is too small for exported sparse movement; next threshold probe should scale LR about 14-20x and gate only the earliest exported-movement checkpoint",
-    "status": "completed_no_export_movement"
+    "hypothesis": "lr1e-5 moved raw l0 floats to 0.0359 after 32 superbatches. lr2e-4 should cross exported int16 thresholds in a short run if movement scales roughly linearly.",
+    "status": "configured"
   },
   "create": {
-    "disabled": true
+    "name": "reckless-enyo32-input-threshold-clampfix-lr2e4-sb16",
+    "run_dir": "/home/petter/code/cpp/chess/nnue_reckless/runs/reckless-enyo32-input-threshold-clampfix-lr2e4-sb16",
+    "backend": "bullet",
+    "bullet_mode": "enyo",
+    "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
+    "bullet_loader": "sfbinpack",
+    "bullet_sfbinpack_min_ply": 16,
+    "bullet_sfbinpack_quiet_only": true,
+    "bullet_sfbinpack_buffer_mb": 1024,
+    "bullet_enyo_input_buckets": 32,
+    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "trainable": "input",
+    "bullet_wdl": 0.75,
+    "bullet_eval_scale": 400.0,
+    "bullet_lr": 0.0002,
+    "bullet_final_lr": 0.0002,
+    "weight_decay": 0.0,
+    "bullet_batch_size": 4096,
+    "bullet_batches": 64,
+    "bullet_superbatches": 16,
+    "bullet_save_rate": 1,
+    "bullet_threads": 4
   },
   "validation": {
     "tmux": "nnue_reckless",
-    "completed_checks": [
-      "build/train completed",
-      "checkpoint 0,1,2,3,4,5,6,7,8,12,16,24,32 exported net diff",
-      "raw.bin movement audit"
-    ],
-    "artifacts": {
-      "export_summary": "runs/reckless-enyo32-input-threshold-clampfix-lr1e5-sb32/validate/netdiff/summary.tsv",
-      "run_log": "runs/reckless-enyo32-input-threshold-clampfix-lr1e5-sb32/runs.log"
-    }
+    "net_diff_checkpoints": "0,1,2,3,4,5,6,7,8,12,16",
+    "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "enyo_input_buckets": 32,
+    "search_gate_condition": "only gate the earliest checkpoint with real exported input movement"
   }
 }
