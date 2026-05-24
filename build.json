@@ -1,51 +1,25 @@
 {
-  "description": "Reckless lane: low-pressure true 32-bucket existing-weight input-only divergence smoke.",
+  "description": "Reckless lane: low-pressure true 32-bucket input-only divergence rejected as same exported net as prior failure.",
   "metadata": {
     "experiment": "reckless-enyo32-existing-input-lr2e7-sb256",
     "track": "nnue_reckless",
-    "hypothesis": "The lr1e-5 Enyo32 input-only run proved export-visible input movement but was too destructive. Retry the same isolated mechanism at 2e-7 to test whether small quantized bucket divergence can move without broad search collapse.",
-    "prior_rejection": "reckless-enyo32-existing-input-lr1e5-sb1024 checkpoint256: all 36 vs 140, capped -18181, worst -31837",
-    "guardrails": [
-      "existing-weight initialization only; not native scratch",
-      "true 32 input buckets",
-      "trainable=input only",
-      "net-diff checkpoint 64/128/256 before any expensive gate",
-      "300k-node search gate only if exported movement is nonzero and small"
-    ],
-    "status": "configured"
+    "hypothesis": "Lower LR might create smaller exported 32-bucket input movement than the rejected lr1e-5 run.",
+    "result": "checkpoints 64, 128, and 256 had the same exported tensor diff as the rejected lr1e-5 checkpoint256; final checkpoint256 is identical to that rejected net",
+    "net_diff": "input_weights 505/25165824 changed, input_biases 7/1024 changed; L1/L2/output unchanged",
+    "comparison_to_prior_rejection": "net_diff checkpoint256 vs reckless-enyo32-existing-input-lr1e5-sb1024 checkpoint256: total changed 0/25200209",
+    "decision": "reject without search gate; LR below the threshold still crosses to the same quantized exported input step",
+    "status": "rejected"
   },
   "create": {
-    "name": "reckless-enyo32-existing-input-lr2e7-sb256",
-    "run_dir": "/home/petter/code/cpp/chess/nnue_reckless/runs/reckless-enyo32-existing-input-lr2e7-sb256",
-    "backend": "bullet",
-    "bullet_mode": "enyo",
-    "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
-    "bullet_loader": "sfbinpack",
-    "bullet_sfbinpack_min_ply": 16,
-    "bullet_sfbinpack_quiet_only": true,
-    "bullet_sfbinpack_buffer_mb": 1024,
-    "bullet_enyo_input_buckets": 32,
-    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "trainable": "input",
-    "bullet_wdl": 0.75,
-    "bullet_eval_scale": 400.0,
-    "bullet_lr": 2e-07,
-    "bullet_final_lr": 5e-08,
-    "weight_decay": 0.0,
-    "bullet_batch_size": 4096,
-    "bullet_batches": 64,
-    "bullet_superbatches": 256,
-    "bullet_save_rate": 64,
-    "bullet_threads": 4
+    "disabled": true
   },
   "validation": {
     "tmux": "nnue_reckless",
-    "post_train_gate": {
-      "net_diff_checkpoints": "64,128,256",
-      "targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
-      "nodes": 300000,
-      "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-      "enyo_input_buckets": 32
-    }
+    "completed_checks": [
+      "build/train completed",
+      "checkpoint 64/128/256 exported net diff",
+      "checkpoint256 equality against prior rejected net"
+    ],
+    "no_search_gate": "candidate exported net is identical to prior checkpoint that failed 36 vs 140, capped -18181"
   }
 }
