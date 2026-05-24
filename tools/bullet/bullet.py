@@ -366,6 +366,8 @@ def cmd_train(args: argparse.Namespace) -> int:
         "--release",
         "--features",
         args.accelerator,
+        "--bin",
+        "enyo-bullet-spike",
         "--manifest-path",
         str(manifest),
     ]
