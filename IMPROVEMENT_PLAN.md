@@ -689,16 +689,24 @@ Do not restart these as near-term Elo lanes:
   stayed far below export thresholds (`max_abs` about `0.04`, no values
   `>=0.1`, none `>=0.5`). Only small L2 float changes exported
   (`166/25200209` total values).
-- reckless Enyo32 input-threshold probes after the Bullet clamp fix: active
-  diagnostic. `lr1e-5/sb32` moved raw input floats but exported no input
-  tensor changes. `lr2e-4/sb16` first crossed export at checkpoint 16, but only
-  for two input biases and no input weights. Search gate was tiny positive
+- reckless Enyo32 input-threshold probes after the Bullet clamp fix: rejected.
+  `lr1e-5/sb32` moved raw input floats but exported no input tensor changes.
+  `lr2e-4/sb16` first crossed export at checkpoint 16, but only for two input
+  biases and no input weights. Search gate was tiny positive
   (`candidate_better=2`, `reference_better=0`, `capped_sum_diff_cp=23`), and
   failure-suite replay was mixed but not catastrophic (`candidate_better=3`,
   `reference_better=7`, `sum_diff_cp=296`, `median_nonzero_diff_cp=-9`,
-  `worst_regression_cp=-123`). It is not SPRT-worthy. Next: `lr3e-4/sb16`,
-  gate the earliest checkpoint with exported input-weight movement, and stop
-  this lane if search/failure tails worsen.
+  `worst_regression_cp=-123`). `lr3e-4/sb16` produced real exported input
+  movement from checkpoint 12 onward. Checkpoint 16 had the best search gate
+  (`candidate_better=34`, `reference_better=30`, `capped_sum_diff_cp=740`,
+  `worst_regression_cp=-125`) but failed failure-suite replay
+  (`candidate_better=61`, `reference_better=69`, `sum_diff_cp=-532`,
+  `worst_regression_cp=-563`). Checkpoint 12 was directionally positive on
+  replay (`candidate_better=73`, `reference_better=65`, `sum_diff_cp=727`,
+  `median_nonzero_diff_cp=3`) but still had unacceptable tails
+  (`worst_regression_cp=-408`, plus another `-287cp` regression). Do not SPRT.
+  This confirms export-visible input nudges can create broad signal, but even
+  the smallest exported movement is not tail-safe.
 
 ## Promotion Gates
 
@@ -719,20 +727,25 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Continue the reckless existing-weight Enyo32 input-threshold audit with one
-   stronger export-visible probe: `lr3e-4/sb16`, then gate the earliest
-   checkpoint with real input-weight movement. No SPRT unless broad search and
-   failure-suite gates are clearly clean.
-2. Stop near-term reckless output-only work unless a new architecture hypothesis
+1. Stop the reckless Enyo32 input-threshold lane. It produced real exported
+   input movement but failed the tail gate before becoming match-testable.
+2. Stop check-bucket bucket6/bucket7 promotion work. Bucket6 had clean gates
+   (`search_1m capped_sum_diff_cp=98`, failure-suite `sum_diff_cp=250`,
+   `worst_regression_cp=-27`) but lost the 4k confirmation match
+   (`Elo=-4.5 +/- 7.7`, `LOS=12.4%`). Bucket7 was even closer to no-op
+   (`search_1m capped_sum_diff_cp=25`, failure-suite exact no-op) and also
+   failed to show Elo (`Elo=-1.7 +/- 7.5`, `LOS=32.4%`). Do not extend these
+   SPRTs without a new reason.
+3. Stop near-term reckless output-only work unless a new architecture hypothesis
    changes more than the final dense/output terms.
-3. Stop sparse/input LR multiplier sweeps on the small failure-derived target
+4. Stop sparse/input LR multiplier sweeps on the small failure-derived target
    set. It is too small and too brittle to move exported representation safely.
-4. Stop the broad-target search-aware native config family after the teacher-
+5. Stop the broad-target search-aware native config family after the teacher-
    preserved retry also failed static and broad search gates.
-5. Continue the native baseline using larger Bullet/SF-binpack training and
+6. Continue the native baseline using larger Bullet/SF-binpack training and
    checkpoint sweeps when the reckless lane is waiting on a long gate.
-6. Do not launch another tiny target-only child-eval recovery run.
-7. No SPRT from the current search-aware native or reckless output-delta runs.
+7. Do not launch another tiny target-only child-eval recovery run.
+8. No SPRT from the current search-aware native or reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.
