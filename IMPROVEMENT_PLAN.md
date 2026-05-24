@@ -46,8 +46,8 @@ This run is rejected by checkpoint gates and should not be extended.
 
 ## Active Decision: 2026-05-24
 
-Waste-control rule: do not start another NNUE training family until the active
-SPRT either justifies confirmation or rejects the candidate.
+Waste-control rule: do not start another NNUE training family from these
+families. Both active lanes rejected their current hypotheses.
 
 Native lane:
 
@@ -62,12 +62,24 @@ Reckless lane:
 
 - bucket 6 is rejected by confirmation:
   `-4.5 +/- 7.7 Elo`, `LOS=12.4%`, `draw=49.5%` over `4000` games.
-- bucket 7 is the only gate-clean checkbucket candidate:
+- bucket 7 was the only gate-clean checkbucket candidate:
   1M search gate `2` vs `0`, capped `+25`, worst regression `0`;
   failure-suite replay is exact parity over `913` positions.
-- run exactly one `1000` game smoke SPRT for bucket 7.
-- if the smoke is not positive, close the checkbucket family.
-- run a `4000` game confirmation only if the smoke is clearly positive.
+- smoke was weakly positive:
+  `+5.2 +/- 15.2 Elo`, `LLR=+0.23/2.94`, `LOS=75.0%`, `draw=50.5%`
+  over `1000` games.
+- confirmation rejected it:
+  `-1.7 +/- 7.5 Elo`, `LLR=-0.83/2.94`, `LOS=32.4%`, `draw=51.9%`
+  over `4000` games.
+- close the checkbucket family. Do not run bucket 8 or another bucket-index
+  sweep without a new architecture hypothesis.
+
+Current next action:
+
+- no active NNUE training run is justified.
+- choose a materially different plan before spending more compute: a larger
+  native data-scale run with a clear checkpoint curve, or a new export-visible
+  architecture change with parity/NPS checks before training.
 
 ## Latest Result
 
