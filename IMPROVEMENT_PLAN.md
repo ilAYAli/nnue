@@ -25,8 +25,9 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048`.
-This run is rejected by checkpoint gates and should not be extended.
+`native-no-active-training-20260524`.
+No training run is configured. Same-architecture native Bullet/SF-binpack
+runs are rejected pending a new architecture or data-scale plan.
 
 ## Track Definitions
 
@@ -51,12 +52,19 @@ families. Both active lanes rejected their current hypotheses.
 
 Native lane:
 
+- `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768` is rejected.
+- best checkpoint-sweep rows had positive capped sums but still retained
+  mate-like catastrophic tails around `-31k cp`; e.g. checkpoint `12288`
+  had all `68` vs `58`, capped `+1142`, but mate-like worst regression
+  `-31311cp`; checkpoint `24576` had all `63` vs `60`, capped `+856`,
+  but mate-like worst regression `-31804cp`.
 - `native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096` is rejected.
 - every checkpoint is worse than the parent gate; `4096` ended at
   `41` vs `97`, capped `-6335`, with mate-like worst regression `-31814cp`.
-- stop tailmix, search-aware patching, and same-architecture LR continuation.
-- next native work requires a new data-scale plan or an export-visible
-  architecture hypothesis before any more GPU time.
+- stop long scratch, tailmix, search-aware patching, and same-architecture
+  LR continuation.
+- next native work requires a materially larger/different data-scale plan or
+  an export-visible architecture hypothesis before any more GPU time.
 
 Reckless lane:
 
@@ -163,16 +171,22 @@ possible, but destructive; conservative training is exported dense-only and
 cannot fix the search tails. The next training attempt needs a different
 architecture/data-scale plan, not another LR continuation.
 
-Next run:
+Rejected long native SF-binpack scratch:
 
 - `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768`.
 - no `init_net`; this is an Enyo-owned native scratch run.
-- same native architecture (`1024` hidden, `16` L2) so the test isolates data
+- same native architecture (`1024` hidden, `16` L2) so the test isolated data
   scale and scratch learning, not architecture.
 - `32768` superbatches, checkpoint every `2048`.
-- gate checkpoints before any SPRT; if it does not materially improve
-  move-choice gates over the shorter native scratch runs, stop same-architecture
-  native scratch and move to an architecture change.
+- checkpoint sweep completed after training finished.
+- no checkpoint was keeper-safe. Checkpoints `12288` and `24576` had the best
+  broad-looking all-split results (`68` vs `58`, capped `+1142`; and `63` vs
+  `60`, capped `+856`), but both retained unacceptable mate-like tails
+  (`worst_regression_cp=-31311` and `-31804`).
+
+Decision: no SPRT. Stop same-architecture native scratch on this data recipe.
+The next native attempt must change the data-scale plan materially or introduce
+an export-visible architecture hypothesis.
 
 Rejected native SF-binpack continuation:
 
@@ -665,8 +679,9 @@ The next action should be one of these, in order:
    set. It is too small and too brittle to move exported representation safely.
 3. Stop the broad-target search-aware native config family after the teacher-
    preserved retry also failed static and broad search gates.
-4. Continue the native baseline using larger Bullet/SF-binpack training and
-   checkpoint sweeps.
+4. Do not continue the native baseline with the same architecture/data recipe.
+   Prepare a materially larger/different data-scale plan or an export-visible
+   architecture hypothesis first.
 5. Do not launch another tiny target-only child-eval recovery run.
 6. No SPRT from the current search-aware native or reckless output-delta runs.
 
