@@ -89,6 +89,12 @@ Current next action:
   `50368836`, and `net_diff --float-atol 1e-6 --fail-if-different` reported
   zero changed tensors. Explicit 16-bucket legacy parity also passed in
   `runs/bullet-enyo-16-init-roundtrip-20260524_031037`.
+- additional Bullet tooling fix: trainable Enyo `l0w`/`l0b` must use full
+  int16 optimizer bounds, not `+/-4095`. Existing Enyo nets legally contain
+  larger accumulator values; the narrower clamp corrupts existing-weight
+  checkpoints on the first saved superbatch. Reckless clampfix audit verified
+  checkpoints `0` through `8` keep input/L1/L2 tensors unchanged, with only
+  `<=1.49e-8` float roundtrip noise in four output weights.
 - rejected smoke:
   `native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048`.
   It was the first true 32-bucket Bullet Enyo scratch run. Checkpoint `512`
