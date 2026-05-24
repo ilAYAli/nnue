@@ -1,13 +1,12 @@
 {
-  "description": "Reckless lane diagnostic complete: Bullet input clamp fix prevents Enyo32 first-step clipping.",
+  "description": "Reckless lane diagnostic complete: lr1e-5 moves raw Enyo32 input floats but not exported ints.",
   "metadata": {
-    "experiment": "reckless-enyo32-input-threshold-clampfix-lr2e7-sb8",
+    "experiment": "reckless-enyo32-input-threshold-clampfix-lr1e5-sb32",
     "track": "nnue_reckless",
-    "type": "tooling diagnostic",
-    "result": "checkpoint 0-8 have input_weights 0, input_biases 0, L1 0, L2 0; only four output weights differ from reference by <=1.49e-8 from Bullet float roundtrip already at checkpoint0",
-    "prior_bug": "Before the fix, trainable Enyo l0 weights/biases were optimizer-clamped to +/-4095, corrupting existing-weight checkpoints whose int16 accumulator tensors contain larger legal values.",
-    "decision": "keep the full-int16 l0 clamp fix; discard previous Enyo32 input-only gate results that were based on clipped checkpoints; lr=2e-7 is below exported sparse movement after the fix.",
-    "status": "completed_fixed"
+    "type": "diagnostic",
+    "result": "after clamp fix, checkpoint 0-32 exported input/L1/L2 tensors remain unchanged; raw l0 floats move only up to 0.0359 at checkpoint32, below the 0.5 export threshold",
+    "decision": "lr1e-5 is too small for exported sparse movement; next threshold probe should scale LR about 14-20x and gate only the earliest exported-movement checkpoint",
+    "status": "completed_no_export_movement"
   },
   "create": {
     "disabled": true
@@ -15,13 +14,13 @@
   "validation": {
     "tmux": "nnue_reckless",
     "completed_checks": [
-      "cargo check --features cuda with CUDA_PATH=/usr/lib/cuda",
       "build/train completed",
-      "checkpoint 0-8 exported net diff"
+      "checkpoint 0,1,2,3,4,5,6,7,8,12,16,24,32 exported net diff",
+      "raw.bin movement audit"
     ],
     "artifacts": {
-      "summary": "runs/reckless-enyo32-input-threshold-clampfix-lr2e7-sb8/validate/netdiff/summary.tsv",
-      "run_log": "runs/reckless-enyo32-input-threshold-clampfix-lr2e7-sb8/runs.log"
+      "export_summary": "runs/reckless-enyo32-input-threshold-clampfix-lr1e5-sb32/validate/netdiff/summary.tsv",
+      "run_log": "runs/reckless-enyo32-input-threshold-clampfix-lr1e5-sb32/runs.log"
     }
   }
 }

@@ -57,6 +57,23 @@ SPRT candidate yet.
 
 
 
+## Latest Diagnostic: Enyo32 Input Threshold After Clamp Fix
+
+Completed `reckless-enyo32-input-threshold-clampfix-lr1e5-sb32`:
+
+- exported tensors through checkpoint `32`: `input_weights=0`,
+  `input_biases=0`, `l1=0`, `l2=0` versus the existing reference.
+- raw Bullet floats did move only the intended tensors: `l0w` max abs
+  movement `0.0359`, `l0b` max abs movement `0.0356` at checkpoint `32`;
+  all dense tensors remained unchanged.
+- no raw value reached the `0.5` threshold needed to alter the exported int16
+  accumulator.
+
+Decision: `lr=1e-5` is too small for exported sparse movement after the clamp
+fix. The next reckless diagnostic should scale LR roughly `14-20x`, save every
+superbatch, and gate only the earliest checkpoint with real exported input
+movement.
+
 ## Latest Diagnostic: Bullet Enyo Input Clamp Fix
 
 Completed `reckless-enyo32-input-threshold-clampfix-lr2e7-sb8` after fixing
