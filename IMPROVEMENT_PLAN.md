@@ -25,11 +25,19 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-policy-overfit64-lichess-cpu-lr3e5-e240` is configured as a native
-search-policy objective audit, not a candidate. It starts from an Enyo-owned
-native checkpoint and must overfit 64 non-mate Lichess policy targets after
-export. If the exported `.nn` cannot reach `64/64` top1 on CPU, do not scale
-this objective.
+`native-policy-overfit64-lichess-cpu-lr3e5-e240` passed as a native
+search-policy objective/export audit, not as a candidate. It reached `64/64`
+top1 on both `model.pt` and exported `.nn` on CPU, with zero gap. Exported
+movement was real and not head-only: `120691/25165824` input weights,
+`303/1024` input biases, and `3252/32768` L1 weights changed. The next rung
+must add broad/init preservation; target-only policy overfit is not a playable
+net.
+
+Current configured rung: `native-policy-preserve64-lichess-w005-lr3e6-e80`.
+It keeps the same 64 policy targets but adds 100k-row init-net distillation.
+Pass condition is exported CPU target retention of at least `60/64` top1 plus
+controlled broad MAE versus the native init checkpoint. If that fails, do not
+scale target count.
 
 ## Track Definitions
 
