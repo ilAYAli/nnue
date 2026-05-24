@@ -1,15 +1,16 @@
 {
-  "description": "Native capped-WDL smoke. Re-run the best low-bucket SF-binpack scratch shape with Bullet WDL mixing on a quiet low-|cp| slice and a small loader buffer for quick feedback.",
+  "description": "Rejected native capped-WDL smoke. Re-ran the best low-bucket SF-binpack scratch shape with Bullet WDL mixing on a quiet low-|cp| slice and a small loader buffer for quick feedback.",
   "metadata": {
     "experiment": "native-bullet-enyo1-sfbinpack-cap400-wdl075-buf64-smoke-eval400-lr1e3-sb1024",
     "track": "nnue_native",
-    "status": "active",
+    "status": "rejected",
+    "do_not_run": true,
     "hypothesis": "The WDL=0.75 smoke failed because the uncapped SF-binpack filter was dominated by decisive high-|cp| rows. Audit of the same loader with max_abs_cp=400 produced a quiet stream: 76.07% draws, mean score -17cp, mean abs score 119cp. Test WDL on that proven-quieter slice before abandoning WDL for this source.",
     "data_source": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
     "init": "scratch quantized Bullet init; no Berserk initialization",
     "architecture": "1 training input bucket expanded to the 32-bucket Enyo runtime layout on export; hidden=1024, l2=16",
     "one_variable": "Keep the rejected WDL=0.75 shape but change bullet_sfbinpack_max_abs_cp from 10000 to 400 based on the SF-binpack audit; use a 64 MB SF-binpack shuffle buffer so smoke feedback starts quickly.",
-    "gate": "Run checkpoint 256/512 against the 800-target external gate. Stop immediately if it is not at least competitive with the CP-only 1-bucket baseline at the same checkpoint."
+    "gate": "Rejected at checkpoint 256: top1 135/800, candidate_better 43 vs reference_better 600, capped_sum_diff_cp -94397, worst_regression_cp -32000."
   },
   "create": {
     "name": "native-bullet-enyo1-sfbinpack-cap400-wdl075-buf64-smoke-eval400-lr1e3-sb1024",
@@ -43,8 +44,8 @@
     "trainable": "all"
   },
   "validation": {
-    "checkpoint_sweep": "Check checkpoints 256 and 512 first; do not wait for full 1024 if 256/512 fail.",
-    "promotion": "No SPRT unless external gate is materially better than the CP-only 1-bucket baseline and mate-like tails are sane.",
-    "next": "If cap400/buf64 WDL fails, stop WDL on test79 and move to data construction instead of retuning this architecture."
+    "checkpoint_sweep": "Stopped after live checkpoint 256 gate because it was worse than both the uncapped WDL smoke and the CP-only 1-bucket baseline.",
+    "promotion": "Not eligible for SPRT.",
+    "next": "Stop WDL on test79. Move to data construction or a different training source instead of retuning this architecture."
   }
 }

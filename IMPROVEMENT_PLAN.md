@@ -31,9 +31,8 @@ The main failure pattern is:
 Current `build.json` state:
 
 - `native-bullet-enyo1-sfbinpack-cap400-wdl075-buf64-smoke-eval400-lr1e3-sb1024`
-  is active.
-- It is a narrow data-filter test after the rejected WDL smoke, not another
-  architecture retune.
+  is rejected.
+- Do not run the current `build.json`.
 - The WDL smoke was stopped after checkpoint 512 because the external gate was
   much worse than the CP-only 1-bucket baseline: top1 `185/800`,
   candidate_better `59` vs reference_better `532`, capped sum `-74484`, worst
@@ -204,8 +203,7 @@ Reckless lane:
 Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
-- native has one active smoke config:
-  `native-bullet-enyo1-sfbinpack-cap400-wdl075-buf64-smoke-eval400-lr1e3-sb1024`.
+- native has no active training config.
 - `native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048` is
   rejected. Checkpoint 512 scored top1 `185/800`, candidate_better `59` vs
   reference_better `532`, capped sum `-74484`, worst regression `-32000`.
@@ -217,13 +215,16 @@ Current next action:
   scratch training: first 1M filtered rows were `56.43%` STM losses, only
   `13.75%` draws, mean score `-1131cp`, mean abs score `3254cp`, and `59.55%`
   of rows were above `1600cp`.
-- the active cap400 smoke uses the same loader with `max_abs_cp=400`, which
-  audited as `76.07%` draws, mean score `-17cp`, mean abs score `119cp`,
-  and score/result agreement `83.27%` on non-draws. It uses a 64 MB loader
-  buffer because the first cap400 attempt with the default 1024 MB buffer spent
-  too long filling the shuffle buffer before producing smoke feedback. Stop it
-  at checkpoint 256/512 if it does not materially beat the rejected WDL stream
-  and approach the CP-only 1-bucket baseline.
+- the cap400 smoke used the same loader with `max_abs_cp=400`, which audited
+  as `76.07%` draws, mean score `-17cp`, mean abs score `119cp`, and
+  score/result agreement `83.27%` on non-draws. It used a 64 MB loader buffer
+  because the first cap400 attempt with the default 1024 MB buffer spent too
+  long filling the shuffle buffer before producing smoke feedback.
+- `native-bullet-enyo1-sfbinpack-cap400-wdl075-buf64-smoke-eval400-lr1e3-sb1024`
+  is rejected. Checkpoint 256 scored top1 `135/800`, candidate_better `43` vs
+  reference_better `600`, capped sum `-94397`, worst regression `-32000`.
+  This is worse than both the uncapped WDL smoke and the CP-only 1-bucket
+  baseline, so WDL on the test79 source is closed for now.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
   documented/runtime native design is 32 buckets. That means older "native"
