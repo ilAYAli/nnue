@@ -1,11 +1,13 @@
 {
-  "description": "Native Enyo 32-bucket input-factorizer Bullet/SF-binpack smoke. This tests shared (piece,square) representation learning folded into the exported 32-bucket runtime net.",
+  "description": "Rejected native Enyo 32-bucket input-factorizer Bullet/SF-binpack smoke.",
   "metadata": {
     "experiment": "native-bullet-enyo32-factorized-sfbinpack-smoke-eval400-lr1e3-sb1024",
     "track": "nnue_native",
-    "status": "configured",
+    "status": "rejected",
+    "do_not_run": true,
     "hypothesis": "Previous native scratch runs likely starved bucket-specific input features. A shared train-time input factorizer gives every king bucket a common (piece,square) representation while still exporting an ordinary Enyo 32-bucket .nn with zero runtime format change. This is the smallest export-visible architecture change that directly targets data starvation.",
     "baseline": "native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048",
+    "gate": "Rejected on 800-target 300k-node Lichess-policy gate. Checkpoint 512: top1 201/800, 75 vs 523, capped -70843, worst -32000. Checkpoint 1024: top1 195/800, 82 vs 515, capped -71346, worst -32000.",
     "constraints": [
       "no Berserk initialization",
       "Bullet SF-binpack loader",
@@ -48,8 +50,8 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "first_gate": "checkpoint sweep at 512 and 1024 on the 800-target Lichess-policy gate, reusing the cached reference CSV.",
-    "continue_only_if": "At least one checkpoint materially beats the old true-32 smoke and does not retain catastrophic mate-like tails.",
-    "promotion": "No SPRT unless checkpoint gate and failure-suite replay are clean."
+    "checkpoint_sweep": "/home/petter/code/cpp/chess/nnue_native_hidden/runs/native-bullet-enyo32-factorized-sfbinpack-smoke-eval400-lr1e3-sb1024/validate/checkpoint_sweep_300k_512_1024/summary.txt",
+    "promotion": "Not eligible for SPRT.",
+    "next": "Stop same-source native architecture tweaks. Move to external/proven training-data source selection before the next native run."
   }
 }

@@ -31,16 +31,16 @@ The main failure pattern is:
 Current `build.json` state:
 
 - `native-bullet-enyo32-factorized-sfbinpack-smoke-eval400-lr1e3-sb1024`
-  is configured.
-- This is a native architecture smoke, not a WDL/data retune: true 32-bucket
-  Enyo input features plus a train-time shared `(piece,square)` input
-  factorizer folded into exported `l0w`.
-- The hypothesis is that previous native scratch runs starved bucket-specific
-  input features; a factorizer shares representation learning across buckets
-  while keeping the exported runtime `.nn` unchanged.
-- First gate: checkpoints `512` and `1024` on the 800-target Lichess-policy
-  gate using the cached reference CSV. No continuation or SPRT unless this
-  materially beats the prior true-32 smoke and does not retain mate-like tails.
+  is rejected.
+- The input-factorizer hypothesis failed the 800-target 300k-node
+  Lichess-policy gate:
+  - checkpoint `512`: top1 `201/800`, `75` vs `523`, capped `-70843`,
+    worst regression `-32000`.
+  - checkpoint `1024`: top1 `195/800`, `82` vs `515`, capped `-71346`,
+    worst regression `-32000`.
+- Do not continue same-source native architecture tweaks from the test79
+  SF-binpack source. The next action is external/proven training-data source
+  selection before another native run.
 - The last useful prior result remains diagnostic only: target-only search-policy
   overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
   but target preservation did not clear the predeclared gate and is not
@@ -110,11 +110,10 @@ on test79, and target-only policy preservation are all rejected. Do not continue
 scalar bucket-count continuations, local search-aware patching, WDL retunes, or
 preservation-weight sweeps.
 
-The active native hypothesis is now an input-factorized 32-bucket Bullet Enyo
-smoke. The factorizer is train-time only and is folded into exported `l0w`, so
-the engine runtime format and NPS should not change. This is allowed because it
-is a concrete feature-geometry/training change aimed at bucket data starvation,
-not a same-architecture scalar continuation.
+The input-factorized 32-bucket Bullet Enyo smoke is rejected. It was a concrete
+feature-geometry/training change aimed at bucket data starvation, but it made
+move-choice behavior worse on the external policy gate. Stop same-source native
+architecture tweaks until the training data/source question is addressed.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
