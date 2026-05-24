@@ -1,30 +1,51 @@
 {
-  "description": "Reckless lane: check-state bucket deltas rejected after bucket-7 confirmation failed.",
+  "description": "Reckless lane: existing-weight true 32-bucket Bullet Enyo input-only divergence smoke.",
   "metadata": {
-    "experiment": "reckless-checkbucket-bucket7-hardgate",
+    "experiment": "reckless-enyo32-existing-input-lr1e5-sb1024",
     "track": "nnue_reckless",
-    "hypothesis": "Bucket 6 was the strongest gate result but failed a 4k confirmation. Bucket 7 is smaller and cleaner in the broad sweep, with only +47 capped cp but worst -15 and no mate-like movement, so it may be a safer existing-weight delta.",
-    "base_net": "runs/reckless-check-bucket-mask2-lr1e6-e4/base_bucketed.nn",
-    "candidate_net": "runs/reckless-check-bucket-output-1m-lr1e6-e4/train/reckless-check-bucket-output-1m-lr1e6-e4/model.nn",
-    "rejected_bucket": "6",
-    "rejected_bucket_net": "runs/reckless-checkbucket-bucket-sweep-20260523_162724/nets/bucket_6.nn",
-    "rejected_bucket_sprt": "bucket 6: confirm4k -4.5 +/- 7.7 Elo, LOS 12.4%, draw 49.5%",
-    "candidate_bucket": "7",
-    "candidate_bucket_net": "runs/reckless-checkbucket-bucket-sweep-20260523_162724/nets/bucket_7.nn",
-    "candidate_bucket_300k": "bucket 7: all 3 vs 2, capped +47, worst -15; mate-like unchanged",
-    "candidate_bucket_smoke_sprt": "bucket 7: smoke1k +5.2 +/- 15.2 Elo, LLR +0.23/2.94, LOS 75.0%, draw 50.5%",
-    "candidate_bucket_confirm_sprt": "bucket 7: confirm4k -1.7 +/- 7.5 Elo, LLR -0.83/2.94, LOS 32.4%, draw 51.9%",
-    "decision": "close checkbucket family; do not run bucket 8 or another bucket-index sweep without a new architecture hypothesis",
-    "status": "rejected"
+    "hypothesis": "Expand the current existing 16-bucket Enyo net into true 32 Bullet Enyo input buckets and train only the input accumulator weights. If king-localized bucket divergence is useful, the duplicate bucket halves should move while the dense head stays fixed.",
+    "why_now": "Previous native Bullet Enyo runs were legacy 16-bucket exports. The toolchain now supports true 32-bucket init/export parity, so this tests the existing-weight near-term lane without scratch training.",
+    "guardrails": [
+      "existing-weight initialization only; not a native scratch run",
+      "trainable=input only; do not drift dense/output tensors in this smoke",
+      "checkpoint gate before any SPRT",
+      "reject if net diff is zero or if broad search/failure tails regress"
+    ],
+    "status": "configured"
+  },
+  "create": {
+    "name": "reckless-enyo32-existing-input-lr1e5-sb1024",
+    "run_dir": "/home/petter/code/cpp/chess/nnue_reckless/runs/reckless-enyo32-existing-input-lr1e5-sb1024",
+    "backend": "bullet",
+    "bullet_mode": "enyo",
+    "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
+    "bullet_loader": "sfbinpack",
+    "bullet_sfbinpack_min_ply": 16,
+    "bullet_sfbinpack_quiet_only": true,
+    "bullet_sfbinpack_buffer_mb": 1024,
+    "bullet_enyo_input_buckets": 32,
+    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "trainable": "input",
+    "bullet_wdl": 0.75,
+    "bullet_eval_scale": 400.0,
+    "bullet_lr": 1e-05,
+    "bullet_final_lr": 2e-06,
+    "weight_decay": 0.0,
+    "bullet_batch_size": 4096,
+    "bullet_batches": 64,
+    "bullet_superbatches": 1024,
+    "bullet_save_rate": 256,
+    "bullet_threads": 4
   },
   "validation": {
     "tmux": "nnue_reckless",
-    "required_checks": [
-      "stronger 1M-node broad gate for bucket 7",
-      "failure-suite replay before SPRT",
-      "1000-game smoke SPRT only after clean gates",
-      "4000-game confirmation only if smoke stays positive",
-      "completed: bucket 7 confirm4k rejected"
-    ]
+    "post_train_gate": {
+      "tool": "tools/validate/checkpoint_sweep.py",
+      "targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
+      "nodes": 300000,
+      "checkpoints": "0,256,512,768,1024",
+      "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+      "enyo_input_buckets": 32
+    }
   }
 }

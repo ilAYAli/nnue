@@ -54,6 +54,20 @@ SPRT candidate yet.
 - may borrow architecture ideas, but the result is native to Enyo.
 - currently useful for background experiments, not promotion.
 
+
+## Active Experiment: Existing-Weight Enyo32 Input Divergence
+
+`reckless-enyo32-existing-input-lr1e5-sb1024` is the next reckless-lane test. It is not native scratch.
+
+- initialize from the current existing Enyo net.
+- export/train true 32-bucket Bullet Enyo input tensors.
+- train only the input accumulator weights (`trainable=input`).
+- keep dense/output tensors fixed to isolate bucket-localized feature movement.
+- run checkpoint search gates before any SPRT.
+
+Stop conditions: zero exported input movement, broad search-target regression,
+failure-suite tail regression, or neutral/negative smoke-SPRT after clean gates.
+
 ## Latest Result: Reckless Check-Bucket Bucket Sweep
 
 Rejected `reckless-checkbucket-bucket-sweep-20260523_162724` /
