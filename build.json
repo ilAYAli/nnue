@@ -1,20 +1,20 @@
 {
-  "description": "Native Enyo 16-bucket, 1280-hidden Bullet/SF-binpack smoke. This isolates hidden-width capacity against the prior 16-bucket/1024 baseline.",
+  "description": "Native Enyo 8-runtime-bucket Bullet/SF-binpack smoke. This tests a true low-bucket runtime architecture instead of training low buckets and expanding them at load time.",
   "metadata": {
-    "experiment": "native-bullet-enyo16-h1280-sfbinpack-smoke",
+    "experiment": "native-bullet-enyo8-runtime-sfbinpack-smoke",
     "track": "nnue_native",
-    "hypothesis": "Keeping the clean 16-bucket Enyo runtime layout but widening the hidden layer from 1024 to 1280 may improve broad move-choice without changing feature geometry.",
+    "hypothesis": "A true 8-king-bucket runtime net may reduce bucket starvation and improve early native scratch behavior compared with 16/32-bucket layouts. The engine is compiled for 8 buckets, so the exported net is not expanded at load time.",
     "baseline": "native-bullet-enyo16-sfbinpack-smoke-eval400-lr1e3-sb2048",
     "constraints": [
       "no existing-net initialization",
       "Bullet sfbinpack loader",
-      "runtime buckets must match the 16-bucket Enyo engine",
-      "1280 hidden is compile-time selected in the engine, not runtime-dispatched"
+      "runtime buckets must match the 8-bucket Enyo engine",
+      "bucket count is compile-time selected in the engine, not runtime-dispatched"
     ]
   },
   "create": {
-    "name": "native-bullet-enyo16-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048",
-    "run_dir": "runs/native-bullet-enyo16-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048",
+    "name": "native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048",
+    "run_dir": "runs/native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048",
     "backend": "bullet",
     "init_net": null,
     "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
@@ -24,7 +24,7 @@
     "bullet_sfbinpack_max_abs_cp": 10000,
     "bullet_sfbinpack_quiet_only": true,
     "bullet_mode": "enyo",
-    "bullet_hidden": 1280,
+    "bullet_hidden": 1024,
     "bullet_l2": 16,
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
@@ -33,14 +33,14 @@
     "bullet_wdl": 0.0,
     "bullet_lr": 0.001,
     "bullet_final_lr": 0.0003,
-    "bullet_enyo_input_buckets": 16,
-    "bullet_enyo_runtime_input_buckets": 16,
+    "bullet_enyo_input_buckets": 8,
+    "bullet_enyo_runtime_input_buckets": 8,
     "bullet_eval_scale": 400.0,
     "bullet_save_rate": 512,
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "first_gate": "checkpoint sweep at 0,512,1024,1536,2048 on the 800-target lichess policy gate using the 1280-hidden engine",
-    "promotion": "no SPRT unless checkpoint gate is materially better than the 1024-hidden 16-bucket smoke and failure replay is clean"
+    "first_gate": "checkpoint sweep at 0,512,1024,1536,2048 on the 800-target lichess policy gate using the 8-bucket engine",
+    "promotion": "no SPRT unless checkpoint gate is materially better than the prior expanded low-bucket smokes and failure replay is clean"
   }
 }

@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-lowbucket-wide-architecture-audit` is disabled. There is no active
-training config. The last active native run,
-`native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192`, was stopped after
-checkpoint `1024` because the 800-target gate collapsed.
+`native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048` is the
+active native config. It tests a true 8-king-bucket runtime architecture with
+Bullet/SF-binpack scratch training. This is distinct from older low-bucket
+smokes that exported into a larger runtime layout.
 
 ## Track Definitions
 
@@ -85,10 +85,15 @@ Native lane:
   The run was stopped after checkpoint `1024`: all `71` vs `531`, top1
   `181/800`, capped `-73291`, worst regression `-32000cp`; non-mate was
   `66` vs `506`, capped `-70161`.
-- next native work is not a run: audit and prepare a low-input-bucket wider
-  architecture. Current tooling/runtime assumes `1024` hidden for standard Enyo
-  `.nn` files, so width changes require explicit loader/evaluator/tool support
-  plus parity and NPS gates before training.
+- `native-bullet-enyo16-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is
+  rejected. Training completed cleanly, but checkpoint `2048` was effectively
+  flat against the 16-bucket/1024 baseline: all top1 `375/800`, `92` vs `285`,
+  capped `-20283`, worst regression `-32000cp`; mate-like was worse than the
+  parent (`4` vs `14`, capped `-1061`, worst `-31703cp`).
+- next native work is the committed low-bucket runtime architecture:
+  `ENYO_NNUE_BUCKETS=8` in the engine and `bullet_enyo_runtime_input_buckets=8`
+  in the exporter. This is a real runtime layout change, not a wider hidden
+  layer and not a low-bucket net expanded at load time.
 - `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768` is rejected.
 - best checkpoint-sweep rows had positive capped sums but still retained
   mate-like catastrophic tails around `-31k cp`; e.g. checkpoint `12288`
@@ -134,7 +139,8 @@ Reckless lane:
 Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
-- native work is limited to architecture preparation; no training is active.
+- native work is active only on the true 8-runtime-bucket scratch smoke. Gate
+  checkpoints before considering any continuation.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
   documented/runtime native design is 32 buckets. That means older "native"
