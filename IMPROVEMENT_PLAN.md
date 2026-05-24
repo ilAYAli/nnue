@@ -689,6 +689,16 @@ Do not restart these as near-term Elo lanes:
   stayed far below export thresholds (`max_abs` about `0.04`, no values
   `>=0.1`, none `>=0.5`). Only small L2 float changes exported
   (`166/25200209` total values).
+- reckless Enyo32 input-threshold probes after the Bullet clamp fix: active
+  diagnostic. `lr1e-5/sb32` moved raw input floats but exported no input
+  tensor changes. `lr2e-4/sb16` first crossed export at checkpoint 16, but only
+  for two input biases and no input weights. Search gate was tiny positive
+  (`candidate_better=2`, `reference_better=0`, `capped_sum_diff_cp=23`), and
+  failure-suite replay was mixed but not catastrophic (`candidate_better=3`,
+  `reference_better=7`, `sum_diff_cp=296`, `median_nonzero_diff_cp=-9`,
+  `worst_regression_cp=-123`). It is not SPRT-worthy. Next: `lr3e-4/sb16`,
+  gate the earliest checkpoint with exported input-weight movement, and stop
+  this lane if search/failure tails worsen.
 
 ## Promotion Gates
 
@@ -709,16 +719,20 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Stop near-term reckless output-only work unless a new architecture hypothesis
+1. Continue the reckless existing-weight Enyo32 input-threshold audit with one
+   stronger export-visible probe: `lr3e-4/sb16`, then gate the earliest
+   checkpoint with real input-weight movement. No SPRT unless broad search and
+   failure-suite gates are clearly clean.
+2. Stop near-term reckless output-only work unless a new architecture hypothesis
    changes more than the final dense/output terms.
-2. Stop sparse/input LR multiplier sweeps on the small failure-derived target
+3. Stop sparse/input LR multiplier sweeps on the small failure-derived target
    set. It is too small and too brittle to move exported representation safely.
-3. Stop the broad-target search-aware native config family after the teacher-
+4. Stop the broad-target search-aware native config family after the teacher-
    preserved retry also failed static and broad search gates.
-4. Continue the native baseline using larger Bullet/SF-binpack training and
-   checkpoint sweeps.
-5. Do not launch another tiny target-only child-eval recovery run.
-6. No SPRT from the current search-aware native or reckless output-delta runs.
+5. Continue the native baseline using larger Bullet/SF-binpack training and
+   checkpoint sweeps when the reckless lane is waiting on a long gate.
+6. Do not launch another tiny target-only child-eval recovery run.
+7. No SPRT from the current search-aware native or reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, and gates.

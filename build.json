@@ -1,15 +1,15 @@
 {
-  "description": "Reckless lane diagnostic: scaled Enyo32 input threshold probe after the Bullet clamp fix.",
+  "description": "Reckless lane diagnostic: stronger Enyo32 input threshold probe after the Bullet clamp fix.",
   "metadata": {
-    "experiment": "reckless-enyo32-input-threshold-clampfix-lr2e4-sb16",
+    "experiment": "reckless-enyo32-input-threshold-clampfix-lr3e4-sb16",
     "track": "nnue_reckless",
     "type": "diagnostic",
-    "hypothesis": "lr1e-5 moved raw l0 floats to 0.0359 after 32 superbatches. lr2e-4 should cross exported int16 thresholds in a short run if movement scales roughly linearly.",
+    "hypothesis": "lr2e-4 crossed export only for two input biases at checkpoint 16 and passed without catastrophic tails. lr3e-4 should produce the first real exported input-weight movement while staying small enough to gate safely.",
     "status": "configured"
   },
   "create": {
-    "name": "reckless-enyo32-input-threshold-clampfix-lr2e4-sb16",
-    "run_dir": "/home/petter/code/cpp/chess/nnue_reckless/runs/reckless-enyo32-input-threshold-clampfix-lr2e4-sb16",
+    "name": "reckless-enyo32-input-threshold-clampfix-lr3e4-sb16",
+    "run_dir": "/home/petter/code/cpp/chess/nnue_reckless/runs/reckless-enyo32-input-threshold-clampfix-lr3e4-sb16",
     "backend": "bullet",
     "bullet_mode": "enyo",
     "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
@@ -22,8 +22,8 @@
     "trainable": "input",
     "bullet_wdl": 0.75,
     "bullet_eval_scale": 400.0,
-    "bullet_lr": 0.0002,
-    "bullet_final_lr": 0.0002,
+    "bullet_lr": 0.0003,
+    "bullet_final_lr": 0.0003,
     "weight_decay": 0.0,
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
@@ -36,6 +36,6 @@
     "net_diff_checkpoints": "0,1,2,3,4,5,6,7,8,12,16",
     "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
     "enyo_input_buckets": 32,
-    "search_gate_condition": "only gate the earliest checkpoint with real exported input movement"
+    "search_gate_condition": "only gate the earliest checkpoint with real exported input-weight movement"
   }
 }
