@@ -25,7 +25,7 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096`.
+`native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048`.
 This run is rejected by checkpoint gates and should not be extended.
 
 ## Track Definitions
@@ -89,13 +89,36 @@ Current next action:
   `50368836`, and `net_diff --float-atol 1e-6 --fail-if-different` reported
   zero changed tensors. Explicit 16-bucket legacy parity also passed in
   `runs/bullet-enyo-16-init-roundtrip-20260524_031037`.
-- active smoke:
+- rejected smoke:
   `native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048`.
-  It is the first true 32-bucket Bullet Enyo scratch run. Gate checkpoints
-  before any SPRT; stop immediately if the checkpoint curve is not materially
-  better than the prior legacy-layout native scratch runs.
+  It was the first true 32-bucket Bullet Enyo scratch run. Checkpoint `512`
+  failed the 300k-node search gate (`34` vs `150`, capped `-18672`,
+  worst `-31837cp`, top1 `27/232`). Checkpoint `1024` also failed
+  (`35` vs `142`, capped `-17815`, worst `-31803cp`, top1 `43/232`).
+  The sweep was stopped before `1536/2048` to avoid wasting compute.
+
+Decision: no SPRT, no longer 32-bucket scratch continuation. The Bullet Enyo
+layout bug is fixed, but true 32-bucket scratch still does not recover
+reference move-choice strength at this data scale.
 
 ## Latest Result
+
+Rejected true 32-bucket native Bullet smoke:
+
+- `native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048` used
+  `bullet_enyo_input_buckets=32`, no init net, SF-binpack input, and exported
+  full-size native `.nn` checkpoints (`50368836` byte payload).
+- training completed successfully in about 20 minutes and wrote checkpoints
+  `512`, `1024`, `1536`, and `2048`.
+- checkpoint gate was stopped after `1024` because both completed checkpoints
+  were catastrophic against the reference:
+  - `512`: all `34` vs `150`, capped `-18672`, worst `-31837cp`;
+    non-mate `10` vs `107`, capped `-14834`.
+  - `1024`: all `35` vs `142`, capped `-17815`, worst `-31803cp`;
+    non-mate `10` vs `102`, capped `-14886`.
+- conclusion: fixing the Bullet layout did not make same-architecture native
+  scratch a near-term Elo lane. Do not continue this family without a much
+  larger data-scale plan or a different architecture objective.
 
 Rejected conservative native SF-binpack retry:
 
