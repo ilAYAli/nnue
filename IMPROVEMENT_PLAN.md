@@ -128,6 +128,17 @@ Decision: no SPRT, no longer 32-bucket scratch continuation. The Bullet Enyo
 layout bug is fixed, but true 32-bucket scratch still does not recover
 reference move-choice strength at this data scale.
 
+Configured next native data-scale smoke:
+
+- `build.json` now defines `native-bullet-lichess-eval-500k-wdl0-sb256`.
+- track: `nnue_native`; no init net; true 32-bucket Enyo Bullet export.
+- data: high-depth Lichess eval DB rows, material-independent signed buckets,
+  scanning up to `5M` input rows for about `500k` balanced training rows.
+- purpose: test whether the `46k` Lichess eval smoke was too small before
+  abandoning this data source; this is not a promotion candidate.
+- validation: checkpoint sweep only. No SPRT unless a checkpoint first clears
+  broad search/move gates and failure replay.
+
 
 ## Data-Scale Audit: Lichess Eval DB
 
