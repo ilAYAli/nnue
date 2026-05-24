@@ -57,16 +57,22 @@ SPRT candidate yet.
 
 
 
-## Active Diagnostic: Enyo32 Input Quantization Threshold
+## Latest Diagnostic: Enyo32 Input Quantization Threshold
 
-`reckless-enyo32-input-threshold-lr2e7-sb8` is a reckless-lane diagnostic, not a candidate.
+Completed `reckless-enyo32-input-threshold-lr2e7-sb8`:
 
-It repeats existing-weight true-32 input-only training with `lr=2e-7`, but saves
-every superbatch for `8` superbatches. The goal is to find whether the exported
-input tensor jumps to the same rejected 512-value delta immediately, or whether
-there is a smaller usable movement window before the destructive step.
+- checkpoint `0` is exact parity.
+- checkpoint `1` already jumps to the exported 512-value input delta:
+  `input_weights 505`, `input_biases 7`, max abs `1538/1575`.
+- checkpoints `2` through `8` are identical to checkpoint `1`.
+- checkpoint `1` is also identical to the previous rejected
+  `reckless-enyo32-existing-input-lr1e5-sb1024` checkpoint `256`
+  (`total changed 0/25200209` when compared directly).
 
-No search gate or SPRT unless net-diff shows a new, smaller exported step.
+Decision: close the Enyo32 existing-weight input-only line. The Bullet/export
+setup can move the 32-bucket input tensor, but the first exported step is already
+the same destructive net that failed `36` vs `140`, capped `-18181`, worst
+`-31837cp`. Another LR-only retry is not justified.
 
 ## Latest Result: Low-Pressure Enyo32 Input Divergence
 

@@ -1,45 +1,28 @@
 {
-  "description": "Reckless lane diagnostic: find when true 32-bucket input-only training first crosses exported quantization.",
+  "description": "Reckless lane diagnostic complete: Enyo32 input-only export jumps to rejected net after one superbatch.",
   "metadata": {
     "experiment": "reckless-enyo32-input-threshold-lr2e7-sb8",
     "track": "nnue_reckless",
     "type": "diagnostic",
-    "hypothesis": "The existing-weight Enyo32 input-only runs may cross a coarse export threshold almost immediately. Save every superbatch to find the first exported input movement.",
-    "prior_rejections": [
-      "lr1e-5 sb1024 checkpoint256 failed search gate: all 36 vs 140, capped -18181",
-      "lr2e-7 sb256 checkpoint64/128/256 exported identical net to the lr1e-5 rejected checkpoint256"
-    ],
-    "status": "configured"
+    "result": "checkpoint 0 exact parity; checkpoint 1 already has the same exported 512-value input delta as the rejected lr1e-5 checkpoint256; checkpoints 2-8 unchanged from checkpoint1",
+    "threshold_table": "0 total 0; 1-8 total 512 each: input_weights 505, input_biases 7, max_abs 1538/1575",
+    "comparison_to_prior_rejection": "checkpoint1 vs reckless-enyo32-existing-input-lr1e5-sb1024 checkpoint256: total changed 0/25200209",
+    "decision": "close Enyo32 existing-weight input-only line; exported quantization admits no smaller useful step with this trainer setup",
+    "status": "completed_rejected"
   },
   "create": {
-    "name": "reckless-enyo32-input-threshold-lr2e7-sb8",
-    "run_dir": "/home/petter/code/cpp/chess/nnue_reckless/runs/reckless-enyo32-input-threshold-lr2e7-sb8",
-    "backend": "bullet",
-    "bullet_mode": "enyo",
-    "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
-    "bullet_loader": "sfbinpack",
-    "bullet_sfbinpack_min_ply": 16,
-    "bullet_sfbinpack_quiet_only": true,
-    "bullet_sfbinpack_buffer_mb": 1024,
-    "bullet_enyo_input_buckets": 32,
-    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "trainable": "input",
-    "bullet_wdl": 0.75,
-    "bullet_eval_scale": 400.0,
-    "bullet_lr": 2e-07,
-    "bullet_final_lr": 2e-07,
-    "weight_decay": 0.0,
-    "bullet_batch_size": 4096,
-    "bullet_batches": 64,
-    "bullet_superbatches": 8,
-    "bullet_save_rate": 1,
-    "bullet_threads": 4
+    "disabled": true
   },
   "validation": {
     "tmux": "nnue_reckless",
-    "net_diff_checkpoints": "0,1,2,3,4,5,6,7,8",
-    "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "enyo_input_buckets": 32,
-    "no_search_gate": "diagnostic only; search gate only if this reveals a smaller non-destructive exported step"
+    "completed_checks": [
+      "build/train completed",
+      "checkpoint 0-8 exported net diff",
+      "checkpoint1 equality against prior rejected checkpoint256"
+    ],
+    "artifacts": {
+      "summary": "runs/reckless-enyo32-input-threshold-lr2e7-sb8/validate/netdiff/summary.tsv",
+      "rejected_compare": "runs/reckless-enyo32-input-threshold-lr2e7-sb8/validate/netdiff/net_diff_1_vs_rejected256.txt"
+    }
   }
 }
