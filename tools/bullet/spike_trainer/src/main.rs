@@ -90,10 +90,10 @@ fn maybe_frozen<'a, T>(builder: &'a ModelBuilder, frozen: bool, mut f: impl FnMu
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct EnyoInputs;
+struct EnyoInputs<const INPUT_BUCKETS: usize>;
 
 #[rustfmt::skip]
-const ENYO_KING_BUCKETS: [usize; 64] = [
+const ENYO_KING_BUCKETS_16: [usize; 64] = [
     15, 15, 14, 14, 14, 14, 15, 15,
     15, 15, 14, 14, 14, 14, 15, 15,
     13, 13, 12, 12, 12, 12, 13, 13,
@@ -104,7 +104,33 @@ const ENYO_KING_BUCKETS: [usize; 64] = [
      3,  2,  1,  0,  0,  1,  2,  3,
 ];
 
-fn enyo_feature(piece: u8, sq_berserk: u8, king_berserk: u8, view: usize) -> usize {
+#[rustfmt::skip]
+const ENYO_KING_BUCKETS_32: [usize; 64] = [
+    31, 30, 29, 28, 28, 29, 30, 31,
+    27, 26, 25, 24, 24, 25, 26, 27,
+    23, 22, 21, 20, 20, 21, 22, 23,
+    19, 18, 17, 16, 16, 17, 18, 19,
+    15, 14, 13, 12, 12, 13, 14, 15,
+    11, 10,  9,  8,  8,  9, 10, 11,
+     7,  6,  5,  4,  4,  5,  6,  7,
+     3,  2,  1,  0,  0,  1,  2,  3,
+];
+
+fn enyo_bucket_map<const INPUT_BUCKETS: usize>() -> &'static [usize; 64] {
+    match INPUT_BUCKETS {
+        16 => &ENYO_KING_BUCKETS_16,
+        32 => &ENYO_KING_BUCKETS_32,
+        _ => panic!("unsupported Enyo input bucket count: {INPUT_BUCKETS}"),
+    }
+}
+
+fn enyo_feature(
+    piece: u8,
+    sq_berserk: u8,
+    king_berserk: u8,
+    view: usize,
+    buckets: &[usize; 64],
+) -> usize {
     let colour = usize::from(piece & 8 != 0);
     let piece_type = usize::from(piece & 7);
     let piece_code = (piece_type << 1) | colour;
@@ -115,14 +141,14 @@ fn enyo_feature(piece: u8, sq_berserk: u8, king_berserk: u8, view: usize) -> usi
     let op = 6 * ((piece_code ^ view) & 1) + (piece_code >> 1);
     let ok = orient ^ king;
     let osq = orient ^ sq;
-    ENYO_KING_BUCKETS[ok] * 12 * 64 + op * 64 + osq
+    buckets[ok] * 12 * 64 + op * 64 + osq
 }
 
-impl SparseInputType for EnyoInputs {
+impl<const INPUT_BUCKETS: usize> SparseInputType for EnyoInputs<INPUT_BUCKETS> {
     type RequiredDataType = ChessBoard;
 
     fn num_inputs(&self) -> usize {
-        16 * 12 * 64
+        INPUT_BUCKETS * 12 * 64
     }
 
     fn max_active(&self) -> usize {
@@ -132,26 +158,27 @@ impl SparseInputType for EnyoInputs {
     fn map_features<F: FnMut(usize, usize)>(&self, pos: &Self::RequiredDataType, mut f: F) {
         let stm_king = pos.our_ksq() ^ 56;
         let ntm_king = pos.opp_ksq();
+        let buckets = enyo_bucket_map::<INPUT_BUCKETS>();
         for (piece, square) in pos.into_iter() {
             let sq = square ^ 56;
             f(
-                enyo_feature(piece, sq, stm_king, 0),
-                enyo_feature(piece, sq, ntm_king, 1),
+                enyo_feature(piece, sq, stm_king, 0, buckets),
+                enyo_feature(piece, sq, ntm_king, 1, buckets),
             );
         }
     }
 
     fn shorthand(&self) -> String {
-        "enyo-16kb".to_string()
+        format!("enyo-{INPUT_BUCKETS}kb")
     }
 
     fn description(&self) -> String {
-        "Enyo 16-king-bucket exported NNUE inputs".to_string()
+        format!("Enyo {INPUT_BUCKETS}-king-bucket exported NNUE inputs")
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn train_enyo(
+fn train_enyo<const INPUT_BUCKETS: usize>(
     dataset: String,
     output: String,
     net_id: String,
@@ -175,12 +202,16 @@ fn train_enyo(
     if hidden != 1024 || l2_size != 16 {
         panic!("Enyo mode writes the fixed Enyo .nn layout; hidden=1024 and l2=16 are required");
     }
+    if INPUT_BUCKETS != 16 && INPUT_BUCKETS != 32 {
+        panic!("Enyo mode supports only 16 or 32 input king buckets");
+    }
 
     println!("mode=enyo");
     println!("dataset={dataset}");
     println!("output={output}");
     println!("net_id={net_id}");
     println!("hidden={hidden} l2={l2_size}");
+    println!("enyo_input_buckets={INPUT_BUCKETS}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
     println!("enyo_l0_export_scale=1");
@@ -202,7 +233,7 @@ fn train_enyo(
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
-        .inputs(EnyoInputs)
+        .inputs(EnyoInputs::<INPUT_BUCKETS>)
         .save_format(&[
             SavedFormat::id("l0w").round().quantise::<i16>(1),
             SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -231,7 +262,7 @@ fn train_enyo(
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
         .build(|builder, stm_inputs, ntm_inputs| {
             let mut l0 = maybe_frozen(builder, !train_input, || {
-                enyo_affine(builder, "l0", 16 * 12 * 64, hidden, l0_stdev)
+                enyo_affine(builder, "l0", INPUT_BUCKETS * 12 * 64, hidden, l0_stdev)
             });
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);
@@ -345,8 +376,12 @@ fn train_enyo(
         }
         "sfbinpack" => {
             let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
-            let dataloader =
-                SfBinpackLoader::new_concat_multiple(&path_refs, buffer_mb, threads, sfbinpack_filter);
+            let dataloader = SfBinpackLoader::new_concat_multiple(
+                &path_refs,
+                buffer_mb,
+                threads,
+                sfbinpack_filter,
+            );
             trainer.run(&schedule, &settings, &dataloader);
         }
         _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
@@ -370,33 +405,58 @@ fn main() {
     let enyo_l0_std = env_parse("ENYO_BULLET_ENYO_L0_STD", 8.0f32);
     let enyo_l1_std = env_parse("ENYO_BULLET_ENYO_L1_STD", 1.0f32);
     let enyo_l1_export_scale = env_parse("ENYO_BULLET_ENYO_L1_EXPORT_SCALE", 1.0f32);
+    let enyo_input_buckets = env_parse("ENYO_BULLET_ENYO_INPUT_BUCKETS", 32usize);
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 1usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
     let weight_decay = env_parse("ENYO_BULLET_WEIGHT_DECAY", 0.0f32);
 
     if mode == "enyo" {
-        train_enyo(
-            dataset,
-            output,
-            net_id,
-            hidden,
-            l2_size,
-            batch_size,
-            batches_per_superbatch,
-            end_superbatch,
-            threads,
-            wdl_proportion,
-            initial_lr,
-            final_lr,
-            enyo_l0_std,
-            enyo_l1_std,
-            enyo_l1_export_scale,
-            eval_scale,
-            save_rate,
-            trainable,
-            weight_decay,
-        );
+        match enyo_input_buckets {
+            16 => train_enyo::<16>(
+                dataset,
+                output,
+                net_id,
+                hidden,
+                l2_size,
+                batch_size,
+                batches_per_superbatch,
+                end_superbatch,
+                threads,
+                wdl_proportion,
+                initial_lr,
+                final_lr,
+                enyo_l0_std,
+                enyo_l1_std,
+                enyo_l1_export_scale,
+                eval_scale,
+                save_rate,
+                trainable,
+                weight_decay,
+            ),
+            32 => train_enyo::<32>(
+                dataset,
+                output,
+                net_id,
+                hidden,
+                l2_size,
+                batch_size,
+                batches_per_superbatch,
+                end_superbatch,
+                threads,
+                wdl_proportion,
+                initial_lr,
+                final_lr,
+                enyo_l0_std,
+                enyo_l1_std,
+                enyo_l1_export_scale,
+                eval_scale,
+                save_rate,
+                trainable,
+                weight_decay,
+            ),
+            _ => panic!("unsupported ENYO_BULLET_ENYO_INPUT_BUCKETS={enyo_input_buckets}"),
+        }
         return;
     }
 
@@ -521,8 +581,12 @@ fn main() {
         }
         "sfbinpack" => {
             let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
-            let dataloader =
-                SfBinpackLoader::new_concat_multiple(&path_refs, buffer_mb, threads, sfbinpack_filter);
+            let dataloader = SfBinpackLoader::new_concat_multiple(
+                &path_refs,
+                buffer_mb,
+                threads,
+                sfbinpack_filter,
+            );
             trainer.run(&schedule, &settings, &dataloader);
         }
         _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),

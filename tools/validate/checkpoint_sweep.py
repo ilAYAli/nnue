@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from bullet.bullet import ENYO_NETWORK_SIZE
+from bullet.bullet import enyo_network_size
 from lib.defaults import DEFAULTS, repo_root
 from lib.events import emit_event
 
@@ -43,17 +43,18 @@ def checkpoint_files(checkpoint_dir: Path, selection: set[int] | None) -> list[P
     return files
 
 
-def export_enyo_net(checkpoint: Path, output: Path) -> None:
+def export_enyo_net(checkpoint: Path, output: Path, input_buckets: int) -> None:
+    network_size = enyo_network_size(input_buckets)
     raw = checkpoint.read_bytes()
-    if len(raw) < ENYO_NETWORK_SIZE:
+    if len(raw) < network_size:
         raise SystemExit(
-            f"{checkpoint} is {len(raw)} bytes, expected at least {ENYO_NETWORK_SIZE}")
-    if len(raw) > ENYO_NETWORK_SIZE:
-        trailer = raw[ENYO_NETWORK_SIZE:]
+            f"{checkpoint} is {len(raw)} bytes, expected at least {network_size}")
+    if len(raw) > network_size:
+        trailer = raw[network_size:]
         expected = (b"bullet" * ((len(trailer) + 5) // 6))[:len(trailer)]
         if trailer != expected:
             raise SystemExit(f"{checkpoint} has unexpected {len(trailer)} byte trailer")
-        raw = raw[:ENYO_NETWORK_SIZE]
+        raw = raw[:network_size]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(raw)
 
@@ -131,6 +132,13 @@ def parse_args() -> argparse.Namespace:
         description="Export Bullet Enyo checkpoints and run search-target gates."
     )
     parser.add_argument("--checkpoint-dir", required=True)
+    parser.add_argument(
+        "--enyo-input-buckets",
+        type=int,
+        choices=[16, 32],
+        default=32,
+        help="Input bucket layout used by the Bullet Enyo checkpoints.",
+    )
     parser.add_argument("--targets", required=True)
     parser.add_argument("--engine", required=True)
     parser.add_argument("--reference-net", required=True)
@@ -187,7 +195,7 @@ def main() -> int:
         net = nets_dir / f"{checkpoint.parent.name}.nn"
         stage = f"checkpoint_{idx}"
         try:
-            export_enyo_net(checkpoint, net)
+            export_enyo_net(checkpoint, net, args.enyo_input_buckets)
         except SystemExit as exc:
             emit_event(
                 run_dir, "fail", stage=stage, status="failed",

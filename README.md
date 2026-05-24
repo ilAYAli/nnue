@@ -73,6 +73,7 @@ standard deviations.
     "bullet_loader": "sfbinpack",
     "bullet_sfbinpack_min_ply": 16,
     "bullet_sfbinpack_quiet_only": true,
+    "bullet_enyo_input_buckets": 32,
     "init_net": null,
     "bullet_enyo_l0_std": 8.0,
     "bullet_enyo_l1_std": 1.0
@@ -93,6 +94,9 @@ material-head bucketed/material head experiments
 The Bullet backend is optional. It uses a Cargo git dependency pinned by
 `tools/bullet/spike_trainer/Cargo.lock`, so it is not tracked as a git
 submodule. Backend-specific details live in `tools/bullet/README.md`.
+
+For `bullet_mode=enyo`, `bullet_enyo_input_buckets=32` matches the current Enyo
+runtime layout. `16` is legacy compatibility and must be chosen explicitly.
 
 Large training runs should prefer direct binpack input through
 `bullet_loader=sfbinpack`. JSONL is still supported for small generated sets,
