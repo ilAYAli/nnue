@@ -116,20 +116,19 @@ const ENYO_KING_BUCKETS_32: [usize; 64] = [
      3,  2,  1,  0,  0,  1,  2,  3,
 ];
 
-fn enyo_bucket_map<const INPUT_BUCKETS: usize>() -> &'static [usize; 64] {
+fn enyo_bucket<const INPUT_BUCKETS: usize>(oriented_king_square: usize) -> usize {
     match INPUT_BUCKETS {
-        16 => &ENYO_KING_BUCKETS_16,
-        32 => &ENYO_KING_BUCKETS_32,
+        1 | 2 | 4 | 8 | 16 => ENYO_KING_BUCKETS_16[oriented_king_square] * INPUT_BUCKETS / 16,
+        32 => ENYO_KING_BUCKETS_32[oriented_king_square],
         _ => panic!("unsupported Enyo input bucket count: {INPUT_BUCKETS}"),
     }
 }
 
-fn enyo_feature(
+fn enyo_feature<const INPUT_BUCKETS: usize>(
     piece: u8,
     sq_berserk: u8,
     king_berserk: u8,
     view: usize,
-    buckets: &[usize; 64],
 ) -> usize {
     let colour = usize::from(piece & 8 != 0);
     let piece_type = usize::from(piece & 7);
@@ -141,7 +140,7 @@ fn enyo_feature(
     let op = 6 * ((piece_code ^ view) & 1) + (piece_code >> 1);
     let ok = orient ^ king;
     let osq = orient ^ sq;
-    buckets[ok] * 12 * 64 + op * 64 + osq
+    enyo_bucket::<INPUT_BUCKETS>(ok) * 12 * 64 + op * 64 + osq
 }
 
 impl<const INPUT_BUCKETS: usize> SparseInputType for EnyoInputs<INPUT_BUCKETS> {
@@ -158,12 +157,11 @@ impl<const INPUT_BUCKETS: usize> SparseInputType for EnyoInputs<INPUT_BUCKETS> {
     fn map_features<F: FnMut(usize, usize)>(&self, pos: &Self::RequiredDataType, mut f: F) {
         let stm_king = pos.our_ksq() ^ 56;
         let ntm_king = pos.opp_ksq();
-        let buckets = enyo_bucket_map::<INPUT_BUCKETS>();
         for (piece, square) in pos.into_iter() {
             let sq = square ^ 56;
             f(
-                enyo_feature(piece, sq, stm_king, 0, buckets),
-                enyo_feature(piece, sq, ntm_king, 1, buckets),
+                enyo_feature::<INPUT_BUCKETS>(piece, sq, stm_king, 0),
+                enyo_feature::<INPUT_BUCKETS>(piece, sq, ntm_king, 1),
             );
         }
     }
@@ -202,8 +200,8 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
     if hidden != 1024 || l2_size != 16 {
         panic!("Enyo mode writes the fixed Enyo .nn layout; hidden=1024 and l2=16 are required");
     }
-    if INPUT_BUCKETS != 16 && INPUT_BUCKETS != 32 {
-        panic!("Enyo mode supports only 16 or 32 input king buckets");
+    if !matches!(INPUT_BUCKETS, 1 | 2 | 4 | 8 | 16 | 32) {
+        panic!("Enyo mode supports only 1, 2, 4, 8, 16, or 32 input king buckets");
     }
 
     println!("mode=enyo");
@@ -415,49 +413,38 @@ fn main() {
     let weight_decay = env_parse("ENYO_BULLET_WEIGHT_DECAY", 0.0f32);
 
     if mode == "enyo" {
+        macro_rules! run_enyo {
+            ($buckets:literal) => {
+                train_enyo::<$buckets>(
+                    dataset,
+                    output,
+                    net_id,
+                    hidden,
+                    l2_size,
+                    batch_size,
+                    batches_per_superbatch,
+                    end_superbatch,
+                    threads,
+                    wdl_proportion,
+                    initial_lr,
+                    final_lr,
+                    enyo_l0_std,
+                    enyo_l1_std,
+                    enyo_l1_export_scale,
+                    eval_scale,
+                    save_rate,
+                    trainable,
+                    weight_decay,
+                )
+            };
+        }
         match enyo_input_buckets {
-            16 => train_enyo::<16>(
-                dataset,
-                output,
-                net_id,
-                hidden,
-                l2_size,
-                batch_size,
-                batches_per_superbatch,
-                end_superbatch,
-                threads,
-                wdl_proportion,
-                initial_lr,
-                final_lr,
-                enyo_l0_std,
-                enyo_l1_std,
-                enyo_l1_export_scale,
-                eval_scale,
-                save_rate,
-                trainable,
-                weight_decay,
-            ),
-            32 => train_enyo::<32>(
-                dataset,
-                output,
-                net_id,
-                hidden,
-                l2_size,
-                batch_size,
-                batches_per_superbatch,
-                end_superbatch,
-                threads,
-                wdl_proportion,
-                initial_lr,
-                final_lr,
-                enyo_l0_std,
-                enyo_l1_std,
-                enyo_l1_export_scale,
-                eval_scale,
-                save_rate,
-                trainable,
-                weight_decay,
-            ),
+            1 => run_enyo!(1),
+            2 => run_enyo!(2),
+            4 => run_enyo!(4),
+            8 => run_enyo!(8),
+            16 => run_enyo!(16),
+            32 => run_enyo!(32),
             _ => panic!("unsupported ENYO_BULLET_ENYO_INPUT_BUCKETS={enyo_input_buckets}"),
         }
         return;
