@@ -115,6 +115,33 @@ Decision: no SPRT, no longer 32-bucket scratch continuation. The Bullet Enyo
 layout bug is fixed, but true 32-bucket scratch still does not recover
 reference move-choice strength at this data scale.
 
+
+## Data-Scale Audit: Lichess Eval DB
+
+Run directory: `runs/native-lichess-eval-audit-20260524`.
+
+Findings:
+
+- source: `/home/petter/code/cpp/chess/assets/lichess_db_eval.jsonl.zst`.
+- 100k-input smoke reached `10000` eligible rows after only `33367` input rows.
+- 1M-input balanced-bucket probe saw `186419` eligible rows and wrote `46392`
+  sampled rows.
+- sign balance was good after bucketing: `20712` positive, `20680` negative,
+  `5000` zero.
+- all requested buckets up to `300-800cp` filled; rare `800-1600cp` buckets
+  were naturally sparse (`712` positive, `680` negative from first 1M input
+  rows).
+
+Decision:
+
+- this is a viable candidate data-scale source for `nnue_native`.
+- do not launch training from sequential first-N rows.
+- do not create a huge JSONL -> Bullet text -> Bullet data chain as the normal
+  path; disk pressure is already a problem.
+- next native work should add or use a streaming/one-time conversion path from
+  Lichess eval rows to Bullet training data, then run a small smoke before any
+  large native scratch training.
+
 ## Latest Result
 
 Rejected true 32-bucket native Bullet smoke:
