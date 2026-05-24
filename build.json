@@ -1,14 +1,16 @@
 {
-  "description": "Native smoke for material-filtered, balanced Lichess eval DB rows. This tests whether a cleaner external scalar source gives a better native baseline than the rejected SF-binpack scalar smokes.",
+  "description": "No active training run. The filtered Lichess scalar native smoke is rejected; replace this config only with a concrete non-scalar data/objective or architecture hypothesis.",
   "metadata": {
     "experiment": "native-bullet-lichess-filtered-5m",
     "track": "nnue_native",
-    "status": "active",
+    "status": "rejected",
     "hypothesis": "A material-filtered, score-balanced Lichess eval slice may reduce the bucket starvation and tactical-tail bias seen in same-data SF-binpack scratch runs.",
     "data_audit": "runs/native-lichess-eval-filter-audit-20260524/import.log",
-    "gate": "800-target Lichess-policy checkpoint sweep"
+    "gate": "800-target Lichess-policy checkpoint sweep",
+    "reason": "checkpoint 256 failed decisively: all 77 vs 519, capped -7207724, worst regression -32000"
   },
   "create": {
+    "disabled": true,
     "name": "native-bullet-lichess-filtered-5m-eval400-lr1e3-sb1024",
     "run_dir": "runs/native-bullet-lichess-filtered-5m-eval400-lr1e3-sb1024",
     "backend": "bullet",
