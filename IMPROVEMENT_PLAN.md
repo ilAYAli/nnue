@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192`.
-This is a one-input-bucket native scratch scale-up on Stockfish binpack through
-Bullet, exported back to the standard 32-bucket runtime layout. It extends the
-only bucket-ladder result that improved the 800-target native gate.
+`native-lowbucket-wide-architecture-audit` is disabled. There is no active
+training config. The last active native run,
+`native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192`, was stopped after
+checkpoint `1024` because the 800-target gate collapsed.
 
 ## Track Definitions
 
@@ -48,20 +48,20 @@ only bucket-ladder result that improved the 800-target native gate.
 
 ## Active Decision: 2026-05-24
 
-Update: the active native plan is now a one-bucket scale-up, not another
-32/16/8-bucket continuation or Lichess-eval scalar run. The 16- and 8-bucket
-rungs failed, and the 1-bucket smoke is still not promotion-grade, but it is
-the least-bad broad-gate native signal so far. Extend that exact direction on
-SF-binpack and checkpoint-gate it before any SPRT. The exporter expands the
-trained one-bucket layout back to the standard 32-bucket runtime layout,
-preserving zero runtime overhead.
+Update: the one-bucket scale-up is rejected. The 16- and 8-bucket rungs
+failed, the 1-bucket smoke was only the least-bad signal, and the longer
+1-bucket run collapsed on the first 800-target checkpoint gate. Do not continue
+scalar bucket-count continuations. The next native work is an export-visible
+architecture hypothesis: a low-input-bucket, wider native net, with runtime
+parity and NPS checks before any training.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
 
 Waste-control rule: do not start another NNUE training family from the rejected
-families. The only currently justified native continuation is the one-bucket
-SF-binpack scale-up described below. Reckless remains paused.
+families. No native or Reckless training is justified until the next build config
+contains a concrete architecture change, data source, and gates. Reckless remains
+paused.
 
 Native lane:
 
@@ -81,8 +81,14 @@ Native lane:
   checkpoint gate was a 200-target smoke at checkpoint `32`, and it collapsed:
   top1 `39/200`, `12` vs `146`, capped `-20416`, worst regression `-32000cp`.
   Do not scale direct Lichess eval scalar training as-is.
-- next native run:
-  `native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192`.
+- `native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192` is rejected.
+  The run was stopped after checkpoint `1024`: all `71` vs `531`, top1
+  `181/800`, capped `-73291`, worst regression `-32000cp`; non-mate was
+  `66` vs `506`, capped `-70161`.
+- next native work is not a run: audit and prepare a low-input-bucket wider
+  architecture. Current tooling/runtime assumes `1024` hidden for standard Enyo
+  `.nn` files, so width changes require explicit loader/evaluator/tool support
+  plus parity and NPS gates before training.
 - `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768` is rejected.
 - best checkpoint-sweep rows had positive capped sums but still retained
   mate-like catastrophic tails around `-31k cp`; e.g. checkpoint `12288`
@@ -94,8 +100,9 @@ Native lane:
   `41` vs `97`, capped `-6335`, with mate-like worst regression `-31814cp`.
 - stop the old 32-bucket long scratch, tailmix, search-aware patching, and
   same-architecture LR continuation families.
-- after the one-bucket scale-up, do not spend more GPU time unless it improves
-  the broad gate materially and removes the non-mate `-32000cp` tail.
+- do not spend more GPU time on bucket-count scalar continuations. The next GPU
+  run must follow a committed export-visible architecture diff or a materially
+  new data-scale plan.
 
 Reckless lane:
 
@@ -127,16 +134,16 @@ Reckless lane:
 Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
-- native work is limited to the one-bucket SF-binpack scale-up described above.
+- native work is limited to architecture preparation; no training is active.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
   documented/runtime native design is 32 buckets. That means older "native"
   Bullet `.nn` runs produced legacy-layout payloads that Enyo expanded at load
   time.
-- do not assume 32 buckets is the right scratch-training start. The 16- and
-  8-bucket rungs failed, and one input bucket is the only currently justified
-  scale-up. Skip 2/4 buckets until the one-bucket long run either improves the
-  broad gate materially or fails cleanly.
+- do not assume 32 buckets is the right scratch-training start. The 16-, 8-,
+  and 1-bucket scalar rungs all failed as promotion paths. A lower bucket count
+  may still be part of a native architecture, but it must be paired with a real
+  architecture hypothesis instead of another same-loss continuation.
 - 32-bucket init/export parity passed in
   `runs/bullet-enyo-32-init-roundtrip-20260524_031011`: exported size
   `50368836`, and `net_diff --float-atol 1e-6 --fail-if-different` reported
@@ -159,6 +166,22 @@ Current next action:
 Decision: no SPRT, no longer 32-bucket scratch continuation. The Bullet Enyo
 layout bug is fixed, but true 32-bucket scratch still does not recover
 reference move-choice strength at this data scale.
+
+
+Latest native bucket-ladder result:
+
+- `native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192` is rejected.
+- checkpoint `1024` was tested against the cached 800-target reference gate.
+- all split: top1 `181/800`, top3 `346/800`, `71` vs `531`, capped
+  `-73291`, worst regression `-32000cp`.
+- mate-like split: top1 `30/66`, `5` vs `25`, capped `-3130`, worst
+  regression `-31991cp`.
+- non-mate split: top1 `151/734`, `66` vs `506`, capped `-70161`, worst
+  regression `-32000cp`.
+
+Decision: stop this run and close scalar bucket-count continuation as the next
+near-term native lane. The next native attempt must be a clean architecture
+branch with parity/NPS gates before training.
 
 Latest native data-source smoke:
 
@@ -848,9 +871,9 @@ The next action should be one of these, in order:
 3. Stop the broad-target search-aware native config family after the teacher-
    preserved retry also failed static and broad search gates.
 4. Do not continue the native baseline with the same architecture/data recipe.
-   Direct Lichess eval import is now available, but the 46k smoke was a hard
-   search-gate reject. Prepare a materially larger/different data-scale plan or
-   an export-visible architecture hypothesis before scaling it.
+   Direct Lichess eval import and SF-binpack scalar training are available, but
+   the latest 1-bucket scale-up was a hard 800-target reject. Prepare an
+   export-visible architecture hypothesis before spending more GPU time.
 5. Do not launch another tiny target-only child-eval recovery run.
 6. No SPRT from the current search-aware native or reckless output-delta runs.
 
