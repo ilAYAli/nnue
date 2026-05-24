@@ -56,6 +56,18 @@ SPRT candidate yet.
 
 
 
+
+## Active Diagnostic: Enyo32 Input Quantization Threshold
+
+`reckless-enyo32-input-threshold-lr2e7-sb8` is a reckless-lane diagnostic, not a candidate.
+
+It repeats existing-weight true-32 input-only training with `lr=2e-7`, but saves
+every superbatch for `8` superbatches. The goal is to find whether the exported
+input tensor jumps to the same rejected 512-value delta immediately, or whether
+there is a smaller usable movement window before the destructive step.
+
+No search gate or SPRT unless net-diff shows a new, smaller exported step.
+
 ## Latest Result: Low-Pressure Enyo32 Input Divergence
 
 Rejected `reckless-enyo32-existing-input-lr2e7-sb256`:
