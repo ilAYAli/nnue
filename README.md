@@ -133,7 +133,8 @@ and then builds a target JSONL:
 `target_score` can also set `lichess_eval_input`; `build.py` will import a
 filtered JSONL position sample before scoring legal moves. Use this for broad
 policy-target construction from `lichess_db_eval.jsonl.zst` without a separate
-ad hoc conversion step.
+ad hoc conversion step. Since that source lacks true ply counters, prefer
+material-count filters such as `max_material_count` over `min_ply`.
 
 Do not launch training from a new target set until the target distribution has
 been inspected.
