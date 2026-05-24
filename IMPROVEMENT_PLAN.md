@@ -25,9 +25,11 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-No active training run. The filtered Lichess scalar native smoke is rejected.
-Replace `build.json` only when the next attempt has a concrete non-scalar
-data/objective or architecture hypothesis and an explicit gate.
+`native-policy-overfit64-lichess-cpu-lr3e5-e240` is configured as a native
+search-policy objective audit, not a candidate. It starts from an Enyo-owned
+native checkpoint and must overfit 64 non-mate Lichess policy targets after
+export. If the exported `.nn` cannot reach `64/64` top1 on CPU, do not scale
+this objective.
 
 ## Track Definitions
 
