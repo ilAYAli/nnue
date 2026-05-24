@@ -139,6 +139,19 @@ def side_to_move_score(fen: str, white_pov_score: int) -> int:
     return white_pov_score if parts[1] == "w" else -white_pov_score
 
 
+def normalize_fen(fen: str) -> str | None:
+    parts = fen.split()
+    if len(parts) == 4:
+        parts.extend(["0", "1"])
+    elif len(parts) == 5:
+        parts.append("1")
+    elif len(parts) != 6:
+        return None
+    if (parts[3] != "-"
+            and not (len(parts[3]) == 2 and parts[3][0] in "abcdefgh")):
+        return None
+    return " ".join(parts)
+
 def valid_standard_material(fen: str) -> bool:
     parts = fen.split()
     if len(parts) < 2 or parts[1] not in ("w", "b"):
@@ -264,6 +277,10 @@ def main() -> None:
                 fen = row.get("fen")
                 if not isinstance(fen, str):
                     stats["skipped_no_eval"] += 1
+                    continue
+                fen = normalize_fen(fen)
+                if fen is None:
+                    stats["skipped_invalid_fen"] += 1
                     continue
                 if not valid_standard_material(fen):
                     stats["skipped_invalid_fen"] += 1
