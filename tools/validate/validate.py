@@ -148,6 +148,44 @@ def cmd_net_diff(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_quant_scan(args: argparse.Namespace) -> int:
+    script = tools_root() / "validate" / "quantization_scan.py"
+    run_dir = event_run_dir(args.run, expand_path(args.state).parent)
+    command = [
+        str(expand_user(args.python)),
+        str(script),
+        "--state", str(expand_path(args.state)),
+    ]
+    if args.reference:
+        command += ["--reference", str(expand_path(args.reference))]
+    if args.json:
+        command += ["--json", str(expand_user(args.json))]
+    if args.fail_if_no_sparse_export_movement:
+        command.append("--fail-if-no-sparse-export-movement")
+    if args.min_input_exported_changed:
+        command += [
+            "--min-input-exported-changed",
+            str(args.min_input_exported_changed),
+        ]
+    if args.min_l1_exported_changed:
+        command += [
+            "--min-l1-exported-changed",
+            str(args.min_l1_exported_changed),
+        ]
+    command += ["--float-atol", str(args.float_atol)]
+    emit_event(
+        run_dir, "phase_start", stage="validate_quantization_scan",
+        status="running", command=command, hook_command=args.event_command or "",
+    )
+    rc = run(command)
+    emit_event(
+        run_dir, "phase_done" if rc == 0 else "fail",
+        stage="validate_quantization_scan", status="ok" if rc == 0 else "failed",
+        rc=rc, command=command, hook_command=args.event_command or "",
+    )
+    return rc
+
+
 def cmd_sprt(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "run_net_sprt_pwa.sh"
     run_dir = event_run_dir(args.run, expand_path(args.net).parent)
@@ -319,6 +357,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Python executable used for net_diff.py; defaults to the project venv when present.",
     )
     net_diff.set_defaults(func=cmd_net_diff)
+
+    quant_scan = subparsers.add_parser(
+        "quant-scan",
+        help="Inspect float checkpoint movement across exported quantization boundaries.",
+    )
+    quant_scan.add_argument("--state", required=True)
+    quant_scan.add_argument("--reference")
+    quant_scan.add_argument("--json")
+    quant_scan.add_argument("--run")
+    quant_scan.add_argument("--event-command")
+    quant_scan.add_argument("--float-atol", type=float, default=0.0)
+    quant_scan.add_argument("--fail-if-no-sparse-export-movement", action="store_true")
+    quant_scan.add_argument("--min-input-exported-changed", type=int, default=0)
+    quant_scan.add_argument("--min-l1-exported-changed", type=int, default=0)
+    quant_scan.add_argument(
+        "--python",
+        default=DEFAULTS.python,
+        help="Python executable used for quantization_scan.py; defaults to the project venv when present.",
+    )
+    quant_scan.set_defaults(func=cmd_quant_scan)
 
     sprt = subparsers.add_parser("sprt", help="Run NNUE candidate SPRT.")
     sprt.add_argument("--net", required=True)

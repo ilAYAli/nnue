@@ -70,6 +70,9 @@ Code audit status:
 - scalar training already supports MPE/WDL blending.
 - search-aware training already supports ranking/policy targets, but the
   target-only preservation family is closed.
+- `tools/validate/validate.py quant-scan` now reports whether `.pt` float
+  movement crosses exported input/L1 integer boundaries before a candidate is
+  considered for broader gates.
 - remaining gap: define a scalable native training path that combines
   CP/WDL/policy with export-aware sparse movement checks, and pair it with a
   simpler/native feature geometry before spending GPU time.

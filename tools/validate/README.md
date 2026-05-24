@@ -11,6 +11,7 @@ one abstraction instead of splitting "gates" and Elo testing.
 tools/validate/validate.py static --help
 tools/validate/validate.py failure-suite --help
 tools/validate/validate.py sprt --help
+tools/validate/validate.py quant-scan --help
 tools/validate/validate.py search-targets --help
 tools/validate/validate.py search-gate --help
 tools/validate/checkpoint_sweep.py --help
@@ -41,6 +42,12 @@ tools/validate/validate.py sprt \
   --games 1000 \
   --tag candidate_smoke \
   --event-command "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+
+tools/validate/validate.py quant-scan \
+  --state run/candidate/model.pt \
+  --reference ~/code/cpp/chess/enyo/nnue/current-reference.nn \
+  --json run/candidate/quantization_scan.json \
+  --fail-if-no-sparse-export-movement
 
 tools/validate/extract_tail_targets.py \
   --bug-dir ~/code/cpp/chess/enyo/bugs \
