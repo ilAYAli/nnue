@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-bullet-enyo16-sfbinpack-smoke-eval400-lr1e3-sb2048`.
-This is the first bucket-ladder native run: scratch Enyo, 16 king buckets,
-Stockfish binpack, Bullet. It directly tests the small-data NNUE hypothesis
-that 32 input buckets are data-starved at our current scale.
+`native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192`.
+This is a one-input-bucket native scratch scale-up on Stockfish binpack through
+Bullet, exported back to the standard 32-bucket runtime layout. It extends the
+only bucket-ladder result that improved the 800-target native gate.
 
 ## Track Definitions
 
@@ -48,20 +48,41 @@ that 32 input buckets are data-starved at our current scale.
 
 ## Active Decision: 2026-05-24
 
-Update: the active native plan is now a bucket ladder, not another 32-bucket
-continuation. Start with the already-supported 16-bucket Enyo/Bullet path, using
-SF-binpack data and checkpoint gates only. If 16 improves gates, patch Bullet
-export/checkpoint tooling for 8/4/2/1 bucket rungs that export back to the
-standard 32-bucket runtime layout, preserving zero runtime overhead.
+Update: the active native plan is now a one-bucket scale-up, not another
+32/16/8-bucket continuation or Lichess-eval scalar run. The 16- and 8-bucket
+rungs failed, and the 1-bucket smoke is still not promotion-grade, but it is
+the least-bad broad-gate native signal so far. Extend that exact direction on
+SF-binpack and checkpoint-gate it before any SPRT. The exporter expands the
+trained one-bucket layout back to the standard 32-bucket runtime layout,
+preserving zero runtime overhead.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
 
-Waste-control rule: do not start another NNUE training family from these
-families. Both active lanes rejected their current hypotheses.
+Waste-control rule: do not start another NNUE training family from the rejected
+families. The only currently justified native continuation is the one-bucket
+SF-binpack scale-up described below. Reckless remains paused.
 
 Native lane:
 
+- `native-bullet-enyo16-sfbinpack-smoke-eval400-lr1e3-sb2048` is rejected.
+  Best checkpoint was `2048`, but it still had all `91` vs `280`,
+  capped `-20039`, and worst regression `-32000cp`.
+- `native-bullet-enyo8-sfbinpack-smoke-eval400-lr1e3-sb2048` is rejected.
+  Checkpoints `512` and `1024` stayed around `45.9%` top1 on the 800-target
+  gate. The best broad row was still `97` vs `296`, capped `-22313`,
+  and the `1024` mate-like row had worst regression `-31425cp`.
+- `native-bullet-enyo1-sfbinpack-smoke-eval400-lr1e3-sb2048` is rejected as a
+  promotion smoke, but is the best bucket-ladder signal. Checkpoint `1536`
+  reached all `106` vs `246`, capped `-15116`, top1 `397/800`; this is still
+  bad, but better than the longer 32-bucket checkpoint on the same 800-target
+  gate.
+- `native-bullet-lichess-eval-500k-wdl0-sb256` is rejected. The only useful
+  checkpoint gate was a 200-target smoke at checkpoint `32`, and it collapsed:
+  top1 `39/200`, `12` vs `146`, capped `-20416`, worst regression `-32000cp`.
+  Do not scale direct Lichess eval scalar training as-is.
+- next native run:
+  `native-bullet-enyo1-sfbinpack-long-eval400-lr1e3-sb8192`.
 - `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768` is rejected.
 - best checkpoint-sweep rows had positive capped sums but still retained
   mate-like catastrophic tails around `-31k cp`; e.g. checkpoint `12288`
@@ -71,10 +92,10 @@ Native lane:
 - `native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096` is rejected.
 - every checkpoint is worse than the parent gate; `4096` ended at
   `41` vs `97`, capped `-6335`, with mate-like worst regression `-31814cp`.
-- stop long scratch, tailmix, search-aware patching, and same-architecture
-  LR continuation.
-- next native work requires a materially larger/different data-scale plan or
-  an export-visible architecture hypothesis before any more GPU time.
+- stop the old 32-bucket long scratch, tailmix, search-aware patching, and
+  same-architecture LR continuation families.
+- after the one-bucket scale-up, do not spend more GPU time unless it improves
+  the broad gate materially and removes the non-mate `-32000cp` tail.
 
 Reckless lane:
 
@@ -106,15 +127,16 @@ Reckless lane:
 Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
-- native work is limited to the bucket-ladder experiment described above.
+- native work is limited to the one-bucket SF-binpack scale-up described above.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
   documented/runtime native design is 32 buckets. That means older "native"
   Bullet `.nn` runs produced legacy-layout payloads that Enyo expanded at load
   time.
-- do not assume 32 buckets is the right scratch-training start. Use the bucket
-  ladder: first supported rung is 16 buckets; if it helps, add 8/4/2/1 training
-  support with export expanded back to the standard 32-bucket runtime layout.
+- do not assume 32 buckets is the right scratch-training start. The 16- and
+  8-bucket rungs failed, and one input bucket is the only currently justified
+  scale-up. Skip 2/4 buckets until the one-bucket long run either improves the
+  broad gate materially or fails cleanly.
 - 32-bucket init/export parity passed in
   `runs/bullet-enyo-32-init-roundtrip-20260524_031011`: exported size
   `50368836`, and `net_diff --float-atol 1e-6 --fail-if-different` reported
@@ -138,16 +160,16 @@ Decision: no SPRT, no longer 32-bucket scratch continuation. The Bullet Enyo
 layout bug is fixed, but true 32-bucket scratch still does not recover
 reference move-choice strength at this data scale.
 
-Configured next native data-scale smoke:
+Latest native data-source smoke:
 
-- `build.json` now defines `native-bullet-lichess-eval-500k-wdl0-sb256`.
-- track: `nnue_native`; no init net; true 32-bucket Enyo Bullet export.
+- `native-bullet-lichess-eval-500k-wdl0-sb256` is rejected.
 - data: high-depth Lichess eval DB rows, material-independent signed buckets,
   scanning up to `5M` input rows for about `500k` balanced training rows.
-- purpose: test whether the `46k` Lichess eval smoke was too small before
-  abandoning this data source; this is not a promotion candidate.
-- validation: checkpoint sweep only. No SPRT unless a checkpoint first clears
-  broad search/move gates and failure replay.
+- result: checkpoint `32` on a 200-target smoke had top1 `39/200`, `12` vs
+  `146`, capped `-20416`, and worst regression `-32000cp`.
+- decision: the importer is useful tooling, but direct Lichess scalar eval
+  training is not a near-term native promotion path without a new sampling or
+  objective hypothesis.
 
 
 ## Data-Scale Audit: Lichess Eval DB
@@ -168,16 +190,12 @@ Findings:
 
 Decision:
 
-- this is a viable candidate data-scale source for `nnue_native`.
-- do not launch training from sequential first-N rows.
+- this is usable tooling, but not a proven training source.
+- the `46k` and `500k` scalar-training smokes both failed search gates badly.
+- do not scale Lichess eval scalar training without a new sampling/objective
+  hypothesis.
 - do not create a huge JSONL -> Bullet text -> Bullet data chain as the normal
   path; disk pressure is already a problem.
-- next native work should add or use a streaming/one-time conversion path from
-  Lichess eval rows to Bullet training data, then run a small smoke before any
-  large native scratch training.
-- configured smoke: `native-bullet-lichess-eval-smoke-46k-wdl0`, using direct
-  Bullet text output from `import_lichess_eval.py`, categorical Bullet results,
-  `bullet_wdl=0.0`, and the first-1M-row balanced bucket recipe.
 
 ## Native Lichess Policy Targets
 
