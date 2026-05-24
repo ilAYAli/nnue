@@ -30,17 +30,21 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-bullet-enyo32-factorized-sfbinpack-smoke-eval400-lr1e3-sb1024`
-  is rejected.
-- The input-factorizer hypothesis failed the 800-target 300k-node
-  Lichess-policy gate:
-  - checkpoint `512`: top1 `201/800`, `75` vs `523`, capped `-70843`,
-    worst regression `-32000`.
-  - checkpoint `1024`: top1 `195/800`, `82` vs `515`, capped `-71346`,
-    worst regression `-32000`.
-- Do not continue same-source native architecture tweaks from the test79
-  SF-binpack source. The next action is external/proven training-data source
-  selection before another native run.
+- `native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048`
+  is configured.
+- This is a native data-source smoke, not another architecture knob:
+  one shared Enyo input bucket, CP-only, no Berserk initialization, and current
+  runtime bucket count on export.
+- Data source: `test80-2024-01-jan-2tb7p.min-v2.v6.binpack`, a recent
+  Stockfish/Leela-derived NNUE binpack chunk.
+- Audit on 1M sampled rows passed:
+  - result distribution: win/draw/loss `17.75/63.14/19.11`.
+  - mean cp `-1.44`, mean abs cp `286.17`.
+  - score/result agreement on non-draw rows `83.79%`.
+- First gate: checkpoints `512`, `1024`, `1536`, and `2048` on the 800-target
+  Lichess-policy gate using the cached reference CSV. No continuation or SPRT
+  unless this materially beats the prior one-bucket Test79 smoke and does not
+  retain mate-like tails.
 - The last useful prior result remains diagnostic only: target-only search-policy
   overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
   but target preservation did not clear the predeclared gate and is not
@@ -112,8 +116,13 @@ preservation-weight sweeps.
 
 The input-factorized 32-bucket Bullet Enyo smoke is rejected. It was a concrete
 feature-geometry/training change aimed at bucket data starvation, but it made
-move-choice behavior worse on the external policy gate. Stop same-source native
-architecture tweaks until the training data/source question is addressed.
+move-choice behavior worse on the external policy gate.
+
+The next native attempt is now a controlled data-source test using a recent
+proven Test80 2024 NNUE binpack chunk. It deliberately keeps the native feature
+geometry simple (`1` input bucket) and CP-only so the result answers one
+question: does a stronger external NNUE data source move Enyo-native scratch
+training closer to reference move-choice behavior?
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
