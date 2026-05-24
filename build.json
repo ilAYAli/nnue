@@ -1,56 +1,46 @@
 {
-  "description": "Native lane smoke: import high-depth Lichess eval DB rows directly to BulletFormat and run a short Enyo scratch train. This validates the data path only; it is not a promotion candidate.",
+  "description": "Native lane target-construction smoke: sample high-depth Lichess eval rows, score legal child moves, and build a broad policy/search target JSONL. This creates targets only; no training.",
   "metadata": {
-    "experiment": "native-bullet-lichess-eval-smoke-46k-wdl0",
+    "experiment": "native-lichess-policy-targets-smoke-20260524",
     "track": "nnue_native",
-    "hypothesis": "The Lichess eval DB provides a larger, balanced high-depth teacher source. First prove build.py can convert it directly to Bullet data without huge JSONL/text chains and train a small scratch smoke.",
-    "expected_rows": "about 46k from first 1M input rows with current bucket recipe",
+    "run_dir": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke-20260524",
+    "hypothesis": "The next native work should build broad policy/search supervision before more training. Start with a small reproducible Lichess-eval target smoke through build.py target-score.",
     "status": "configured",
-    "no_sprt": true
+    "no_training": true
   },
-  "create": {
-    "name": "native-bullet-lichess-eval-smoke-46k-wdl0",
-    "run_dir": "runs/native-bullet-lichess-eval-smoke-46k-wdl0",
-    "backend": "bullet",
-    "bullet_mode": "enyo",
-    "bullet_loader": "direct",
-    "bullet_lichess_eval_input": "/home/petter/code/cpp/chess/assets/lichess_db_eval.jsonl.zst",
-    "bullet_lichess_eval_buckets": "zero:zero:0:1:5000;pos_1_50:pos:1:50:5000;neg_1_50:neg:1:50:5000;pos_50_100:pos:50:100:5000;neg_50_100:neg:50:100:5000;pos_100_300:pos:100:300:5000;neg_100_300:neg:100:300:5000;pos_300_800:pos:300:800:5000;neg_300_800:neg:300:800:5000;pos_800_1600:pos:800:1600:2000;neg_800_1600:neg:800:1600:2000",
-    "bullet_lichess_eval_min_depth": 18,
-    "bullet_lichess_eval_min_knodes": 100000,
-    "bullet_lichess_eval_max_input_rows": 1000000,
-    "bullet_lichess_eval_unique_fen": true,
-    "bullet_lichess_eval_stop_when_full": false,
-    "bullet_lichess_eval_seed": 20260524,
-    "bullet_rows": 0,
-    "bullet_max_abs_cp": 1600,
-    "bullet_eval_scale": 400.0,
-    "bullet_enyo_input_buckets": 32,
-    "bullet_hidden": 1024,
-    "bullet_l2": 16,
-    "bullet_batch_size": 4096,
-    "bullet_batches": 64,
-    "bullet_superbatches": 32,
-    "bullet_save_rate": 8,
-    "bullet_wdl": 0.0,
-    "bullet_lr": 0.001,
-    "bullet_final_lr": 0.0003,
-    "trainable": "all",
-    "weight_decay": 0.0,
-    "init_net": "",
-    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+  "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
+  "target_score": {
+    "run_dir": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke-20260524",
+    "lichess_eval_input": "/home/petter/code/cpp/chess/assets/lichess_db_eval.jsonl.zst",
+    "lichess_eval_buckets": "zero:zero:0:1:40;pos_1_80:pos:1:80:50;neg_1_80:neg:1:80:50;pos_80_250:pos:80:250:50;neg_80_250:neg:80:250:50;pos_250_800:pos:250:800:35;neg_250_800:neg:250:800:35;pos_800_1200:pos:800:1200:20;neg_800_1200:neg:800:1200:20",
+    "lichess_eval_min_depth": 18,
+    "lichess_eval_min_knodes": 100000,
+    "lichess_eval_max_abs_cp": 1200,
+    "lichess_eval_max_input_rows": 1000000,
+    "lichess_eval_unique_fen": true,
+    "lichess_eval_seed": 20260524,
+    "lichess_eval_progress": 250000,
+    "scores_csv": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke-20260524/lichess_policy_scores.csv",
+    "search_targets_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke-20260524/lichess_policy_targets.jsonl",
+    "summary": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke-20260524/lichess_policy_targets.summary.txt",
+    "source_name": "lichess_eval_policy_smoke",
+    "engine": "/home/petter/local/bin/stockfish",
+    "nodes": 50000,
+    "hash": 128,
+    "threads": 1,
+    "min_ply": 16,
+    "max_targets": 120,
+    "max_abs_cp": 1200,
+    "score_progress": 20,
+    "seed": 20260524,
+    "max_moves": 12,
+    "policy_temperature_cp": 200.0,
+    "mate_gap_cp": 30000,
+    "dedupe_fen": true
   },
   "validation": {
-    "tmux": "nnue_native",
-    "expected_phases": [
-      "bullet_text",
-      "bullet_format",
-      "bullet_train"
-    ],
-    "post_run": [
-      "validate direct BulletFormat row count from bullet_format log",
-      "net_diff checkpoint 0/final against reference only for movement sanity",
-      "cheap 300k search gate only if smoke loss/export is sane"
-    ]
+    "inspect_before_training": true,
+    "expected_targets": "up to 120 positions after min-ply filtering",
+    "next_gate": "inspect source/tag/phase distribution and top-move gaps; do not train automatically"
   }
 }

@@ -130,6 +130,11 @@ and then builds a target JSONL:
 ./build.py -c build.json
 ```
 
+`target_score` can also set `lichess_eval_input`; `build.py` will import a
+filtered JSONL position sample before scoring legal moves. Use this for broad
+policy-target construction from `lichess_db_eval.jsonl.zst` without a separate
+ad hoc conversion step.
+
 Do not launch training from a new target set until the target distribution has
 been inspected.
 
