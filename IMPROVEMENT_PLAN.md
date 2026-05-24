@@ -84,8 +84,16 @@ Current next action:
   at load time.
 - require `bullet_enyo_input_buckets=32` for future native Bullet runs; use 16
   only for explicit legacy compatibility.
-- after the toolchain passes init/export parity for 32-bucket Bullet Enyo,
-  rerun only a short native checkpoint curve before considering more GPU time.
+- 32-bucket init/export parity passed in
+  `runs/bullet-enyo-32-init-roundtrip-20260524_031011`: exported size
+  `50368836`, and `net_diff --float-atol 1e-6 --fail-if-different` reported
+  zero changed tensors. Explicit 16-bucket legacy parity also passed in
+  `runs/bullet-enyo-16-init-roundtrip-20260524_031037`.
+- active smoke:
+  `native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048`.
+  It is the first true 32-bucket Bullet Enyo scratch run. Gate checkpoints
+  before any SPRT; stop immediately if the checkpoint curve is not materially
+  better than the prior legacy-layout native scratch runs.
 
 ## Latest Result
 
