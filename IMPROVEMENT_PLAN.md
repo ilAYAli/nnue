@@ -25,10 +25,10 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-`native-lichess-policy-targets-800-mc26-20260524`.
-This target-construction run is complete and has a reference baseline gate.
-Same-architecture native Bullet/SF-binpack training remains rejected pending a
-stronger data/objective plan.
+`native-bullet-enyo16-sfbinpack-smoke-eval400-lr1e3-sb2048`.
+This is the first bucket-ladder native run: scratch Enyo, 16 king buckets,
+Stockfish binpack, Bullet. It directly tests the small-data NNUE hypothesis
+that 32 input buckets are data-starved at our current scale.
 
 ## Track Definitions
 
@@ -47,6 +47,15 @@ stronger data/objective plan.
 - currently useful for background experiments, not promotion.
 
 ## Active Decision: 2026-05-24
+
+Update: the active native plan is now a bucket ladder, not another 32-bucket
+continuation. Start with the already-supported 16-bucket Enyo/Bullet path, using
+SF-binpack data and checkpoint gates only. If 16 improves gates, patch Bullet
+export/checkpoint tooling for 8/4/2/1 bucket rungs that export back to the
+standard 32-bucket runtime layout, preserving zero runtime overhead.
+
+Reckless remains paused until there is a new written hypothesis; the recent
+existing-weight architectural deltas were rejected by confirmation or smoke.
 
 Waste-control rule: do not start another NNUE training family from these
 families. Both active lanes rejected their current hypotheses.
@@ -96,15 +105,16 @@ Reckless lane:
 
 Current next action:
 
-- no active NNUE training or SPRT run is justified.
-- no current reckless candidate remains viable enough for 4k confirmation.
+- no Reckless training or SPRT run is justified until a new written hypothesis exists.
+- native work is limited to the bucket-ladder experiment described above.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
   documented/runtime native design is 32 buckets. That means older "native"
   Bullet `.nn` runs produced legacy-layout payloads that Enyo expanded at load
   time.
-- require `bullet_enyo_input_buckets=32` for future native Bullet runs; use 16
-  only for explicit legacy compatibility.
+- do not assume 32 buckets is the right scratch-training start. Use the bucket
+  ladder: first supported rung is 16 buckets; if it helps, add 8/4/2/1 training
+  support with export expanded back to the standard 32-bucket runtime layout.
 - 32-bucket init/export parity passed in
   `runs/bullet-enyo-32-init-roundtrip-20260524_031011`: exported size
   `50368836`, and `net_diff --float-atol 1e-6 --fail-if-different` reported
