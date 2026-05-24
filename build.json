@@ -3,13 +3,14 @@
   "metadata": {
     "experiment": "native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048",
     "track": "nnue_native",
-    "status": "active",
+    "status": "rejected",
+    "do_not_run": true,
     "hypothesis": "The previous native Bullet SF-binpack smokes used bullet_wdl=0.0. A WDL-aware objective is a proven NNUE recipe and may reduce scalar CP overfitting while keeping the 1-bucket feature geometry that gave the best low-data signal.",
     "data_source": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
     "init": "scratch quantized Bullet init; no Berserk initialization",
     "architecture": "1 training input bucket expanded to the 32-bucket Enyo runtime layout on export; hidden=1024, l2=16",
     "one_variable": "Change bullet_wdl from 0.0 to 0.75 relative to native-bullet-enyo1-sfbinpack-smoke-eval400-lr1e3-sb2048.",
-    "gate": "After checkpoint sweep, require clear improvement over the previous 1-bucket smoke on the 800-target external gate before any longer run. No SPRT unless broad/mate-like tails are sane."
+    "gate": "Rejected at checkpoint 512: all top1 185/800, candidate_better 59 vs reference_better 532, capped_sum_diff_cp -74484, worst_regression_cp -32000."
   },
   "create": {
     "name": "native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048",
@@ -43,8 +44,8 @@
     "trainable": "all"
   },
   "validation": {
-    "checkpoint_sweep": "Run checkpoints 512,1024,1536,2048 against the 800-target Lichess policy/search gate and compare to native-bullet-enyo1-sfbinpack-smoke-eval400-lr1e3-sb2048.",
-    "promotion": "Not eligible for SPRT unless candidate_better approaches reference_better, capped_sum_diff_cp improves materially, and mate-like worst regression is no longer catastrophic.",
-    "next": "If WDL is not clearly better than CP-only, stop this objective branch and move to larger/better data rather than retuning the same shape."
+    "checkpoint_sweep": "Stopped after live checkpoint 512 gate because it was much worse than the CP-only 1-bucket baseline.",
+    "promotion": "Not eligible for SPRT.",
+    "next": "Do not run this config again. Audit WDL/result semantics or move to better/larger data rather than retuning the same shape."
   }
 }

@@ -30,11 +30,17 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-policy-preserve64-lichess-w002-select-lr3e6-e80` is rejected.
+- `native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048` is
+  rejected.
 - Do not run the current `build.json`.
-- The last useful result was diagnostic only: target-only search-policy overfit
-  can move exported input/L1 and can exactly fit a 64-row policy slice, but
-  target preservation did not clear the predeclared gate and is not playable.
+- The WDL smoke was stopped after checkpoint 512 because the external gate was
+  much worse than the CP-only 1-bucket baseline: top1 `185/800`,
+  candidate_better `59` vs reference_better `532`, capped sum `-74484`, worst
+  regression `-32000`.
+- The last useful result remains diagnostic only: target-only search-policy
+  overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
+  but target preservation did not clear the predeclared gate and is not
+  playable.
 
 ## Closed Lanes
 
@@ -197,15 +203,16 @@ Reckless lane:
 Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
-- native has one active smoke config:
-  `native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048`.
-  This is not another scalar continuation. It tests one new objective variable:
-  prior native SF-binpack smokes used `bullet_wdl=0.0`, while this run uses
-  `bullet_wdl=0.75` on the best low-data 1-bucket scratch shape.
-- compare the checkpoint sweep directly against
-  `native-bullet-enyo1-sfbinpack-smoke-eval400-lr1e3-sb2048`; stop WDL-smoke
-  if it does not materially improve the 800-target external gate and mate-like
-  tail behavior.
+- native has no active training config.
+- `native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048` is
+  rejected. Checkpoint 512 scored top1 `185/800`, candidate_better `59` vs
+  reference_better `532`, capped sum `-74484`, worst regression `-32000`.
+  The comparable CP-only 1-bucket checkpoint 512 was much better at top1
+  `369/800`, candidate_better `93` vs reference_better `289`, capped sum
+  `-21127`.
+- do not sweep WDL on this source again until the SF-binpack result/WDL
+  semantics are audited. Heavy WDL mix (`bullet_wdl=0.75`) on this data is
+  currently a dead branch, not an improvement path.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
   documented/runtime native design is 32 buckets. That means older "native"
