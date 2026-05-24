@@ -111,6 +111,10 @@ def load_create_arg_defaults(path: str | Path | None) -> dict[str, object]:
     if not isinstance(create, dict):
         raise SystemExit(f"{config_path}: 'create' must be a JSON object")
 
+    if create.get("disabled"):
+        description = str(data.get("description") or "no active create config")
+        raise SystemExit(f"{config_path}: create config is disabled: {description}")
+
     allowed = {field.name for field in fields(DEFAULTS)}
     allowed.update({"name", "run_dir", "dry_run", "force", "event_command"})
     out: dict[str, object] = {"config": str(config_path)}
