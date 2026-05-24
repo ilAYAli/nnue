@@ -25,9 +25,9 @@ The main failure pattern is:
   native run was materially better than prior Enyo-selfplay scratch attempts.
 
 Current `build.json` state:
-No active training run. The true 8-runtime-bucket native smoke is rejected.
-Replace `build.json` only when the next attempt has a concrete new data-scale
-or architecture hypothesis and an explicit gate.
+No active training run. The filtered Lichess scalar native smoke is rejected.
+Replace `build.json` only when the next attempt has a concrete non-scalar
+data/objective or architecture hypothesis and an explicit gate.
 
 ## Track Definitions
 
@@ -96,6 +96,13 @@ Native lane:
   checkpoint was `1536`: all top1 `371/800`, `82` vs `277`, capped `-19627`,
   worst regression `-32000cp`; non-mate was `76` vs `268`, capped `-19431`.
   Checkpoints `512`, `1024`, and `2048` were also clear fails.
+- `native-bullet-lichess-filtered-5m-eval400-lr1e3-sb1024` is rejected.
+  This was a scratch native scalar run on a material-filtered, score-balanced
+  Lichess eval DB slice. The source import worked, writing `276830` rows from
+  the first `5M` input rows, but checkpoint `256` failed the 800-target
+  external gate decisively: all top1 `205/800`, `77` vs `519`, capped
+  `-7207724`, median nonzero `-257cp`, worst regression `-32000cp`. The
+  remaining checkpoint sweep was stopped.
 - `native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768` is rejected.
 - best checkpoint-sweep rows had positive capped sums but still retained
   mate-like catastrophic tails around `-31k cp`; e.g. checkpoint `12288`
@@ -141,7 +148,7 @@ Reckless lane:
 Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
-- native work has no active training config after the true 8-runtime-bucket
+- native work has no active training config after the filtered Lichess scalar
   rejection.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
@@ -210,6 +217,8 @@ Run directory: `runs/native-lichess-eval-audit-20260524`.
 Findings:
 
 - source: `/home/petter/code/cpp/chess/assets/lichess_db_eval.jsonl.zst`.
+- the source mostly has four-field FENs, so true ply is unavailable after
+  normalization; use material-count filters, not `min_ply`, for this source.
 - 100k-input smoke reached `10000` eligible rows after only `33367` input rows.
 - 1M-input balanced-bucket probe saw `186419` eligible rows and wrote `46392`
   sampled rows.
@@ -218,11 +227,17 @@ Findings:
 - all requested buckets up to `300-800cp` filled; rare `800-1600cp` buckets
   were naturally sparse (`712` positive, `680` negative from first 1M input
   rows).
+- material-filtered scalar audit
+  `runs/native-lichess-eval-filter-audit-20260524/import.log` wrote `276830`
+  Bullet-text rows from the first `5M` input rows using material count `10-30`,
+  depth `>=18`, knodes `>=100000`, and abs cp `<=1200`. Buckets up to
+  `25-100cp` filled; larger score buckets were sparse.
 
 Decision:
 
 - this is usable tooling, but not a proven training source.
-- the `46k` and `500k` scalar-training smokes both failed search gates badly.
+- the `46k`, `500k`, and material-filtered `276k` scalar-training smokes all
+  failed search gates badly.
 - do not scale Lichess eval scalar training without a new sampling/objective
   hypothesis.
 - do not create a huge JSONL -> Bullet text -> Bullet data chain as the normal
