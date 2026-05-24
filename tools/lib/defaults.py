@@ -136,6 +136,14 @@ class CandidateDefaults:
     bullet_sfbinpack_max_abs_cp: int = 10000
     bullet_sfbinpack_quiet_only: bool = True
     bullet_rows: int = 0
+    bullet_lichess_eval_input: str = ""
+    bullet_lichess_eval_buckets: str = ""
+    bullet_lichess_eval_min_depth: int = 18
+    bullet_lichess_eval_min_knodes: int = 100000
+    bullet_lichess_eval_max_input_rows: int = 0
+    bullet_lichess_eval_unique_fen: bool = True
+    bullet_lichess_eval_stop_when_full: bool = False
+    bullet_lichess_eval_seed: int = 1
     bullet_mode: str = "reckless"
     bullet_max_abs_cp: int = 1600
     bullet_manifest: str = "~/source/bullet/Cargo.toml"

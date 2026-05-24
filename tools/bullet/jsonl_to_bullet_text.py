@@ -24,6 +24,14 @@ def phase_scale_from_fen(fen: str) -> float:
     return (128.0 + float(phase)) / 128.0
 
 
+def categorical_result(value: float) -> float:
+    if value > 0.5:
+        return 1.0
+    if value < 0.5:
+        return 0.0
+    return 0.5
+
+
 def white_result_from_row(row: dict) -> float:
     result = row.get("result")
     if result == "1-0":
@@ -35,7 +43,8 @@ def white_result_from_row(row: dict) -> float:
 
     wdl = float(row.get("wdl", 0.5))
     stm = row["fen"].split()[1]
-    return wdl if stm == "w" else 1.0 - wdl
+    white_wdl = wdl if stm == "w" else 1.0 - wdl
+    return categorical_result(white_wdl)
 
 
 def convert(input_path: Path, output_path: Path, *, limit: int,

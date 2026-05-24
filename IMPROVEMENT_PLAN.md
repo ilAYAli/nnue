@@ -141,6 +141,9 @@ Decision:
 - next native work should add or use a streaming/one-time conversion path from
   Lichess eval rows to Bullet training data, then run a small smoke before any
   large native scratch training.
+- configured smoke: `native-bullet-lichess-eval-smoke-46k-wdl0`, using direct
+  Bullet text output from `import_lichess_eval.py`, categorical Bullet results,
+  `bullet_wdl=0.0`, and the first-1M-row balanced bucket recipe.
 
 ## Latest Result
 
