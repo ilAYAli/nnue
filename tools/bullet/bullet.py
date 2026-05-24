@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 ENYO_DEFAULT_INPUT_BUCKETS = 32
+ENYO_SUPPORTED_INPUT_BUCKETS = (1, 2, 4, 8, 16, 32)
 ENYO_PIECE_TYPES = 12
 ENYO_SQUARES = 64
 ENYO_HIDDEN = 1024
@@ -33,6 +34,65 @@ def enyo_network_size(input_buckets: int = ENYO_DEFAULT_INPUT_BUCKETS) -> int:
 
 
 ENYO_NETWORK_SIZE = enyo_network_size()
+
+ENYO_FEATURE_STRIDE = ENYO_PIECE_TYPES * ENYO_SQUARES
+ENYO_LEGACY_BUCKET_FOR_32 = (
+    0, 1, 2, 3, 4, 5, 6, 7,
+    8, 9, 10, 11, 8, 9, 10, 11,
+    12, 12, 13, 13, 12, 12, 13, 13,
+    14, 14, 15, 15, 14, 14, 15, 15,
+)
+
+
+def trim_bullet_checkpoint(raw: bytes, input_buckets: int) -> bytes:
+    network_size = enyo_network_size(input_buckets)
+    if len(raw) < network_size:
+        raise SystemExit(f"checkpoint is {len(raw)} bytes, expected at least {network_size}")
+    if len(raw) == network_size:
+        return raw
+    trailer = raw[network_size:]
+    expected = (b"bullet" * ((len(trailer) + 5) // 6))[:len(trailer)]
+    if trailer != expected:
+        raise SystemExit(f"checkpoint has unexpected {len(trailer)} byte trailer")
+    return raw[:network_size]
+
+
+def enyo_parent_bucket(target_bucket: int, input_buckets: int) -> int:
+    if input_buckets == ENYO_DEFAULT_INPUT_BUCKETS:
+        return target_bucket
+    if input_buckets not in ENYO_SUPPORTED_INPUT_BUCKETS:
+        raise SystemExit(f"unsupported Enyo input bucket count: {input_buckets}")
+    legacy_bucket = ENYO_LEGACY_BUCKET_FOR_32[target_bucket]
+    return legacy_bucket * input_buckets // 16
+
+
+def expand_enyo_input_buckets(raw: bytes, input_buckets: int) -> bytes:
+    raw = trim_bullet_checkpoint(raw, input_buckets)
+    if input_buckets == ENYO_DEFAULT_INPUT_BUCKETS:
+        return raw
+
+    source_features = input_buckets * ENYO_FEATURE_STRIDE
+    target_features = ENYO_DEFAULT_INPUT_BUCKETS * ENYO_FEATURE_STRIDE
+    feature_bytes = ENYO_HIDDEN * 2
+    source_l0_bytes = source_features * feature_bytes
+    target_l0_bytes = target_features * feature_bytes
+    rest = raw[source_l0_bytes:]
+    expanded = bytearray(target_l0_bytes + len(rest))
+
+    for target_bucket in range(ENYO_DEFAULT_INPUT_BUCKETS):
+        source_bucket = enyo_parent_bucket(target_bucket, input_buckets)
+        for offset in range(ENYO_FEATURE_STRIDE):
+            source_feature = source_bucket * ENYO_FEATURE_STRIDE + offset
+            target_feature = target_bucket * ENYO_FEATURE_STRIDE + offset
+            source_start = source_feature * feature_bytes
+            target_start = target_feature * feature_bytes
+            expanded[target_start:target_start + feature_bytes] = raw[
+                source_start:source_start + feature_bytes
+            ]
+
+    expanded[target_l0_bytes:] = rest
+    return bytes(expanded)
+
 
 def expand_path(value: str | Path) -> Path:
     return Path(os.path.expandvars(str(value))).expanduser().resolve()
@@ -272,17 +332,7 @@ def cmd_train(args: argparse.Namespace) -> int:
             raise SystemExit(f"no Bullet quantised.bin checkpoints found under {out_dir}")
         checkpoints.sort(key=lambda path: path.stat().st_mtime)
         model_path = out_dir.parent / "model.nn"
-        network_size = enyo_network_size(args.enyo_input_buckets)
-        raw = checkpoints[-1].read_bytes()
-        if len(raw) < network_size:
-            raise SystemExit(
-                f"{checkpoints[-1]} is {len(raw)} bytes, expected at least {network_size}")
-        if len(raw) > network_size:
-            trailer = raw[network_size:]
-            if trailer != (b"bullet" * ((len(trailer) + 5) // 6))[:len(trailer)]:
-                raise SystemExit(
-                    f"{checkpoints[-1]} has unexpected {len(trailer)} byte trailer")
-            raw = raw[:network_size]
+        raw = expand_enyo_input_buckets(checkpoints[-1].read_bytes(), args.enyo_input_buckets)
         model_path.write_bytes(raw)
         print(f"wrote {model_path}", flush=True)
     return 0
@@ -333,9 +383,9 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument(
         "--enyo-input-buckets",
         type=int,
-        choices=[16, 32],
+        choices=list(ENYO_SUPPORTED_INPUT_BUCKETS),
         default=ENYO_DEFAULT_INPUT_BUCKETS,
-        help="Enyo input king buckets. 32 matches the current runtime; 16 is legacy compatibility.",
+        help="Enyo training input king buckets. Values below 32 export expanded 32-bucket .nn files.",
     )
     train.add_argument("--eval-scale", type=float, default=400.0)
     train.add_argument("--save-rate", type=int, default=1)

@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from bullet.bullet import enyo_network_size
+from bullet.bullet import ENYO_SUPPORTED_INPUT_BUCKETS, expand_enyo_input_buckets
 from lib.defaults import DEFAULTS, repo_root
 from lib.events import emit_event
 
@@ -44,17 +44,7 @@ def checkpoint_files(checkpoint_dir: Path, selection: set[int] | None) -> list[P
 
 
 def export_enyo_net(checkpoint: Path, output: Path, input_buckets: int) -> None:
-    network_size = enyo_network_size(input_buckets)
-    raw = checkpoint.read_bytes()
-    if len(raw) < network_size:
-        raise SystemExit(
-            f"{checkpoint} is {len(raw)} bytes, expected at least {network_size}")
-    if len(raw) > network_size:
-        trailer = raw[network_size:]
-        expected = (b"bullet" * ((len(trailer) + 5) // 6))[:len(trailer)]
-        if trailer != expected:
-            raise SystemExit(f"{checkpoint} has unexpected {len(trailer)} byte trailer")
-        raw = raw[:network_size]
+    raw = expand_enyo_input_buckets(checkpoint.read_bytes(), input_buckets)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(raw)
 
@@ -135,7 +125,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--enyo-input-buckets",
         type=int,
-        choices=[16, 32],
+        choices=list(ENYO_SUPPORTED_INPUT_BUCKETS),
         default=32,
         help="Input bucket layout used by the Bullet Enyo checkpoints.",
     )

@@ -1288,7 +1288,7 @@ def add_create_args(
     parser.add_argument("--bullet-enyo-l0-std", type=float, default=value("bullet_enyo_l0_std", d.bullet_enyo_l0_std))
     parser.add_argument("--bullet-enyo-l1-std", type=float, default=value("bullet_enyo_l1_std", d.bullet_enyo_l1_std))
     parser.add_argument("--bullet-enyo-l1-export-scale", type=float, default=value("bullet_enyo_l1_export_scale", d.bullet_enyo_l1_export_scale))
-    parser.add_argument("--bullet-enyo-input-buckets", type=int, choices=[16, 32],
+    parser.add_argument("--bullet-enyo-input-buckets", type=int, choices=[1, 2, 4, 8, 16, 32],
                         default=value("bullet_enyo_input_buckets", d.bullet_enyo_input_buckets))
     parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
     parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
