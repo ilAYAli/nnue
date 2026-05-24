@@ -82,15 +82,27 @@ Reckless lane:
   over `4000` games.
 - close the checkbucket family. Do not run bucket 8 or another bucket-index
   sweep without a new architecture hypothesis.
+- `floathead_delta_020.nn` is rejected. It narrowly passed the external
+  Lichess-policy gate, but match smoke finished `-6.2 +/- 14.9 Elo`,
+  `LLR=-0.86/2.94`, `LOS=20.6%`, `draw=52.0%` over `1000` games. The
+  follow-up smoke failure mine found slightly more local wins than reference
+  (`33` vs `25`) but a negative capped result (`-275cp` at `100cp` cap) and
+  huge losing outliers (`worst_regression_cp=-31433`).
+- `reckless-enyo32-input-threshold-clampfix-lr3e4-sb16` is rejected. It was
+  the only recent exported-input-movement probe with a positive cheap cp16
+  search gate (`34` vs `30`, capped `+740`, worst regression `-125cp`), but
+  the 1k smoke finished `-10.8 +/- 14.4 Elo`, `LLR=-1.33/2.94`,
+  `LOS=7.1%`, `draw=55.3%`.
 
 Current next action:
 
-- no active NNUE training run is justified.
-- audit/fix the Bullet Enyo layout before spending more compute. The Bullet
-  Enyo trainer was hard-coded to the legacy 16-king-bucket input layout while
-  the documented/runtime native design is 32 buckets. That means recent
-  "native" Bullet `.nn` runs produced legacy-layout payloads that Enyo expanded
-  at load time.
+- no active NNUE training or SPRT run is justified.
+- no current reckless candidate remains viable enough for 4k confirmation.
+- the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
+  been hard-coded to the legacy 16-king-bucket input layout while the
+  documented/runtime native design is 32 buckets. That means older "native"
+  Bullet `.nn` runs produced legacy-layout payloads that Enyo expanded at load
+  time.
 - require `bullet_enyo_input_buckets=32` for future native Bullet runs; use 16
   only for explicit legacy compatibility.
 - 32-bucket init/export parity passed in
