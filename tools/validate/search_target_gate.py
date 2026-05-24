@@ -203,6 +203,11 @@ def summarize_compare(name: str, rows: list[dict[str, object]]) -> list[str]:
     ]
 
 
+def read_csv(path: Path) -> list[dict[str, object]]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
 def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
     if not rows:
         return
@@ -220,6 +225,11 @@ def main() -> int:
     parser.add_argument("--candidate-net", type=Path)
     parser.add_argument("--reference-engine", type=Path)
     parser.add_argument("--reference-net", type=Path)
+    parser.add_argument(
+        "--reference-csv",
+        type=Path,
+        help="Reuse a previously written reference.csv instead of rerunning reference search.",
+    )
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--nodes", type=int, default=100000)
     parser.add_argument("--threads", type=int, default=1)
@@ -232,6 +242,11 @@ def main() -> int:
         help="Do not send ucinewgame/isready before each target.",
     )
     args = parser.parse_args()
+
+    if args.reference_csv and (args.reference_net or args.reference_engine):
+        raise SystemExit(
+            "--reference-csv cannot be combined with --reference-net or "
+            "--reference-engine")
 
     targets = load_targets(args.targets.expanduser(), args.limit)
     out_dir = args.out_dir.expanduser()
@@ -246,12 +261,17 @@ def main() -> int:
         if name == "all" or name in {"mate_like", "non_mate"}:
             lines.extend(summarize_rows(name, rows))
             lines.append("")
-    if args.reference_net or args.reference_engine:
+    reference: list[dict[str, object]] | None = None
+    if args.reference_csv:
+        reference = read_csv(args.reference_csv.expanduser())
+    elif args.reference_net or args.reference_engine:
         ref_engine = args.reference_engine.expanduser() if args.reference_engine else args.engine.expanduser()
         reference = run_engine(ref_engine,
                                args.reference_net.expanduser() if args.reference_net else None,
                                targets, nodes=args.nodes, threads=args.threads,
                                hash_mb=args.hash, reset_game=not args.reuse_hash)
+
+    if reference is not None:
         write_csv(out_dir / "reference.csv", reference)
         comparisons = compare_rows(candidate, reference, cap=args.cap)
         write_csv(out_dir / "compare.csv", comparisons)

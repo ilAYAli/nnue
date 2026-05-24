@@ -26,9 +26,9 @@ The main failure pattern is:
 
 Current `build.json` state:
 `native-lichess-policy-targets-800-mc26-20260524`.
-This is target construction only, not training. Same-architecture native
-Bullet/SF-binpack training remains rejected pending a stronger data/objective
-plan.
+This target-construction run is complete and has a reference baseline gate.
+Same-architecture native Bullet/SF-binpack training remains rejected pending a
+stronger data/objective plan.
 
 ## Track Definitions
 
@@ -169,10 +169,21 @@ Decision:
 
 - material-count filtering is required for Lichess eval policy-target use; do
   not rely on `min_ply` for this source.
-- current configured next run is
-  `native-lichess-policy-targets-800-mc26-20260524`, an `800` target
-  construction scale-up only. Do not train from it until the target distribution
-  has been inspected.
+- `native-lichess-policy-targets-800-mc26-20260524` produced `800` targets /
+  `8833` child moves with no opening-tagged targets: `465` midgame, `244`
+  late, `91` endgame, `66` mate-like.
+- reference baseline at `300k` nodes is sane: `top1=506/800` (`63.2%`) and
+  `top3=690/800` (`86.2%`), with mate-like `top1=47/66` (`71.2%`).
+- native scratch checkpoint `12288` is rejected on this external gate:
+  `top1=387/800`; compare `90` vs `263`, capped `-18472`,
+  median nonzero `-32cp`, worst regression `-32000cp`.
+- reckless `bucket_7.nn` is rejected on this external gate despite the neutral
+  4k SPRT confirmation: `top1=185/800`; compare `56` vs `537`, capped
+  `-74691`, median nonzero `-211cp`, worst regression `-32000cp`.
+- do not train from these targets yet. Use the target set first as a cheap
+  external-policy sanity gate for future candidates.
+- `search_target_gate.py` now accepts `--reference-csv` so future candidate
+  sweeps can reuse the cached reference pass instead of rerunning it.
 
 ## Latest Result
 
