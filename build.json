@@ -4,8 +4,8 @@
     "experiment": "native-no-active-training-20260524",
     "track": "nnue_native",
     "hypothesis": "Do not spend more GPU on same-architecture native Bullet/SF-binpack continuation. The next run must change data scale materially or introduce an export-visible architecture hypothesis.",
-    "result": "32-bucket smoke, long scratch, tailmix, search-aware, and continuation families all failed checkpoint/search gates or mate-like tails.",
-    "decision": "no active native run; prepare a new plan before changing build.json back to an executable create config",
+    "result": "32-bucket smoke, long scratch, tailmix, search-aware, and continuation families all failed; Lichess eval audit found a viable larger data source, but conversion must avoid huge intermediates.",
+    "decision": "no active native run; next work is streaming/one-time Lichess-eval to Bullet-data conversion before training",
     "status": "paused",
     "no_sprt": true
   },
@@ -19,6 +19,7 @@
       "native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048",
       "native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768",
       "native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096"
-    ]
+    ],
+    "data_audit": "runs/native-lichess-eval-audit-20260524"
   }
 }
