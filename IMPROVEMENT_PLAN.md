@@ -177,9 +177,16 @@ Decision:
 - native scratch checkpoint `12288` is rejected on this external gate:
   `top1=387/800`; compare `90` vs `263`, capped `-18472`,
   median nonzero `-32cp`, worst regression `-32000cp`.
+- native scratch checkpoint `24576` is also rejected:
+  `top1=386/800`; compare `86` vs `249`, capped `-18489`,
+  median nonzero `-35cp`, worst regression `-32000cp`.
 - reckless `bucket_7.nn` is rejected on this external gate despite the neutral
   4k SPRT confirmation: `top1=185/800`; compare `56` vs `537`, capped
   `-74691`, median nonzero `-211cp`, worst regression `-32000cp`.
+- `floathead_delta_020.nn` passes the external gate narrowly but fails match
+  smoke: external gate `top1=508/800`, compare `69` vs `71`, capped `+400`;
+  smoke SPRT finished `-6.2 +/- 14.9 Elo`, `LLR=-0.86/2.94`, `LOS=20.6%`,
+  `draw=52.0%` over `1000` games.
 - do not train from these targets yet. Use the target set first as a cheap
   external-policy sanity gate for future candidates.
 - `search_target_gate.py` now accepts `--reference-csv` so future candidate
@@ -698,10 +705,10 @@ Do not restart these as near-term Elo lanes:
   `capped_sum_diff_cp=-1242`, mate-like `worst_regression_cp=-31082`).
   The old composite gate was a false positive.
 - `floathead_delta_020.nn` as a promotion candidate:
-  the current broad `300k` search-aware gate did not confirm the old `100k`
-  signal (`candidate_better=29`, `reference_better=33`,
-  `capped_sum_diff_cp=-173`, mate-like `worst_regression_cp=-31084`).
-  It has non-mate signal, but the mate-like tail is still a hard veto.
+  the external Lichess-policy gate is slightly positive (`top1=508/800`,
+  compare `69` vs `71`, capped `+400`) but match smoke rejected it:
+  `-6.2 +/- 14.9 Elo`, `LLR=-0.86/2.94`, `LOS=20.6%`, `draw=52.0%`
+  over `1000` games. Do not run 4k confirmation.
 - shared mate-like tail diagnosis:
   `reckless-shared-tail-diagnosis-20260523_085539` showed the worst FEN is a
   horizon/target mismatch for Enyo search. Stockfish ranks `e5e6` clearly best
