@@ -1,46 +1,30 @@
 {
-  "description": "Native Enyo 8-runtime-bucket Bullet/SF-binpack smoke. This tests a true low-bucket runtime architecture instead of training low buckets and expanding them at load time.",
+  "description": "No active training run. The true 8-runtime-bucket native smoke is rejected; replace this config with a concrete new data-scale or architecture hypothesis before running build.py create.",
   "metadata": {
     "experiment": "native-bullet-enyo8-runtime-sfbinpack-smoke",
     "track": "nnue_native",
+    "status": "rejected",
     "hypothesis": "A true 8-king-bucket runtime net may reduce bucket starvation and improve early native scratch behavior compared with 16/32-bucket layouts. The engine is compiled for 8 buckets, so the exported net is not expanded at load time.",
     "baseline": "native-bullet-enyo16-sfbinpack-smoke-eval400-lr1e3-sb2048",
-    "constraints": [
-      "no existing-net initialization",
-      "Bullet sfbinpack loader",
-      "runtime buckets must match the 8-bucket Enyo engine",
-      "bucket count is compile-time selected in the engine, not runtime-dispatched"
-    ]
+    "reason": "best checkpoint 1536 failed the 800-target gate: all 82 vs 277, capped -19627, worst -32000"
   },
   "create": {
+    "disabled": true,
     "name": "native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048",
-    "run_dir": "runs/native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048",
-    "backend": "bullet",
-    "init_net": null,
-    "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
-    "bullet_loader": "sfbinpack",
-    "bullet_sfbinpack_buffer_mb": 1024,
-    "bullet_sfbinpack_min_ply": 16,
-    "bullet_sfbinpack_max_abs_cp": 10000,
-    "bullet_sfbinpack_quiet_only": true,
-    "bullet_mode": "enyo",
-    "bullet_hidden": 1024,
-    "bullet_l2": 16,
-    "bullet_batch_size": 4096,
-    "bullet_batches": 64,
-    "bullet_superbatches": 2048,
-    "bullet_threads": 8,
-    "bullet_wdl": 0.0,
-    "bullet_lr": 0.001,
-    "bullet_final_lr": 0.0003,
-    "bullet_enyo_input_buckets": 8,
-    "bullet_enyo_runtime_input_buckets": 8,
-    "bullet_eval_scale": 400.0,
-    "bullet_save_rate": 512,
-    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+    "run_dir": "runs/native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048"
   },
   "validation": {
-    "first_gate": "checkpoint sweep at 0,512,1024,1536,2048 on the 800-target lichess policy gate using the 8-bucket engine",
-    "promotion": "no SPRT unless checkpoint gate is materially better than the prior expanded low-bucket smokes and failure replay is clean"
+    "gate": "800-target Lichess-policy checkpoint sweep",
+    "promotion": "not eligible for SPRT"
+  },
+  "next_hypothesis": {
+    "lane": "nnue_native",
+    "intent": "stop same-data scalar bucket-count and hidden-width smoke runs; next work needs either materially larger/better training data or a new architecture objective with a measurable reason to improve search move choice",
+    "constraints": [
+      "no Berserk initialization for native runs",
+      "Bullet/binpack training path",
+      "no runtime dispatch overhead for the selected net",
+      "no training before build.json names the concrete hypothesis and gate"
+    ]
   }
 }
