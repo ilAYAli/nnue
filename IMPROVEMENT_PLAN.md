@@ -55,6 +55,24 @@ SPRT candidate yet.
 - currently useful for background experiments, not promotion.
 
 
+
+## Active Experiment: Low-Pressure Enyo32 Input Divergence
+
+`reckless-enyo32-existing-input-lr2e7-sb256` repeats the existing-weight true-32 input-only test at much lower
+pressure (`lr=2e-7 -> 5e-8`, `256` superbatches).
+
+Purpose: determine whether the previous catastrophic result was just too much
+input movement, or whether any exported 32-bucket input divergence from the
+existing net is broadly unsafe.
+
+Rules:
+
+- no scratch initialization.
+- train only input accumulator tensors.
+- inspect net-diff at checkpoints `64`, `128`, and `256`.
+- run the 300k-node search gate only if exported movement is nonzero and small.
+- no SPRT unless search gates and failure-suite replay are clean.
+
 ## Latest Result: Existing-Weight Enyo32 Input Divergence
 
 Rejected `reckless-enyo32-existing-input-lr1e5-sb1024`:
