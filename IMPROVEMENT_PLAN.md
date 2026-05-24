@@ -890,6 +890,14 @@ Do not restart these as near-term Elo lanes:
   `l1_weights changed=2278/32768`), but the final exported policy gate missed
   the required retention (`57/64`, required `60/64`). One lower-preservation
   retry is allowed before stopping this family.
+- native Lichess policy preservation retry:
+  `native-policy-preserve64-lichess-w002-select-lr3e6-e80` also rejected. The
+  target-best checkpoint was epoch `45` with `61/64` top1, `63/64` top3,
+  `sum_gap_cp=14`, `worst_gap_cp=12`; exported `model.nn` matched `model.pt`,
+  but the predeclared gate was `62/64`. It moved exported representation
+  tensors (`input_weights changed=4667621/25165824`,
+  `l1_weights changed=2621/32768`) but still did not produce a broad-gateable
+  candidate. Stop this target-only preservation family.
 
 ## Promotion Gates
 
@@ -914,10 +922,9 @@ The next action should be one of these, in order:
    changes more than the final dense/output terms.
 2. Stop sparse/input LR multiplier sweeps on the small failure-derived target
    set. It is too small and too brittle to move exported representation safely.
-3. Run exactly one lower-preservation native policy retry:
-   `native-policy-preserve64-lichess-w002-select-lr3e6-e80`. It must pass the
-   CPU exported model gate at `62/64` before any broad engine gate. If it fails,
-   stop this target-only preservation family.
+3. Stop target-only native policy preservation after
+   `native-policy-preserve64-lichess-w002-select-lr3e6-e80` missed the
+   predeclared exported model gate (`61/64`, required `62/64`).
 4. Stop the broad-target search-aware native config family after the teacher-
    preserved retry also failed static and broad search gates.
 5. Do not continue the native baseline with the same architecture/data recipe.
