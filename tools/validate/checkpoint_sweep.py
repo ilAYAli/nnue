@@ -153,8 +153,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--l2", type=int, default=16)
     parser.add_argument("--targets", required=True)
     parser.add_argument("--engine", required=True)
-    parser.add_argument("--reference-net", required=True)
+    parser.add_argument("--reference-net")
     parser.add_argument("--reference-engine")
+    parser.add_argument(
+        "--reference-csv",
+        help="Reuse a previously written search_target_gate reference.csv.",
+    )
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--nodes", type=int, default=300000)
     parser.add_argument("--threads", type=int, default=1)
@@ -180,7 +184,10 @@ def main() -> int:
     targets = expand_user(args.targets).resolve()
     engine = expand_user(args.engine).resolve()
     reference_engine = expand_user(args.reference_engine).resolve() if args.reference_engine else engine
-    reference_net = expand_user(args.reference_net).resolve()
+    reference_net = expand_user(args.reference_net).resolve() if args.reference_net else None
+    reference_csv = expand_user(args.reference_csv).resolve() if args.reference_csv else None
+    if reference_csv is None and reference_net is None:
+        raise SystemExit("--reference-net is required unless --reference-csv is set")
     python = str(expand_user(args.python))
     search_gate = repo_root() / "tools" / "validate" / "search_target_gate.py"
 
@@ -199,7 +206,10 @@ def main() -> int:
     with run_log.open("w", encoding="utf-8") as handle:
         handle.write(f"checkpoint_dir={checkpoint_dir}\n")
         handle.write(f"targets={targets}\n")
-        handle.write(f"reference_net={reference_net}\n")
+        if reference_csv is not None:
+            handle.write(f"reference_csv={reference_csv}\n")
+        else:
+            handle.write(f"reference_net={reference_net}\n")
         handle.write(f"nodes={args.nodes}\n")
 
     for checkpoint in checkpoint_files(checkpoint_dir, selected):
@@ -228,8 +238,6 @@ def main() -> int:
             "--targets", str(targets),
             "--engine", str(engine),
             "--candidate-net", str(net),
-            "--reference-engine", str(reference_engine),
-            "--reference-net", str(reference_net),
             "--out-dir", str(gate_dir),
             "--nodes", str(args.nodes),
             "--threads", str(args.threads),
@@ -237,6 +245,14 @@ def main() -> int:
             "--limit", str(args.limit),
             "--cap", str(args.cap),
         ]
+        if reference_csv is not None:
+            command.extend(["--reference-csv", str(reference_csv)])
+        else:
+            assert reference_net is not None
+            command.extend([
+                "--reference-engine", str(reference_engine),
+                "--reference-net", str(reference_net),
+            ])
         emit_event(
             run_dir, "phase_start", stage=stage, status="running",
             command=command, hook_command=args.event_command or "",
