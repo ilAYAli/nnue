@@ -1,14 +1,12 @@
 {
-  "description": "Native lane: true 32-bucket Bullet Enyo scratch smoke rejected by checkpoint gates.",
+  "description": "Native lane: no training run configured; same-architecture Bullet SF-binpack native runs are rejected pending a new architecture or data-scale plan.",
   "metadata": {
-    "experiment": "native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048",
+    "experiment": "native-no-active-training-20260524",
     "track": "nnue_native",
-    "hypothesis": "Previous native Bullet runs exported legacy 16-bucket nets. A short 32-bucket scratch curve should verify whether the current runtime layout learns at least as well before any larger native run.",
-    "result": "training completed and exported full-size 32-bucket checkpoints, but 512 and 1024 failed the 300k-node search gate catastrophically",
-    "checkpoint_512": "all 34 vs 150, capped -18672, worst -31837cp, top1 27/232",
-    "checkpoint_1024": "all 35 vs 142, capped -17815, worst -31803cp, top1 43/232",
-    "decision": "reject; no SPRT and no continuation of same-architecture 32-bucket scratch without a larger data-scale plan or different objective",
-    "status": "rejected",
+    "hypothesis": "Do not spend more GPU on same-architecture native Bullet/SF-binpack continuation. The next run must change data scale materially or introduce an export-visible architecture hypothesis.",
+    "result": "32-bucket smoke, long scratch, tailmix, search-aware, and continuation families all failed checkpoint/search gates or mate-like tails.",
+    "decision": "no active native run; prepare a new plan before changing build.json back to an executable create config",
+    "status": "paused",
     "no_sprt": true
   },
   "create": {
@@ -16,10 +14,11 @@
   },
   "validation": {
     "tmux": "nnue_native",
-    "completed_checks": [
+    "rejected_families": [
       "32-bucket init/export parity",
-      "training exported 50368836-byte native .nn payloads",
-      "300k-node checkpoint gate for 512 and 1024"
+      "native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048",
+      "native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768",
+      "native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096"
     ]
   }
 }
