@@ -55,18 +55,25 @@ SPRT candidate yet.
 - currently useful for background experiments, not promotion.
 
 
-## Active Experiment: Existing-Weight Enyo32 Input Divergence
+## Latest Result: Existing-Weight Enyo32 Input Divergence
 
-`reckless-enyo32-existing-input-lr1e5-sb1024` is the next reckless-lane test. It is not native scratch.
+Rejected `reckless-enyo32-existing-input-lr1e5-sb1024`:
 
-- initialize from the current existing Enyo net.
-- export/train true 32-bucket Bullet Enyo input tensors.
-- train only the input accumulator weights (`trainable=input`).
-- keep dense/output tensors fixed to isolate bucket-localized feature movement.
-- run checkpoint search gates before any SPRT.
+- this was a reckless-lane test, not native scratch. It initialized from the
+  current existing Enyo net, expanded it to true 32 Bullet Enyo input buckets,
+  and trained only input accumulator tensors.
+- checkpoint `0` was exact export parity after 16->32 expansion:
+  no changed input, L1, L2, or output tensors.
+- checkpoint `256` moved only the intended exported tensors:
+  `input_weights 505/25165824`, `input_biases 7/1024`; L1/L2/output unchanged.
+- checkpoint `256` failed the 300k-node search gate badly:
+  all `36` vs `140`, capped `-18181`, worst `-31837cp`;
+  mate-like `26` vs `36`, capped `-3626`, worst `-31837cp`;
+  non-mate `10` vs `104`, capped `-14555`, worst `-701cp`.
 
-Stop conditions: zero exported input movement, broad search-target regression,
-failure-suite tail regression, or neutral/negative smoke-SPRT after clean gates.
+Decision: reject. True 32-bucket existing-weight input-only movement is possible
+after the Bullet layout fix, but this LR/pressure immediately destroys broad
+move-choice behavior. No SPRT and no later-checkpoint sweep for this run.
 
 ## Latest Result: Reckless Check-Bucket Bucket Sweep
 

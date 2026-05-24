@@ -1,51 +1,27 @@
 {
-  "description": "Reckless lane: existing-weight true 32-bucket Bullet Enyo input-only divergence smoke.",
+  "description": "Reckless lane: existing-weight true 32-bucket input-only divergence rejected by checkpoint gate.",
   "metadata": {
     "experiment": "reckless-enyo32-existing-input-lr1e5-sb1024",
     "track": "nnue_reckless",
-    "hypothesis": "Expand the current existing 16-bucket Enyo net into true 32 Bullet Enyo input buckets and train only the input accumulator weights. If king-localized bucket divergence is useful, the duplicate bucket halves should move while the dense head stays fixed.",
-    "why_now": "Previous native Bullet Enyo runs were legacy 16-bucket exports. The toolchain now supports true 32-bucket init/export parity, so this tests the existing-weight near-term lane without scratch training.",
-    "guardrails": [
-      "existing-weight initialization only; not a native scratch run",
-      "trainable=input only; do not drift dense/output tensors in this smoke",
-      "checkpoint gate before any SPRT",
-      "reject if net diff is zero or if broad search/failure tails regress"
-    ],
-    "status": "configured"
+    "hypothesis": "Expand the current existing 16-bucket Enyo net into true 32 Bullet Enyo input buckets and train only the input accumulator weights.",
+    "result": "checkpoint 0 was exact parity, checkpoint 256 moved only input tensors but failed the 300k-node search gate catastrophically",
+    "checkpoint_0": "net_diff exact parity vs reference after 16->32 expansion",
+    "checkpoint_256_net_diff": "input_weights 505/25165824 changed, input_biases 7/1024 changed; l1/l2/output unchanged",
+    "checkpoint_256_gate": "all 36 vs 140, capped -18181, worst -31837; mate_like 26 vs 36, capped -3626, worst -31837; non_mate 10 vs 104, capped -14555, worst -701",
+    "decision": "reject; no SPRT and no later-checkpoint sweep needed for this LR/pressure",
+    "status": "rejected"
   },
   "create": {
-    "name": "reckless-enyo32-existing-input-lr1e5-sb1024",
-    "run_dir": "/home/petter/code/cpp/chess/nnue_reckless/runs/reckless-enyo32-existing-input-lr1e5-sb1024",
-    "backend": "bullet",
-    "bullet_mode": "enyo",
-    "bullet_data": "/home/petter/code/cpp/chess/assets/test79-may2022-16tb7p-filter-v6-dd.min-mar2023.unmin.high-simple-eval-1k.min-v2.binpack",
-    "bullet_loader": "sfbinpack",
-    "bullet_sfbinpack_min_ply": 16,
-    "bullet_sfbinpack_quiet_only": true,
-    "bullet_sfbinpack_buffer_mb": 1024,
-    "bullet_enyo_input_buckets": 32,
-    "init_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "trainable": "input",
-    "bullet_wdl": 0.75,
-    "bullet_eval_scale": 400.0,
-    "bullet_lr": 1e-05,
-    "bullet_final_lr": 2e-06,
-    "weight_decay": 0.0,
-    "bullet_batch_size": 4096,
-    "bullet_batches": 64,
-    "bullet_superbatches": 1024,
-    "bullet_save_rate": 256,
-    "bullet_threads": 4
+    "disabled": true
   },
   "validation": {
     "tmux": "nnue_reckless",
-    "post_train_gate": {
-      "tool": "tools/validate/checkpoint_sweep.py",
-      "targets": "/home/petter/code/cpp/chess/nnue/assets/failure_suite/search_aware_targets_20260523.jsonl",
-      "nodes": 300000,
-      "checkpoints": "0,256,512,768,1024",
-      "reference_net": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-      "enyo_input_buckets": 32
-    }
+    "completed_checks": [
+      "build/train completed",
+      "checkpoint 0 export parity",
+      "checkpoint 256 exported net diff",
+      "checkpoint 256 300k-node search gate"
+    ],
+    "ignored_failure": "checkpoint_0 failure notification came from a duplicate post-train sweep killed after the real 256-only gate was already running"
   }
 }
