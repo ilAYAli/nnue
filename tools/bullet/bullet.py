@@ -343,6 +343,7 @@ def cmd_train(args: argparse.Namespace) -> int:
         "ENYO_BULLET_ENYO_L0_STD": str(args.enyo_l0_std),
         "ENYO_BULLET_ENYO_L1_STD": str(args.enyo_l1_std),
         "ENYO_BULLET_ENYO_L1_EXPORT_SCALE": str(args.enyo_l1_export_scale),
+        "ENYO_BULLET_ENYO_INPUT_FACTORISER": "1" if args.enyo_input_factorizer else "0",
         "ENYO_BULLET_ENYO_INPUT_BUCKETS": str(args.enyo_input_buckets),
         "ENYO_BULLET_ENYO_RUNTIME_INPUT_BUCKETS": str(args.enyo_runtime_input_buckets),
         "ENYO_BULLET_EVAL_SCALE": str(args.eval_scale),
@@ -432,6 +433,12 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--enyo-l0-std", type=float, default=8.0)
     train.add_argument("--enyo-l1-std", type=float, default=1.0)
     train.add_argument("--enyo-l1-export-scale", type=float, default=1.0)
+    train.add_argument(
+        "--enyo-input-factorizer",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Train a shared (piece,square) input factorizer folded into exported Enyo l0w.",
+    )
     train.add_argument(
         "--enyo-input-buckets",
         type=int,
