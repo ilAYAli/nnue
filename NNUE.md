@@ -88,7 +88,9 @@ goal     = produce and improve Enyo-owned weights over time
 ```
 
 Bullet may be used as a faster trainer, but native experiments must export a
-normal Enyo `model.nn` with `--bullet-mode enyo`.
+normal Enyo `model.nn` with `--bullet-mode enyo` and
+`--bullet-enyo-input-buckets 32`. The 16-bucket Bullet path is legacy
+compatibility only.
 
 ## Compatibility Experiments
 

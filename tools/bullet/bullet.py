@@ -9,21 +9,30 @@ import shutil
 import subprocess
 import sys
 
-ENYO_FEATURES = 16 * 12 * 64
+ENYO_DEFAULT_INPUT_BUCKETS = 32
+ENYO_PIECE_TYPES = 12
+ENYO_SQUARES = 64
 ENYO_HIDDEN = 1024
 ENYO_L1 = 2 * ENYO_HIDDEN
 ENYO_L2 = 16
 ENYO_L3 = 32
-ENYO_NETWORK_SIZE = (
-    ENYO_FEATURES * ENYO_HIDDEN * 2
-    + ENYO_HIDDEN * 2
-    + ENYO_L1 * ENYO_L2
-    + ENYO_L2 * 4
-    + ENYO_L2 * ENYO_L3 * 4
-    + ENYO_L3 * 4
-    + ENYO_L3 * 4
-    + 4
-)
+
+
+def enyo_network_size(input_buckets: int = ENYO_DEFAULT_INPUT_BUCKETS) -> int:
+    features = input_buckets * ENYO_PIECE_TYPES * ENYO_SQUARES
+    return (
+        features * ENYO_HIDDEN * 2
+        + ENYO_HIDDEN * 2
+        + ENYO_L1 * ENYO_L2
+        + ENYO_L2 * 4
+        + ENYO_L2 * ENYO_L3 * 4
+        + ENYO_L3 * 4
+        + ENYO_L3 * 4
+        + 4
+    )
+
+
+ENYO_NETWORK_SIZE = enyo_network_size()
 
 def expand_path(value: str | Path) -> Path:
     return Path(os.path.expandvars(str(value))).expanduser().resolve()
@@ -231,6 +240,7 @@ def cmd_train(args: argparse.Namespace) -> int:
         "ENYO_BULLET_ENYO_L0_STD": str(args.enyo_l0_std),
         "ENYO_BULLET_ENYO_L1_STD": str(args.enyo_l1_std),
         "ENYO_BULLET_ENYO_L1_EXPORT_SCALE": str(args.enyo_l1_export_scale),
+        "ENYO_BULLET_ENYO_INPUT_BUCKETS": str(args.enyo_input_buckets),
         "ENYO_BULLET_EVAL_SCALE": str(args.eval_scale),
         "ENYO_BULLET_SAVE_RATE": str(args.save_rate),
         "ENYO_BULLET_EXPORT_INIT_ONLY": "1" if args.export_init_only else "0",
@@ -262,16 +272,17 @@ def cmd_train(args: argparse.Namespace) -> int:
             raise SystemExit(f"no Bullet quantised.bin checkpoints found under {out_dir}")
         checkpoints.sort(key=lambda path: path.stat().st_mtime)
         model_path = out_dir.parent / "model.nn"
+        network_size = enyo_network_size(args.enyo_input_buckets)
         raw = checkpoints[-1].read_bytes()
-        if len(raw) < ENYO_NETWORK_SIZE:
+        if len(raw) < network_size:
             raise SystemExit(
-                f"{checkpoints[-1]} is {len(raw)} bytes, expected at least {ENYO_NETWORK_SIZE}")
-        if len(raw) > ENYO_NETWORK_SIZE:
-            trailer = raw[ENYO_NETWORK_SIZE:]
+                f"{checkpoints[-1]} is {len(raw)} bytes, expected at least {network_size}")
+        if len(raw) > network_size:
+            trailer = raw[network_size:]
             if trailer != (b"bullet" * ((len(trailer) + 5) // 6))[:len(trailer)]:
                 raise SystemExit(
                     f"{checkpoints[-1]} has unexpected {len(trailer)} byte trailer")
-            raw = raw[:ENYO_NETWORK_SIZE]
+            raw = raw[:network_size]
         model_path.write_bytes(raw)
         print(f"wrote {model_path}", flush=True)
     return 0
@@ -319,6 +330,13 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--enyo-l0-std", type=float, default=8.0)
     train.add_argument("--enyo-l1-std", type=float, default=1.0)
     train.add_argument("--enyo-l1-export-scale", type=float, default=1.0)
+    train.add_argument(
+        "--enyo-input-buckets",
+        type=int,
+        choices=[16, 32],
+        default=ENYO_DEFAULT_INPUT_BUCKETS,
+        help="Enyo input king buckets. 32 matches the current runtime; 16 is legacy compatibility.",
+    )
     train.add_argument("--eval-scale", type=float, default=400.0)
     train.add_argument("--save-rate", type=int, default=1)
     train.add_argument("--init-weights", default="")

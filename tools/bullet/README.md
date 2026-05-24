@@ -1,7 +1,7 @@
 # Bullet Backend
 
 Experimental backend for testing Bullet-trained NNUE architectures with Enyo
-scored JSONL data.
+data.
 
 Normal entry point:
 
@@ -56,10 +56,9 @@ l0b  i16  [768]
 l1w  i8   [128, 768]
 ```
 
-A real Bullet-trained candidate now needs speed work on the Enyo
-evaluator/head path, or a Bullet trainer configured to save exactly Enyo's
-current layout if the goal is faster tooling rather than a different
-architecture.
+`bullet_mode=enyo` exports normal Enyo `.nn` files. Use
+`--enyo-input-buckets 32` for the current native runtime layout. Use `16` only
+for explicit legacy compatibility.
 
 On RTX 50-series GPUs with CUDA 12.4, `--bullet-cuda-arch auto` patches Bullet's
 cached CUDA runtime to use `compute_90`, because NVRTC rejects `sm_120`.
