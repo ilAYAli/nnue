@@ -179,6 +179,15 @@ def result_wdl(score: int, scale: float) -> float:
     return 1.0 / (1.0 + math.exp(-score / scale))
 
 
+def phase_scale_from_fen(fen: str) -> float:
+    board = fen.split()[0]
+    minors = sum(1 for ch in board if ch in "NnBb")
+    rooks = sum(1 for ch in board if ch in "Rr")
+    queens = sum(1 for ch in board if ch in "Qq")
+    phase = 3 * minors + 5 * rooks + 10 * queens
+    return (128.0 + float(phase)) / 128.0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
@@ -200,7 +209,13 @@ def main() -> None:
                     help="Stop once all bucket reservoirs are full. Faster, "
                          "but biased toward earlier input rows.")
     ap.add_argument("--progress", type=int, default=100000)
+    ap.add_argument("--output-format", choices=("jsonl", "bullet-text"),
+                    default="jsonl")
+    ap.add_argument("--enyo-runtime-target", action="store_true",
+                    help="For bullet-text output, pre-divide cp labels by "
+                         "Enyo's runtime phase scale.")
     args = ap.parse_args()
+    output_format = str(args.output_format)
     if args.bucket and args.rows:
         raise SystemExit("--rows is only valid without --bucket; put row "
                          "counts in the bucket specs")
@@ -229,6 +244,8 @@ def main() -> None:
         "seed": args.seed,
         "eligible": 0,
         "skipped_no_bucket": 0,
+        "output_format": output_format,
+        "enyo_runtime_target": bool(args.enyo_runtime_target),
     }
     seen_fens: set[str] = set()
 
@@ -283,7 +300,20 @@ def main() -> None:
                     "teacher_depth": int(entry.get("depth") or 0),
                     "teacher_knodes": int(entry.get("knodes") or 0),
                 }
-                out_line = json.dumps(out_row, separators=(",", ":"))
+                if output_format == "bullet-text":
+                    bullet_score = white_score
+                    if args.enyo_runtime_target:
+                        bullet_score = int(round(
+                            bullet_score / phase_scale_from_fen(fen)))
+                    if white_score > 0:
+                        bullet_result = 1.0
+                    elif white_score < 0:
+                        bullet_result = 0.0
+                    else:
+                        bullet_result = 0.5
+                    out_line = f"{fen} | {bullet_score} | {bullet_result:.1f}"
+                else:
+                    out_line = json.dumps(out_row, separators=(",", ":"))
                 stats["eligible"] += 1
 
                 if buckets:

@@ -1,25 +1,56 @@
 {
-  "description": "Native lane: no training run configured; same-architecture Bullet SF-binpack native runs are rejected pending a new architecture or data-scale plan.",
+  "description": "Native lane smoke: import high-depth Lichess eval DB rows directly to BulletFormat and run a short Enyo scratch train. This validates the data path only; it is not a promotion candidate.",
   "metadata": {
-    "experiment": "native-no-active-training-20260524",
+    "experiment": "native-bullet-lichess-eval-smoke-46k-wdl0",
     "track": "nnue_native",
-    "hypothesis": "Do not spend more GPU on same-architecture native Bullet/SF-binpack continuation. The next run must change data scale materially or introduce an export-visible architecture hypothesis.",
-    "result": "32-bucket smoke, long scratch, tailmix, search-aware, and continuation families all failed; Lichess eval audit found a viable larger data source, but conversion must avoid huge intermediates.",
-    "decision": "no active native run; next work is streaming/one-time Lichess-eval to Bullet-data conversion before training",
-    "status": "paused",
+    "hypothesis": "The Lichess eval DB provides a larger, balanced high-depth teacher source. First prove build.py can convert it directly to Bullet data without huge JSONL/text chains and train a small scratch smoke.",
+    "expected_rows": "about 46k from first 1M input rows with current bucket recipe",
+    "status": "configured",
     "no_sprt": true
   },
   "create": {
-    "disabled": true
+    "name": "native-bullet-lichess-eval-smoke-46k-wdl0",
+    "run_dir": "runs/native-bullet-lichess-eval-smoke-46k-wdl0",
+    "backend": "bullet",
+    "bullet_mode": "enyo",
+    "bullet_loader": "direct",
+    "bullet_lichess_eval_input": "/home/petter/code/cpp/chess/assets/lichess_db_eval.jsonl.zst",
+    "bullet_lichess_eval_buckets": "zero:zero:0:1:5000;pos_1_50:pos:1:50:5000;neg_1_50:neg:1:50:5000;pos_50_100:pos:50:100:5000;neg_50_100:neg:50:100:5000;pos_100_300:pos:100:300:5000;neg_100_300:neg:100:300:5000;pos_300_800:pos:300:800:5000;neg_300_800:neg:300:800:5000;pos_800_1600:pos:800:1600:2000;neg_800_1600:neg:800:1600:2000",
+    "bullet_lichess_eval_min_depth": 18,
+    "bullet_lichess_eval_min_knodes": 100000,
+    "bullet_lichess_eval_max_input_rows": 1000000,
+    "bullet_lichess_eval_unique_fen": true,
+    "bullet_lichess_eval_stop_when_full": false,
+    "bullet_lichess_eval_seed": 20260524,
+    "bullet_rows": 0,
+    "bullet_max_abs_cp": 1600,
+    "bullet_eval_scale": 400.0,
+    "bullet_enyo_input_buckets": 32,
+    "bullet_hidden": 1024,
+    "bullet_l2": 16,
+    "bullet_batch_size": 4096,
+    "bullet_batches": 64,
+    "bullet_superbatches": 32,
+    "bullet_save_rate": 8,
+    "bullet_wdl": 0.0,
+    "bullet_lr": 0.001,
+    "bullet_final_lr": 0.0003,
+    "trainable": "all",
+    "weight_decay": 0.0,
+    "init_net": "",
+    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "tmux": "nnue_native",
-    "rejected_families": [
-      "32-bucket init/export parity",
-      "native-bullet-enyo32-sfbinpack-smoke-eval400-lr1e3-sb2048",
-      "native-bullet-sfbinpack-scratch-long-eval400-lr1e3-sb32768",
-      "native-bullet-sfbinpack-tailmix-12288-lr1e5-sb4096"
+    "expected_phases": [
+      "bullet_text",
+      "bullet_format",
+      "bullet_train"
     ],
-    "data_audit": "runs/native-lichess-eval-audit-20260524"
+    "post_run": [
+      "validate direct BulletFormat row count from bullet_format log",
+      "net_diff checkpoint 0/final against reference only for movement sanity",
+      "cheap 300k search gate only if smoke loss/export is sane"
+    ]
   }
 }

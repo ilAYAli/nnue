@@ -175,7 +175,9 @@ def create_config(args: argparse.Namespace) -> dict:
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"
     labeled_jsonl = str(args.labeled_jsonl or "")
-    external_bullet_data = args.backend == "bullet" and bool(args.bullet_data)
+    external_bullet_data = args.backend == "bullet" and (
+        bool(args.bullet_data) or bool(args.bullet_lichess_eval_input)
+    )
     pack_input = "{score}/labeled.jsonl"
     steps = []
 
@@ -569,6 +571,14 @@ def create_config(args: argparse.Namespace) -> dict:
         ])
     elif args.backend == "bullet":
         bullet_text = "{pack}/bullet/enyo.txt"
+        lichess_eval_input = str(args.bullet_lichess_eval_input or "")
+        if args.bullet_data and lichess_eval_input:
+            raise SystemExit(
+                "bullet_data and bullet_lichess_eval_input are mutually exclusive")
+        if lichess_eval_input and args.bullet_loader != "direct":
+            raise SystemExit(
+                "bullet_lichess_eval_input produces BulletFormat data; use "
+                "bullet_loader=direct")
         bullet_data = str(args.bullet_data or "{pack}/bullet/enyo.data")
         bullet_cargo_target_dir = (
             str(expand_user(args.bullet_cargo_target_dir))
@@ -629,7 +639,7 @@ def create_config(args: argparse.Namespace) -> dict:
         if args.bullet_cuda_path:
             bullet_train.extend(["--cuda-path", str(expand_user(args.bullet_cuda_path))])
 
-        if args.bullet_mode == "enyo" and not args.bullet_data:
+        if args.bullet_mode == "enyo" and not args.bullet_data and not lichess_eval_input:
             steps.append({
                 "name": "pack",
                 "command": [
@@ -645,16 +655,47 @@ def create_config(args: argparse.Namespace) -> dict:
             })
 
         if not args.bullet_data:
+            if lichess_eval_input:
+                bucket_specs = str(args.bullet_lichess_eval_buckets or "")
+                if isinstance(args.bullet_lichess_eval_buckets, list):
+                    bucket_list = [str(x) for x in args.bullet_lichess_eval_buckets]
+                else:
+                    bucket_list = [
+                        item.strip() for item in bucket_specs.split(";")
+                        if item.strip()
+                    ]
+                bullet_text_command = [
+                    str(expand_user(args.python)),
+                    tool("score/import_lichess_eval.py"),
+                    "--input", str(expand_path(lichess_eval_input)),
+                    "--output", bullet_text,
+                    "--rows", str(args.bullet_rows),
+                    "--min-depth", str(args.bullet_lichess_eval_min_depth),
+                    "--min-knodes", str(args.bullet_lichess_eval_min_knodes),
+                    "--max-abs-cp", str(args.bullet_max_abs_cp),
+                    "--max-input-rows", str(args.bullet_lichess_eval_max_input_rows),
+                    "--seed", str(args.bullet_lichess_eval_seed),
+                    "--progress", str(args.pack_progress),
+                    "--output-format", "bullet-text",
+                ] + (["--enyo-runtime-target"] if args.bullet_mode == "enyo" else [])
+                if args.bullet_lichess_eval_unique_fen:
+                    bullet_text_command.append("--unique-fen")
+                if args.bullet_lichess_eval_stop_when_full:
+                    bullet_text_command.append("--stop-when-full")
+                for bucket in bucket_list:
+                    bullet_text_command.extend(["--bucket", bucket])
+            else:
+                bullet_text_command = [
+                    tool("bullet/jsonl_to_bullet_text.py"),
+                    "--input", pack_input,
+                    "--output", bullet_text,
+                    "--limit", str(args.bullet_rows),
+                    "--max-abs-cp", str(args.bullet_max_abs_cp),
+                ] + (["--enyo-runtime-target"] if args.bullet_mode == "enyo" else [])
             steps.extend([
                 {
                     "name": "bullet_text",
-                    "command": [
-                        tool("bullet/jsonl_to_bullet_text.py"),
-                        "--input", pack_input,
-                        "--output", bullet_text,
-                        "--limit", str(args.bullet_rows),
-                        "--max-abs-cp", str(args.bullet_max_abs_cp),
-                    ] + (["--enyo-runtime-target"] if args.bullet_mode == "enyo" else []),
+                    "command": bullet_text_command,
                 },
                 {
                     "name": "bullet_format",
@@ -1142,6 +1183,16 @@ def add_create_args(
     parser.add_argument("--search-model-gate-min-top1", type=int, default=value("search_model_gate_min_top1", d.search_model_gate_min_top1))
 
     parser.add_argument("--bullet-rows", type=int, default=value("bullet_rows", d.bullet_rows))
+    parser.add_argument("--bullet-lichess-eval-input", default=value("bullet_lichess_eval_input", d.bullet_lichess_eval_input))
+    parser.add_argument("--bullet-lichess-eval-buckets", default=value("bullet_lichess_eval_buckets", d.bullet_lichess_eval_buckets))
+    parser.add_argument("--bullet-lichess-eval-min-depth", type=int, default=value("bullet_lichess_eval_min_depth", d.bullet_lichess_eval_min_depth))
+    parser.add_argument("--bullet-lichess-eval-min-knodes", type=int, default=value("bullet_lichess_eval_min_knodes", d.bullet_lichess_eval_min_knodes))
+    parser.add_argument("--bullet-lichess-eval-max-input-rows", type=int, default=value("bullet_lichess_eval_max_input_rows", d.bullet_lichess_eval_max_input_rows))
+    parser.add_argument("--bullet-lichess-eval-unique-fen", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_lichess_eval_unique_fen", d.bullet_lichess_eval_unique_fen))
+    parser.add_argument("--bullet-lichess-eval-stop-when-full", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_lichess_eval_stop_when_full", d.bullet_lichess_eval_stop_when_full))
+    parser.add_argument("--bullet-lichess-eval-seed", type=int, default=value("bullet_lichess_eval_seed", d.bullet_lichess_eval_seed))
     parser.add_argument(
         "--bullet-data",
         default=value("bullet_data", d.bullet_data),
