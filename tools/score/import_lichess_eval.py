@@ -69,6 +69,8 @@ def maybe_take(bucket: Bucket, line: str, rng: random.Random) -> None:
 
 
 def open_text(path: Path) -> IO[str]:
+    if not path.exists():
+        raise FileNotFoundError(path)
     suffixes = path.suffixes
     if suffixes and suffixes[-1] == ".gz":
         return gzip.open(path, "rt", encoding="utf-8", errors="replace")
@@ -83,6 +85,7 @@ def open_text(path: Path) -> IO[str]:
             proc = subprocess.Popen(
                 ["zstdcat", str(path)],
                 stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
@@ -152,6 +155,21 @@ def normalize_fen(fen: str) -> str | None:
         return None
     return " ".join(parts)
 
+
+def ply_from_fen(fen: str) -> int:
+    parts = fen.split()
+    if len(parts) != 6 or parts[1] not in ("w", "b"):
+        raise ValueError(f"invalid FEN: {fen}")
+    fullmove = int(parts[5])
+    if fullmove < 1:
+        raise ValueError(f"invalid FEN fullmove: {fen}")
+    return (fullmove - 1) * 2 + (1 if parts[1] == "b" else 0)
+
+
+def material_count_from_fen(fen: str) -> int:
+    return sum(1 for ch in fen.split()[0] if ch.isalpha())
+
+
 def valid_standard_material(fen: str) -> bool:
     parts = fen.split()
     if len(parts) < 2 or parts[1] not in ("w", "b"):
@@ -209,6 +227,9 @@ def main() -> None:
     ap.add_argument("--min-depth", type=int, default=18)
     ap.add_argument("--min-knodes", type=int, default=0)
     ap.add_argument("--max-abs-cp", type=int, default=1600)
+    ap.add_argument("--min-ply", type=int, default=0)
+    ap.add_argument("--min-material-count", type=int, default=0)
+    ap.add_argument("--max-material-count", type=int, default=32)
     ap.add_argument("--wdl-scale", type=float, default=400.0)
     ap.add_argument("--unique-fen", action="store_true")
     ap.add_argument("--bucket", action="append",
@@ -252,11 +273,16 @@ def main() -> None:
         "min_depth": args.min_depth,
         "min_knodes": args.min_knodes,
         "max_abs_cp": args.max_abs_cp,
+        "min_ply": args.min_ply,
+        "min_material_count": args.min_material_count,
+        "max_material_count": args.max_material_count,
         "unique_fen": args.unique_fen,
         "bucket_mode": bool(buckets),
         "seed": args.seed,
         "eligible": 0,
         "skipped_no_bucket": 0,
+        "skipped_ply": 0,
+        "skipped_material": 0,
         "output_format": output_format,
         "enyo_runtime_target": bool(args.enyo_runtime_target),
     }
@@ -284,6 +310,19 @@ def main() -> None:
                     continue
                 if not valid_standard_material(fen):
                     stats["skipped_invalid_fen"] += 1
+                    continue
+                try:
+                    ply = ply_from_fen(fen)
+                except ValueError:
+                    stats["skipped_invalid_fen"] += 1
+                    continue
+                if ply < args.min_ply:
+                    stats["skipped_ply"] += 1
+                    continue
+                material_count = material_count_from_fen(fen)
+                if (material_count < args.min_material_count
+                        or material_count > args.max_material_count):
+                    stats["skipped_material"] += 1
                     continue
                 if args.unique_fen:
                     if fen in seen_fens:
@@ -316,6 +355,8 @@ def main() -> None:
                     "teacher": "lichess_eval_db",
                     "teacher_depth": int(entry.get("depth") or 0),
                     "teacher_knodes": int(entry.get("knodes") or 0),
+                    "ply": ply,
+                    "material_count": material_count,
                 }
                 if output_format == "bullet-text":
                     bullet_score = white_score

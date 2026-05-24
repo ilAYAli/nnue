@@ -140,6 +140,9 @@ class CandidateDefaults:
     bullet_lichess_eval_buckets: str = ""
     bullet_lichess_eval_min_depth: int = 18
     bullet_lichess_eval_min_knodes: int = 100000
+    bullet_lichess_eval_min_ply: int = 0
+    bullet_lichess_eval_min_material_count: int = 0
+    bullet_lichess_eval_max_material_count: int = 32
     bullet_lichess_eval_max_input_rows: int = 0
     bullet_lichess_eval_unique_fen: bool = True
     bullet_lichess_eval_stop_when_full: bool = False
