@@ -297,8 +297,11 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
             "l0w",
             AdamWParams {
                 decay: weight_decay,
-                max_weight: 4095.0,
-                min_weight: -4095.0,
+                // Enyo stores accumulator weights as int16. Existing Enyo nets
+                // legitimately contain values outside the older +/-4095 guard;
+                // clamping there corrupts the first exported Bullet checkpoint.
+                max_weight: f32::from(i16::MAX),
+                min_weight: f32::from(i16::MIN),
                 ..Default::default()
             },
         );
@@ -306,8 +309,8 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
             "l0b",
             AdamWParams {
                 decay: weight_decay,
-                max_weight: 4095.0,
-                min_weight: -4095.0,
+                max_weight: f32::from(i16::MAX),
+                min_weight: f32::from(i16::MIN),
                 ..Default::default()
             },
         );

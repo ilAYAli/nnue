@@ -57,22 +57,27 @@ SPRT candidate yet.
 
 
 
-## Latest Diagnostic: Enyo32 Input Quantization Threshold
+## Latest Diagnostic: Bullet Enyo Input Clamp Fix
 
-Completed `reckless-enyo32-input-threshold-lr2e7-sb8`:
+Completed `reckless-enyo32-input-threshold-clampfix-lr2e7-sb8` after fixing
+the Bullet Enyo optimizer clamp for trainable input tensors:
 
-- checkpoint `0` is exact parity.
-- checkpoint `1` already jumps to the exported 512-value input delta:
-  `input_weights 505`, `input_biases 7`, max abs `1538/1575`.
-- checkpoints `2` through `8` are identical to checkpoint `1`.
-- checkpoint `1` is also identical to the previous rejected
-  `reckless-enyo32-existing-input-lr1e5-sb1024` checkpoint `256`
-  (`total changed 0/25200209` when compared directly).
+- root cause: the trainer clamped `l0w`/`l0b` to `+/-4095`, but Enyo stores
+  accumulator weights and biases as full int16 values. The existing reference
+  net legitimately contains values outside `+/-4095`.
+- the previous Enyo32 input-only runs were therefore invalid: checkpoint `1`
+  was mostly an export clamp artifact, not learned sparse movement.
+- fix: trainable Enyo `l0w`/`l0b` now use full int16 optimizer bounds.
+- verification: checkpoint `0` through `8` now have `input_weights=0`,
+  `input_biases=0`, `l1=0`, and `l2=0` versus the reference.
+- only four output weights differ by `<=1.49e-8`, already present at
+  checkpoint `0`, which is Bullet float roundtrip noise and not training.
 
-Decision: close the Enyo32 existing-weight input-only line. The Bullet/export
-setup can move the 32-bucket input tensor, but the first exported step is already
-the same destructive net that failed `36` vs `140`, capped `-18181`, worst
-`-31837cp`. Another LR-only retry is not justified.
+Decision: keep the clamp fix and discard the prior Enyo32 input-only gate
+results that depended on clipped checkpoints. `lr=2e-7` is below exported sparse
+movement after the fix; the next reckless input test must intentionally search
+for the first real exported input movement, then gate that checkpoint before any
+SPRT.
 
 ## Latest Result: Low-Pressure Enyo32 Input Divergence
 
