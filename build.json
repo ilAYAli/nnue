@@ -4,6 +4,7 @@
     "experiment": "native-policy-preserve64-lichess-w002-select-lr3e6-e80",
     "track": "nnue_native",
     "status": "rejected",
+    "do_not_run": true,
     "hypothesis": "A lower init-distillation weight plus target-best selection can retain the export-visible policy signal without the final-epoch drift seen at w=0.05.",
     "data_source": "runs/native-lichess-policy-targets-800-mc26-20260524/lichess_policy_targets.jsonl",
     "init": "Enyo-owned native SF-binpack checkpoint 2048; no Berserk initialization",
