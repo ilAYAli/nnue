@@ -552,6 +552,40 @@ keeps the `-31814cp` mate-like tail. It is still materially better than prior
 native Enyo-selfplay scratch checkpoints, so continue once with lower LR from
 this Enyo-owned checkpoint before changing architecture or data again.
 
+
+## Latest Result: Native Lichess Eval Bullet Smoke
+
+`native-bullet-lichess-eval-smoke-46k-wdl0`
+
+Purpose: validate direct `lichess_db_eval.jsonl.zst` to Bullet data without a
+large intermediate JSONL/train pack, then run a tiny scratch native smoke.
+
+Pipeline result:
+
+- direct Bullet text import succeeded from the first `1M` input rows.
+- Bullet format parsed and validated `46392` positions.
+- result balance used for Bullet parser compatibility: `20712` wins,
+  `5000` draws, `20680` losses.
+- training completed in about `9s`; loss dropped from `0.070535` to
+  `0.012504`.
+- checkpoints: `8`, `16`, `24`, `32`.
+
+Checkpoint search-gate sweep on v3 targets rejected every checkpoint:
+
+- `8`: `top1=41/279`, `candidate_better=40`, `reference_better=177`,
+  `capped_sum_diff_cp=-24554`, `worst_regression_cp=-32000`.
+- `16`: `top1=48/279`, `candidate_better=44`, `reference_better=163`,
+  `capped_sum_diff_cp=-22213`, `worst_regression_cp=-32000`.
+- `24`: `top1=40/279`, `candidate_better=41`, `reference_better=170`,
+  `capped_sum_diff_cp=-22976`, `worst_regression_cp=-32000`.
+- `32`: `top1=34/279`, `candidate_better=39`, `reference_better=176`,
+  `capped_sum_diff_cp=-23779`, `worst_regression_cp=-32000`.
+
+Decision: no SPRT and no immediate scale-up of this recipe. The direct Lichess
+eval data path is useful infrastructure, but the tiny eval-only smoke does not
+show move-choice promise. Any future Lichess-eval use must be part of a larger
+native data strategy with stronger gates, not a direct promotion lane.
+
 ## Hard Rejections
 
 Do not restart these as near-term Elo lanes:
@@ -684,6 +718,12 @@ Do not restart these as near-term Elo lanes:
   `>=0.1`, none `>=0.5`). Only small L2 float changes exported
   (`166/25200209` total values).
 
+- `native-bullet-lichess-eval-smoke-46k-wdl0` as a candidate recipe:
+  direct Lichess eval import and Bullet training work, but all checkpoints were
+  far behind the reference on v3 search targets. Best checkpoint was `16` with
+  `top1=48/279`, `candidate_better=44`, `reference_better=163`,
+  `capped_sum_diff_cp=-22213`, `worst_regression_cp=-32000`.
+
 ## Promotion Gates
 
 A candidate must pass cheap gates before match testing:
@@ -710,8 +750,9 @@ The next action should be one of these, in order:
 3. Stop the broad-target search-aware native config family after the teacher-
    preserved retry also failed static and broad search gates.
 4. Do not continue the native baseline with the same architecture/data recipe.
-   Prepare a materially larger/different data-scale plan or an export-visible
-   architecture hypothesis first.
+   Direct Lichess eval import is now available, but the 46k smoke was a hard
+   search-gate reject. Prepare a materially larger/different data-scale plan or
+   an export-visible architecture hypothesis before scaling it.
 5. Do not launch another tiny target-only child-eval recovery run.
 6. No SPRT from the current search-aware native or reckless output-delta runs.
 
