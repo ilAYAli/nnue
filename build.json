@@ -1,16 +1,16 @@
 {
   "description": "Native lane target-construction smoke: sample high-depth Lichess eval rows, score legal child moves, and build a broad policy/search target JSONL. This creates targets only; no training.",
   "metadata": {
-    "experiment": "native-lichess-policy-targets-smoke2-20260524",
+    "experiment": "native-lichess-policy-targets-smoke3-20260524",
     "track": "nnue_native",
-    "run_dir": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke2-20260524",
-    "hypothesis": "Build a small broad policy/search target sample from high-depth Lichess eval rows. This source lacks true ply/fullmove counters, so filtering is by score/material buckets, not min_ply.",
+    "run_dir": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke3-20260524",
+    "hypothesis": "Build a small broad policy/search target sample from high-depth Lichess eval rows. This source lacks true ply/fullmove counters, so filter by material count instead of min_ply.",
     "status": "configured",
     "no_training": true
   },
   "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
   "target_score": {
-    "run_dir": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke2-20260524",
+    "run_dir": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke3-20260524",
     "lichess_eval_input": "/home/petter/code/cpp/chess/assets/lichess_db_eval.jsonl.zst",
     "lichess_eval_buckets": "zero:zero:0:1:40;pos_1_80:pos:1:80:50;neg_1_80:neg:1:80:50;pos_80_250:pos:80:250:50;neg_80_250:neg:80:250:50;pos_250_800:pos:250:800:35;neg_250_800:neg:250:800:35;pos_800_1200:pos:800:1200:20;neg_800_1200:neg:800:1200:20",
     "lichess_eval_min_depth": 18,
@@ -20,9 +20,9 @@
     "lichess_eval_unique_fen": true,
     "lichess_eval_seed": 20260524,
     "lichess_eval_progress": 250000,
-    "scores_csv": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke2-20260524/lichess_policy_scores.csv",
-    "search_targets_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke2-20260524/lichess_policy_targets.jsonl",
-    "summary": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke2-20260524/lichess_policy_targets.summary.txt",
+    "scores_csv": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke3-20260524/lichess_policy_scores.csv",
+    "search_targets_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke3-20260524/lichess_policy_targets.jsonl",
+    "summary": "/home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-smoke3-20260524/lichess_policy_targets.summary.txt",
     "source_name": "lichess_eval_policy_smoke",
     "engine": "/home/petter/local/bin/stockfish",
     "nodes": 50000,
@@ -36,11 +36,12 @@
     "max_moves": 12,
     "policy_temperature_cp": 200.0,
     "mate_gap_cp": 30000,
-    "dedupe_fen": true
+    "dedupe_fen": true,
+    "max_material_count": 26
   },
   "validation": {
     "inspect_before_training": true,
-    "expected_targets": "up to 120 positions; Lichess eval FENs lack true ply counters",
+    "expected_targets": "up to 120 positions with material_count <= 26; Lichess eval FENs lack true ply counters",
     "next_gate": "inspect source/tag/phase distribution and top-move gaps; do not train automatically"
   }
 }

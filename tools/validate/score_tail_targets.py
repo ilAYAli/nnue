@@ -38,6 +38,11 @@ def side_name(fen: str) -> str:
     return "White" if chess.Board(fen).turn == chess.WHITE else "Black"
 
 
+def material_count(fen: str) -> int:
+    board = fen.split()[0] if fen else ""
+    return sum(1 for ch in board if ch.isalpha())
+
+
 def target_from_jsonl_row(row: dict[str, object], index: int) -> dict[str, str]:
     fen = str(row["fen"])
     board = chess.Board(fen)
@@ -84,6 +89,11 @@ def reservoir_sample_positions(args: argparse.Namespace) -> list[dict[str, str]]
                 ply = 2 * (board.fullmove_number - 1) + (0 if board.turn == chess.WHITE else 1)
                 if ply < args.min_ply:
                     continue
+            pieces = material_count(fen)
+            if args.min_material_count > 0 and pieces < args.min_material_count:
+                continue
+            if args.max_material_count > 0 and pieces > args.max_material_count:
+                continue
             score = int_value(row.get("score", row.get("score_cp")), 0)
             if args.max_abs_cp > 0 and abs(score) > args.max_abs_cp:
                 continue
@@ -126,6 +136,8 @@ def main() -> int:
     parser.add_argument("--max-targets", type=int, default=0)
     parser.add_argument("--max-abs-cp", type=int, default=0)
     parser.add_argument("--min-ply", type=int, default=0)
+    parser.add_argument("--min-material-count", type=int, default=0)
+    parser.add_argument("--max-material-count", type=int, default=0)
     parser.add_argument("--scan-limit", type=int, default=0)
     parser.add_argument("--scan-progress", type=int, default=0)
     parser.add_argument("--score-progress", type=int, default=0)

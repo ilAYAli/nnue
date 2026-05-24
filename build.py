@@ -917,6 +917,8 @@ def target_score_command(target_score: dict, run_dir: Path) -> list[str]:
         "max_targets": "--max-targets",
         "max_abs_cp": "--max-abs-cp",
         "min_ply": "--min-ply",
+        "min_material_count": "--min-material-count",
+        "max_material_count": "--max-material-count",
         "scan_limit": "--scan-limit",
         "scan_progress": "--scan-progress",
         "score_progress": "--score-progress",
