@@ -610,6 +610,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--enyo-l0-std", str(args.bullet_enyo_l0_std),
             "--enyo-l1-std", str(args.bullet_enyo_l1_std),
             "--enyo-l1-export-scale", str(args.bullet_enyo_l1_export_scale),
+            "--enyo-input-factorizer" if args.bullet_enyo_input_factorizer else "--no-enyo-input-factorizer",
             "--enyo-input-buckets", str(args.bullet_enyo_input_buckets),
             "--enyo-runtime-input-buckets", str(args.bullet_enyo_runtime_input_buckets),
             "--eval-scale", str(args.bullet_eval_scale),
@@ -1300,6 +1301,8 @@ def add_create_args(
     parser.add_argument("--bullet-enyo-l0-std", type=float, default=value("bullet_enyo_l0_std", d.bullet_enyo_l0_std))
     parser.add_argument("--bullet-enyo-l1-std", type=float, default=value("bullet_enyo_l1_std", d.bullet_enyo_l1_std))
     parser.add_argument("--bullet-enyo-l1-export-scale", type=float, default=value("bullet_enyo_l1_export_scale", d.bullet_enyo_l1_export_scale))
+    parser.add_argument("--bullet-enyo-input-factorizer", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_enyo_input_factorizer", d.bullet_enyo_input_factorizer))
     parser.add_argument("--bullet-enyo-input-buckets", type=int, choices=[1, 2, 4, 8, 16, 32],
                         default=value("bullet_enyo_input_buckets", d.bullet_enyo_input_buckets))
     parser.add_argument("--bullet-enyo-runtime-input-buckets", type=int,

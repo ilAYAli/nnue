@@ -192,6 +192,7 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
     l0_stdev: f32,
     l1_stdev: f32,
     l1_export_scale: f32,
+    input_factoriser: bool,
     eval_scale: f32,
     save_rate: usize,
     trainable: String,
@@ -215,6 +216,7 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
     println!("enyo_input_buckets={INPUT_BUCKETS}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
+    println!("enyo_input_factoriser={input_factoriser}");
     println!("enyo_l0_export_scale=1");
     println!("eval_scale={eval_scale}");
     println!("save_rate={save_rate}");
@@ -231,12 +233,28 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
     let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
     let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
 
+    let l0w_format = if input_factoriser {
+        SavedFormat::id("l0w")
+            .transform(|store, weights| {
+                let factoriser = store.get("l0f").values.f32().repeat(INPUT_BUCKETS);
+                weights
+                    .into_iter()
+                    .zip(factoriser)
+                    .map(|(a, b)| a + b)
+                    .collect()
+            })
+            .round()
+            .quantise::<i16>(1)
+    } else {
+        SavedFormat::id("l0w").round().quantise::<i16>(1)
+    };
+
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
         .inputs(EnyoInputs::<INPUT_BUCKETS>)
         .save_format(&[
-            SavedFormat::id("l0w").round().quantise::<i16>(1),
+            l0w_format,
             SavedFormat::id("l0b").round().quantise::<i16>(1),
             SavedFormat::id("l1w")
                 .transpose()
@@ -265,6 +283,12 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
             let mut l0 = maybe_frozen(builder, !train_input, || {
                 enyo_affine(builder, "l0", INPUT_BUCKETS * 12 * 64, hidden, l0_stdev)
             });
+            if input_factoriser {
+                let l0f = maybe_frozen(builder, !train_input, || {
+                    builder.new_weights("l0f", Shape::new(hidden, 12 * 64), InitSettings::Zeroed)
+                });
+                l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
+            }
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);
 
@@ -315,6 +339,17 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
                 ..Default::default()
             },
         );
+        if input_factoriser {
+            trainer.optimiser.set_params_for_weight(
+                "l0f",
+                AdamWParams {
+                    decay: weight_decay,
+                    max_weight: f32::from(i16::MAX),
+                    min_weight: f32::from(i16::MIN),
+                    ..Default::default()
+                },
+            );
+        }
     }
     if train_l1 {
         trainer.optimiser.set_params_for_weight(
@@ -409,6 +444,7 @@ fn main() {
     let enyo_l0_std = env_parse("ENYO_BULLET_ENYO_L0_STD", 8.0f32);
     let enyo_l1_std = env_parse("ENYO_BULLET_ENYO_L1_STD", 1.0f32);
     let enyo_l1_export_scale = env_parse("ENYO_BULLET_ENYO_L1_EXPORT_SCALE", 1.0f32);
+    let enyo_input_factoriser = env_parse("ENYO_BULLET_ENYO_INPUT_FACTORISER", 0usize) != 0;
     let enyo_input_buckets = env_parse("ENYO_BULLET_ENYO_INPUT_BUCKETS", 32usize);
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 1usize);
@@ -434,6 +470,7 @@ fn main() {
                     enyo_l0_std,
                     enyo_l1_std,
                     enyo_l1_export_scale,
+                    enyo_input_factoriser,
                     eval_scale,
                     save_rate,
                     trainable,
