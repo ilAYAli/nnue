@@ -197,8 +197,15 @@ Reckless lane:
 Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
-- native work has no active training config after the filtered Lichess scalar
-  rejection.
+- native has one active smoke config:
+  `native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048`.
+  This is not another scalar continuation. It tests one new objective variable:
+  prior native SF-binpack smokes used `bullet_wdl=0.0`, while this run uses
+  `bullet_wdl=0.75` on the best low-data 1-bucket scratch shape.
+- compare the checkpoint sweep directly against
+  `native-bullet-enyo1-sfbinpack-smoke-eval400-lr1e3-sb2048`; stop WDL-smoke
+  if it does not materially improve the 800-target external gate and mate-like
+  tail behavior.
 - the Bullet Enyo layout audit/fix is complete. The Bullet Enyo trainer had
   been hard-coded to the legacy 16-king-bucket input layout while the
   documented/runtime native design is 32 buckets. That means older "native"
