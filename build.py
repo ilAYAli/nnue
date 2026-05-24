@@ -804,6 +804,54 @@ def target_score_run_dir(config: dict) -> Path:
     return expand_path(DEFAULTS.run_base) / str(experiment)
 
 
+def target_score_positions_path(target_score: dict, run_dir: Path) -> Path | None:
+    positions = target_score.get("positions_jsonl")
+    if positions:
+        return expand_path(str(positions))
+    if target_score.get("lichess_eval_input"):
+        return run_dir / "positions.jsonl"
+    return None
+
+
+def target_score_bucket_specs(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in str(value or "").split(";") if item.strip()]
+
+
+def target_score_import_command(target_score: dict, run_dir: Path) -> list[str] | None:
+    lichess_input = target_score.get("lichess_eval_input")
+    if not lichess_input:
+        return None
+    if target_score.get("targets_csv"):
+        raise SystemExit("target_score accepts targets_csv or lichess_eval_input, not both")
+    output = target_score_positions_path(target_score, run_dir)
+    if output is None:
+        raise SystemExit("target_score lichess_eval_input requires an output positions path")
+    command = [
+        str(expand_user(target_score.get("python", DEFAULTS.python))),
+        tool("score/import_lichess_eval.py"),
+        "--input", str(expand_path(str(lichess_input))),
+        "--output", str(output),
+        "--rows", str(target_score.get("lichess_eval_rows", 0)),
+        "--min-depth", str(target_score.get("lichess_eval_min_depth", 18)),
+        "--min-knodes", str(target_score.get("lichess_eval_min_knodes", 0)),
+        "--max-abs-cp", str(target_score.get(
+            "lichess_eval_max_abs_cp", target_score.get("max_abs_cp", 1600))),
+        "--max-input-rows", str(target_score.get("lichess_eval_max_input_rows", 0)),
+        "--seed", str(target_score.get("lichess_eval_seed", target_score.get("seed", 1))),
+        "--progress", str(target_score.get("lichess_eval_progress", 100000)),
+        "--output-format", "jsonl",
+    ]
+    if target_score.get("lichess_eval_unique_fen", True):
+        command.append("--unique-fen")
+    if target_score.get("lichess_eval_stop_when_full", False):
+        command.append("--stop-when-full")
+    for bucket in target_score_bucket_specs(target_score.get("lichess_eval_buckets")):
+        command.extend(["--bucket", bucket])
+    return command
+
+
 def target_build_command(
     target_build: dict,
     *,
@@ -840,7 +888,7 @@ def target_build_command(
     return command
 
 
-def target_score_command(target_score: dict) -> list[str]:
+def target_score_command(target_score: dict, run_dir: Path) -> list[str]:
     output = target_score.get("scores_csv")
     if not output:
         raise SystemExit("target_score.scores_csv is required")
@@ -854,15 +902,15 @@ def target_score_command(target_score: dict) -> list[str]:
         "--threads", str(target_score.get("threads", 1)),
     ]
     targets = target_score.get("targets_csv")
-    positions = target_score.get("positions_jsonl")
+    positions = target_score_positions_path(target_score, run_dir)
     if targets and positions:
-        raise SystemExit("target_score accepts targets_csv or positions_jsonl, not both")
+        raise SystemExit("target_score accepts targets_csv or positions_jsonl/lichess_eval_input, not both")
     if targets:
         command.extend(["--targets", str(expand_path(str(targets)))])
     elif positions:
-        command.extend(["--positions-jsonl", str(expand_path(str(positions)))])
+        command.extend(["--positions-jsonl", str(positions)])
     else:
-        raise SystemExit("target_score.targets_csv or positions_jsonl is required")
+        raise SystemExit("target_score.targets_csv, positions_jsonl, or lichess_eval_input is required")
 
     optional_args = {
         "syzygy_path": "--syzygy-path",
@@ -996,18 +1044,25 @@ def cmd_target_score(args: argparse.Namespace) -> int:
         hooks = config.get("hooks", {})
         if isinstance(hooks, dict):
             event_command = str(hooks.get("event_command", ""))
+    import_command = target_score_import_command(target_score, run_dir)
     if args.dry_run:
-        print(" ".join(target_score_command(target_score)))
+        if import_command:
+            print(" ".join(import_command))
+        print(" ".join(target_score_command(target_score, run_dir)))
         print(" ".join(target_score_build_command(target_score)))
         return 0
 
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "config.json").write_text(
         json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    for stage, command in [
-        ("score_legal_moves", target_score_command(target_score)),
+    stages = []
+    if import_command:
+        stages.append(("import_positions", import_command))
+    stages.extend([
+        ("score_legal_moves", target_score_command(target_score, run_dir)),
         ("build_search_targets", target_score_build_command(target_score)),
-    ]:
+    ])
+    for stage, command in stages:
         emit_event(
             run_dir, "phase_start", stage=stage, status="running",
             message=f"{stage} running", hook_command=event_command,
