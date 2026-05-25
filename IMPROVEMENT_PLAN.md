@@ -296,15 +296,24 @@ only `9` candidate-better, capped `-40361`. Root-only search-aware fitting is
 therefore not sufficient; the next test must train the continuation positions
 that make search reject the static root preference.
 
-`native-searchaware-override-child-targetonly-lr1e6-e120` is the current
-diagnostic. It uses `160` child positions generated from the worst model-top1
+`native-searchaware-override-child-targetonly-lr1e6-e120` passed as a
+diagnostic. It used `160` child positions generated from the worst model-top1
 / search-override cases, scored at `50k` nodes per legal move and rebuilt as
 `override_child_targets.jsonl` with `2166` move rows. Parent baseline on this
-child corpus is `38/160` top1; the rejected recovered model is `45/160`. The
-target-only diagnostic starts from the recovered model, uses no broad
-preservation, and must reach at least `120/160` exported `.pt`/`.nn` top1
-before any recovered child-continuation run is justified. No engine gate or
-SPRT from the target-only audit.
+child corpus was `38/160` top1; the rejected recovered model was `45/160`.
+The target-only run started from the recovered model, used no broad
+preservation, and fit the child-continuation corpus with exact `.pt`/`.nn`
+parity: `151/160` top1, `158/160` top3, sum gap `23cp`, worst gap `6cp`.
+This validates the search-override failure theory, but the target-only model is
+not a candidate because broad drift is uncontrolled.
+
+`native-searchaware-override-child-recover-lr2e7-e80` is the current recovery
+audit. It initializes from the child target-only fit and distills broad rows
+back toward `native-searchaware-reference-distill-recover-final-lr2e7-e80`.
+The exported `.pt`/`.nn` model gate must retain at least `130/160` child-target
+top1. If it passes, run only a corrected native-32 unified `10k` search gate
+against the original parent reference CSV. No SPRT unless corrected `10k` and
+then `300k` gates beat the original parent.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
