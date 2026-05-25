@@ -255,15 +255,21 @@ move. Broad rows distilled the parent net (`search_broad_target=init`,
 model gate, versus parent baseline `491/1400` and the required `540/1400`.
 The soft reference policy was too diffuse to move root choice.
 
-`native-searchaware-reference-distill-hard-lr5e7-e32` is the one allowed
-pressure audit for this recipe. It uses the same reference engine root moves,
-but with a hard rank-1 policy (`policy_temperature_cp=0`) and `50cp` minimum
-gap, weaker broad init distillation (`search_broad_weight=10`), and stronger
-search-aware loss. The predeclared model gate is `580/1400` top1 with exact
-`.pt`/`.nn` parity. If this does not clear the model gate, close
-reference-root distillation as currently implemented. If it clears, the first
-engine gate is the corrected native-32 unified corpus at `10k` nodes with
-`--require-native-net-load`. No SPRT from this config.
+`native-searchaware-reference-distill-hard-lr5e7-e32` is rejected. It used the
+same reference engine root moves, but with a hard rank-1 policy
+(`policy_temperature_cp=0`) and `50cp` minimum gap, weaker broad init
+distillation (`search_broad_weight=10`), and stronger search-aware loss. The
+selected checkpoint still reached only `497/1400` top1 in the exported model
+gate, versus the required `580/1400`. Stronger policy pressure did not move the
+root-choice boundary.
+
+`native-searchaware-reference-distill-targetonly-lr1e6-e80` is a diagnostic,
+not a candidate. It removes broad preservation entirely (`search_broad_weight=0`)
+and trains only the hard reference-root target corpus. If it cannot fit the
+target corpus to at least `900/1400` exported top1, reference-root distillation
+is closed as currently implemented. If it can fit, the blocker is
+preservation/generalization rather than target plumbing. No engine gate and no
+SPRT from this run.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
