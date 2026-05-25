@@ -1,16 +1,18 @@
 {
-  "description": "Rejected native lane 5k reference-search distillation target-only diagnostic. Do not continue this run.",
+  "description": "No active NNUE candidate. Latest 5k reference-search distillation diagnostic is rejected; next work is a one-pair exported overfit diagnostic.",
   "metadata": {
     "experiment": "native-reference-distill5k-targetonly-lr1e6-e80",
     "track": "nnue_native",
-    "status": "rejected_stopped",
+    "status": "disabled_rejected",
     "previous_result": "The oracle-policy 5k target-only run collapsed, and the rank-hinge 16-target audit stayed at 4/16 top1. The broad-reference retargeted 5k corpus retained 4937/5000 rows; native parent direct-model baseline is 1146/4937 top1 and 2348/4937 top3.",
     "hypothesis": "Reference searched-root moves may be a learnable intermediate target for the native net even when Stockfish child-oracle moves are not. This should recover reference-like move choice before any attempt to improve beyond it.",
     "gate": "Final .pt/.nn model gate must reach at least 3000/4937 top1 on the retargeted 5k reference-search corpus. If it misses, stop this distillation path.",
-    "decision": "Rejected/stopped. The run was below parent baseline immediately and degraded further, so no engine search, no SPRT, and no candidate promotion."
+    "decision": "Rejected/stopped. The run was below parent baseline immediately and degraded further, so no engine search, no SPRT, and no candidate promotion.",
+    "next_action": "Do not rerun this config. Build a one-pair exported overfit diagnostic before any larger search-aware native training."
   },
   "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
   "create": {
+    "disabled": true,
     "name": "native-reference-distill5k-targetonly-lr1e6-e80",
     "run_dir": "runs/native-reference-distill5k-targetonly-lr1e6-e80",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",

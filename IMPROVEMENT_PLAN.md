@@ -15,112 +15,49 @@ restart a lane.
 
 No trained Enyo net is currently a keeper.
 
-The current Berserk-derived Enyo net appears locally saturated for ordinary
-fine-tuning. Static MAE/sign can improve while search behavior and SPRT do not.
-The main failure pattern is:
+As of 2026-05-25, no NNUE training process is running. Both native and Reckless
+candidate generation are paused until the next diagnostic answers a smaller
+question than "can this produce a better net?"
 
-- head/output changes can improve narrow diagnostics, but fail broad gates or
-  mate-like tails.
-- normal input/L1 fine-tunes receive gradients but usually do not cross exported
-  quantization thresholds.
-- forced sparse movement is possible, but has not improved engine-search move
-  choice.
-- scratch/native training works technically. Current Enyo self-play volume has
-  not recovered reference move-choice strength, but the first Stockfish-binpack
-  native run was materially better than prior Enyo-selfplay scratch attempts.
+The current failure pattern is sharper than before:
+
+- ordinary existing-weight fine-tuning mostly changes dense/head behavior and
+  does not produce reliable Elo.
+- forced sparse movement is possible, but has not improved broad engine-search
+  move choice.
+- native scratch/scalar training works technically, but has not recovered
+  reference move-choice strength.
+- search-aware target fitting can move exported weights on some slices, but the
+  latest 5k/rank-hinge/reference-distill diagnostics show that the current
+  objective is not reliably learning even tiny ranking targets.
+- direct exported-model gates are not enough. Previous runs improved model
+  top1/top3 while engine search still rejected the candidate.
 
 Current `build.json` state:
 
-- `native-searchaware-rankhinge16-audit-lr3e7-e80` is rejected. The
-  default-off direct rank-hinge objective failed the tiny overfit gate:
-  selected epoch `0`, exact `.pt/.nn` parity, `4/16` top1, `7/16` top3,
-  sum gap `2078cp`, worst gap `471cp`. No search gate and no SPRT.
-  Do not scale this objective.
-- Next configured diagnostic:
-  `native-reference-distill5k-targetonly-lr1e6-e80`. This changes the target
-  meaning from Stockfish child-oracle moves to the current reference engine's
-  searched root moves on the broad 5k Lichess-policy corpus. Retargeting kept
-  `4937/5000` rows; `63` reference moves were not in the preserved scored-move
-  set. Native parent direct-model baseline is `1146/4937` top1,
-  `2348/4937` top3. The target-only gate is at least `3000/4937` top1 with
-  exact `.pt/.nn` parity. If it fails, stop this distillation path. If it
-  passes, the only possible follow-up is a broad-recovery diagnostic; this is
-  not a candidate and must not be SPRT'd.
+- `build.json` is disabled. It records the latest rejected diagnostic and must
+  not be rerun as a candidate.
+- `native-searchaware-lichess5k-mpe-preflight-lr3e6-e48` is rejected. It
+  reached only `1255/5000` top1, below the `1600/5000` exported-model gate.
+- `native-searchaware-lichess5k-targetonly-lr1e6-e80` is rejected/stopped. With
+  broad preservation removed, the 5k target objective collapsed from
+  `1054/5000` top1 to about `131/5000`.
+- `native-searchaware-rankhinge16-audit-lr3e7-e80` is rejected. The direct
+  rank-hinge objective stayed at `4/16` top1 and `7/16` top3 with exact
+  `.pt/.nn` parity.
 - `native-reference-distill5k-targetonly-lr1e6-e80` is rejected/stopped. It
   was below the native parent baseline immediately after epoch `0`
   (`1095/4937` top1 vs parent `1146/4937`) and then degraded further to
   `957/4937` by epoch `7`, so it was interrupted. Do not continue this run and
   do not launch more search-aware target-only variants from the current native
   checkpoint.
-- `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is
-  rejected. It combined the best prior native bucket-density signal (`1`
-  train-time input bucket expanded to the `32`-bucket runtime layout) with the
-  `1280` hidden-width architecture. It completed training, but all checkpoints
-  failed the external `800`-target Lichess-policy gate. Follow-up direct model
-  and model/search joins show this is not a validation artifact: 1280 lowered
-  scalar training loss but degraded both direct exported model choice and engine
-  search behavior. No SPRT.
-- `native-searchaware-rootchild-combo-w2-lr5e7-e80` is rejected. It combined
-  `1400` broad reference-root targets with `690` broad child-continuation
-  targets, but failed the hard exported model gate: final `.pt/.nn` parity was
-  only `1126/2090` top1, `1709/2090` top3, sum gap `104701cp`, worst gap
-  `800cp`, below the required `1300/2090`. The training curve peaked early at
-  `1227/2090` top1 around epoch `12` and then degraded while broad MAE rose to
-  about `46cp`. No search gate and no SPRT.
-- `native-searchaware-override-child-broad-recover-w20-lr2e7-e120` is
-  rejected. It retained the broad child-continuation target signal after export
-  (`607/690` top1, `679/690` top3), but corrected native-32 `10k` search got
-  worse than the prior child recovery: `407/1409` top1, `170`
-  candidate-better vs `749` reference-better, capped `-70808`. Its exported
-  model on the unified root target gate also fell to `497/1409` top1, proving
-  scalar broad distillation did not preserve searched root policy.
-- `native-searchaware-override-child-broad-targetonly-lr1e6-e160` completed as
-  a diagnostic, not a candidate. It fit the broad `690`-target
-  child-continuation corpus after export with exact `.pt`/`.nn` parity:
-  `617/690` top1, `681/690` top3, sum gap `772cp`, worst gap `64cp`. Broad
-  drift was still around `330cp`, so it is not playable and must not be SPRT'd.
-- `native-searchaware-override-child-recover-lr2e7-e80` is rejected. Do not
-  rerun or continue it. It proved that a small child-continuation target set
-  can be retained after export (`149/160` top1, `160/160` top3), but the
-  corrected native-32 `10k` unified search gate still failed the original
-  parent (`414/1409` top1, `183` candidate-better vs `720` parent-better,
-  capped `-65230`).
-- `native-searchaware-unified-mpe-continue-lr1e6-e64` is also rejected.
-- Do not rerun or continue it. It cleared the exported model gate
-  (`647/1409` top1, `1065/1409` top3) and moved sparse tensors. The original
-  engine-search rejection was invalid because it used an engine build that
-  silently took the legacy loader path for a 32-bucket native net. Corrected
-  native-32 validation still rejects the candidate, but less catastrophically:
-  at `300k` nodes all top1 `560/1409`, top3 `914/1409`, compare all `207`
-  candidate-better vs `553` reference-better, capped sum `-35908`, median
-  nonzero diff `-28cp`, worst regression `-32000cp`.
-- Corrected low-node native-32 gates show the model/search gap narrows with
-  nodes but remains a fail. At `1k` nodes it scored all top1 `338/1409`,
-  top3 `632/1409`, `177` candidate-better vs `855` reference-better, capped
-  sum `-94698`. At `10k` nodes it scored all top1 `446/1409`, top3
-  `765/1409`, `187` vs `728`, capped sum `-66065`.
-- The active artifact is now the unified search-aware target corpus:
-  `runs/native-searchaware-unified-targets-20260525/search_aware_unified_targets.jsonl`.
-  It combines existing scored legal-move sources into `1409` deduped targets
-  and `20067` scored moves; `235` are `mate_like`, `1174` are `non_mate`, and
-  marker coverage is complete (`missing_marked=0`).
-- The current reference engine baseline on that unified corpus at `300k` nodes
-  is saved in
-  `runs/native-searchaware-unified-targets-20260525/reference_gate_300k/reference.csv`:
-  all top1 `761/1409`, top3 `1130/1409`; mate-like top1 `108/235`,
-  non-mate top1 `653/1174`.
-- The current preflight target is
-  `runs/native-searchaware-reference-distill-targets-20260525/reference_distill_targets.jsonl`.
-  It rewrites the unified corpus toward the reference engine's actual `300k`
-  selected root move. It contains `1400` targets; `9` unified rows were skipped
-  because the reference move was not present in the retained legal-move list.
-  The rejected native parent scores only `491/1400` top1 and `856/1400` top3
-  on this retargeted corpus, so this is now a stricter test of searched-policy
-  imitation than the prior oracle child-eval gate.
-- The last useful prior result remains diagnostic only: target-only search-policy
-  overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
-  but target preservation did not clear the predeclared gate and is not
-  playable.
+- The immediate next action is not a larger run. It is a one-pair exported
+  overfit diagnostic: one parent FEN, one intended move, one bad move, train
+  until the exported `.nn` ranks the intended child correctly, then verify the
+  same ordering through the engine/eval path. If one pair cannot be learned, the
+  search-aware objective/export plumbing is broken or misformulated. If one pair
+  passes but `4`/`16` targets fail, the problem is target conflict,
+  representation capacity, or generalization.
 
 ## Closed Lanes
 
@@ -151,7 +88,8 @@ Native work should now optimize for:
 1. exported sparse/input/L1 movement that is intentional and measured.
 2. broad move-choice and tactical-tail behavior before scalar MAE/sign.
 3. CP/WDL/policy supervision together, not scalar-only training.
-4. architecture/data hypotheses that reduce data starvation instead of adding
+4. a proven one-pair exported ranking update before any broad search-aware run.
+5. architecture/data hypotheses that reduce data starvation instead of adding
    another local correction layer.
 
 Code audit status:
@@ -168,9 +106,9 @@ Code audit status:
 - `tools/validate/validate.py quant-scan` now reports whether `.pt` float
   movement crosses exported input/L1 integer boundaries before a candidate is
   considered for broader gates.
-- remaining gap: define a scalable native training path that combines
-  CP/WDL/policy with export-aware sparse movement checks, and pair it with a
-  simpler/native feature geometry before spending GPU time.
+- remaining gap: prove that the training/export/engine evaluation loop can learn
+  a single intended-vs-bad child ranking. Until that passes, larger
+  search-aware runs are invalid.
 
 ## Track Definitions
 
@@ -189,6 +127,28 @@ Code audit status:
 - currently useful for background experiments, not promotion.
 
 ## Next Research Task: 2026-05-25
+
+Active task: build and run a one-pair exported overfit diagnostic.
+
+Required result:
+
+- select one failing policy target with a clear intended move and one bad move.
+- train only that two-child ranking under the same quantized/export path.
+- export `.nn`.
+- verify `.pt` and `.nn` select the intended child.
+- verify the engine/eval path reports the same child ordering.
+
+Interpretation:
+
+- if this fails, stop all native search-aware training and fix target polarity,
+  objective math, quantized gradients, export, or engine evaluation.
+- if this passes but `4` and `16` target slices fail, the issue is target
+  conflict, representation capacity, or generalization.
+- only after the `1 -> 4 -> 16` progression passes may a 5k or unified-corpus
+  training run be configured.
+
+Historical entries below are retained as evidence only. Any older "next" wording
+below this line is stale unless repeated above.
 
 Update: the one-bucket scale-up, same-architecture native scalar scaling, WDL
 on test79, and target-only policy preservation are all rejected. Do not continue
