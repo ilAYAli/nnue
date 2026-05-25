@@ -437,6 +437,25 @@ Native lane:
   fit the 5k external-policy corpus at all. If target-only cannot clear a high
   model gate, the blocker is objective/representation capacity. If it can, the
   blocker remains broad preservation/generalization.
+- `native-searchaware-lichess5k-targetonly-lr1e6-e80` is rejected/stopped.
+  With broad preservation removed, the full 5k target objective did not fit the
+  policy corpus; it actively collapsed from epoch `0` `1054/5000` top1 to about
+  `131/5000` top1 by epoch `38`, so the run was interrupted instead of wasting
+  more GPU time. A small polarity audit on the first 16 targets did not show a
+  root-high sign inversion: `child-low` started at `4/16` top1 while
+  `root-high` started at `2/16`. Smaller controlled `child-low` audits through
+  the same quantized-forward path held at `4/16` top1 after dozens of epochs
+  while broad scalar predictions drifted. Conclusion: do not launch more
+  full search-aware native runs from this objective family. The next native work
+  must change the target-ranking objective or representation, then pass a tiny
+  exported-model overfit audit before any 5k/full-corpus run.
+- Next configured diagnostic:
+  `native-searchaware-rankhinge16-audit-lr3e7-e80`. This adds a default-off
+  direct pairwise rank-hinge term to `train_search_aware.py` and tests only the
+  first 16 Lichess-policy targets. The gate is deliberately small and hard:
+  exact `.pt/.nn` exported-model top1 must reach at least `8/16`. If it cannot
+  clear this tiny overfit gate, the current search-aware native objective work
+  remains blocked and no larger run is justified.
 - `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048` is
   rejected. It tested the newer Test80 source with the prior best real
   8-runtime-bucket native geometry. Checkpoints `512`, `1024`, `1536`, and

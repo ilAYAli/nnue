@@ -296,6 +296,7 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
                             args: argparse.Namespace):
     margin_losses = []
     policy_losses = []
+    rank_losses = []
     weight_total = pred.new_tensor(0.0)
     chosen_gaps = []
     top1 = 0
@@ -310,14 +311,17 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
         weight_total = weight_total + weight
         best = int(best_indices[i]) - start
         best_pred = group_pred[best]
+        rank_margin_cp = getattr(args, "search_rank_margin_cp", 20.0)
         if args.search_score_mode == "root-high":
             margin_values = best_pred - group_pred
             logits = group_pred / max(args.search_policy_temperature_cp, 1e-6)
             order = torch.argsort(group_pred, descending=True)
+            rank_violations = group_pred - best_pred + rank_margin_cp
         else:
             margin_values = group_pred - best_pred
             logits = -group_pred / max(args.search_policy_temperature_cp, 1e-6)
             order = torch.argsort(group_pred)
+            rank_violations = best_pred - group_pred + rank_margin_cp
         margin_losses.append(weight * F.smooth_l1_loss(
             margin_values,
             group_gaps,
@@ -325,6 +329,12 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
             reduction="mean"))
         policy_losses.append(
             weight * (-(group_policy * F.log_softmax(logits, dim=0)).sum()))
+        if len(group_pred) > 1:
+            rank_mask = torch.ones_like(group_pred, dtype=torch.bool)
+            rank_mask[best] = False
+            temp = max(getattr(args, "search_rank_temperature_cp", 50.0), 1e-6)
+            rank_losses.append(
+                weight * (F.softplus(rank_violations[rank_mask] / temp).mean() * temp))
         selected = int(order[0])
         if selected == best:
             top1 += 1
@@ -335,9 +345,14 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
         normalizer = weight_total.clamp_min(1e-6)
         margin_loss = torch.stack(margin_losses).sum() / normalizer
         policy_loss = torch.stack(policy_losses).sum() / normalizer
+        if rank_losses:
+            rank_loss = torch.stack(rank_losses).sum() / normalizer
+        else:
+            rank_loss = pred.sum() * 0.0
     else:
         margin_loss = pred.sum() * 0.0
         policy_loss = pred.sum() * 0.0
+        rank_loss = pred.sum() * 0.0
     metrics = {
         "top1": top1,
         "top3": top3,
@@ -346,7 +361,7 @@ def target_loss_and_metrics(pred: torch.Tensor, group_offsets: torch.Tensor,
         "median_gap": float(statistics.median(chosen_gaps)) if chosen_gaps else 0.0,
         "worst_gap": max(chosen_gaps) if chosen_gaps else 0.0,
     }
-    return margin_loss, policy_loss, metrics
+    return margin_loss, policy_loss, rank_loss, metrics
 
 
 @torch.no_grad()
@@ -365,7 +380,7 @@ def search_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
         policies = batch[9].to(args.device)
         group_weights = batch[10].to(args.device)
         pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
-        _margin, _policy, metrics = target_loss_and_metrics(
+        _margin, _policy, _rank, metrics = target_loss_and_metrics(
             pred, group_offsets, best_indices, gaps, policies, group_weights, args)
         total += metrics["targets"]
         top1 += metrics["top1"]
@@ -498,14 +513,15 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             policies = target_batch[9].to(args.device)
             group_weights = target_batch[10].to(args.device)
             target_pred = predict(model, args, tw, tb, two, tbo, tstm, tphase)
-            margin_loss, policy_loss, target_metrics = target_loss_and_metrics(
+            margin_loss, policy_loss, rank_loss, target_metrics = target_loss_and_metrics(
                 target_pred, group_offsets, best_indices, gaps, policies,
                 group_weights, args)
 
             loss = (
                 broad_weight * broad_loss
                 + args.search_margin_weight * margin_loss
-                + args.search_policy_weight * policy_loss)
+                + args.search_policy_weight * policy_loss
+                + args.search_rank_weight * rank_loss)
             opt.zero_grad()
             loss.backward()
             if args.grad_norm_every > 0 and batch_index % args.grad_norm_every == 0:
@@ -601,8 +617,11 @@ def main() -> None:
                     help="Epochs to linearly ramp broad weight after target warmup")
     ap.add_argument("--search-margin-weight", type=float, default=1.0)
     ap.add_argument("--search-policy-weight", type=float, default=0.25)
+    ap.add_argument("--search-rank-weight", type=float, default=0.0)
     ap.add_argument("--search-margin-beta", type=float, default=100.0)
     ap.add_argument("--search-policy-temperature-cp", type=float, default=200.0)
+    ap.add_argument("--search-rank-margin-cp", type=float, default=20.0)
+    ap.add_argument("--search-rank-temperature-cp", type=float, default=50.0)
     ap.add_argument("--search-score-mode", default="child-low",
                     choices=["child-low", "root-high"],
                     help="Whether rank-1 child should score lowest or highest")

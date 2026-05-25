@@ -116,8 +116,11 @@ class CandidateDefaults:
     search_broad_ramp_epochs: int = 0
     search_margin_weight: float = 1.0
     search_policy_weight: float = 0.25
+    search_rank_weight: float = 0.0
     search_margin_beta: float = 100.0
     search_policy_temperature_cp: float = 200.0
+    search_rank_margin_cp: float = 20.0
+    search_rank_temperature_cp: float = 50.0
     search_score_mode: str = "child-low"
     search_max_gap_cp: float = 800.0
     search_max_moves: int = 0
