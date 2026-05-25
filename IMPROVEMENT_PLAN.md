@@ -220,6 +220,16 @@ and `46` worse by at least `200cp`. The same pattern holds on the
 teach the net the searched continuation after the desired root move, not only
 raise that root child at ply one.
 
+`native-searchaware-continuation-mix-lr5e7-e16` is the next preflight. It
+continues from the rejected parent but changes the broad scalar mix by adding
+reference-depth-10 labels for `1143` forced-PV continuation positions from the
+`145` roots where the model-preferred root move searched at least `50cp` worse
+than normal search. This is still not a promotion candidate. Its only purpose
+is to test whether searched-continuation labels reduce the override failure
+without destroying the unified model/search gates. If it passes the model gate,
+validate first on the `303` model-top1/search-override subset, then on the
+unified corpus with the corrected native-32 engine and `--require-native-net-load`.
+
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
 
