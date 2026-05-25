@@ -24,6 +24,7 @@ N_SQUARES = 64
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
 LEGACY_N_FEATURES = LEGACY_N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
 N_HIDDEN = 1024
+SUPPORTED_HIDDEN = (1024, 1280)
 N_L1 = 2 * N_HIDDEN
 N_L2 = 16
 N_L3 = 32
@@ -79,6 +80,63 @@ LEGACY_BUCKETED_HEAD_NETWORK_SIZE = (
 )
 
 THREAT_WEIGHTS_SIZE = N_THREAT_FEATURES * N_HIDDEN * np.dtype(np.int8).itemsize
+
+
+def network_size(
+    feature_count: int = N_FEATURES,
+    hidden: int = N_HIDDEN,
+    *,
+    bucketed_head: bool = False,
+    threat: bool = False,
+) -> int:
+    l1_width = 2 * hidden
+    size = (
+        feature_count * hidden * np.dtype(np.int16).itemsize
+        + hidden * np.dtype(np.int16).itemsize
+        + l1_width * N_L2 * np.dtype(np.int8).itemsize
+        + N_L2 * np.dtype(np.int32).itemsize
+    )
+    if bucketed_head:
+        size += (
+            N_OUTPUT_BUCKETS * N_L2 * N_L3 * np.dtype(np.float32).itemsize
+            + N_OUTPUT_BUCKETS * N_L3 * np.dtype(np.float32).itemsize
+            + N_OUTPUT_BUCKETS * N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+            + N_OUTPUT_BUCKETS * np.dtype(np.float32).itemsize
+        )
+    else:
+        size += (
+            N_L2 * N_L3 * np.dtype(np.float32).itemsize
+            + N_L3 * np.dtype(np.float32).itemsize
+            + N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+            + N_OUTPUT * np.dtype(np.float32).itemsize
+        )
+    if threat:
+        size += N_THREAT_FEATURES * hidden * np.dtype(np.int8).itemsize
+    return size
+
+
+def _load_specs() -> dict[int, tuple[int, bool, bool, bool]]:
+    specs: dict[int, tuple[int, bool, bool, bool]] = {}
+    for hidden in SUPPORTED_HIDDEN:
+        for feature_count, legacy_layout in (
+            (LEGACY_N_FEATURES, True),
+            (N_FEATURES, False),
+        ):
+            for bucketed_head in (False, True):
+                for threat_layout in (False, True):
+                    size = network_size(
+                        feature_count,
+                        hidden,
+                        bucketed_head=bucketed_head,
+                        threat=threat_layout,
+                    )
+                    specs[size] = (
+                        hidden,
+                        legacy_layout,
+                        bucketed_head,
+                        threat_layout,
+                    )
+    return specs
 
 KING_BUCKETS: tuple[int, ...] = (
     31, 30, 29, 28, 28, 29, 30, 31,
@@ -324,38 +382,14 @@ def check_state_bucket_from_pieces(
 
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
-    valid_sizes = (
-        LEGACY_NETWORK_SIZE,
-        NETWORK_SIZE,
-        LEGACY_BUCKETED_HEAD_NETWORK_SIZE,
-        BUCKETED_HEAD_NETWORK_SIZE,
-        LEGACY_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-    )
-    if len(data) not in valid_sizes:
+    specs = _load_specs()
+    if len(data) not in specs:
+        valid_sizes = sorted(specs)
         raise ValueError(
             f"{path}: size {len(data)} != expected "
             f"{', '.join(str(v) for v in valid_sizes)}")
-    legacy_layout = len(data) in (
-        LEGACY_NETWORK_SIZE,
-        LEGACY_BUCKETED_HEAD_NETWORK_SIZE,
-        LEGACY_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-    )
-    bucketed_head = len(data) in (
-        LEGACY_BUCKETED_HEAD_NETWORK_SIZE,
-        BUCKETED_HEAD_NETWORK_SIZE,
-        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-    )
-    threat_layout = len(data) in (
-        LEGACY_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        LEGACY_BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-    )
+    hidden, legacy_layout, bucketed_head, threat_layout = specs[len(data)]
+    l1_width = 2 * hidden
     head_buckets = N_OUTPUT_BUCKETS if bucketed_head else 1
 
     off = 0
@@ -367,9 +401,9 @@ def load_net(path: str | Path) -> Net:
         return arr.copy()
 
     if legacy_layout:
-        legacy_iw = take(np.int16, LEGACY_N_FEATURES * N_HIDDEN).reshape(
-            LEGACY_N_FEATURES, N_HIDDEN)
-        iw = np.empty((N_FEATURES, N_HIDDEN), dtype=np.int16)
+        legacy_iw = take(np.int16, LEGACY_N_FEATURES * hidden).reshape(
+            LEGACY_N_FEATURES, hidden)
+        iw = np.empty((N_FEATURES, hidden), dtype=np.int16)
         bucket_stride = N_PIECE_TYPES * N_SQUARES
         for bucket, legacy_bucket in enumerate(LEGACY_BUCKET_FOR_BUCKET):
             src = slice(legacy_bucket * bucket_stride,
@@ -378,9 +412,9 @@ def load_net(path: str | Path) -> Net:
                         (bucket + 1) * bucket_stride)
             iw[dst] = legacy_iw[src]
     else:
-        iw = take(np.int16, N_FEATURES * N_HIDDEN).reshape(N_FEATURES, N_HIDDEN)
-    ib = take(np.int16, N_HIDDEN)
-    l1w = take(np.int8, N_L1 * N_L2).reshape(N_L2, N_L1)
+        iw = take(np.int16, N_FEATURES * hidden).reshape(N_FEATURES, hidden)
+    ib = take(np.int16, hidden)
+    l1w = take(np.int8, l1_width * N_L2).reshape(N_L2, l1_width)
     l1b = take(np.int32, N_L2)
     if bucketed_head:
         l2w = take(np.float32, head_buckets * N_L2 * N_L3).reshape(
@@ -398,8 +432,8 @@ def load_net(path: str | Path) -> Net:
         off += 4
     threat_weights = None
     if threat_layout:
-        threat_weights = take(np.int8, N_THREAT_FEATURES * N_HIDDEN).reshape(
-            N_THREAT_FEATURES, N_HIDDEN)
+        threat_weights = take(np.int8, N_THREAT_FEATURES * hidden).reshape(
+            N_THREAT_FEATURES, hidden)
     assert off == len(data)
     return Net(iw, ib, l1w, l1b, l2w, l2b, ow,
                ob if bucketed_head else float(ob), threat_weights)
@@ -423,13 +457,13 @@ def write_net(net: Net, path: str | Path) -> None:
         if net.threat_weights is not None:
             f.write(np.asarray(net.threat_weights, dtype=np.int8).tobytes(order="C"))
     size = out.stat().st_size
-    valid_sizes = (
-        NETWORK_SIZE,
-        BUCKETED_HEAD_NETWORK_SIZE,
-        NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
-        BUCKETED_HEAD_NETWORK_SIZE + THREAT_WEIGHTS_SIZE,
+    input_weights = np.asarray(net.input_weights)
+    hidden = int(input_weights.shape[1])
+    expected = network_size(
+        int(input_weights.shape[0]),
+        hidden,
+        bucketed_head=np.asarray(net.l2_weights).ndim == 3,
+        threat=net.threat_weights is not None,
     )
-    if size not in valid_sizes:
-        raise RuntimeError(
-            f"wrote {size} bytes, expected "
-            f"{', '.join(str(v) for v in valid_sizes)}")
+    if size != expected:
+        raise RuntimeError(f"wrote {size} bytes, expected {expected}")

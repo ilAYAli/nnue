@@ -12,26 +12,37 @@ from . import enyo_nnue as nn2
 
 
 class EnyoNNUE(nn_pt.Module):
-    def __init__(self, init: str = "kaiming"):
+    def __init__(
+        self,
+        init: str = "kaiming",
+        *,
+        hidden: int = nn2.N_HIDDEN,
+        l2_width: int = nn2.N_L2,
+        l3_width: int = nn2.N_L3,
+    ):
         super().__init__()
+        self.hidden = hidden
+        self.l1_width = 2 * hidden
+        self.l2_width = l2_width
+        self.l3_width = l3_width
         self.embed = nn_pt.EmbeddingBag(
-            nn2.N_FEATURES, nn2.N_HIDDEN, mode="sum")
-        self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
-        self.l1_weight = nn_pt.Parameter(torch.zeros(nn2.N_L2, nn2.N_L1))
-        self.l1_bias = nn_pt.Parameter(torch.zeros(nn2.N_L2))
-        self.l2 = nn_pt.Linear(nn2.N_L2, nn2.N_L3)
-        self.output = nn_pt.Linear(nn2.N_L3, nn2.N_OUTPUT)
+            nn2.N_FEATURES, hidden, mode="sum")
+        self.input_bias = nn_pt.Parameter(torch.zeros(hidden))
+        self.l1_weight = nn_pt.Parameter(torch.zeros(l2_width, self.l1_width))
+        self.l1_bias = nn_pt.Parameter(torch.zeros(l2_width))
+        self.l2 = nn_pt.Linear(l2_width, l3_width)
+        self.output = nn_pt.Linear(l3_width, nn2.N_OUTPUT)
 
         if init == "kaiming":
             nn_pt.init.normal_(self.embed.weight, std=math.sqrt(2.0 / 32.0))
-            nn_pt.init.normal_(self.l1_weight, std=math.sqrt(2.0 / nn2.N_L1))
-            nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / nn2.N_L2))
-            nn_pt.init.normal_(self.output.weight, std=math.sqrt(2.0 / nn2.N_L3))
+            nn_pt.init.normal_(self.l1_weight, std=math.sqrt(2.0 / self.l1_width))
+            nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / l2_width))
+            nn_pt.init.normal_(self.output.weight, std=math.sqrt(2.0 / l3_width))
         elif init == "quantized-kaiming":
             nn_pt.init.normal_(self.embed.weight, std=8.0)
             nn_pt.init.normal_(self.l1_weight, std=1.0)
-            nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / nn2.N_L2))
-            nn_pt.init.normal_(self.output.weight, std=math.sqrt(2.0 / nn2.N_L3))
+            nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / l2_width))
+            nn_pt.init.normal_(self.output.weight, std=math.sqrt(2.0 / l3_width))
         elif init == "berserk-ish":
             nn_pt.init.normal_(self.embed.weight, std=64.0)
             nn_pt.init.normal_(self.l1_weight, std=4.0)
@@ -144,7 +155,12 @@ def load_model_from_nn(path: str | Path, device: str = "cpu") -> EnyoNNUE:
         if isinstance(net.output_bias, np.ndarray)
         else float(net.output_bias)
     )
-    model = EnyoNNUE(init="kaiming")
+    model = EnyoNNUE(
+        init="kaiming",
+        hidden=int(net.input_weights.shape[1]),
+        l2_width=int(net.l1_weights.shape[0]),
+        l3_width=int(output_weights.shape[0]),
+    )
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
         model.input_bias.copy_(torch.from_numpy(net.input_biases.astype(np.float32)))
