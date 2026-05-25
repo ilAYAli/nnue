@@ -59,16 +59,21 @@ class UciEngine:
         ready_lines = read_until_lines(self.proc, "readyok")
         if nnue_file and require_native_net_load:
             text = "\n".join(ready_lines)
-            if "network loaded from" not in text:
+            loaded = (
+                "network loaded from" in text
+                or "nnue: loaded network from" in text
+            )
+            fallback = (
+                "invalid size" in text
+                or "using embedded evaluator" in text
+            )
+            if not loaded:
                 raise RuntimeError(
                     "engine did not report native NNUE load for "
                     f"{nnue_file}; ready output was:\n{text}")
-            if (
-                "embedded evaluator loaded from" in text
-                or "nnue: loaded network" in text
-            ):
+            if fallback:
                 raise RuntimeError(
-                    "engine used legacy/embedded NNUE loader for "
+                    "engine rejected native NNUE load for "
                     f"{nnue_file}; ready output was:\n{text}")
 
     def close(self) -> None:

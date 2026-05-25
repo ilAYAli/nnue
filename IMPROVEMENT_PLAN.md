@@ -35,7 +35,8 @@ Current `build.json` state:
   active config. It combines the best prior native bucket-density signal
   (`1` train-time input bucket expanded to the `32`-bucket runtime layout) with
   the `1280` hidden-width architecture. It trains on Test79 SF binpack only.
-  Gate by checkpoint sweep on the external `800`-target Lichess-policy corpus.
+  Gate by checkpoint sweep using the `build-native-1280` engine on the external
+  `800`-target Lichess-policy corpus.
   No SPRT unless a checkpoint beats the reference on candidate/reference counts,
   capped sum, and tail regression.
 - `native-searchaware-rootchild-combo-w2-lr5e7-e80` is rejected. It combined
