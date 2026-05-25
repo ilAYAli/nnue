@@ -34,16 +34,18 @@ Current `build.json` state:
 - `native-searchaware-unified-mpe-continue-lr1e6-e64` is rejected and left as
   the last completed reproducible config.
 - Do not rerun or continue it. It cleared the exported model gate
-  (`647/1409` top1, `1065/1409` top3) and moved sparse tensors, but failed the
-  real 300k-node engine-search gate badly: all top1 `184/1409`, top3
-  `420/1409`; compare all `119` candidate-better vs `1058` reference-better,
-  capped sum `-150029`, median nonzero diff `-276cp`, worst regression
-  `-32000cp`.
-- Low-node engine gates show the collapse is immediate, not a deep-search-only
-  amplification. At `1k` nodes it scored all top1 `155/1409`, top3 `381/1409`,
-  `103` candidate-better vs `1103` reference-better, capped sum `-160444`.
-  At `10k` nodes it scored all top1 `160/1409`, top3 `396/1409`, `105` vs
-  `1091`, capped sum `-157784`.
+  (`647/1409` top1, `1065/1409` top3) and moved sparse tensors. The original
+  engine-search rejection was invalid because it used an engine build that
+  silently took the legacy loader path for a 32-bucket native net. Corrected
+  native-32 validation still rejects the candidate, but less catastrophically:
+  at `300k` nodes all top1 `560/1409`, top3 `914/1409`, compare all `207`
+  candidate-better vs `553` reference-better, capped sum `-35908`, median
+  nonzero diff `-28cp`, worst regression `-32000cp`.
+- Corrected low-node native-32 gates show the model/search gap narrows with
+  nodes but remains a fail. At `1k` nodes it scored all top1 `338/1409`,
+  top3 `632/1409`, `177` candidate-better vs `855` reference-better, capped
+  sum `-94698`. At `10k` nodes it scored all top1 `446/1409`, top3
+  `765/1409`, `187` vs `728`, capped sum `-66065`.
 - The active artifact is now the unified search-aware target corpus:
   `runs/native-searchaware-unified-targets-20260525/search_aware_unified_targets.jsonl`.
   It combines existing scored legal-move sources into `1409` deduped targets
@@ -163,26 +165,49 @@ the exported model gate to `.pt`/`.nn` parity at `647/1409` top1 and
 `1065/1409` top3, improved static scalar metrics on the next `100k` broad rows
 (`mae 129.63 -> 111.47`, `sign 76.81% -> 80.40%` versus the parent), and kept
 export-visible sparse movement (`1.72M` input weights, `290` L1 weights changed
-versus the parent). The 300k-node engine-search gate rejected it decisively:
-all top1 `184/1409`, top3 `420/1409`, mate-like top1 `60/235`, non-mate top1
-`124/1174`, compare all `119` candidate-better vs `1058` reference-better,
-capped sum `-150029`, median nonzero diff `-276cp`, worst regression
-`-32000cp`.
+versus the parent).
 
-Low-node diagnostics make this stronger: `1k` nodes already failed at all top1
-`155/1409`, `103` vs `1103`, capped `-160444`; `10k` nodes failed at all top1
-`160/1409`, `105` vs `1091`, capped `-157784`. The gap is present at shallow
-search, so the direct child-eval model gate is not a reliable proxy for playable
-move choice.
+The original 300k-node engine-search gate is invalid and must not be cited as
+evidence: the engine build used for that gate did not support native 32-bucket
+loads and could silently fall back to the legacy loader on oversized `.nn`
+files. Enyo commit `c99a7b1` fixes this by supporting native 32-bucket loads
+and by requiring an exact legacy-size match before the legacy loader is used.
+NNUE commits `169733e` and `d244611` add `--require-native-net-load` and pass it
+through the validation wrappers.
+
+Corrected native-32 engine gates still reject the candidate. At `1k` nodes:
+all top1 `338/1409`, top3 `632/1409`, compare all `177` candidate-better vs
+`855` reference-better, capped sum `-94698`, median nonzero diff `-78cp`,
+worst regression `-32000cp`. At `10k` nodes: all top1 `446/1409`, top3
+`765/1409`, `187` vs `728`, capped `-66065`, median `-50cp`. At `300k` nodes:
+all top1 `560/1409`, top3 `914/1409`, mate-like top1 `109/235`, non-mate top1
+`451/1174`, compare all `207` vs `553`, capped `-35908`, median `-28cp`,
+worst regression `-32000cp`.
+
+This is not an SPRT candidate. The correction changes the diagnosis from
+"catastrophic collapse" to "direct model-gate progress does not transfer enough
+to engine search." The `.nn` model-gate top1 is `647/1409`, but the corrected
+300k search top1 is only `560/1409` and still loses badly to the reference
+engine's `761/1409`.
 
 Decision: no SPRT, no more continuation, and no more same-objective model-gate
 training. Direct child-eval/model-gate improvement can be a false positive.
-The next native step must explain the model-gate/search-gate disconnect before
-spending more GPU time. Dump per-target model-selected moves from the exported
-model gate, join them with low-node and `300k` engine-search CSVs, and identify
-whether failures are target construction, polarity/score-mode mismatch, or
-ordinary search instability. Do not train from this objective again until that
-join gives a concrete fix.
+The model/search join explains the remaining loss. When corrected 300k search
+chooses the same move as the exported model (`430/1409` positions), the
+candidate is essentially neutral against reference: `60` candidate-better vs
+`57` reference-better, capped sum `+618`, median nonzero diff `+1cp`, and worst
+regression only `-383cp`. The failure is in the `979/1409` positions where
+search overrides the model: `147` vs `496`, capped `-36526`. The clearest
+subset is the `303` positions where the model's direct child eval has the
+target as top1 but search does not play it; that subset is `28` vs `199`,
+capped `-17453`, median `-67cp`, and includes a `-32000cp` tail. Most broad
+loss comes from `lichess_policy` and `broad_nonmate` rows, not only mate-like
+tails.
+
+The next native step must build a search-stability objective or gate around the
+model-top1/search-override failures. Do not spend GPU time on another
+child-eval-only target run until the target construction includes the positions
+where search refuses the model-preferred move.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
