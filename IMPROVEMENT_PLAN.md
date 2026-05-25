@@ -209,6 +209,17 @@ model-top1/search-override failures. Do not spend GPU time on another
 child-eval-only target run until the target construction includes the positions
 where search refuses the model-preferred move.
 
+Forced-search probe on the `303` model-top1/search-override positions confirms
+that this is not just root move ordering noise. With `go nodes 300000
+searchmoves <model_move>`, the forced model move scored worse than normal
+search in `201/303` positions, equal in `27`, and better in `75`; median forced
+minus normal score was `-45cp`, with `145` positions worse by at least `50cp`
+and `46` worse by at least `200cp`. The same pattern holds on the
+`reference_better` subset (`132/199` forced worse, median `-42cp`) and on both
+`mate_like` and `non_mate` rows. Therefore the next target construction must
+teach the net the searched continuation after the desired root move, not only
+raise that root child at ply one.
+
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
 
