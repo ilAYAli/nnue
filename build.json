@@ -1,23 +1,24 @@
 {
-  "description": "Native Enyo one-bucket CP-only Bullet/Test80 smoke. This isolates the new proven Test80 2024 data source before adding WDL or bucket complexity.",
+  "description": "Native Enyo 8-bucket CP-only Bullet/Test80 smoke. This combines the stronger Test80 2024 data source with the real 8-runtime-bucket geometry that previously gave the best native signal.",
   "metadata": {
-    "experiment": "native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048",
+    "experiment": "native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048",
     "track": "nnue_native",
     "status": "configured",
-    "hypothesis": "The previous native attempts used a small/older Test79 source or derived Enyo/Lichess slices and failed to recover reference move choice. Test80 2024 is a recent proven Stockfish/Leela-derived NNUE binpack source. Start with one shared Enyo input bucket to avoid bucket data starvation and isolate data-source quality before adding WDL or king-bucket complexity.",
-    "baseline": "native-bullet-enyo1-sfbinpack-smoke-eval400-lr1e3-sb2048",
+    "hypothesis": "The one-bucket Test80 CP-only smoke proved that the Test80 source alone does not recover move-choice behavior: checkpoints 512-2048 stayed near 25% top1 with candidate_better 66-70 vs reference_better about 500. The best prior native shape used a real 8-runtime-bucket layout on Test79 and reached about 46% top1. This run tests whether that lower-bucket geometry plus the newer Test80 source improves the native baseline without adding WDL or policy complexity yet.",
+    "baseline": "native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048",
+    "previous_result": "native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048 rejected: checkpoint 2048 all top1 205/800, candidate_better 70 vs reference_better 501, capped -67617, worst -32000.",
     "data_audit": "runs/native-test80-jan2024-data-audit-20260524/run.log: 1M rows sampled; result win/draw/loss 17.75/63.14/19.11; score_result_agree 83.79% on non-draws.",
     "constraints": [
       "no Berserk initialization",
       "Bullet SF-binpack loader",
       "CP-only objective first; no WDL until the data-source effect is known",
-      "one train-time input bucket expanded to current runtime bucket count",
+      "real 8 train-time and runtime input buckets",
       "checkpoint gate before any continuation or SPRT"
     ]
   },
   "create": {
-    "name": "native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048",
-    "run_dir": "runs/native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048",
+    "name": "native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048",
+    "run_dir": "runs/native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048",
     "backend": "bullet",
     "init_net": null,
     "bullet_mode": "enyo",
@@ -40,8 +41,8 @@
     "bullet_enyo_l1_std": 1.0,
     "bullet_enyo_l1_export_scale": 1.0,
     "bullet_enyo_input_factorizer": false,
-    "bullet_enyo_input_buckets": 1,
-    "bullet_enyo_runtime_input_buckets": 32,
+    "bullet_enyo_input_buckets": 8,
+    "bullet_enyo_runtime_input_buckets": 8,
     "bullet_eval_scale": 400.0,
     "bullet_save_rate": 512,
     "weight_decay": 0.0,
@@ -50,7 +51,7 @@
   },
   "validation": {
     "first_gate": "checkpoint sweep at 512, 1024, 1536, and 2048 on the 800-target Lichess-policy gate, reusing the cached reference CSV.",
-    "continue_only_if": "This must materially beat the prior one-bucket Test79 smoke and avoid catastrophic mate-like tails.",
+    "continue_only_if": "This must materially beat the prior Test79 real-8-runtime run, especially checkpoint 1536: all top1 371/800, candidate_better 82 vs reference_better 277, capped -19627, worst -32000.",
     "promotion": "No SPRT unless checkpoint gate and failure-suite replay are clean."
   }
 }
