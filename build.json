@@ -1,12 +1,13 @@
 {
-  "description": "Native Enyo 8-bucket CP-only Bullet/Test80 smoke. This combines the stronger Test80 2024 data source with the real 8-runtime-bucket geometry that previously gave the best native signal.",
+  "description": "Rejected native Enyo 8-bucket CP-only Bullet/Test80 smoke. Kept only as the last completed reproducible training config; do not rerun without a new hypothesis.",
   "metadata": {
     "experiment": "native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048",
     "track": "nnue_native",
-    "status": "configured",
+    "status": "rejected",
     "hypothesis": "The one-bucket Test80 CP-only smoke proved that the Test80 source alone does not recover move-choice behavior: checkpoints 512-2048 stayed near 25% top1 with candidate_better 66-70 vs reference_better about 500. The best prior native shape used a real 8-runtime-bucket layout on Test79 and reached about 46% top1. This run tests whether that lower-bucket geometry plus the newer Test80 source improves the native baseline without adding WDL or policy complexity yet.",
     "baseline": "native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048",
     "previous_result": "native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048 rejected: checkpoint 2048 all top1 205/800, candidate_better 70 vs reference_better 501, capped -67617, worst -32000.",
+    "result": "rejected: checkpoints 512-2048 all failed; best all top1 was 2048 at 195/800, candidate_better 69 vs reference_better 525, capped -76578, worst -32000.",
     "data_audit": "runs/native-test80-jan2024-data-audit-20260524/run.log: 1M rows sampled; result win/draw/loss 17.75/63.14/19.11; score_result_agree 83.79% on non-draws.",
     "constraints": [
       "no Berserk initialization",
