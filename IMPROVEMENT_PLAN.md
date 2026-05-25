@@ -31,6 +31,11 @@ The main failure pattern is:
 
 Current `build.json` state:
 
+- `native-searchaware-rankhinge16-audit-lr3e7-e80` is rejected. The
+  default-off direct rank-hinge objective failed the tiny overfit gate:
+  selected epoch `0`, exact `.pt/.nn` parity, `4/16` top1, `7/16` top3,
+  sum gap `2078cp`, worst gap `471cp`. No search gate and no SPRT.
+  Do not scale this objective.
 - `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is
   rejected. It combined the best prior native bucket-density signal (`1`
   train-time input bucket expanded to the `32`-bucket runtime layout) with the
@@ -456,6 +461,11 @@ Native lane:
   exact `.pt/.nn` exported-model top1 must reach at least `8/16`. If it cannot
   clear this tiny overfit gate, the current search-aware native objective work
   remains blocked and no larger run is justified.
+- `native-searchaware-rankhinge16-audit-lr3e7-e80` is rejected. It did not move
+  the tiny target slice at all: selected epoch `0`, `.pt` and `.nn` both
+  `4/16` top1, `7/16` top3, sum gap `2078cp`, worst gap `471cp`. This closes
+  the current search-aware objective path unless the representation or target
+  format changes materially.
 - `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048` is
   rejected. It tested the newer Test80 source with the prior best real
   8-runtime-bucket native geometry. Checkpoints `512`, `1024`, `1536`, and

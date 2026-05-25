@@ -1,13 +1,13 @@
 {
-  "description": "Native lane tiny rank-hinge overfit audit. Diagnostic only; no search gate and no SPRT.",
+  "description": "Rejected native lane tiny rank-hinge overfit audit. Do not scale this objective.",
   "metadata": {
     "experiment": "native-searchaware-rankhinge16-audit-lr3e7-e80",
     "track": "nnue_native",
-    "status": "configured",
+    "status": "rejected",
     "previous_result": "The 5k Lichess-policy target-only diagnostic collapsed from 1054/5000 top1 at epoch 0 to about 131/5000 by epoch 38, and controlled child-low audits did not improve a 16-target slice. The current margin/policy objective is closed.",
     "hypothesis": "A direct pairwise rank hinge can move exported-model top1 on a tiny 16-target policy slice without forcing large cp gaps. If this cannot overfit the slice, do not run more search-aware native training.",
     "gate": "Final .pt/.nn model gate must reach at least 8/16 top1 on the first 16 Lichess-policy targets.",
-    "decision": "Diagnostic only. No engine search, no SPRT, and no candidate promotion from this run."
+    "decision": "Rejected. The exported .pt/.nn model stayed at 4/16 top1 and 7/16 top3, so no engine search, no SPRT, and no candidate promotion."
   },
   "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
   "create": {
