@@ -220,15 +220,23 @@ and `46` worse by at least `200cp`. The same pattern holds on the
 teach the net the searched continuation after the desired root move, not only
 raise that root child at ply one.
 
-`native-searchaware-continuation-mix-lr5e7-e16` is the next preflight. It
-continues from the rejected parent but changes the broad scalar mix by adding
-reference-depth-10 labels for `1143` forced-PV continuation positions from the
-`145` roots where the model-preferred root move searched at least `50cp` worse
-than normal search. This is still not a promotion candidate. Its only purpose
-is to test whether searched-continuation labels reduce the override failure
-without destroying the unified model/search gates. If it passes the model gate,
-validate first on the `303` model-top1/search-override subset, then on the
-unified corpus with the corrected native-32 engine and `--require-native-net-load`.
+`native-searchaware-continuation-mix-lr5e7-e16` is rejected. It continued from
+the rejected parent and added repeated reference-depth-10 scalar labels for
+`1143` forced-PV continuation positions from the `145` roots where the
+model-preferred root move searched at least `50cp` worse than normal search.
+The exported model gate stayed healthy and slightly improved over the parent
+(`651/1409` top1, `1061/1409` top3, exact `.pt`/`.nn` parity, versus parent
+`647/1409` and `1065/1409`). The 303-position override subset also improved:
+parent was `28` candidate-better vs `199` reference-better, capped `-17453`;
+the continuation mix was `49` vs `155`, capped `-11555`. But the unified 10k
+gate did not improve: parent was `446/1409`, `187` vs `728`, capped `-66065`;
+the continuation mix was `439/1409`, `187` vs `737`, capped `-66243`. No full
+300k gate and no SPRT.
+
+Conclusion: continuation scalar labels move the intended failure subset, but
+they do not generalize to broad search. Do not repeat this as a scalar mix.
+The next native attempt needs an explicit searched-policy/ranking objective or
+a broader continuation corpus, not a small repeated PV-label blend.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
