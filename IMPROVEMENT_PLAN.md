@@ -30,11 +30,11 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048`
+- `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048`
   is configured.
-- This is a native data-source smoke, not another architecture knob:
-  one shared Enyo input bucket, CP-only, no Berserk initialization, and current
-  runtime bucket count on export.
+- This is a native data/geometry smoke:
+  real `8` train-time/runtime input buckets, CP-only, no Berserk
+  initialization.
 - Data source: `test80-2024-01-jan-2tb7p.min-v2.v6.binpack`, a recent
   Stockfish/Leela-derived NNUE binpack chunk.
 - Audit on 1M sampled rows passed:
@@ -43,8 +43,12 @@ Current `build.json` state:
   - score/result agreement on non-draw rows `83.79%`.
 - First gate: checkpoints `512`, `1024`, `1536`, and `2048` on the 800-target
   Lichess-policy gate using the cached reference CSV. No continuation or SPRT
-  unless this materially beats the prior one-bucket Test79 smoke and does not
-  retain mate-like tails.
+  unless this materially beats the prior real-8-runtime Test79 smoke and does
+  not retain mate-like tails.
+- The one-bucket Test80 source smoke is rejected:
+  `native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048` stayed flat from
+  checkpoints `512` through `2048`; checkpoint `2048` was all top1 `205/800`,
+  `70` vs `501`, capped `-67617`, worst regression `-32000cp`.
 - The last useful prior result remains diagnostic only: target-only search-policy
   overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
   but target preservation did not clear the predeclared gate and is not
@@ -118,11 +122,14 @@ The input-factorized 32-bucket Bullet Enyo smoke is rejected. It was a concrete
 feature-geometry/training change aimed at bucket data starvation, but it made
 move-choice behavior worse on the external policy gate.
 
-The next native attempt is now a controlled data-source test using a recent
-proven Test80 2024 NNUE binpack chunk. It deliberately keeps the native feature
-geometry simple (`1` input bucket) and CP-only so the result answers one
-question: does a stronger external NNUE data source move Enyo-native scratch
-training closer to reference move-choice behavior?
+The controlled one-bucket Test80 data-source test is rejected. Better external
+data alone did not recover move-choice behavior.
+
+The next native attempt keeps the same Test80 2024 binpack source and CP-only
+objective, but restores the lower-bucket geometry that previously gave the
+best native signal: real `8` train-time/runtime input buckets. This answers a
+narrow question: was the one-bucket collapse due to under-bucketed geometry, or
+does Test80 also fail when combined with the best prior native bucket layout?
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
@@ -134,6 +141,12 @@ paused.
 
 Native lane:
 
+- `native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048` is rejected.
+  It was a controlled data-source smoke with one shared train-time input bucket
+  expanded to the current runtime layout. Checkpoints `512`, `1024`, `1536`,
+  and `2048` stayed around `24.5-25.8%` top1 on the 800-target gate; checkpoint
+  `2048` ended at all `70` vs `501`, capped `-67617`, worst regression
+  `-32000cp`. Do not continue one-bucket CP-only Test80 training.
 - `native-bullet-enyo16-sfbinpack-smoke-eval400-lr1e3-sb2048` is rejected.
   Best checkpoint was `2048`, but it still had all `91` vs `280`,
   capped `-20039`, and worst regression `-32000cp`.
