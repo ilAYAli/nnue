@@ -263,13 +263,22 @@ selected checkpoint still reached only `497/1400` top1 in the exported model
 gate, versus the required `580/1400`. Stronger policy pressure did not move the
 root-choice boundary.
 
-`native-searchaware-reference-distill-targetonly-lr1e6-e80` is a diagnostic,
-not a candidate. It removes broad preservation entirely (`search_broad_weight=0`)
-and trains only the hard reference-root target corpus. If it cannot fit the
-target corpus to at least `900/1400` exported top1, reference-root distillation
-is closed as currently implemented. If it can fit, the blocker is
-preservation/generalization rather than target plumbing. No engine gate and no
-SPRT from this run.
+`native-searchaware-reference-distill-targetonly-lr1e6-e80` passed as a
+diagnostic, not as a candidate. It removed broad preservation entirely
+(`search_broad_weight=0`) and trained only the hard reference-root target
+corpus. The selected checkpoint reached `1072/1400` top1 and `1351/1400` top3
+with exact `.pt`/`.nn` parity, so the objective can fit the target corpus.
+But broad drift against the parent rose to roughly `175cp`, so the resulting
+net is not playable. The blocker is preservation/generalization, not target
+plumbing.
+
+`native-searchaware-reference-distill-recover-lr2e7-e80` is the one staged
+recovery audit for this recipe. It initializes from the target-only fit and
+uses `search_broad_target_net` to distill broad rows back toward the rejected
+native parent while retaining reference-root target top1. The predeclared
+retention gate is `950/1400` top1 with exact `.pt`/`.nn` parity. If it passes,
+run only the corrected native-32 unified `10k` search gate first. No SPRT unless
+both corrected `10k` and `300k` search gates beat the parent.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
