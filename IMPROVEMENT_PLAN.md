@@ -35,7 +35,10 @@ Current `build.json` state:
   rejected. It combined the best prior native bucket-density signal (`1`
   train-time input bucket expanded to the `32`-bucket runtime layout) with the
   `1280` hidden-width architecture. It completed training, but all checkpoints
-  failed the external `800`-target Lichess-policy gate. No SPRT.
+  failed the external `800`-target Lichess-policy gate. Follow-up direct model
+  and model/search joins show this is not a validation artifact: 1280 lowered
+  scalar training loss but degraded both direct exported model choice and engine
+  search behavior. No SPRT.
 - `native-searchaware-rootchild-combo-w2-lr5e7-e80` is rejected. It combined
   `1400` broad reference-root targets with `690` broad child-continuation
   targets, but failed the hard exported model gate: final `.pt/.nn` parity was
@@ -436,7 +439,9 @@ Native lane:
   promotion smoke, but is the best bucket-ladder signal. Checkpoint `1536`
   reached all `106` vs `246`, capped `-15116`, top1 `397/800`; this is still
   bad, but better than the longer 32-bucket checkpoint on the same 800-target
-  gate.
+  gate. Re-gating checkpoint `1536` with the current native-load guard
+  reproduced the exact result, so this signal is real and not legacy-loader
+  contamination.
 - `native-bullet-lichess-eval-500k-wdl0-sb256` is rejected. The only useful
   checkpoint gate was a 200-target smoke at checkpoint `32`, and it collapsed:
   top1 `39/200`, `12` vs `146`, capped `-20416`, worst regression `-32000cp`.
@@ -459,7 +464,13 @@ Native lane:
   `-64477`, worst regression `-32000cp`. Checkpoint `2048` was `69` vs `508`,
   capped `-68602`. This is worse than both the 1024-hidden one-bucket smoke and
   the 16-bucket/1280 smoke. Do not continue hidden-width plus one-bucket scalar
-  Test79 variants.
+  Test79 variants. Direct exported-model gates on checkpoint `1536` were also
+  poor: 1024-hidden one-bucket was only `185/800` top1 and `368/800` top3,
+  while 1280-hidden one-bucket was worse at `171/800` top1 and `360/800` top3.
+  The 1024 search gate is better only because search rescues many bad static
+  choices (`267` rows where model was not top1 but engine search was top1);
+  the 1280 run has far worse model/search disagreement (`500`
+  reference-better rows, capped `-64477`, median nonzero `-152cp`).
 - `native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048` is
   rejected. It used `ENYO_NNUE_BUCKETS=8` in the engine and
   `bullet_enyo_runtime_input_buckets=8` in the exporter, so this was a real
@@ -523,6 +534,9 @@ Current next action:
 - validation tooling accepts the current native engine load line
   (`nnue: loaded network from`) and still rejects invalid-size fallback to the
   embedded evaluator.
+- `search_target_model_gate.py` can now load both 1024- and 1280-hidden native
+  `.nn` files, so direct exported-model gates are available for hidden-width
+  experiments.
 - `native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048` is
   rejected. Checkpoint 512 scored top1 `185/800`, candidate_better `59` vs
   reference_better `532`, capped sum `-74484`, worst regression `-32000`.
