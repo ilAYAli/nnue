@@ -279,12 +279,32 @@ passed at `1073/1400` top1, but `search_select_best_target` saved epoch `0`;
 later epochs had lower broad drift (`~105cp`) while still retaining about
 `1052/1400` target top1.
 
-`native-searchaware-reference-distill-recover-final-lr2e7-e80` is configured to
-rerun the same recovery but save the final epoch instead of the target-best
-epoch. The retention gate remains `950/1400` top1 with exact `.pt`/`.nn`
-parity. If it passes, run only the corrected native-32 unified `10k` search
-gate first. No SPRT unless both corrected `10k` and `300k` search gates beat
-the parent.
+`native-searchaware-reference-distill-recover-final-lr2e7-e80` is rejected as
+an engine candidate. It fixed the checkpoint-selection error and saved the
+lower-drift final epoch: training ended around `105cp` broad drift while
+retaining `1052/1400` target top1. The exported model gate passed with exact
+`.pt`/`.nn` parity at `1064/1400` top1 and `1346/1400` top3. But corrected
+native-32 `10k` search on the unified corpus failed against the parent:
+top1 `425/1409`, top3 `785/1409`, and compare `181` candidate-better vs
+`717` parent-better with capped sum `-65161`.
+
+The useful diagnosis is that the exported model is better than search on the
+same unified targets: model top1 was `682/1409`, but Enyo search followed the
+model root move on only `442/1409`. In the subset where the model had the
+target root move but search overrode it, the parent was better `345` times vs
+only `9` candidate-better, capped `-40361`. Root-only search-aware fitting is
+therefore not sufficient; the next test must train the continuation positions
+that make search reject the static root preference.
+
+`native-searchaware-override-child-targetonly-lr1e6-e120` is the current
+diagnostic. It uses `160` child positions generated from the worst model-top1
+/ search-override cases, scored at `50k` nodes per legal move and rebuilt as
+`override_child_targets.jsonl` with `2166` move rows. Parent baseline on this
+child corpus is `38/160` top1; the rejected recovered model is `45/160`. The
+target-only diagnostic starts from the recovered model, uses no broad
+preservation, and must reach at least `120/160` exported `.pt`/`.nn` top1
+before any recovered child-continuation run is justified. No engine gate or
+SPRT from the target-only audit.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
