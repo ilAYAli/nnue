@@ -31,8 +31,14 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-searchaware-unified-mpe-continue-lr1e6-e64` is rejected and left as
+- `native-searchaware-override-child-recover-lr2e7-e80` is rejected and left as
   the last completed reproducible config.
+- Do not rerun or continue it. It proved that a small child-continuation target
+  set can be retained after export (`149/160` top1, `160/160` top3), but the
+  corrected native-32 `10k` unified search gate still failed the original
+  parent (`414/1409` top1, `183` candidate-better vs `720` parent-better,
+  capped `-65230`).
+- `native-searchaware-unified-mpe-continue-lr1e6-e64` is also rejected.
 - Do not rerun or continue it. It cleared the exported model gate
   (`647/1409` top1, `1065/1409` top3) and moved sparse tensors. The original
   engine-search rejection was invalid because it used an engine build that
@@ -307,13 +313,23 @@ parity: `151/160` top1, `158/160` top3, sum gap `23cp`, worst gap `6cp`.
 This validates the search-override failure theory, but the target-only model is
 not a candidate because broad drift is uncontrolled.
 
-`native-searchaware-override-child-recover-lr2e7-e80` is the current recovery
-audit. It initializes from the child target-only fit and distills broad rows
-back toward `native-searchaware-reference-distill-recover-final-lr2e7-e80`.
-The exported `.pt`/`.nn` model gate must retain at least `130/160` child-target
-top1. If it passes, run only a corrected native-32 unified `10k` search gate
-against the original parent reference CSV. No SPRT unless corrected `10k` and
-then `300k` gates beat the original parent.
+`native-searchaware-override-child-recover-lr2e7-e80` is rejected as an engine
+candidate. It initialized from the child target-only fit and distilled broad
+rows back toward `native-searchaware-reference-distill-recover-final-lr2e7-e80`.
+The exported `.pt`/`.nn` model gate retained the child-continuation signal with
+exact parity: `149/160` top1, `160/160` top3, sum gap `22cp`, worst gap `6cp`.
+But corrected native-32 `10k` search on the unified corpus still failed against
+the original parent reference CSV: top1 `414/1409`, top3 `788/1409`,
+compare `183` candidate-better vs `720` parent-better, capped sum `-65230`,
+median nonzero diff `-51cp`, worst regression `-32000cp`. This is no 300k gate
+and no SPRT.
+
+Decision: close the small child-continuation patch family. The target
+construction is learnable and export-stable, but `160` continuation positions
+are too narrow to change broad search behavior. Any further native work must
+either scale this idea into a broad search-stability corpus or change the
+native architecture/data source; do not run another preservation-weight sweep
+on the same child set.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
