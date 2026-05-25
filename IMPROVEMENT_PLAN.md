@@ -31,10 +31,19 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-searchaware-override-child-recover-lr2e7-e80` is rejected and left as
-  the last completed reproducible config.
-- Do not rerun or continue it. It proved that a small child-continuation target
-  set can be retained after export (`149/160` top1, `160/160` top3), but the
+- `native-searchaware-override-child-broad-recover-w20-lr2e7-e120` is the
+  active config. It is the only allowed recovery audit after the broad
+  child-continuation target-only pass. No 300k gate or SPRT unless it first
+  improves the corrected native-32 `10k` unified gate against the original
+  parent reference CSV.
+- `native-searchaware-override-child-broad-targetonly-lr1e6-e160` completed as
+  a diagnostic, not a candidate. It fit the broad `690`-target
+  child-continuation corpus after export with exact `.pt`/`.nn` parity:
+  `617/690` top1, `681/690` top3, sum gap `772cp`, worst gap `64cp`. Broad
+  drift was still around `330cp`, so it is not playable and must not be SPRT'd.
+- `native-searchaware-override-child-recover-lr2e7-e80` is rejected. Do not
+  rerun or continue it. It proved that a small child-continuation target set
+  can be retained after export (`149/160` top1, `160/160` top3), but the
   corrected native-32 `10k` unified search gate still failed the original
   parent (`414/1409` top1, `183` candidate-better vs `720` parent-better,
   capped `-65230`).
@@ -341,13 +350,23 @@ child-continuation corpus are still poor but ordered correctly: parent
 model `235/690`. This means the small child patch moved in the intended
 direction on broader continuation rows, but not enough to affect engine search.
 
-Next audit: `native-searchaware-override-child-broad-targetonly-lr1e6-e160`.
-It is target-only and non-playable by design. It starts from the final-recovery
-model and tries to overfit the `690` broad child-continuation targets. Required
-exported `.nn` top1 is `500/690`. If this fails, close the broad
-child-continuation objective. If it passes, run exactly one recovery audit with
-broad distillation and then the corrected native-32 `10k` gate before any
-deeper validation.
+`native-searchaware-override-child-broad-targetonly-lr1e6-e160` passed as a
+diagnostic. It started from the final-recovery model and overfit the `690`
+broad child-continuation targets. Exported `.pt` and `.nn` were exact on the
+gate: `617/690` top1, `681/690` top3, sum gap `772cp`, worst gap `64cp`.
+Training selected epoch `144`; later epochs stayed in the same target-retention
+range. This confirms the broad child-continuation objective is learnable and
+export-stable, but the run is non-playable because broad scalar drift remained
+around `330cp`.
+
+Next audit: `native-searchaware-override-child-broad-recover-w20-lr2e7-e120`.
+It is the single allowed recovery run for this family. It starts from the
+broad target-only model, distills broad rows back toward
+`native-searchaware-reference-distill-recover-final-lr2e7-e80`, and must retain
+at least `350/690` exported `.nn` top1 on the broad child-continuation corpus.
+If it passes, run the corrected native-32 `10k` unified search gate against the
+original parent reference CSV. If that search gate does not beat the parent,
+close the broad child-continuation family. No preservation-weight sweep.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
