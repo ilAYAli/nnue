@@ -27,20 +27,49 @@ def read_until(proc: subprocess.Popen[str], prefix: str) -> str:
             return line
 
 
+def read_until_lines(proc: subprocess.Popen[str], prefix: str) -> list[str]:
+    assert proc.stdout is not None
+    lines: list[str] = []
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            raise RuntimeError(f"engine exited before {prefix!r}")
+        line = line.strip()
+        lines.append(line)
+        if line.startswith(prefix):
+            return lines
+
+
 class UciEngine:
     def __init__(self, engine: Path, *, nnue_file: Path | None,
-                 threads: int, hash_mb: int) -> None:
+                 threads: int, hash_mb: int,
+                 require_native_net_load: bool) -> None:
         self.proc = subprocess.Popen(
             [str(engine)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, bufsize=1)
         send(self.proc, "uci")
         read_until(self.proc, "uciok")
+        if require_native_net_load:
+            send(self.proc, "debug on")
         send(self.proc, f"setoption name Threads value {threads}")
         send(self.proc, f"setoption name Hash value {hash_mb}")
         if nnue_file:
             send(self.proc, f"setoption name nnue_file value {nnue_file}")
         send(self.proc, "isready")
-        read_until(self.proc, "readyok")
+        ready_lines = read_until_lines(self.proc, "readyok")
+        if nnue_file and require_native_net_load:
+            text = "\n".join(ready_lines)
+            if "network loaded from" not in text:
+                raise RuntimeError(
+                    "engine did not report native NNUE load for "
+                    f"{nnue_file}; ready output was:\n{text}")
+            if (
+                "embedded evaluator loaded from" in text
+                or "nnue: loaded network" in text
+            ):
+                raise RuntimeError(
+                    "engine used legacy/embedded NNUE loader for "
+                    f"{nnue_file}; ready output was:\n{text}")
 
     def close(self) -> None:
         if self.proc.poll() is None:
@@ -97,10 +126,14 @@ def move_info(target: dict[str, object], move: str) -> dict[str, object]:
     return {"rank": 999, "score_cp": 0, "gap_cp": 32000, "policy": 0.0}
 
 
-def run_engine(engine: Path, net: Path | None, targets: list[dict[str, object]],
-               *, nodes: int, threads: int, hash_mb: int,
-               reset_game: bool) -> list[dict[str, object]]:
-    uci = UciEngine(engine, nnue_file=net, threads=threads, hash_mb=hash_mb)
+def run_engine(
+    engine: Path, net: Path | None, targets: list[dict[str, object]],
+    *, nodes: int, threads: int, hash_mb: int,
+    reset_game: bool, require_native_net_load: bool,
+) -> list[dict[str, object]]:
+    uci = UciEngine(
+        engine, nnue_file=net, threads=threads, hash_mb=hash_mb,
+        require_native_net_load=require_native_net_load)
     rows: list[dict[str, object]] = []
     try:
         for target in targets:
@@ -241,6 +274,11 @@ def main() -> int:
         action="store_true",
         help="Do not send ucinewgame/isready before each target.",
     )
+    parser.add_argument(
+        "--require-native-net-load",
+        action="store_true",
+        help="Fail if a supplied net is not loaded through the native NNUE loader.",
+    )
     args = parser.parse_args()
 
     if args.reference_csv and (args.reference_net or args.reference_engine):
@@ -254,7 +292,8 @@ def main() -> int:
     candidate = run_engine(args.engine.expanduser(),
                            args.candidate_net.expanduser() if args.candidate_net else None,
                            targets, nodes=args.nodes, threads=args.threads,
-                           hash_mb=args.hash, reset_game=not args.reuse_hash)
+                           hash_mb=args.hash, reset_game=not args.reuse_hash,
+                           require_native_net_load=args.require_native_net_load)
     write_csv(out_dir / "candidate.csv", candidate)
     lines: list[str] = []
     for name, rows in sorted(split_rows(candidate).items()):
@@ -269,7 +308,8 @@ def main() -> int:
         reference = run_engine(ref_engine,
                                args.reference_net.expanduser() if args.reference_net else None,
                                targets, nodes=args.nodes, threads=args.threads,
-                               hash_mb=args.hash, reset_game=not args.reuse_hash)
+                               hash_mb=args.hash, reset_game=not args.reuse_hash,
+                               require_native_net_load=args.require_native_net_load)
 
     if reference is not None:
         write_csv(out_dir / "reference.csv", reference)
