@@ -32,24 +32,18 @@ The main failure pattern is:
 Current `build.json` state:
 
 - `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048`
-  is configured.
-- This is a native data/geometry smoke:
-  real `8` train-time/runtime input buckets, CP-only, no Berserk
-  initialization.
-- Data source: `test80-2024-01-jan-2tb7p.min-v2.v6.binpack`, a recent
-  Stockfish/Leela-derived NNUE binpack chunk.
-- Audit on 1M sampled rows passed:
-  - result distribution: win/draw/loss `17.75/63.14/19.11`.
-  - mean cp `-1.44`, mean abs cp `286.17`.
-  - score/result agreement on non-draw rows `83.79%`.
-- First gate: checkpoints `512`, `1024`, `1536`, and `2048` on the 800-target
-  Lichess-policy gate using the cached reference CSV. No continuation or SPRT
-  unless this materially beats the prior real-8-runtime Test79 smoke and does
-  not retain mate-like tails.
+  is rejected and left only as the last completed reproducible config.
+- Do not rerun it. Best row was checkpoint `2048`: all top1 `195/800`,
+  `69` vs `525`, capped `-76578`, worst regression `-32000cp`.
 - The one-bucket Test80 source smoke is rejected:
   `native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048` stayed flat from
   checkpoints `512` through `2048`; checkpoint `2048` was all top1 `205/800`,
   `70` vs `501`, capped `-67617`, worst regression `-32000cp`.
+- The active artifact is now the unified search-aware target corpus:
+  `runs/native-searchaware-unified-targets-20260525/search_aware_unified_targets.jsonl`.
+  It combines existing scored legal-move sources into `1409` deduped targets
+  and `20067` scored moves; `235` are `mate_like`, `1174` are `non_mate`, and
+  marker coverage is complete (`missing_marked=0`).
 - The last useful prior result remains diagnostic only: target-only search-policy
   overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
   but target preservation did not clear the predeclared gate and is not
@@ -131,16 +125,13 @@ move-choice behavior worse on the external policy gate.
 The controlled one-bucket Test80 data-source test is rejected. Better external
 data alone did not recover move-choice behavior.
 
-The next native attempt keeps the same Test80 2024 binpack source and CP-only
-objective, but restores the lower-bucket geometry that previously gave the
-best native signal: real `8` train-time/runtime input buckets. This answers a
-narrow question: was the one-bucket collapse due to under-bucketed geometry, or
-does Test80 also fail when combined with the best prior native bucket layout?
+The real-8-runtime Test80 run is rejected. Test80 scalar training is worse than
+the older Test79 scalar runs for this native architecture, both with one bucket
+and with the best prior lower-bucket geometry. Stop scalar-only Test80 variants.
 
-This is not a promotion candidate generation loop. It is one controlled
-failure-theory test. If it does not materially beat the prior Test79 real-8
-runtime run on the cached 800-target gate, stop this data/geometry family and
-move back to target/objective design.
+The next native task is target/objective design. Use the unified search-aware
+target corpus as the broad gate and training-objective preflight source before
+any new GPU training family.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
@@ -152,6 +143,12 @@ paused.
 
 Native lane:
 
+- `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048` is
+  rejected. It tested the newer Test80 source with the prior best real
+  8-runtime-bucket native geometry. Checkpoints `512`, `1024`, `1536`, and
+  `2048` all failed badly; checkpoint `2048` was all top1 `195/800`,
+  `69` vs `525`, capped `-76578`, worst regression `-32000cp`. Do not run
+  more scalar-only Test80 bucket/data variants.
 - `native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048` is rejected.
   It was a controlled data-source smoke with one shared train-time input bucket
   expanded to the current runtime layout. Checkpoints `512`, `1024`, `1536`,
@@ -1022,22 +1019,18 @@ is negative.
 
 The next action should be one of these, in order:
 
-1. Let the current Test80 real-8-runtime run finish its checkpoint gate.
-2. If it fails, do not launch another scalar-only bucket/data variant.
-3. Build or expand a broad search-aware supervision corpus before the next
-   training family. It should include legal move scores, reference-selected
-   move, candidate-selected move, top-N teacher moves, mate-like flag, capped
-   score gaps, taxonomy tags, and phase/material tags.
-4. Implement or verify a mixed native objective path:
+1. Gate the unified search-aware corpus with the current reference engine and
+   save `reference.csv` as the baseline for future model gates.
+2. Implement or verify a mixed native objective path:
    CP/MPE-WDL plus policy/ranking from top-N child scores, with quantized
    forward/export checks.
-5. Add preflight gates before scale-up:
+3. Add preflight gates before scale-up:
    10k-100k overfit, gradient reach, quantization-boundary scan after early
    batches, exported `net-diff`, small move-choice gate, and tactical-tail gate.
-6. Only after those pass, run a larger Bullet/binpack native training job.
-7. Keep Reckless paused unless a new existing-weight-compatible architecture
+4. Only after those pass, run a larger Bullet/binpack native training job.
+5. Keep Reckless paused unless a new existing-weight-compatible architecture
    hypothesis changes representation in a measurable way.
-8. No SPRT from current native/search-aware/reckless output-delta runs.
+6. No SPRT from current native/search-aware/reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, objective, architecture/export change, and gates.
