@@ -424,6 +424,19 @@ Native lane:
   must reach at least `1600/5000` top1 on that corpus, above the current
   reference net's direct model `1556/5000` and native parent `1107/5000`.
   If it misses, reject without search gate or SPRT.
+- `native-searchaware-lichess5k-mpe-preflight-lr3e6-e48` is rejected. It
+  trained quickly and improved broad scalar MAE, but missed the hard exported
+  model gate: selected epoch `46` reached exact `.pt/.nn` parity at only
+  `1255/5000` top1, `2503/5000` top3, sum gap `605871cp`, worst gap `800cp`.
+  This is better than the native parent direct model (`1107/5000`) but still
+  below the reference direct model (`1556/5000`) and far below the required
+  `1600/5000`. No search gate and no SPRT.
+- Next diagnostic only:
+  `native-searchaware-lichess5k-targetonly-lr1e6-e80`. Remove broad
+  preservation and test whether the same exported architecture/objective can
+  fit the 5k external-policy corpus at all. If target-only cannot clear a high
+  model gate, the blocker is objective/representation capacity. If it can, the
+  blocker remains broad preservation/generalization.
 - `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048` is
   rejected. It tested the newer Test80 source with the prior best real
   8-runtime-bucket native geometry. Checkpoints `512`, `1024`, `1536`, and
