@@ -36,6 +36,16 @@ Current `build.json` state:
   selected epoch `0`, exact `.pt/.nn` parity, `4/16` top1, `7/16` top3,
   sum gap `2078cp`, worst gap `471cp`. No search gate and no SPRT.
   Do not scale this objective.
+- Next configured diagnostic:
+  `native-reference-distill5k-targetonly-lr1e6-e80`. This changes the target
+  meaning from Stockfish child-oracle moves to the current reference engine's
+  searched root moves on the broad 5k Lichess-policy corpus. Retargeting kept
+  `4937/5000` rows; `63` reference moves were not in the preserved scored-move
+  set. Native parent direct-model baseline is `1146/4937` top1,
+  `2348/4937` top3. The target-only gate is at least `3000/4937` top1 with
+  exact `.pt/.nn` parity. If it fails, stop this distillation path. If it
+  passes, the only possible follow-up is a broad-recovery diagnostic; this is
+  not a candidate and must not be SPRT'd.
 - `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is
   rejected. It combined the best prior native bucket-density signal (`1`
   train-time input bucket expanded to the `32`-bucket runtime layout) with the
