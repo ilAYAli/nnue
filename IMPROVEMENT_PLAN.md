@@ -44,6 +44,11 @@ Current `build.json` state:
   It combines existing scored legal-move sources into `1409` deduped targets
   and `20067` scored moves; `235` are `mate_like`, `1174` are `non_mate`, and
   marker coverage is complete (`missing_marked=0`).
+- The current reference engine baseline on that unified corpus at `300k` nodes
+  is saved in
+  `runs/native-searchaware-unified-targets-20260525/reference_gate_300k/reference.csv`:
+  all top1 `761/1409`, top3 `1130/1409`; mate-like top1 `108/235`,
+  non-mate top1 `653/1174`.
 - The last useful prior result remains diagnostic only: target-only search-policy
   overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
   but target preservation did not clear the predeclared gate and is not
@@ -86,8 +91,10 @@ Code audit status:
 - PyTorch Kaiming input init already uses active-feature fan-in
   `sqrt(2 / 32)`, not full matrix fan-in.
 - scalar training already supports MPE/WDL blending.
-- search-aware training already supports ranking/policy targets, but the
-  target-only preservation family is closed.
+- search-aware training supports ranking/policy targets. As of
+  `native-searchaware-unified-mpe-preflight-lr3e6-e48`, its broad scalar term
+  can also use the same `mpe25`/WDL objective as normal scalar training.
+  The old target-only preservation family remains closed.
 - `tools/validate/validate.py quant-scan` now reports whether `.pt` float
   movement crosses exported input/L1 integer boundaries before a candidate is
   considered for broader gates.
@@ -132,6 +139,19 @@ and with the best prior lower-bucket geometry. Stop scalar-only Test80 variants.
 The next native task is target/objective design. Use the unified search-aware
 target corpus as the broad gate and training-objective preflight source before
 any new GPU training family.
+
+The current planned config is
+`native-searchaware-unified-mpe-preflight-lr3e6-e48`. It is a preflight, not a
+promotion candidate. It starts from the best available Enyo-owned native
+checkpoint only to test the mixed objective on the unified `1409`-target corpus:
+MPE/WDL broad supervision plus policy/ranking child-move loss under quantized
+forward. The init checkpoint's model-level baseline on the unified corpus is
+top1 `337/1409`, top3 `594/1409`, median gap `53.5cp`, worst gap `800cp`.
+The preflight must materially beat that model baseline, then pass
+quant-scan/net-diff, and only then be compared against the saved `300k`
+reference engine baseline. The current reference engine baseline is top1
+`761/1409`, top3 `1130/1409`, with severe mate-like/outlier gaps still present
+in the target set.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
@@ -1024,6 +1044,9 @@ The next action should be one of these, in order:
 2. Implement or verify a mixed native objective path:
    CP/MPE-WDL plus policy/ranking from top-N child scores, with quantized
    forward/export checks.
+   Current implementation status: search-aware training now forwards the broad
+   batch through the same scalar `score_loss` helper used by normal training,
+   so `objective=mpe25` and `wdl_lambda` are active for broad rows.
 3. Add preflight gates before scale-up:
    10k-100k overfit, gradient reach, quantization-boundary scan after early
    batches, exported `net-diff`, small move-choice gate, and tactical-tail gate.

@@ -20,6 +20,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import enyo_nnue as nn2
 from lib.nnue_dataset import load_score_dataset
 from lib.nnue_model import EnyoNNUE, export_model, load_model_from_nn
+try:
+    from train_impl import load_source_map, parse_source_values, score_loss
+except ModuleNotFoundError:
+    from train.train_impl import load_source_map, parse_source_values, score_loss
 
 
 @dataclass
@@ -478,15 +482,14 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         target_gap_sum = 0.0
         for batch_index, broad_batch in enumerate(broad_loader):
             broad_batch = to_device(broad_batch, args.device)
-            w, b, w_off, b_off, stm, y, _wdl, phase_scale, _source_ids = broad_batch
+            w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = broad_batch
             if init_model is not None:
                 with torch.no_grad():
                     y = predict(init_model, args, w, b, w_off, b_off, stm, phase_scale)
             elif args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
             pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
-            broad_loss = F.smooth_l1_loss(
-                pred, y, beta=args.huber_beta, reduction="mean")
+            broad_loss = score_loss(pred, y, wdl, source_ids, args)
 
             target_batch = next(target_iter)
             tensors = to_device(target_batch[:8], args.device)
@@ -579,6 +582,11 @@ def main() -> None:
     ap.add_argument("--input-lr-mult", type=float, default=1.0)
     ap.add_argument("--l1-lr-mult", type=float, default=1.0)
     ap.add_argument("--dense-lr-mult", type=float, default=1.0)
+    ap.add_argument("--objective", default="huber",
+                    choices=["mse", "huber", "mpe25"])
+    ap.add_argument("--wdl-lambda", type=float, default=0.75)
+    ap.add_argument("--sign-loss-weight", type=float, default=0.0)
+    ap.add_argument("--sign-loss-scale", type=float, default=100.0)
     ap.add_argument("--huber-beta", type=float, default=200.0)
     ap.add_argument("--target-clamp", type=float, default=800.0)
     ap.add_argument("--search-broad-weight", type=float, default=1.0)
@@ -618,6 +626,14 @@ def main() -> None:
     ap.add_argument("--trainable", default="all",
                     choices=["all", "input", "float-head", "output"])
     args = ap.parse_args()
+    source_map = load_source_map(args.data)
+    args.source_wdl_lambdas = parse_source_values(
+        [], value_name="source-wdl-lambda", source_map=source_map)
+    args.source_loss_weights = parse_source_values(
+        [], value_name="source-loss-weight", source_map=source_map)
+    if source_map:
+        print(f"source_map={source_map}", flush=True)
+    print(f"broad objective: {args.objective}", flush=True)
 
     model = train(args)
     out = Path(args.out)
