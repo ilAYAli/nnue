@@ -1,7 +1,7 @@
 {
   "description": "Native reference-distill staged recovery audit. Start from the target-only reference-root fit and distill broad behavior back toward the parent while retaining target top1.",
   "metadata": {
-    "experiment": "native-searchaware-reference-distill-recover-lr2e7-e80",
+    "experiment": "native-searchaware-reference-distill-recover-final-lr2e7-e80",
     "track": "nnue_native",
     "status": "configured",
     "parent": "native-searchaware-unified-mpe-continue-lr1e6-e64",
@@ -10,13 +10,14 @@
     "hard_reference_result": "native-searchaware-reference-distill-hard-lr5e7-e32 failed: selected checkpoint only reached 497/1400 top1, versus the required 580/1400, even with hard rank-1 policy and weaker broad init distillation.",
     "targetonly_result": "native-searchaware-reference-distill-targetonly-lr1e6-e80 passed the diagnostic: selected checkpoint reached 1072/1400 top1 and 1351/1400 top3 with exact .pt/.nn parity, but broad init drift reached about 175cp.",
     "reference_distill_targets": "runs/native-searchaware-reference-distill-hard-targets-20260525/reference_distill_hard_targets.jsonl: 1400 targets retargeted from the unified corpus to the reference engine's 300k selected root move, with policy_temperature_cp=0 and gap_floor_cp=50.",
-    "hypothesis": "The target can be fit, but simultaneous preservation blocks it. Start from the target-only fit and recover parent broad behavior with explicit broad-target-net distillation while retaining most target top1.",
+    "recover_result": "native-searchaware-reference-distill-recover-lr2e7-e80 retained target top1, but target-best checkpoint selection saved epoch 0. Later epochs had lower broad drift (~105cp) while still retaining about 1052/1400 target top1.",
+    "hypothesis": "Save the final recovery epoch instead of target-best epoch, so the model keeps lower broad drift while retaining most target top1.",
     "gate": "Recovery audit only. The exported .pt/.nn model gate must retain at least 950/1400 top1 before any corrected native-32 10k engine gate is considered.",
     "decision": "If target retention passes, run only a corrected native-32 unified 10k gate. If target retention fails or broad search is not better than parent, close staged reference-root recovery."
   },
   "create": {
-    "name": "native-searchaware-reference-distill-recover-lr2e7-e80",
-    "run_dir": "runs/native-searchaware-reference-distill-recover-lr2e7-e80",
+    "name": "native-searchaware-reference-distill-recover-final-lr2e7-e80",
+    "run_dir": "runs/native-searchaware-reference-distill-recover-final-lr2e7-e80",
     "backend": "search-aware",
     "labeled_jsonl": "/home/petter/code/cpp/chess/nnue/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl",
     "pack_skip": 0,
@@ -53,7 +54,7 @@
     "search_max_gap_cp": 800.0,
     "search_max_moves": 16,
     "search_target_shuffle": true,
-    "search_select_best_target": true,
+    "search_select_best_target": false,
     "search_model_gate_device": "cpu",
     "search_model_gate_min_top1": 950,
     "device": "cuda",
