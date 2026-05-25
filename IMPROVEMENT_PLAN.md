@@ -46,6 +46,12 @@ Current `build.json` state:
   exact `.pt/.nn` parity. If it fails, stop this distillation path. If it
   passes, the only possible follow-up is a broad-recovery diagnostic; this is
   not a candidate and must not be SPRT'd.
+- `native-reference-distill5k-targetonly-lr1e6-e80` is rejected/stopped. It
+  was below the native parent baseline immediately after epoch `0`
+  (`1095/4937` top1 vs parent `1146/4937`) and then degraded further to
+  `957/4937` by epoch `7`, so it was interrupted. Do not continue this run and
+  do not launch more search-aware target-only variants from the current native
+  checkpoint.
 - `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is
   rejected. It combined the best prior native bucket-density signal (`1`
   train-time input bucket expanded to the `32`-bucket runtime layout) with the
