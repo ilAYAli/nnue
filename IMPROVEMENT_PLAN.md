@@ -6,7 +6,8 @@ This file is the active working plan. Long experiment notes are archived in
 Goal: produce a stronger Enyo net without repeating already-failed NNUE farming
 loops.
 
-Only `Current State`, `Closed Lanes`, `Active Theory`, and `Next Decision` are
+Only `Current State`, `Closed Lanes`, `Active Bottleneck`,
+`Next Research Task`, `Do Not Do`, `Gates`, and `Candidate Workflow` are
 authoritative. Older result entries below are evidence, not invitations to
 restart a lane.
 
@@ -68,10 +69,15 @@ mechanistic hypothesis is written before the run:
 - Reckless existing-weight deltas that only affect dense/head tensors or a
   small bucket mask.
 
-## Active Theory
+## Active Bottleneck
 
 The current bottleneck is not ordinary scalar training loss. The bottleneck is
 safe, export-visible representation movement plus search-aware supervision.
+
+Do not treat data volume, teacher depth, LR, or head structure as the primary
+unknown unless a run first explains how it should improve exported
+representation movement and broad search move choice without creating tactical
+tails.
 
 Native work should now optimize for:
 
@@ -111,7 +117,7 @@ Code audit status:
 - may borrow architecture ideas, but the result is native to Enyo.
 - currently useful for background experiments, not promotion.
 
-## Active Decision: 2026-05-24
+## Next Research Task: 2026-05-25
 
 Update: the one-bucket scale-up, same-architecture native scalar scaling, WDL
 on test79, and target-only policy preservation are all rejected. Do not continue
@@ -130,6 +136,11 @@ objective, but restores the lower-bucket geometry that previously gave the
 best native signal: real `8` train-time/runtime input buckets. This answers a
 narrow question: was the one-bucket collapse due to under-bucketed geometry, or
 does Test80 also fail when combined with the best prior native bucket layout?
+
+This is not a promotion candidate generation loop. It is one controlled
+failure-theory test. If it does not materially beat the prior Test79 real-8
+runtime run on the cached 800-target gate, stop this data/geometry family and
+move back to target/objective design.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
@@ -833,7 +844,7 @@ eval data path is useful infrastructure, but the tiny eval-only smoke does not
 show move-choice promise. Any future Lichess-eval use must be part of a larger
 native data strategy with stronger gates, not a direct promotion lane.
 
-## Hard Rejections
+## Do Not Do
 
 Do not restart these as near-term Elo lanes:
 
@@ -992,7 +1003,7 @@ Do not restart these as near-term Elo lanes:
   `l1_weights changed=2621/32768`) but still did not produce a broad-gateable
   candidate. Stop this target-only preservation family.
 
-## Promotion Gates
+## Gates
 
 A candidate must pass cheap gates before match testing:
 
@@ -1007,24 +1018,26 @@ A candidate must pass cheap gates before match testing:
 A narrow positive gate does not justify SPRT if a broader gate or mate-like tail
 is negative.
 
-## Next Decision
+## Candidate Workflow
 
 The next action should be one of these, in order:
 
-1. Do not start a new training run from the current `build.json`.
-2. Write the native architecture/objective hypothesis before the next GPU run.
-   The hypothesis must choose the feature geometry, explain why it reduces data
-   starvation or improves representation learning, and list parity/NPS gates.
-3. Implement or verify a mixed native objective path:
+1. Let the current Test80 real-8-runtime run finish its checkpoint gate.
+2. If it fails, do not launch another scalar-only bucket/data variant.
+3. Build or expand a broad search-aware supervision corpus before the next
+   training family. It should include legal move scores, reference-selected
+   move, candidate-selected move, top-N teacher moves, mate-like flag, capped
+   score gaps, taxonomy tags, and phase/material tags.
+4. Implement or verify a mixed native objective path:
    CP/MPE-WDL plus policy/ranking from top-N child scores, with quantized
    forward/export checks.
-4. Add preflight gates before scale-up:
+5. Add preflight gates before scale-up:
    10k-100k overfit, gradient reach, quantization-boundary scan after early
    batches, exported `net-diff`, small move-choice gate, and tactical-tail gate.
-5. Only after those pass, run a larger Bullet/binpack native training job.
-6. Keep Reckless paused unless a new existing-weight-compatible architecture
+6. Only after those pass, run a larger Bullet/binpack native training job.
+7. Keep Reckless paused unless a new existing-weight-compatible architecture
    hypothesis changes representation in a measurable way.
-7. No SPRT from current native/search-aware/reckless output-delta runs.
+8. No SPRT from current native/search-aware/reckless output-delta runs.
 
 Do not launch another training run until `build.json` names the lane,
 hypothesis, data source, objective, architecture/export change, and gates.
