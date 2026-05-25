@@ -31,11 +31,18 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-searchaware-override-child-broad-recover-w20-lr2e7-e120` is the
-  active config. It is the only allowed recovery audit after the broad
-  child-continuation target-only pass. No 300k gate or SPRT unless it first
-  improves the corrected native-32 `10k` unified gate against the original
-  parent reference CSV.
+- `native-searchaware-rootchild-combo-w2-lr5e7-e80` is the active config. It
+  combines `1400` broad reference-root targets with `690` broad
+  child-continuation targets. No 300k gate or SPRT unless it first improves the
+  corrected native-32 `10k` unified gate against the original parent reference
+  CSV.
+- `native-searchaware-override-child-broad-recover-w20-lr2e7-e120` is
+  rejected. It retained the broad child-continuation target signal after export
+  (`607/690` top1, `679/690` top3), but corrected native-32 `10k` search got
+  worse than the prior child recovery: `407/1409` top1, `170`
+  candidate-better vs `749` reference-better, capped `-70808`. Its exported
+  model on the unified root target gate also fell to `497/1409` top1, proving
+  scalar broad distillation did not preserve searched root policy.
 - `native-searchaware-override-child-broad-targetonly-lr1e6-e160` completed as
   a diagnostic, not a candidate. It fit the broad `690`-target
   child-continuation corpus after export with exact `.pt`/`.nn` parity:
@@ -359,14 +366,30 @@ range. This confirms the broad child-continuation objective is learnable and
 export-stable, but the run is non-playable because broad scalar drift remained
 around `330cp`.
 
-Next audit: `native-searchaware-override-child-broad-recover-w20-lr2e7-e120`.
-It is the single allowed recovery run for this family. It starts from the
-broad target-only model, distills broad rows back toward
-`native-searchaware-reference-distill-recover-final-lr2e7-e80`, and must retain
-at least `350/690` exported `.nn` top1 on the broad child-continuation corpus.
-If it passes, run the corrected native-32 `10k` unified search gate against the
+`native-searchaware-override-child-broad-recover-w20-lr2e7-e120` is rejected.
+It retained the child-continuation objective with exact export parity:
+`607/690` top1, `679/690` top3, sum gap `827cp`, worst gap `64cp`, and reduced
+broad scalar drift to roughly `120cp`. But the corrected native-32 `10k`
+unified search gate failed worse than the small child recovery: all top1
+`407/1409`, top3 `751/1409`, `170` candidate-better vs `749`
+reference-better, capped `-70808`, median `-56cp`, worst `-32000cp`. The model
+/ search join shows the deeper problem: the exported model itself dropped to
+`497/1409` top1 on the unified root target gate, and rows where model top1 was
+not followed by search were `6` candidate-better vs `226` reference-better.
+Most loss still comes from `lichess_policy` and `broad_nonmate` rows. Scalar
+broad distillation is therefore not enough to preserve searched root policy.
+
+Next audit: `native-searchaware-rootchild-combo-w2-lr5e7-e80`. It starts from
+`native-searchaware-reference-distill-recover-final-lr2e7-e80` and trains one
+combined search-aware corpus:
+`runs/native-searchaware-rootchild-combo-targets-20260525/rootchild_combo_targets.jsonl`.
+That corpus has `1400` reference-root targets plus `690` broad
+child-continuation targets, with no duplicate ids. Child rows are weighted `2x`
+inside the search-aware loss so their effective count is close to the root
+policy rows. Required exported `.nn` model gate is `1300/2090` top1. If it
+passes, run the corrected native-32 `10k` unified search gate against the
 original parent reference CSV. If that search gate does not beat the parent,
-close the broad child-continuation family. No preservation-weight sweep.
+close search-aware patching and move to a larger data/architecture change.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
