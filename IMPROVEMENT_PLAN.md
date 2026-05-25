@@ -416,6 +416,14 @@ paused.
 
 Native lane:
 
+- Next configured run:
+  `native-searchaware-lichess5k-mpe-preflight-lr3e6-e48`. This is not a
+  candidate run. It starts from the rejected but best one-bucket native
+  checkpoint `1536` and trains against the new `5000`-target Lichess-policy
+  corpus with MPE/WDL broad preservation. The exported `.pt/.nn` model gate
+  must reach at least `1600/5000` top1 on that corpus, above the current
+  reference net's direct model `1556/5000` and native parent `1107/5000`.
+  If it misses, reject without search gate or SPRT.
 - `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048` is
   rejected. It tested the newer Test80 source with the prior best real
   8-runtime-bucket native geometry. Checkpoints `512`, `1024`, `1536`, and
@@ -679,6 +687,19 @@ Decision:
   late, `91` endgame, `66` mate-like.
 - reference baseline at `300k` nodes is sane: `top1=506/800` (`63.2%`) and
   `top3=690/800` (`86.2%`), with mate-like `top1=47/66` (`71.2%`).
+- `native-lichess-policy-targets-5k-mc26-20260525` scaled the same source to
+  `5000` targets. Construction scored `151081` legal moves and retained
+  `56026` child moves. The distribution is `3405` midgame, `1086` late, `509`
+  endgame, with `262` mate-like and `4738` non-mate targets.
+- the 5k reference baseline at `100k` nodes is also sane:
+  `top1=3009/5000` (`60.2%`), `top3=4295/5000` (`85.9%`), mate-like
+  `top1=191/262` (`72.9%`), non-mate `top1=2818/4738` (`59.5%`). Use this
+  as the next broad external-policy gate before spending GPU time.
+- native one-bucket checkpoint `1536` is rejected on the 5k gate:
+  `top1=2053/5000` (`41.1%`), `top3=3346/5000` (`66.9%`); compare
+  `603` candidate-better vs `2053` reference-better, capped `-147151`,
+  median nonzero `-34cp`, worst regression `-32000cp`. The old 800-target
+  improvement signal does not survive the broader external-policy gate.
 - native scratch checkpoint `12288` is rejected on this external gate:
   `top1=387/800`; compare `90` vs `263`, capped `-18472`,
   median nonzero `-32cp`, worst regression `-32000cp`.
