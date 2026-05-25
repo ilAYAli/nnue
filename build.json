@@ -3,12 +3,12 @@
   "metadata": {
     "experiment": "native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048",
     "track": "nnue_native",
-    "status": "configured",
+    "status": "rejected",
     "previous_result": "native-searchaware-rootchild-combo-w2-lr5e7-e80 failed the combined exported model gate at 1126/2090 top1 versus the required 1300/2090, so the current search-aware patching family is closed.",
     "basis": "The prior one-bucket Test79 scalar smoke was the best bucket-density signal despite still failing promotion gates. The prior 1280-hidden smoke used 16 buckets and was flat versus the 1024-hidden 16-bucket baseline. This run combines the best bucket density with the wider hidden layer.",
     "hypothesis": "A one-bucket train-time representation reduces bucket data starvation, while 1280 hidden neurons may recover capacity without adding bucket sparsity.",
-    "gate": "After training, run tools/validate/checkpoint_sweep.py on the external 800-target Lichess-policy corpus for checkpoints 512,1024,1536,2048. Reject unless a checkpoint beats the reference on candidate/reference counts, capped sum, and tail regression.",
-    "decision": "One architecture smoke only. No SPRT unless checkpoint sweep is clearly positive and mate-like tails are clean."
+    "gate": "Checkpoint sweep on the external 800-target Lichess-policy corpus for checkpoints 512,1024,1536,2048.",
+    "decision": "Rejected. Training completed in 21m22s, but all checkpoints failed the gate. Best candidate/reference count was checkpoint 1536: top1 206/800, top3 377/800, 73 candidate-better vs 500 reference-better, capped sum -64477, worst regression -32000. Checkpoint 2048 was 69 vs 508, capped -68602. No SPRT."
   },
   "create": {
     "name": "native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048",
@@ -48,6 +48,6 @@
     "checkpoint_sweep": "After bullet_train completes, run tools/validate/checkpoint_sweep.py with --enyo-input-buckets 1 --enyo-runtime-input-buckets 32 --hidden 1280 --l2 16 against /home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-800-mc26-20260524/lichess_policy_targets.jsonl.",
     "reference": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
     "engine": "/home/petter/code/cpp/chess/enyo_native_hidden/build-native-1280/enyo",
-    "hard_stop": "No 300k follow-up and no SPRT unless the 800-target checkpoint sweep is clearly better than the reference and has no mate-like tail blowout."
+    "hard_stop": "Rejected. Do not run a 300k follow-up or SPRT for this config."
   }
 }
