@@ -140,18 +140,23 @@ The next native task is target/objective design. Use the unified search-aware
 target corpus as the broad gate and training-objective preflight source before
 any new GPU training family.
 
+`native-searchaware-unified-mpe-preflight-lr3e6-e48` completed. It is not a
+promotion candidate. The run tested MPE/WDL broad supervision plus
+policy/ranking child-move loss under quantized forward on the unified
+`1409`-target corpus. It improved the exported model gate from the native init
+baseline `337/1409` top1 and `594/1409` top3 to exact `.pt`/`.nn` parity at
+`499/1409` top1 and `898/1409` top3, but failed the predeclared `600/1409`
+hard gate. Net-diff and quant-scan confirm this was export-visible movement:
+`2.81M/25.20M` exported values changed, including `11.161%` of input weights and
+`3.665%` of L1 weights.
+
 The current planned config is
-`native-searchaware-unified-mpe-preflight-lr3e6-e48`. It is a preflight, not a
-promotion candidate. It starts from the best available Enyo-owned native
-checkpoint only to test the mixed objective on the unified `1409`-target corpus:
-MPE/WDL broad supervision plus policy/ranking child-move loss under quantized
-forward. The init checkpoint's model-level baseline on the unified corpus is
-top1 `337/1409`, top3 `594/1409`, median gap `53.5cp`, worst gap `800cp`.
-The preflight must materially beat that model baseline, then pass
-quant-scan/net-diff, and only then be compared against the saved `300k`
-reference engine baseline. The current reference engine baseline is top1
-`761/1409`, top3 `1130/1409`, with severe mate-like/outlier gaps still present
-in the target set.
+`native-searchaware-unified-mpe-continue-lr1e6-e64`. This is a single controlled
+continuation because the parent selected its final epoch and was still
+improving. It starts from the parent exported `.nn`, lowers LR, uses the next
+`100k` broad rows, and keeps the same unified target gate. It must reach at
+least `600/1409` on the exported model gate before quant-scan/net-diff follow-up
+or any engine-search gate.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
