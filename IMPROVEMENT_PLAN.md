@@ -56,6 +56,14 @@ Current `build.json` state:
   `runs/native-searchaware-unified-targets-20260525/reference_gate_300k/reference.csv`:
   all top1 `761/1409`, top3 `1130/1409`; mate-like top1 `108/235`,
   non-mate top1 `653/1174`.
+- The current preflight target is
+  `runs/native-searchaware-reference-distill-targets-20260525/reference_distill_targets.jsonl`.
+  It rewrites the unified corpus toward the reference engine's actual `300k`
+  selected root move. It contains `1400` targets; `9` unified rows were skipped
+  because the reference move was not present in the retained legal-move list.
+  The rejected native parent scores only `491/1400` top1 and `856/1400` top3
+  on this retargeted corpus, so this is now a stricter test of searched-policy
+  imitation than the prior oracle child-eval gate.
 - The last useful prior result remains diagnostic only: target-only search-policy
   overfit can move exported input/L1 and can exactly fit a 64-row policy slice,
   but target preservation did not clear the predeclared gate and is not
@@ -237,6 +245,17 @@ Conclusion: continuation scalar labels move the intended failure subset, but
 they do not generalize to broad search. Do not repeat this as a scalar mix.
 The next native attempt needs an explicit searched-policy/ranking objective or
 a broader continuation corpus, not a small repeated PV-label blend.
+
+`native-searchaware-reference-distill-init-lr5e7-e24` is configured as the next
+native preflight. It continues from the rejected native-32 parent but changes
+the target meaning: rank 1 is the reference engine's corrected `300k` root move,
+not the oracle child-eval move. Broad rows distill the parent net
+(`search_broad_target=init`, `wdl_lambda=1.0`) to limit broad drift while the
+search-aware target tries to move root choice. Parent baseline on the
+reference-distill target corpus is `491/1400` top1. The predeclared model gate
+is `540/1400` top1 with exact `.pt`/`.nn` parity; if it passes, the first
+engine gate is the corrected native-32 unified corpus at `10k` nodes with
+`--require-native-net-load`. No SPRT from this config.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
