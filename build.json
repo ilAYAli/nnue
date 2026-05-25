@@ -47,7 +47,7 @@
   "validation": {
     "checkpoint_sweep": "After bullet_train completes, run tools/validate/checkpoint_sweep.py with --enyo-input-buckets 1 --enyo-runtime-input-buckets 32 --hidden 1280 --l2 16 against /home/petter/code/cpp/chess/nnue/runs/native-lichess-policy-targets-800-mc26-20260524/lichess_policy_targets.jsonl.",
     "reference": "/home/petter/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "engine": "/home/petter/code/cpp/chess/enyo_native_hidden/build-native-32/enyo",
+    "engine": "/home/petter/code/cpp/chess/enyo_native_hidden/build-native-1280/enyo",
     "hard_stop": "No 300k follow-up and no SPRT unless the 800-target checkpoint sweep is clearly better than the reference and has no mate-like tail blowout."
   }
 }
