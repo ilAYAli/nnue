@@ -31,14 +31,11 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is the
-  active config. It combines the best prior native bucket-density signal
-  (`1` train-time input bucket expanded to the `32`-bucket runtime layout) with
-  the `1280` hidden-width architecture. It trains on Test79 SF binpack only.
-  Gate by checkpoint sweep using the `build-native-1280` engine on the external
-  `800`-target Lichess-policy corpus.
-  No SPRT unless a checkpoint beats the reference on candidate/reference counts,
-  capped sum, and tail regression.
+- `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is
+  rejected. It combined the best prior native bucket-density signal (`1`
+  train-time input bucket expanded to the `32`-bucket runtime layout) with the
+  `1280` hidden-width architecture. It completed training, but all checkpoints
+  failed the external `800`-target Lichess-policy gate. No SPRT.
 - `native-searchaware-rootchild-combo-w2-lr5e7-e80` is rejected. It combined
   `1400` broad reference-root targets with `690` broad child-continuation
   targets, but failed the hard exported model gate: final `.pt/.nn` parity was
@@ -453,6 +450,16 @@ Native lane:
   flat against the 16-bucket/1024 baseline: all top1 `375/800`, `92` vs `285`,
   capped `-20283`, worst regression `-32000cp`; mate-like was worse than the
   parent (`4` vs `14`, capped `-1061`, worst `-31703cp`).
+- `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is
+  rejected. It combined `1` train-time input bucket expanded to `32` runtime
+  buckets with `1280` hidden neurons. Training completed in `21m22s`, but all
+  checkpoints failed the external `800`-target Lichess-policy gate. Checkpoint
+  `1536` was the least bad by candidate/reference count: all top1 `206/800`,
+  top3 `377/800`, `73` candidate-better vs `500` reference-better, capped sum
+  `-64477`, worst regression `-32000cp`. Checkpoint `2048` was `69` vs `508`,
+  capped `-68602`. This is worse than both the 1024-hidden one-bucket smoke and
+  the 16-bucket/1280 smoke. Do not continue hidden-width plus one-bucket scalar
+  Test79 variants.
 - `native-bullet-enyo8-runtime-sfbinpack-smoke-eval400-lr1e3-sb2048` is
   rejected. It used `ENYO_NNUE_BUCKETS=8` in the engine and
   `bullet_enyo_runtime_input_buckets=8` in the exporter, so this was a real
@@ -513,6 +520,9 @@ Current next action:
 
 - no Reckless training or SPRT run is justified until a new written hypothesis exists.
 - native has no active training config.
+- validation tooling accepts the current native engine load line
+  (`nnue: loaded network from`) and still rejects invalid-size fallback to the
+  embedded evaluator.
 - `native-bullet-enyo1-sfbinpack-wdl075-smoke-eval400-lr1e3-sb2048` is
   rejected. Checkpoint 512 scored top1 `185/800`, candidate_better `59` vs
   reference_better `532`, capped sum `-74484`, worst regression `-32000`.
