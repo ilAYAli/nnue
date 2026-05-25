@@ -246,14 +246,22 @@ they do not generalize to broad search. Do not repeat this as a scalar mix.
 The next native attempt needs an explicit searched-policy/ranking objective or
 a broader continuation corpus, not a small repeated PV-label blend.
 
-`native-searchaware-reference-distill-init-lr5e7-e24` is configured as the next
-native preflight. It continues from the rejected native-32 parent but changes
-the target meaning: rank 1 is the reference engine's corrected `300k` root move,
-not the oracle child-eval move. Broad rows distill the parent net
-(`search_broad_target=init`, `wdl_lambda=1.0`) to limit broad drift while the
-search-aware target tries to move root choice. Parent baseline on the
-reference-distill target corpus is `491/1400` top1. The predeclared model gate
-is `540/1400` top1 with exact `.pt`/`.nn` parity; if it passes, the first
+`native-searchaware-reference-distill-init-lr5e7-e24` is rejected. It continued
+from the rejected native-32 parent and changed the target meaning: rank 1 was
+the reference engine's corrected `300k` root move, not the oracle child-eval
+move. Broad rows distilled the parent net (`search_broad_target=init`,
+`wdl_lambda=1.0`). The selected target-best checkpoint reached only
+`486/1400` top1 during training and `498/1400` in the final exported `.pt`/`.nn`
+model gate, versus parent baseline `491/1400` and the required `540/1400`.
+The soft reference policy was too diffuse to move root choice.
+
+`native-searchaware-reference-distill-hard-lr5e7-e32` is the one allowed
+pressure audit for this recipe. It uses the same reference engine root moves,
+but with a hard rank-1 policy (`policy_temperature_cp=0`) and `50cp` minimum
+gap, weaker broad init distillation (`search_broad_weight=10`), and stronger
+search-aware loss. The predeclared model gate is `580/1400` top1 with exact
+`.pt`/`.nn` parity. If this does not clear the model gate, close
+reference-root distillation as currently implemented. If it clears, the first
 engine gate is the corrected native-32 unified corpus at `10k` nodes with
 `--require-native-net-load`. No SPRT from this config.
 
