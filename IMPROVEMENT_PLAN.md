@@ -31,11 +31,20 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-searchaware-rootchild-combo-w2-lr5e7-e80` is the active config. It
-  combines `1400` broad reference-root targets with `690` broad
-  child-continuation targets. No 300k gate or SPRT unless it first improves the
-  corrected native-32 `10k` unified gate against the original parent reference
-  CSV.
+- `native-bullet-enyo1-h1280-sfbinpack-smoke-eval400-lr1e3-sb2048` is the
+  active config. It combines the best prior native bucket-density signal
+  (`1` train-time input bucket expanded to the `32`-bucket runtime layout) with
+  the `1280` hidden-width architecture. It trains on Test79 SF binpack only.
+  Gate by checkpoint sweep on the external `800`-target Lichess-policy corpus.
+  No SPRT unless a checkpoint beats the reference on candidate/reference counts,
+  capped sum, and tail regression.
+- `native-searchaware-rootchild-combo-w2-lr5e7-e80` is rejected. It combined
+  `1400` broad reference-root targets with `690` broad child-continuation
+  targets, but failed the hard exported model gate: final `.pt/.nn` parity was
+  only `1126/2090` top1, `1709/2090` top3, sum gap `104701cp`, worst gap
+  `800cp`, below the required `1300/2090`. The training curve peaked early at
+  `1227/2090` top1 around epoch `12` and then degraded while broad MAE rose to
+  about `46cp`. No search gate and no SPRT.
 - `native-searchaware-override-child-broad-recover-w20-lr2e7-e120` is
   rejected. It retained the broad child-continuation target signal after export
   (`607/690` top1, `679/690` top3), but corrected native-32 `10k` search got
@@ -379,17 +388,22 @@ not followed by search were `6` candidate-better vs `226` reference-better.
 Most loss still comes from `lichess_policy` and `broad_nonmate` rows. Scalar
 broad distillation is therefore not enough to preserve searched root policy.
 
-Next audit: `native-searchaware-rootchild-combo-w2-lr5e7-e80`. It starts from
-`native-searchaware-reference-distill-recover-final-lr2e7-e80` and trains one
+`native-searchaware-rootchild-combo-w2-lr5e7-e80` is rejected. It started from
+`native-searchaware-reference-distill-recover-final-lr2e7-e80` and trained one
 combined search-aware corpus:
 `runs/native-searchaware-rootchild-combo-targets-20260525/rootchild_combo_targets.jsonl`.
-That corpus has `1400` reference-root targets plus `690` broad
-child-continuation targets, with no duplicate ids. Child rows are weighted `2x`
-inside the search-aware loss so their effective count is close to the root
-policy rows. Required exported `.nn` model gate is `1300/2090` top1. If it
-passes, run the corrected native-32 `10k` unified search gate against the
-original parent reference CSV. If that search gate does not beat the parent,
-close search-aware patching and move to a larger data/architecture change.
+That corpus had `1400` reference-root targets plus `690` broad
+child-continuation targets, with no duplicate ids. Child rows were weighted `2x`
+inside the search-aware loss. Final exported `.pt` and `.nn` were exact, but
+only reached `1126/2090` top1 and `1709/2090` top3, versus the required
+`1300/2090`. The best training point was early (`1227/2090` top1 near epoch
+`12`); later epochs traded away top1 while broad MAE climbed. No corrected
+search gate, no 300k gate, and no SPRT.
+
+Decision: close current search-aware patching. The target plumbing is learnable,
+but preserving broad searched policy and child-continuation repair inside this
+same architecture is not producing a candidate. Move to a larger
+data/architecture change.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
