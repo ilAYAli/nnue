@@ -272,13 +272,19 @@ But broad drift against the parent rose to roughly `175cp`, so the resulting
 net is not playable. The blocker is preservation/generalization, not target
 plumbing.
 
-`native-searchaware-reference-distill-recover-lr2e7-e80` is the one staged
-recovery audit for this recipe. It initializes from the target-only fit and
-uses `search_broad_target_net` to distill broad rows back toward the rejected
-native parent while retaining reference-root target top1. The predeclared
-retention gate is `950/1400` top1 with exact `.pt`/`.nn` parity. If it passes,
-run only the corrected native-32 unified `10k` search gate first. No SPRT unless
-both corrected `10k` and `300k` search gates beat the parent.
+`native-searchaware-reference-distill-recover-lr2e7-e80` passed target
+retention, but is not the model to gate. It initialized from the target-only fit
+and distilled broad rows back toward the rejected native parent. The target gate
+passed at `1073/1400` top1, but `search_select_best_target` saved epoch `0`;
+later epochs had lower broad drift (`~105cp`) while still retaining about
+`1052/1400` target top1.
+
+`native-searchaware-reference-distill-recover-final-lr2e7-e80` is configured to
+rerun the same recovery but save the final epoch instead of the target-best
+epoch. The retention gate remains `950/1400` top1 with exact `.pt`/`.nn`
+parity. If it passes, run only the corrected native-32 unified `10k` search
+gate first. No SPRT unless both corrected `10k` and `300k` search gates beat
+the parent.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
