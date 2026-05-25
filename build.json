@@ -1,20 +1,16 @@
 {
-  "description": "Controlled continuation of the native unified search-aware MPE/WDL preflight. Previous run improved exported model top1 from 337/1409 to 499/1409 but failed the 600/1409 hard gate; continue only because the final epoch was still improving.",
+  "description": "Rejected controlled continuation of the native unified search-aware MPE/WDL preflight. It passed the exported model gate but failed the real 300k-node engine-search gate badly, so this config is retained only as a reproducible rejected result.",
   "metadata": {
     "experiment": "native-searchaware-unified-mpe-continue-lr1e6-e64",
     "track": "nnue_native",
-    "status": "planned",
+    "status": "rejected",
     "parent": "native-searchaware-unified-mpe-preflight-lr3e6-e48",
     "parent_result": "model gate rerun: pt=nn exact, top1 499/1409, top3 898/1409, sum_gap 151483, median gap 19cp, worst 800cp. Net diff changed 2.81M/25.20M exported values, including 2.81M input weights and 1201 L1 weights. Quant scan showed exported input movement 11.161% and L1 movement 3.665%. This is export-visible but still below the preflight top1 threshold.",
     "hypothesis": "The mixed objective is not dead: it improved target move-choice substantially and selected the final epoch. A lower-LR continuation from the exported checkpoint, using the next 100k broad rows, tests whether it can cross the model gate without another scalar-only or local-repair loop.",
     "baseline_model_gate": "Parent exported model: top1 499/1409, top3 898/1409. Original native init model: top1 337/1409, top3 594/1409.",
     "baseline_reference_gate": "Current reference engine at 300k nodes on unified targets: top1 761/1409, top3 1130/1409; mate_like top1 108/235, non_mate top1 653/1174.",
-    "required_followup": [
-      "validate_search_targets_model must reach at least 600/1409",
-      "run quantization scan against the parent and original init net",
-      "run net-diff against the parent and original init net",
-      "run the unified 300k engine gate only if exported movement is sane"
-    ]
+    "result": "validate_search_targets_model passed with pt=nn exact, top1 647/1409, top3 1065/1409. Static on the next 100k broad rows improved versus parent (mae 129.63 -> 111.47, sign 76.81% -> 80.40%). Net-diff versus parent changed 1.725M/25.200M exported values, including 1.724M input weights and 290 L1 weights. Quant-scan versus parent showed exported input movement 6.853% and L1 movement 0.885%. Engine-search gate at 300k nodes rejected it: all top1 184/1409, top3 420/1409; compare all 119 candidate-better vs 1058 reference-better, capped_sum_diff_cp -150029, median_nonzero_diff_cp -276, worst_regression_cp -32000.",
+    "decision": "No SPRT. Do not continue this run or launch another same-objective continuation. The next task must diagnose the model-gate/search-gate disconnect with a small instrumented engine gate before more GPU training."
   },
   "create": {
     "name": "native-searchaware-unified-mpe-continue-lr1e6-e64",
@@ -64,7 +60,7 @@
   },
   "validation": {
     "preflight_only": "Do not run SPRT from this config.",
-    "continue_only_if": "Model gate top1 is at least 600/1409, exported sparse movement remains measurable, and broad engine gate does not create mate-like tails.",
-    "hard_stop": "If this continuation plateaus below 600/1409, stop this mixed-objective continuation path and move to a different architecture/data hypothesis."
+    "engine_gate": "Rejected at 300k nodes on the unified search-aware corpus.",
+    "hard_stop": "Closed. Do not continue the mixed-objective continuation path without a new model-gate/search-gate disconnect hypothesis."
   }
 }

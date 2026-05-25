@@ -31,14 +31,14 @@ The main failure pattern is:
 
 Current `build.json` state:
 
-- `native-bullet-test80-enyo8-runtime-cp-smoke-eval400-lr1e3-sb2048`
-  is rejected and left only as the last completed reproducible config.
-- Do not rerun it. Best row was checkpoint `2048`: all top1 `195/800`,
-  `69` vs `525`, capped `-76578`, worst regression `-32000cp`.
-- The one-bucket Test80 source smoke is rejected:
-  `native-bullet-test80-enyo1-cp-smoke-eval400-lr1e3-sb2048` stayed flat from
-  checkpoints `512` through `2048`; checkpoint `2048` was all top1 `205/800`,
-  `70` vs `501`, capped `-67617`, worst regression `-32000cp`.
+- `native-searchaware-unified-mpe-continue-lr1e6-e64` is rejected and left as
+  the last completed reproducible config.
+- Do not rerun or continue it. It cleared the exported model gate
+  (`647/1409` top1, `1065/1409` top3) and moved sparse tensors, but failed the
+  real 300k-node engine-search gate badly: all top1 `184/1409`, top3
+  `420/1409`; compare all `119` candidate-better vs `1058` reference-better,
+  capped sum `-150029`, median nonzero diff `-276cp`, worst regression
+  `-32000cp`.
 - The active artifact is now the unified search-aware target corpus:
   `runs/native-searchaware-unified-targets-20260525/search_aware_unified_targets.jsonl`.
   It combines existing scored legal-move sources into `1409` deduped targets
@@ -94,7 +94,9 @@ Code audit status:
 - search-aware training supports ranking/policy targets. As of
   `native-searchaware-unified-mpe-preflight-lr3e6-e48`, its broad scalar term
   can also use the same `mpe25`/WDL objective as normal scalar training.
-  The old target-only preservation family remains closed.
+  The old target-only preservation family remains closed. The follow-up
+  continuation proves that exported model-gate improvement is not sufficient:
+  search can collapse even when direct child-eval top1/top3 improve.
 - `tools/validate/validate.py quant-scan` now reports whether `.pt` float
   movement crosses exported input/L1 integer boundaries before a candidate is
   considered for broader gates.
@@ -150,13 +152,25 @@ hard gate. Net-diff and quant-scan confirm this was export-visible movement:
 `2.81M/25.20M` exported values changed, including `11.161%` of input weights and
 `3.665%` of L1 weights.
 
-The current planned config is
-`native-searchaware-unified-mpe-continue-lr1e6-e64`. This is a single controlled
-continuation because the parent selected its final epoch and was still
-improving. It starts from the parent exported `.nn`, lowers LR, uses the next
-`100k` broad rows, and keeps the same unified target gate. It must reach at
-least `600/1409` on the exported model gate before quant-scan/net-diff follow-up
-or any engine-search gate.
+`native-searchaware-unified-mpe-continue-lr1e6-e64` is rejected. It was the
+single allowed continuation of the mixed MPE/WDL/policy preflight. It improved
+the exported model gate to `.pt`/`.nn` parity at `647/1409` top1 and
+`1065/1409` top3, improved static scalar metrics on the next `100k` broad rows
+(`mae 129.63 -> 111.47`, `sign 76.81% -> 80.40%` versus the parent), and kept
+export-visible sparse movement (`1.72M` input weights, `290` L1 weights changed
+versus the parent). The 300k-node engine-search gate rejected it decisively:
+all top1 `184/1409`, top3 `420/1409`, mate-like top1 `60/235`, non-mate top1
+`124/1174`, compare all `119` candidate-better vs `1058` reference-better,
+capped sum `-150029`, median nonzero diff `-276cp`, worst regression
+`-32000cp`.
+
+Decision: no SPRT, no more continuation, and no more same-objective model-gate
+training. Direct child-eval/model-gate improvement can be a false positive.
+The next native step must explain the model-gate/search-gate disconnect before
+spending more GPU time. Use a small instrumented engine gate first: compare
+candidate behavior at very low nodes against the direct model gate and the
+300k-node gate, then decide whether the failure is runtime/eval parity,
+search amplification, or simply an unplayable representation.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
