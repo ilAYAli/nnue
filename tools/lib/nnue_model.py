@@ -39,6 +39,13 @@ class EnyoNNUE(nn_pt.Module):
                     ) -> torch.Tensor:
         return self.embed(feats, offsets) + self.input_bias
 
+    @staticmethod
+    def _quantized_input_relu(acc: torch.Tensor) -> torch.Tensor:
+        x = torch.clamp(acc, min=0.0, max=float(127 << nn2.QUANT1_BITS))
+        scaled = x / float(1 << nn2.QUANT1_BITS)
+        floored = torch.floor(scaled)
+        return scaled + (floored - scaled).detach()
+
     def raw_forward(self, w_feats: torch.Tensor, b_feats: torch.Tensor,
                     w_offsets: torch.Tensor, b_offsets: torch.Tensor,
                     stm: torch.Tensor) -> torch.Tensor:
@@ -50,8 +57,7 @@ class EnyoNNUE(nn_pt.Module):
         them = stm_f * w_acc + (1.0 - stm_f) * b_acc
         acc = torch.cat([us, them], dim=-1)
 
-        x0 = torch.clamp(acc, min=0.0, max=float(127 << nn2.QUANT1_BITS))
-        x0 = x0 / float(1 << nn2.QUANT1_BITS)
+        x0 = self._quantized_input_relu(acc)
         x1 = torch.relu(x0 @ self.l1_weight.t() + self.l1_bias)
         x2 = torch.relu(self.l2(x1))
         return self.output(x2).squeeze(-1) / nn2.EVAL_DIVISOR
