@@ -331,6 +331,24 @@ either scale this idea into a broad search-stability corpus or change the
 native architecture/data source; do not run another preservation-weight sweep
 on the same child set.
 
+`native-searchaware-override-child-broadtargets-20260525` scales the same
+diagnosis to all `model_top1 && search_overrode_model && parent_better` rows
+from the joined final-recovery diagnostics. It produced `345` root cases,
+`690` child positions, `19374` scored legal moves at `50k` nodes, and a
+`690`-target / `9817`-move search-aware corpus. Model gates on this broader
+child-continuation corpus are still poor but ordered correctly: parent
+`158/690` top1, final recovery `170/690`, and the rejected small child-recovery
+model `235/690`. This means the small child patch moved in the intended
+direction on broader continuation rows, but not enough to affect engine search.
+
+Next audit: `native-searchaware-override-child-broad-targetonly-lr1e6-e160`.
+It is target-only and non-playable by design. It starts from the final-recovery
+model and tries to overfit the `690` broad child-continuation targets. Required
+exported `.nn` top1 is `500/690`. If this fails, close the broad
+child-continuation objective. If it passes, run exactly one recovery audit with
+broad distillation and then the corrected native-32 `10k` gate before any
+deeper validation.
+
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
 
