@@ -1,14 +1,15 @@
 {
-  "description": "Native search-stability preflight. Continue the corrected native-32 search-aware model with a small repeated scalar mix from forced-PV continuation positions where search rejected the model-top1 root move. This tests whether searched continuation labels can reduce model-top1/search-override failures without another child-eval-only target run.",
+  "description": "Rejected native search-stability preflight. The forced-PV continuation scalar mix improved the targeted override subset, but did not improve the unified broad search gate.",
   "metadata": {
     "experiment": "native-searchaware-continuation-mix-lr5e7-e16",
     "track": "nnue_native",
-    "status": "configured",
+    "status": "rejected",
     "parent": "native-searchaware-unified-mpe-continue-lr1e6-e64",
     "parent_result": "Corrected native-32 validation rejected the parent: model gate top1 647/1409, 300k search top1 560/1409, compare all 207 candidate-better vs 553 reference-better, capped -35908. Join showed the parent is neutral when search follows the model move, but loses badly when search overrides it.",
     "hypothesis": "The parent already ranks the desired child as top1 in 303 failing positions, so repeating the same child-eval objective is useless. Add reference-labeled positions from the forced model-move PVs where forced search was at least 50cp worse than normal search. This should teach the searched continuation after the desired root move and reduce search override failures.",
     "continuation_data": "runs/native-searchaware-continuation-targets-20260525/forced_pv_worse50_reference_d10.jsonl: 1143 rows from 145 roots, reference depth 10, 8 mate rows skipped. Scores mean 41cp, median 30cp, min -2045, max 2045, 290 rows abs(score)>800.",
-    "hard_gate": "No SPRT. First require model gate not to collapse, then run corrected native-32 search gates on the 303 model-top1 override subset and unified 1k/10k/300k gates."
+    "result": "Model gate passed with exact pt/nn parity and top1 651/1409, top3 1061/1409. The 303-position override subset improved versus parent from 28 candidate-better vs 199 reference-better, capped -17453, to 49 vs 155, capped -11555. The unified 10k broad gate did not improve: parent was top1 446/1409, 187 vs 728, capped -66065; this run was top1 439/1409, 187 vs 737, capped -66243.",
+    "decision": "Rejected. No full 300k unified gate and no SPRT. The scalar continuation mix moved the intended subset but did not generalize. Do not repeat this recipe; next work needs explicit searched-policy/ranking supervision or a broader continuation corpus."
   },
   "create": {
     "name": "native-searchaware-continuation-mix-lr5e7-e16",
@@ -62,8 +63,8 @@
   },
   "validation": {
     "preflight_only": "Do not run SPRT from this config.",
-    "first_gate": "Model gate must stay at or above 620/1409 top1.",
-    "search_gate": "If model gate passes, run corrected native-32 search gates with --require-native-net-load on the model-top1 override subset and then on the unified corpus.",
-    "hard_stop": "Reject if override subset search does not improve without worsening the unified 10k/300k gate."
+    "first_gate": "Passed: model gate stayed above 620/1409 top1.",
+    "search_gate": "Rejected: override subset improved, but unified 10k gate did not.",
+    "hard_stop": "Closed. Do not continue this scalar continuation mix."
   }
 }
