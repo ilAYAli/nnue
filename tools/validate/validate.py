@@ -284,6 +284,10 @@ def cmd_search_gate(args: argparse.Namespace) -> int:
         command += ["--reference-engine", str(expand_user(args.reference_engine))]
     if args.reference_net:
         command += ["--reference-net", str(expand_user(args.reference_net))]
+    if args.reference_csv:
+        command += ["--reference-csv", str(expand_user(args.reference_csv))]
+    if args.require_native_net_load:
+        command.append("--require-native-net-load")
     emit_event(
         run_dir, "phase_start", stage="search_target_gate", status="running",
         command=command, hook_command=args.event_command or "",
@@ -424,12 +428,14 @@ def build_parser() -> argparse.ArgumentParser:
     search_gate.add_argument("--candidate-net")
     search_gate.add_argument("--reference-engine")
     search_gate.add_argument("--reference-net")
+    search_gate.add_argument("--reference-csv")
     search_gate.add_argument("--out-dir", required=True)
     search_gate.add_argument("--nodes", type=int, default=100000)
     search_gate.add_argument("--threads", type=int, default=1)
     search_gate.add_argument("--hash", type=int, default=128)
     search_gate.add_argument("--limit", type=int, default=0)
     search_gate.add_argument("--cap", type=int, default=200)
+    search_gate.add_argument("--require-native-net-load", action="store_true")
     search_gate.add_argument("--run")
     search_gate.add_argument("--event-command")
     search_gate.set_defaults(func=cmd_search_gate)

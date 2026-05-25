@@ -159,6 +159,11 @@ def parse_args() -> argparse.Namespace:
         "--reference-csv",
         help="Reuse a previously written search_target_gate reference.csv.",
     )
+    parser.add_argument(
+        "--require-native-net-load",
+        action="store_true",
+        help="Fail if exported checkpoints are not loaded by the native NNUE loader.",
+    )
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--nodes", type=int, default=300000)
     parser.add_argument("--threads", type=int, default=1)
@@ -245,6 +250,8 @@ def main() -> int:
             "--limit", str(args.limit),
             "--cap", str(args.cap),
         ]
+        if args.require_native_net_load:
+            command.append("--require-native-net-load")
         if reference_csv is not None:
             command.extend(["--reference-csv", str(reference_csv)])
         else:
