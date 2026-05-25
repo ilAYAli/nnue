@@ -39,6 +39,11 @@ Current `build.json` state:
   `420/1409`; compare all `119` candidate-better vs `1058` reference-better,
   capped sum `-150029`, median nonzero diff `-276cp`, worst regression
   `-32000cp`.
+- Low-node engine gates show the collapse is immediate, not a deep-search-only
+  amplification. At `1k` nodes it scored all top1 `155/1409`, top3 `381/1409`,
+  `103` candidate-better vs `1103` reference-better, capped sum `-160444`.
+  At `10k` nodes it scored all top1 `160/1409`, top3 `396/1409`, `105` vs
+  `1091`, capped sum `-157784`.
 - The active artifact is now the unified search-aware target corpus:
   `runs/native-searchaware-unified-targets-20260525/search_aware_unified_targets.jsonl`.
   It combines existing scored legal-move sources into `1409` deduped targets
@@ -164,13 +169,20 @@ all top1 `184/1409`, top3 `420/1409`, mate-like top1 `60/235`, non-mate top1
 capped sum `-150029`, median nonzero diff `-276cp`, worst regression
 `-32000cp`.
 
+Low-node diagnostics make this stronger: `1k` nodes already failed at all top1
+`155/1409`, `103` vs `1103`, capped `-160444`; `10k` nodes failed at all top1
+`160/1409`, `105` vs `1091`, capped `-157784`. The gap is present at shallow
+search, so the direct child-eval model gate is not a reliable proxy for playable
+move choice.
+
 Decision: no SPRT, no more continuation, and no more same-objective model-gate
 training. Direct child-eval/model-gate improvement can be a false positive.
 The next native step must explain the model-gate/search-gate disconnect before
-spending more GPU time. Use a small instrumented engine gate first: compare
-candidate behavior at very low nodes against the direct model gate and the
-300k-node gate, then decide whether the failure is runtime/eval parity,
-search amplification, or simply an unplayable representation.
+spending more GPU time. Dump per-target model-selected moves from the exported
+model gate, join them with low-node and `300k` engine-search CSVs, and identify
+whether failures are target construction, polarity/score-mode mismatch, or
+ordinary search instability. Do not train from this objective again until that
+join gives a concrete fix.
 
 Reckless remains paused until there is a new written hypothesis; the recent
 existing-weight architectural deltas were rejected by confirmation or smoke.
