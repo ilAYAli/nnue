@@ -46,6 +46,9 @@ Latest child-ranking result:
 - `child-ranking-fourgroup-preserve001-lr1e4-e320`: passed `.pt`, `.nn`, and
   engine gates at `4/4` with `broad_excess` about `63cp`. This is the first
   useful child-ranking preserve setting for the small ladder.
+- `child-ranking-lossv5-16-preserve001-lr1e4-e320`: passed the next rung.
+  Model gate: `.pt` and `.nn` `13/16`; misses were broad/quiet rows. Engine
+  gate: `16/16`. Final training broad excess was about `54cp`.
 
 Rejected lanes:
 
@@ -101,19 +104,19 @@ Secondary lanes:
 
 Run the next child-ranking ladder rung:
 
-1. Sixteen loss-log target groups from `losslogs_v5`.
-   - Use `targets/child-ranking/losslogs_v5_16.jsonl`.
-   - Use `broad_preserve_weight=0.01`; `0.02` blocked the hard small group.
-   - Require `.pt` and `.nn` model gates at least `13/16`.
-   - Require engine gate at least `13/16`.
+1. Sixty-four loss-log target groups from `losslogs_v5`.
+   - Use `targets/child-ranking/losslogs_v5_64.jsonl`.
+   - Use the same `broad_preserve_weight=0.01` that passed 16 groups.
+   - Require `.pt` and `.nn` model gates at least `52/64`.
+   - Require engine gate at least `52/64`.
    - Inspect misses by category before changing LR or weights.
-2. If the 16-group rung passes:
+2. If the 64-group rung passes:
    - expand to a larger category-balanced loss-log child set;
    - keep broad preservation active from epoch 0;
    - run replay/failure-suite gates;
    - run a 200-300 game smoke before any full SPRT.
 
-If the 16-group rung fails below `13/16`, stop and diagnose the misses. Do not
+If the 64-group rung fails below `52/64`, stop and diagnose the misses. Do not
 launch a larger set until the failed categories are understood.
 
 ## Candidate Workflow
@@ -126,7 +129,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-16-preserve001-lr1e4-e320`
+- candidate name: `child-ranking-lossv5-64-preserve001-lr1e4-e320`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -135,10 +138,10 @@ Current `build.json` intent:
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: ranking loss plus a `0.01` broad deadzone preservation leash
-- current ladder target: `targets/child-ranking/losslogs_v5_16.jsonl`
-  - 16 groups, 108 pairs.
-  - category balance: forcing `4`, queen/rook endgame `4`, conversion `2`,
-    pawn race `1`, broad-other `3`, quiet-broad `2`.
+- current ladder target: `targets/child-ranking/losslogs_v5_64.jsonl`
+  - 64 groups, 893 pairs, category-balanced from loss logs.
+  - category balance: forcing `13`, queen/rook endgame `18`, conversion `7`,
+    pawn race `1`, broad-other `13`, quiet-broad `12`.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
