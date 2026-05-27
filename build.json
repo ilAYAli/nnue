@@ -1,8 +1,8 @@
 {
   "description": "Active Enyo NNUE diagnostic: one-pair child ranking target-only capability test.",
-  "experiment": "child-ranking-a4b4-a4d4-targetonly-lr1e4-e160",
+  "experiment": "child-ranking-a4b4-neighbors-targetonly-lr1e4-e160",
   "create": {
-    "name": "child-ranking-a4b4-a4d4-targetonly-lr1e4-e160",
+    "name": "child-ranking-a4b4-neighbors-targetonly-lr1e4-e160",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/one_pair.jsonl",
@@ -26,7 +26,7 @@
     "rank_margin_cp": 250,
     "rank_temperature_cp": 25,
     "min_groups": 1,
-    "min_pairs": 1,
+    "min_pairs": 7,
     "child_model_gate_min_top1": 1,
     "child_engine_gate_min_top1": 1,
     "workers": 4,

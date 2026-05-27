@@ -15,6 +15,18 @@ Tooling correction:
 - `train_child_ranking.py` now trains child margins in parent POV. The first
   target-only run exposed that the previous loss used child side-to-move POV
   with the wrong sign: loss went down while `.pt`/`.nn` gates got worse.
+- `child_rank_engine_gate.py` uses the engine eval path. Current reference
+  binaries do not expose `eval2`, so the gate falls back to `eval <cp>` instead
+  of timing out on `unknown command: 'eval2'`.
+
+Latest child-ranking result:
+
+- `child-ranking-a4b4-a4d4-targetonly-lr3e5-e48`: failed one-pair model gate
+  after moving in the right direction (`.pt` margin `-269cp`, `.nn` margin
+  `-271cp`).
+- `child-ranking-a4b4-a4d4-targetonly-lr1e4-e160`: passed the one-pair
+  capability proof. `.pt` top1 `1/1` margin `+189cp`, `.nn` top1 `1/1` margin
+  `+172cp`, engine gate top1 `1/1`.
 
 Rejected lanes:
 
@@ -97,7 +109,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-a4b4-a4d4-targetonly-lr3e5-e48`
+- candidate name: `child-ranking-a4b4-neighbors-targetonly-lr1e4-e160`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -105,10 +117,10 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: target-only ranking loss for the one-pair capability diagnostic
+- objective: target-only ranking loss for the one-group capability diagnostic
 - first ladder target: `targets/child-ranking/one_pair.jsonl`
-  - current contents are intentionally reduced to `a4b4` vs `a4d4`
-    only; re-add neighbors only after this exported one-pair gate passes.
+  - current contents restore the original `a4b4` group with seven scored
+    neighbor/bad moves after the one-pair gate passed.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
