@@ -244,6 +244,9 @@ scripts/make_candidate.sh
 
 - Run all long-running tasks on `pwa-5090` in the tmux session `nnue_native`.
 - Localhost is for short edits, dry-runs, syntax checks, and git only.
+- Every long-running task must notify `AI_stdin` on `done` and `fail`.
+  `nnue_event_ntfy.sh` defaults to this; do not disable it unless the user
+  explicitly asks.
 - Before starting a long run, verify the host, branch, and tmux session:
 
 ```sh

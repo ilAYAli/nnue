@@ -8,7 +8,7 @@ NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 EVENTS=${NNUE_NTFY_EVENTS:-done,fail,test}
 AI_EVENTS=${NNUE_AI_STDIN_EVENTS:-done,fail}
-AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-0}
+AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
