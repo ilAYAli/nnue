@@ -84,6 +84,7 @@ class CandidateDefaults:
     workers: int = 2
     prefetch_factor: int = 2
     amp: str = "off"
+    torch_compile: bool = False
     val_rows: int = 100000
     max_rows: int = 0
     skip_rows: int = 0

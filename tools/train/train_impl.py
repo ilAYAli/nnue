@@ -140,6 +140,13 @@ def autocast_context(args: argparse.Namespace):
     return nullcontext()
 
 
+def maybe_compile_model(model: EnyoNNUE, args: argparse.Namespace):
+    if getattr(args, "torch_compile", False):
+        print("torch.compile enabled mode=reduce-overhead", flush=True)
+        return torch.compile(model, mode="reduce-overhead")
+    return model
+
+
 def selection_value(metrics: dict[str, float], args: argparse.Namespace) -> float:
     value = metrics[args.select_metric]
     return -value if args.select_metric == "sign" else value
@@ -284,6 +291,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     for group in param_groups:
         print(f"optimizer group {group['name']} lr={group['lr']}", flush=True)
     opt = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
+    forward_model = maybe_compile_model(model, args)
 
     best_metric = float("inf")
     best_display = float("inf")
@@ -303,7 +311,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
 
             with autocast_context(args):
-                pred = model_forward(model, w, b, w_off, b_off, stm, phase_scale, args)
+                pred = model_forward(forward_model, w, b, w_off, b_off, stm, phase_scale, args)
                 loss = score_loss(pred.float(), y, wdl, source_ids, args)
 
             opt.zero_grad()
@@ -331,7 +339,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                 f"mae={mae_sum / max(1, n):7.2f}")
         val_metrics = None
         if val_loader is not None:
-            val_metrics = eval_metrics(model, val_loader, args)
+            val_metrics = eval_metrics(forward_model, val_loader, args)
             line += (
                 f" val loss={val_metrics['loss']:.6f}"
                 f" mse={val_metrics['mse']:10.2f}"
@@ -410,6 +418,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--prefetch-factor", type=int, default=2)
     ap.add_argument("--amp", default="off", choices=["off", "bf16"])
+    ap.add_argument("--torch-compile", default=False,
+                    action=argparse.BooleanOptionalAction)
     ap.add_argument("--patience", type=int, default=0)
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
