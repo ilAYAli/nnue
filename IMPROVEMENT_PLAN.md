@@ -10,6 +10,12 @@ kind of Stockfish-labeled Enyo self-play.
 
 No trained Enyo net is currently a keeper.
 
+Tooling correction:
+
+- `train_child_ranking.py` now trains child margins in parent POV. The first
+  target-only run exposed that the previous loss used child side-to-move POV
+  with the wrong sign: loss went down while `.pt`/`.nn` gates got worse.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did

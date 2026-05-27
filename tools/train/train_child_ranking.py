@@ -191,7 +191,10 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
                 best_pred = forward_model(bw, bb, bwo, bbo, bstm, bphase)
                 other_pred = forward_model(ow, ob, owo, obo, ostm, ophase)
-                pred_margin = best_pred.float() - other_pred.float()
+                # Child evals are side-to-move POV after the parent move.
+                # Negate back to parent POV: best_parent - other_parent is
+                # other_child_stm - best_child_stm.
+                pred_margin = other_pred.float() - best_pred.float()
                 rank_loss = F.softplus((margin - pred_margin) / args.rank_temperature_cp).mean()
                 loss = (args.ranking_weight * rank_loss
                         + args.broad_preserve_weight * broad_loss)
