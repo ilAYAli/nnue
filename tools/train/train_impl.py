@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import sys
 from pathlib import Path
@@ -99,6 +100,37 @@ def selection_value(metrics: dict[str, float], args: argparse.Namespace) -> floa
     return -value if args.select_metric == "sign" else value
 
 
+def dataloader_kwargs(args: argparse.Namespace) -> dict[str, object]:
+    kwargs: dict[str, object] = {
+        "num_workers": args.workers,
+        "pin_memory": args.device.startswith("cuda"),
+    }
+    if args.workers > 0:
+        kwargs["persistent_workers"] = True
+        kwargs["prefetch_factor"] = args.prefetch_factor
+    return kwargs
+
+
+def move_batch(batch, device: str):
+    return tuple(
+        item.to(device, non_blocking=True) if torch.is_tensor(item) else item
+        for item in batch
+    )
+
+
+def autocast_context(args: argparse.Namespace):
+    if args.amp == "bf16" and args.device.startswith("cuda"):
+        return torch.autocast("cuda", dtype=torch.bfloat16)
+    return nullcontext()
+
+
+def maybe_compile_model(model: EnyoNNUE, args: argparse.Namespace):
+    if args.torch_compile:
+        print("torch.compile enabled mode=reduce-overhead", flush=True)
+        return torch.compile(model, mode="reduce-overhead")
+    return model
+
+
 @torch.no_grad()
 def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
                  ) -> dict[str, float]:
@@ -110,19 +142,15 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
     sign_n = 0
     n = 0
     for w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids in loader:
-        w = w.to(args.device)
-        b = b.to(args.device)
-        w_off = w_off.to(args.device)
-        b_off = b_off.to(args.device)
-        stm = stm.to(args.device)
-        y = y.to(args.device)
-        wdl = wdl.to(args.device)
-        phase_scale = phase_scale.to(args.device)
-        source_ids = source_ids.to(args.device)
+        w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = move_batch(
+            (w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids),
+            args.device,
+        )
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-        pred = model(w, b, w_off, b_off, stm, phase_scale)
-        loss = score_loss(pred, y, wdl, source_ids, args)
+        with autocast_context(args):
+            pred = model(w, b, w_off, b_off, stm, phase_scale)
+            loss = score_loss(pred.float(), y, wdl, source_ids, args)
         err = pred - y
         sign_mask = y != 0
         batch_n = len(y)
@@ -156,18 +184,21 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             f"val_skip={val_skip})", flush=True)
 
     train_set, collate_fn = load_score_dataset(
-        args.data, limit=train_limit, skip=args.skip_rows)
+        args.data, limit=train_limit, skip=args.skip_rows,
+        in_memory=args.dataset_in_memory)
     print(f"train rows: {len(train_set)}", flush=True)
     val_set = None
     if args.val:
         print(f"loading val rows from {args.val}", flush=True)
         val_set, val_collate_fn = load_score_dataset(
-            args.val, limit=args.val_rows)
+            args.val, limit=args.val_rows,
+            in_memory=args.dataset_in_memory)
     elif args.val_rows > 0:
         print(f"loading val rows from {args.data} at skip={val_skip}",
               flush=True)
         val_set, val_collate_fn = load_score_dataset(
-            args.data, limit=args.val_rows, skip=val_skip)
+            args.data, limit=args.val_rows, skip=val_skip,
+            in_memory=args.dataset_in_memory)
     if val_set is not None:
         print(f"val rows: {len(val_set)}", flush=True)
 
@@ -193,17 +224,16 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     train_loader = DataLoader(
         train_set, batch_size=args.batch_size, shuffle=True,
-        collate_fn=collate_fn, num_workers=args.workers,
-        pin_memory=args.device.startswith("cuda"))
+        collate_fn=collate_fn, **dataloader_kwargs(args))
     val_loader = (DataLoader(
         val_set, batch_size=args.batch_size, shuffle=False,
-        collate_fn=val_collate_fn, num_workers=args.workers,
-        pin_memory=args.device.startswith("cuda"))
+        collate_fn=val_collate_fn, **dataloader_kwargs(args))
         if val_set is not None else None)
 
     opt = torch.optim.AdamW(
         (p for p in model.parameters() if p.requires_grad),
         lr=args.lr, weight_decay=args.weight_decay)
+    forward_model = maybe_compile_model(model, args)
 
     best_metric = float("inf")
     best_display = float("inf")
@@ -214,20 +244,16 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         mse_sum = 0.0
         n = 0
         for w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids in train_loader:
-            w = w.to(args.device)
-            b = b.to(args.device)
-            w_off = w_off.to(args.device)
-            b_off = b_off.to(args.device)
-            stm = stm.to(args.device)
-            y = y.to(args.device)
-            wdl = wdl.to(args.device)
-            phase_scale = phase_scale.to(args.device)
-            source_ids = source_ids.to(args.device)
+            w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = move_batch(
+                (w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids),
+                args.device,
+            )
             if args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
 
-            pred = model(w, b, w_off, b_off, stm, phase_scale)
-            loss = score_loss(pred, y, wdl, source_ids, args)
+            with autocast_context(args):
+                pred = forward_model(w, b, w_off, b_off, stm, phase_scale)
+                loss = score_loss(pred.float(), y, wdl, source_ids, args)
 
             opt.zero_grad()
             loss.backward()
@@ -242,7 +268,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                 f"mae={mae_sum / max(1, n):7.2f}")
         val_metrics = None
         if val_loader is not None:
-            val_metrics = eval_metrics(model, val_loader, args)
+            val_metrics = eval_metrics(forward_model, val_loader, args)
             line += (
                 f" val loss={val_metrics['loss']:.6f}"
                 f" mse={val_metrics['mse']:10.2f}"
@@ -307,6 +333,12 @@ def main() -> None:
     ap.add_argument("--target-clamp", type=float, default=0.0)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--workers", type=int, default=0)
+    ap.add_argument("--prefetch-factor", type=int, default=2)
+    ap.add_argument("--amp", default="off", choices=["off", "bf16"])
+    ap.add_argument("--torch-compile", default=False,
+                    action=argparse.BooleanOptionalAction)
+    ap.add_argument("--dataset-in-memory", default=False,
+                    action=argparse.BooleanOptionalAction)
     ap.add_argument("--patience", type=int, default=0)
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)

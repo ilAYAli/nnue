@@ -15,6 +15,11 @@
     "epochs": 8,
     "select_metric": "sign",
     "patience": 2,
+    "workers": 4,
+    "prefetch_factor": 2,
+    "amp": "bf16",
+    "torch_compile": true,
+    "dataset_in_memory": true,
     "event_command": "$HOME/scripts/nnue_event_ntfy.sh"
   },
   "validation": {

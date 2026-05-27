@@ -231,6 +231,10 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--target-clamp", str(args.target_clamp),
                 "--device", args.device,
                 "--workers", str(args.workers),
+                "--prefetch-factor", str(args.prefetch_factor),
+                "--amp", args.amp,
+                "--torch-compile" if args.torch_compile else "--no-torch-compile",
+                "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
                 "--patience", str(args.patience),
                 "--val-rows", str(args.val_rows),
                 "--trainable", args.trainable,
@@ -361,6 +365,12 @@ def add_create_args(
     parser.add_argument("--batch-size", type=int, default=value("batch_size", d.batch_size))
     parser.add_argument("--device", default=value("device", d.device))
     parser.add_argument("--workers", type=int, default=value("workers", d.workers))
+    parser.add_argument("--prefetch-factor", type=int, default=value("prefetch_factor", d.prefetch_factor))
+    parser.add_argument("--amp", default=value("amp", d.amp), choices=["off", "bf16"])
+    parser.add_argument("--torch-compile", action=argparse.BooleanOptionalAction,
+                        default=value("torch_compile", d.torch_compile))
+    parser.add_argument("--dataset-in-memory", action=argparse.BooleanOptionalAction,
+                        default=value("dataset_in_memory", d.dataset_in_memory))
     parser.add_argument("--val-rows", type=int, default=value("val_rows", d.val_rows))
     parser.add_argument("--patience", type=int, default=value("patience", d.patience))
     parser.add_argument("--select-metric", default=value("select_metric", d.select_metric),

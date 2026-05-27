@@ -48,6 +48,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--target-clamp", str(args.target_clamp),
         "--device", args.device,
         "--workers", str(args.workers),
+        "--prefetch-factor", str(args.prefetch_factor),
+        "--amp", args.amp,
+        "--torch-compile" if args.torch_compile else "--no-torch-compile",
+        "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
         "--patience", str(args.patience),
         "--max-rows", str(args.max_rows),
         "--skip-rows", str(args.skip_rows),
@@ -116,6 +120,12 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--target-clamp", type=float, default=0.0)
     train.add_argument("--device", default="cpu")
     train.add_argument("--workers", type=int, default=0)
+    train.add_argument("--prefetch-factor", type=int, default=2)
+    train.add_argument("--amp", default="off", choices=["off", "bf16"])
+    train.add_argument("--torch-compile", default=False,
+                       action=argparse.BooleanOptionalAction)
+    train.add_argument("--dataset-in-memory", default=False,
+                       action=argparse.BooleanOptionalAction)
     train.add_argument("--patience", type=int, default=0)
     train.add_argument("--max-rows", type=int, default=0)
     train.add_argument("--skip-rows", type=int, default=0)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 from pathlib import Path
 import shutil
 
@@ -68,7 +69,11 @@ class CandidateDefaults:
     epochs: int = 8
     batch_size: int = 8192
     device: str = "cuda"
-    workers: int = 2
+    workers: int = 4
+    prefetch_factor: int = 2
+    amp: Literal["off", "bf16"] = "bf16"
+    torch_compile: bool = True
+    dataset_in_memory: bool = True
     val_rows: int = 100000
     patience: int = 2
     select_metric: str = "mae"
