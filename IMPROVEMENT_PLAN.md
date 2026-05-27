@@ -97,7 +97,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-onepair-targetonly-lr3e5-e48`
+- candidate name: `child-ranking-a4b4-a4d4-targetonly-lr3e5-e48`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -107,6 +107,8 @@ Current `build.json` intent:
 - score depth: `16`
 - objective: target-only ranking loss for the one-pair capability diagnostic
 - first ladder target: `targets/child-ranking/one_pair.jsonl`
+  - current contents are intentionally reduced to `a4b4` vs `a4d4`
+    only; re-add neighbors only after this exported one-pair gate passes.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`

@@ -1,8 +1,8 @@
 {
   "description": "Active Enyo NNUE diagnostic: one-pair child ranking target-only capability test.",
-  "experiment": "child-ranking-onepair-targetonly-lr3e5-e48",
+  "experiment": "child-ranking-a4b4-a4d4-targetonly-lr3e5-e48",
   "create": {
-    "name": "child-ranking-onepair-targetonly-lr3e5-e48",
+    "name": "child-ranking-a4b4-a4d4-targetonly-lr3e5-e48",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/one_pair.jsonl",
