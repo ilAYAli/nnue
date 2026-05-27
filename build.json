@@ -42,6 +42,7 @@
     "workers": 4,
     "prefetch_factor": 2,
     "amp": "bf16",
+    "torch_compile": true,
     "max_rows": 200000,
     "val_rows": 100000,
     "pack_limit": 200000,
