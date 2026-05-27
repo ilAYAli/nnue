@@ -251,6 +251,13 @@ def autocast_context(args: argparse.Namespace):
     return nullcontext()
 
 
+def maybe_compile_model(model: EnyoNNUE, args: argparse.Namespace):
+    if getattr(args, "torch_compile", False):
+        print("torch.compile enabled mode=reduce-overhead", flush=True)
+        return torch.compile(model, mode="reduce-overhead")
+    return model
+
+
 def predict(model: EnyoNNUE, args, w_feats: torch.Tensor, b_feats: torch.Tensor,
             w_offsets: torch.Tensor, b_offsets: torch.Tensor,
             stm: torch.Tensor, phase_scale: torch.Tensor) -> torch.Tensor:
@@ -502,6 +509,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     for group in param_groups:
         print(f"optimizer group {group['name']} lr={group['lr']}", flush=True)
     opt = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
+    forward_model = maybe_compile_model(model, args)
     best_state = None
     best_epoch = -1
     best_metrics: dict[str, float] | None = None
@@ -529,9 +537,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             tw, tb, two, tbo, tstm, tphase, group_offsets, best_indices = tensors
             gaps, policies, group_weights = to_device(target_batch[8:11], args.device)
             with autocast_context(args):
-                pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
+                pred = predict(forward_model, args, w, b, w_off, b_off, stm, phase_scale)
                 broad_loss = score_loss(pred.float(), y, wdl, source_ids, args)
-                target_pred = predict(model, args, tw, tb, two, tbo, tstm, tphase)
+                target_pred = predict(forward_model, args, tw, tb, two, tbo, tstm, tphase)
                 margin_loss, policy_loss, rank_loss, target_metrics = target_loss_and_metrics(
                     target_pred.float(), group_offsets, best_indices, gaps, policies,
                     group_weights, args)
@@ -563,7 +571,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             target_top3 += target_metrics["top3"]
             target_gap_sum += target_metrics["sum_gap"]
 
-        metrics = search_metrics(model, target_loader, args)
+        metrics = search_metrics(forward_model, target_loader, args)
         print(
             f"epoch {epoch:4d}"
             f" broad_w={broad_weight:g}"
@@ -659,6 +667,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--prefetch-factor", type=int, default=2)
     ap.add_argument("--amp", default="off", choices=["off", "bf16"])
+    ap.add_argument("--torch-compile", default=False,
+                    action=argparse.BooleanOptionalAction)
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
     ap.add_argument("--grad-norm-every", type=int, default=0)

@@ -307,6 +307,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--workers", str(args.workers),
             "--prefetch-factor", str(args.prefetch_factor),
             "--amp", args.amp,
+            "--torch-compile" if args.torch_compile else "--no-torch-compile",
             "--patience", str(args.patience),
             "--max-rows", str(args.max_rows),
             "--skip-rows", str(args.skip_rows),
@@ -516,6 +517,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--workers", str(args.workers),
             "--prefetch-factor", str(args.prefetch_factor),
             "--amp", args.amp,
+            "--torch-compile" if args.torch_compile else "--no-torch-compile",
             "--max-rows", str(args.max_rows),
             "--skip-rows", str(args.skip_rows),
             "--grad-norm-every", str(args.grad_norm_every),
@@ -1210,6 +1212,8 @@ def add_create_args(
     parser.add_argument("--workers", type=int, default=value("workers", d.workers))
     parser.add_argument("--prefetch-factor", type=int, default=value("prefetch_factor", d.prefetch_factor))
     parser.add_argument("--amp", default=value("amp", d.amp), choices=["off", "bf16"])
+    parser.add_argument("--torch-compile", default=value("torch_compile", d.torch_compile),
+                        action=argparse.BooleanOptionalAction)
     parser.add_argument("--val-rows", type=int, default=value("val_rows", d.val_rows))
     parser.add_argument("--max-rows", type=int, default=value("max_rows", d.max_rows))
     parser.add_argument("--skip-rows", type=int, default=value("skip_rows", d.skip_rows))
