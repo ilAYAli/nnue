@@ -74,18 +74,20 @@ class FenScoreDataset(Dataset):
 
 class PackedFenScoreDataset(Dataset):
     def __init__(self, path: str | Path, *,
-                 limit: int = 0, skip: int = 0) -> None:
+                 limit: int = 0, skip: int = 0,
+                 in_memory: bool = False) -> None:
         root = Path(path)
-        self.w_features = np.load(root / "white_features.npy", mmap_mode="r")
-        self.b_features = np.load(root / "black_features.npy", mmap_mode="r")
-        self.counts = np.load(root / "counts.npy", mmap_mode="r")
-        self.stms = np.load(root / "stm.npy", mmap_mode="r")
-        self.scores = np.load(root / "score.npy", mmap_mode="r")
-        self.wdls = np.load(root / "wdl.npy", mmap_mode="r")
-        self.phase_scales = np.load(root / "phase_scale.npy", mmap_mode="r")
+        mmap_mode = None if in_memory else "r"
+        self.w_features = np.load(root / "white_features.npy", mmap_mode=mmap_mode)
+        self.b_features = np.load(root / "black_features.npy", mmap_mode=mmap_mode)
+        self.counts = np.load(root / "counts.npy", mmap_mode=mmap_mode)
+        self.stms = np.load(root / "stm.npy", mmap_mode=mmap_mode)
+        self.scores = np.load(root / "score.npy", mmap_mode=mmap_mode)
+        self.wdls = np.load(root / "wdl.npy", mmap_mode=mmap_mode)
+        self.phase_scales = np.load(root / "phase_scale.npy", mmap_mode=mmap_mode)
         source_id_path = root / "source_id.npy"
         self.source_ids = (
-            np.load(source_id_path, mmap_mode="r")
+            np.load(source_id_path, mmap_mode=mmap_mode)
             if source_id_path.exists() else None)
 
         rows = len(self.counts)
@@ -177,9 +179,13 @@ def count_rows(path: str | Path) -> int:
     return n
 
 
-def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0
+def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
+                       in_memory: bool = False
                        ) -> tuple[Dataset, Callable]:
     p = Path(path)
     if p.is_dir():
-        return PackedFenScoreDataset(p, limit=limit, skip=skip), collate_packed
+        return (
+            PackedFenScoreDataset(p, limit=limit, skip=skip, in_memory=in_memory),
+            collate_packed,
+        )
     return FenScoreDataset.from_jsonl(p, limit=limit, skip=skip), collate

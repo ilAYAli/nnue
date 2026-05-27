@@ -308,6 +308,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--prefetch-factor", str(args.prefetch_factor),
             "--amp", args.amp,
             "--torch-compile" if args.torch_compile else "--no-torch-compile",
+            "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
             "--patience", str(args.patience),
             "--max-rows", str(args.max_rows),
             "--skip-rows", str(args.skip_rows),
@@ -518,6 +519,7 @@ def create_config(args: argparse.Namespace) -> dict:
             "--prefetch-factor", str(args.prefetch_factor),
             "--amp", args.amp,
             "--torch-compile" if args.torch_compile else "--no-torch-compile",
+            "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
             "--max-rows", str(args.max_rows),
             "--skip-rows", str(args.skip_rows),
             "--grad-norm-every", str(args.grad_norm_every),
@@ -1213,6 +1215,8 @@ def add_create_args(
     parser.add_argument("--prefetch-factor", type=int, default=value("prefetch_factor", d.prefetch_factor))
     parser.add_argument("--amp", default=value("amp", d.amp), choices=["off", "bf16"])
     parser.add_argument("--torch-compile", default=value("torch_compile", d.torch_compile),
+                        action=argparse.BooleanOptionalAction)
+    parser.add_argument("--dataset-in-memory", default=value("dataset_in_memory", d.dataset_in_memory),
                         action=argparse.BooleanOptionalAction)
     parser.add_argument("--val-rows", type=int, default=value("val_rows", d.val_rows))
     parser.add_argument("--max-rows", type=int, default=value("max_rows", d.max_rows))

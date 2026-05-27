@@ -449,7 +449,8 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         torch.cuda.manual_seed_all(args.seed)
 
     broad_set, broad_collate = load_score_dataset(
-        args.data, limit=args.max_rows, skip=args.skip_rows)
+        args.data, limit=args.max_rows, skip=args.skip_rows,
+        in_memory=args.dataset_in_memory)
     tag_weights = parse_tag_weights(args.search_tag_weights)
     if tag_weights:
         print(
@@ -668,6 +669,8 @@ def main() -> None:
     ap.add_argument("--prefetch-factor", type=int, default=2)
     ap.add_argument("--amp", default="off", choices=["off", "bf16"])
     ap.add_argument("--torch-compile", default=False,
+                    action=argparse.BooleanOptionalAction)
+    ap.add_argument("--dataset-in-memory", default=False,
                     action=argparse.BooleanOptionalAction)
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)

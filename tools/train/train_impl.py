@@ -241,18 +241,21 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             f"val_skip={val_skip})", flush=True)
 
     train_set, collate_fn = load_score_dataset(
-        args.data, limit=train_limit, skip=args.skip_rows)
+        args.data, limit=train_limit, skip=args.skip_rows,
+        in_memory=args.dataset_in_memory)
     print(f"train rows: {len(train_set)}", flush=True)
     val_set = None
     if args.val:
         print(f"loading val rows from {args.val}", flush=True)
         val_set, val_collate_fn = load_score_dataset(
-            args.val, limit=args.val_rows)
+            args.val, limit=args.val_rows,
+            in_memory=args.dataset_in_memory)
     elif args.val_rows > 0:
         print(f"loading val rows from {args.data} at skip={val_skip}",
               flush=True)
         val_set, val_collate_fn = load_score_dataset(
-            args.data, limit=args.val_rows, skip=val_skip)
+            args.data, limit=args.val_rows, skip=val_skip,
+            in_memory=args.dataset_in_memory)
     if val_set is not None:
         print(f"val rows: {len(val_set)}", flush=True)
 
@@ -419,6 +422,8 @@ def main() -> None:
     ap.add_argument("--prefetch-factor", type=int, default=2)
     ap.add_argument("--amp", default="off", choices=["off", "bf16"])
     ap.add_argument("--torch-compile", default=False,
+                    action=argparse.BooleanOptionalAction)
+    ap.add_argument("--dataset-in-memory", default=False,
                     action=argparse.BooleanOptionalAction)
     ap.add_argument("--patience", type=int, default=0)
     ap.add_argument("--max-rows", type=int, default=0)
