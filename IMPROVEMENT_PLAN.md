@@ -139,7 +139,8 @@ Current `build.json` intent:
 - score depth: `16`
 - objective: ranking loss plus a `0.01` broad deadzone preservation leash
 - current ladder target: `targets/child-ranking/losslogs_v5_64.jsonl`
-  - 64 groups, 893 pairs, category-balanced from loss logs.
+  - 64 groups, 891 positive-gap training pairs, category-balanced from loss
+    logs.
   - category balance: forcing `13`, queen/rook endgame `18`, conversion `7`,
     pawn race `1`, broad-other `13`, quiet-broad `12`.
 - main knobs:

@@ -26,7 +26,7 @@
     "rank_margin_cp": 250,
     "rank_temperature_cp": 25,
     "min_groups": 64,
-    "min_pairs": 893,
+    "min_pairs": 891,
     "child_model_gate_min_top1": 52,
     "child_engine_gate_min_top1": 52,
     "workers": 4,
