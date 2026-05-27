@@ -58,6 +58,12 @@ Latest child-ranking result:
   Model gate: `.pt` `42/64`, `.nn` `36/64`; corrected exported-engine gate:
   `36/64`. This means cleaner targets helped but not enough under the `0.01`
   broad leash.
+- `child-ranking-lossv5-signal64-targetonly-lr1e4-e320`: also failed. Model
+  gate: `.pt` `43/64`, `.nn` `37/64`; corrected exported-engine gate:
+  `37/64`. Removing broad preservation was not enough. Category split showed
+  broad rows are bad primary ranking targets: `broad_other` hit `3/15` and
+  `quiet_broad` hit `8/15`, while conversion/pawn-race/queen-rook mostly
+  learned and forcing was partial.
 
 Rejected lanes:
 
@@ -113,11 +119,12 @@ Secondary lanes:
 
 Run the next child-ranking ladder rung:
 
-1. Target-only diagnostic on the high-signal 64-group set.
-   - Use `targets/child-ranking/losslogs_v5_signal64.jsonl`.
+1. Target-only diagnostic on the focused 34-group primary set.
+   - Use `targets/child-ranking/losslogs_v5_signal34_primary.jsonl`.
+   - It excludes `broad_other` and `quiet_broad` from primary ranking targets.
    - Set `broad_preserve_weight=0.0`.
-   - Require `.pt` and `.nn` model gates at least `52/64`.
-   - Require corrected engine gate at least `52/64`.
+   - Require `.pt` and `.nn` model gates at least `30/34`.
+   - Require corrected engine gate at least `30/34`.
    - This is a capability test, not a keeper candidate.
 2. If target-only passes:
    - retry with a weaker broad leash (`0.005`) or a smaller 32-group preserve
@@ -128,7 +135,7 @@ Run the next child-ranking ladder rung:
    - run replay/failure-suite gates;
    - run a 200-300 game smoke before any full SPRT.
 
-If target-only fails below `52/64`, the child-ranking objective is not yet
+If target-only fails below `30/34`, the child-ranking objective is not yet
 scaling from small capability proofs to broad loss-log groups. Stop and diagnose
 by category before launching another preserve run.
 
@@ -142,7 +149,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-signal64-targetonly-lr1e4-e320`
+- candidate name: `child-ranking-lossv5-primary34-targetonly-lr1e4-e320`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -150,12 +157,12 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: target-only ranking loss for the high-signal 64-group diagnostic
-- current ladder target: `targets/child-ranking/losslogs_v5_signal64.jsonl`
-  - 64 groups, 445 positive-gap training pairs, category-balanced from loss
-    logs.
+- objective: target-only ranking loss for the focused primary 34-group
+  diagnostic
+- current ladder target: `targets/child-ranking/losslogs_v5_signal34_primary.jsonl`
+  - 34 groups, 235 positive-gap training pairs, selected from loss logs.
   - category balance: forcing `23`, queen/rook endgame `5`, conversion `5`,
-    pawn race `1`, broad-other `15`, quiet-broad `15`.
+    pawn race `1`.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
