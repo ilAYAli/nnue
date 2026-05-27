@@ -14,6 +14,7 @@ import chess
 
 
 EVAL2_RE = re.compile(r"^eval2\s+(-?\d+)\s+cp\s+\(stm=(white|black)\)")
+EVALNET_RE = re.compile(r"^evalnet\s+(-?\d+)\s+cp\s+\(stm=(white|black)\)")
 EVAL_RE = re.compile(r"^eval\s+(-?\d+)\s*$")
 
 
@@ -91,8 +92,11 @@ class EnyoEval2:
             if match:
                 return int(match.group(1))
             if line == "unknown command: 'eval2'":
-                self.send("eval")
+                self.send("evalnet")
                 continue
+            match = EVALNET_RE.match(line)
+            if match:
+                return int(match.group(1))
             match = EVAL_RE.match(line)
             if match:
                 return int(match.group(1))

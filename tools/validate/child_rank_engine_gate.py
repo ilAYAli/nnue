@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gate child-move ranking targets with Enyo's engine eval2 path."""
+"""Gate child-move ranking targets with Enyo's engine eval2/evalnet path."""
 from __future__ import annotations
 
 import argparse
