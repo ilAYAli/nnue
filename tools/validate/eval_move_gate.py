@@ -14,6 +14,7 @@ import chess
 
 
 EVAL2_RE = re.compile(r"^eval2\s+(-?\d+)\s+cp\s+\(stm=(white|black)\)")
+EVAL_RE = re.compile(r"^eval\s+(-?\d+)\s*$")
 
 
 class EngineError(RuntimeError):
@@ -87,6 +88,12 @@ class EnyoEval2:
         while True:
             line = self.read_line(10.0)
             match = EVAL2_RE.match(line)
+            if match:
+                return int(match.group(1))
+            if line == "unknown command: 'eval2'":
+                self.send("eval")
+                continue
+            match = EVAL_RE.match(line)
             if match:
                 return int(match.group(1))
             if line.startswith("eval2 error:"):
