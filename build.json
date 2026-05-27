@@ -4,7 +4,8 @@
   "create": {
     "name": "child-ranking-onepair-v1",
     "backend": "child-ranking",
-    "child_targets": "runs/child-ranking-targets/one_pair.jsonl",
+    "pack_dir": "runs/imported/latest/pack/train",
+    "child_targets": "targets/child-ranking/one_pair.jsonl",
     "selfplay_depth": 12,
     "selfplay_seed": 2026052101,
     "skip_plies": 8,
@@ -27,6 +28,7 @@
     "min_groups": 1,
     "min_pairs": 1,
     "child_model_gate_min_top1": 1,
+    "child_engine_gate_min_top1": 1,
     "workers": 4,
     "prefetch_factor": 2,
     "amp": "bf16",

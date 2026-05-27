@@ -94,12 +94,13 @@ Current `build.json` intent:
 - candidate name: `child-ranking-onepair-v1`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
+- broad-preserve data: existing packed broad data via `pack_dir`
 - self-play depth: `12`
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: ranking loss plus broad deadzone preservation
-- first ladder target: `runs/child-ranking-targets/one_pair.jsonl`
+- first ladder target: `targets/child-ranking/one_pair.jsonl`
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`

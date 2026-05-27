@@ -60,6 +60,7 @@ class CandidateDefaults:
 
     max_features: int = 32
     pack_progress: int = 250000
+    pack_dir: str = ""
 
     backend: str = "pytorch"
     objective: str = "huber"
@@ -93,6 +94,7 @@ class CandidateDefaults:
     min_groups: int = 1
     min_pairs: int = 1
     child_model_gate_min_top1: int = 1
+    child_engine_gate_min_top1: int = 1
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

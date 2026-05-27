@@ -131,97 +131,102 @@ def create_config(args: argparse.Namespace) -> dict:
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"
-    steps = [
-        {
-            "name": "posgen_selfplay",
-            "command": [
-                tool("posgen/posgen.py"), "selfplay",
-                "--runner", str(expand_path(args.runner)),
-                "--engine", str(expand_path(args.engine)),
-                "--nnue-file", str(expand_path(args.nnue_file)),
-                "--book", str(expand_path(args.book)),
-                "--output", "{posgen}/selfplay.pgn",
-                "--games", str(args.selfplay_games),
-                "--shard-games", str(args.selfplay_shard_games),
-                "--concurrency", str(args.selfplay_concurrency),
-                "--threads", str(args.selfplay_threads),
-                "--depth", str(args.selfplay_depth),
-                "--srand", str(args.selfplay_seed),
-                "--restart", "off",
-                "--engine-option", f"Hash={args.selfplay_hash}",
-            ],
-        },
-        {
-            "name": "posgen_extract",
-            "command": [
-                tool("posgen/posgen.py"), "extract",
-                "{posgen}/selfplay.pgn",
-                "--output", "{posgen}/positions.jsonl",
-                "--stats", "{posgen}/extract_stats.json",
-                "--skip-plies", str(args.skip_plies),
-                "--min-depth", str(args.selfplay_depth),
-                "--max-abs-cp", str(args.source_max_abs_cp),
-            ],
-        },
-        {
-            "name": "posgen_sample",
-            "command": [
-                tool("posgen/posgen.py"), "sample",
-                "--input", "{posgen}/positions.jsonl",
-                "--output", "{posgen}/source.jsonl",
-                "--preset", args.sample_preset,
-                "--unique-fen",
-                "--seed", str(args.selfplay_seed),
-            ],
-        },
-    ]
+    steps = []
+    if args.pack_dir:
+        data_dir = str(expand_path(args.pack_dir))
+    else:
+        data_dir = "{pack}/train"
+        steps.extend([
+            {
+                "name": "posgen_selfplay",
+                "command": [
+                    tool("posgen/posgen.py"), "selfplay",
+                    "--runner", str(expand_path(args.runner)),
+                    "--engine", str(expand_path(args.engine)),
+                    "--nnue-file", str(expand_path(args.nnue_file)),
+                    "--book", str(expand_path(args.book)),
+                    "--output", "{posgen}/selfplay.pgn",
+                    "--games", str(args.selfplay_games),
+                    "--shard-games", str(args.selfplay_shard_games),
+                    "--concurrency", str(args.selfplay_concurrency),
+                    "--threads", str(args.selfplay_threads),
+                    "--depth", str(args.selfplay_depth),
+                    "--srand", str(args.selfplay_seed),
+                    "--restart", "off",
+                    "--engine-option", f"Hash={args.selfplay_hash}",
+                ],
+            },
+            {
+                "name": "posgen_extract",
+                "command": [
+                    tool("posgen/posgen.py"), "extract",
+                    "{posgen}/selfplay.pgn",
+                    "--output", "{posgen}/positions.jsonl",
+                    "--stats", "{posgen}/extract_stats.json",
+                    "--skip-plies", str(args.skip_plies),
+                    "--min-depth", str(args.selfplay_depth),
+                    "--max-abs-cp", str(args.source_max_abs_cp),
+                ],
+            },
+            {
+                "name": "posgen_sample",
+                "command": [
+                    tool("posgen/posgen.py"), "sample",
+                    "--input", "{posgen}/positions.jsonl",
+                    "--output", "{posgen}/source.jsonl",
+                    "--preset", args.sample_preset,
+                    "--unique-fen",
+                    "--seed", str(args.selfplay_seed),
+                ],
+            },
+        ])
 
-    for shard in range(args.score_shards):
-        steps.append({
-            "name": f"score_{shard:02d}",
-            "command": [
-                tool("score/score.py"), "uci",
-                "--input", "{posgen}/source.jsonl",
-                "--output", f"{{score}}/shards/label.{shard}.jsonl",
-                "--engine", str(expand_path(args.score_engine)),
-                "--depth", str(args.score_depth),
-                "--threads", str(args.score_threads),
-                "--hash", str(args.score_hash),
-                "--shard-count", str(args.score_shards),
-                "--shard-index", str(shard),
-                "--max-abs-cp", str(args.score_max_abs_cp),
-                "--progress", str(args.score_progress),
-            ],
-        })
+        for shard in range(args.score_shards):
+            steps.append({
+                "name": f"score_{shard:02d}",
+                "command": [
+                    tool("score/score.py"), "uci",
+                    "--input", "{posgen}/source.jsonl",
+                    "--output", f"{{score}}/shards/label.{shard}.jsonl",
+                    "--engine", str(expand_path(args.score_engine)),
+                    "--depth", str(args.score_depth),
+                    "--threads", str(args.score_threads),
+                    "--hash", str(args.score_hash),
+                    "--shard-count", str(args.score_shards),
+                    "--shard-index", str(shard),
+                    "--max-abs-cp", str(args.score_max_abs_cp),
+                    "--progress", str(args.score_progress),
+                ],
+            })
 
-    steps.extend([
-        {
-            "name": "score_merge",
-            "command": [
-                "bash", "-lc",
-                "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
-                "merge-score", "{score}",
-            ],
-        },
-        {
-            "name": "pack",
-            "command": [
-                tool("pack/pack.py"), "build",
-                "--input", "{score}/labeled.jsonl",
-                "--out-dir", "{pack}/train",
-                "--max-features", str(args.max_features),
-                "--progress", str(args.pack_progress),
-                "--python", str(expand_user(args.python)),
-            ],
-        },
-    ])
+        steps.extend([
+            {
+                "name": "score_merge",
+                "command": [
+                    "bash", "-lc",
+                    "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
+                    "merge-score", "{score}",
+                ],
+            },
+            {
+                "name": "pack",
+                "command": [
+                    tool("pack/pack.py"), "build",
+                    "--input", "{score}/labeled.jsonl",
+                    "--out-dir", "{pack}/train",
+                    "--max-features", str(args.max_features),
+                    "--progress", str(args.pack_progress),
+                    "--python", str(expand_user(args.python)),
+                ],
+            },
+        ])
 
     if args.backend == "pytorch":
         steps.append({
             "name": "train",
             "command": [
                 tool("train/train.py"), "run",
-                "--data", "{pack}/train",
+                "--data", data_dir,
                 "--init-from-nn", str(expand_path(args.init_net)),
                 "--objective", args.objective,
                 "--huber-beta", str(args.huber_beta),
@@ -254,7 +259,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 "name": "train_child_ranking",
                 "command": [
                     tool("train/train_child_ranking.py"),
-                    "--data", "{pack}/train",
+                    "--data", data_dir,
                     "--child-targets", str(expand_path(args.child_targets)),
                     "--init-from-nn", str(expand_path(args.init_net)),
                     "--epochs", str(args.epochs),
@@ -293,6 +298,19 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--min-groups", str(args.min_groups),
                     "--fail-if-net-top1-below", str(args.child_model_gate_min_top1),
                     "--fail-if-pt-top1-below", str(args.child_model_gate_min_top1),
+                ],
+            },
+            {
+                "name": "validate_child_ranking_engine",
+                "command": [
+                    tool("validate/child_rank_engine_gate.py"),
+                    "--targets", str(expand_path(args.child_targets)),
+                    "--engine", str(expand_path(args.engine)),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--threads", "1",
+                    "--hash", "64",
+                    "--min-groups", str(args.min_groups),
+                    "--fail-if-top1-below", str(args.child_engine_gate_min_top1),
                 ],
             },
         ])
@@ -407,6 +425,11 @@ def add_create_args(
 
     parser.add_argument("--max-features", type=int, default=value("max_features", d.max_features))
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))
+    parser.add_argument(
+        "--pack-dir",
+        default=value("pack_dir", d.pack_dir),
+        help="Reuse an existing packed dataset and skip self-play, scoring, and packing.",
+    )
 
     parser.add_argument("--init-net", default=value("init_net", d.init_net))
     parser.add_argument("--backend", default=value("backend", d.backend),
@@ -446,6 +469,7 @@ def add_create_args(
     parser.add_argument("--min-groups", type=int, default=value("min_groups", d.min_groups))
     parser.add_argument("--min-pairs", type=int, default=value("min_pairs", d.min_pairs))
     parser.add_argument("--child-model-gate-min-top1", type=int, default=value("child_model_gate_min_top1", d.child_model_gate_min_top1))
+    parser.add_argument("--child-engine-gate-min-top1", type=int, default=value("child_engine_gate_min_top1", d.child_engine_gate_min_top1))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

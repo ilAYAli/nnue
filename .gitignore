@@ -11,6 +11,8 @@ __pycache__/
 *.binpack
 *.binpack.zst
 *.npy
+!/targets/
+!/targets/**
 
 # Local run output
 /tmp/
