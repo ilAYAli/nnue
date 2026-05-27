@@ -82,6 +82,8 @@ class CandidateDefaults:
     batch_size: int = 8192
     device: str = "cuda"
     workers: int = 2
+    prefetch_factor: int = 2
+    amp: str = "off"
     val_rows: int = 100000
     max_rows: int = 0
     skip_rows: int = 0

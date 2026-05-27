@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import sys
 from pathlib import Path
@@ -115,6 +116,30 @@ def model_forward(model: EnyoNNUE, w: torch.Tensor, b: torch.Tensor,
     return model(w, b, w_off, b_off, stm, phase_scale)
 
 
+def dataloader_kwargs(args: argparse.Namespace) -> dict[str, object]:
+    kwargs: dict[str, object] = {
+        "num_workers": args.workers,
+        "pin_memory": args.device.startswith("cuda"),
+    }
+    if args.workers > 0:
+        kwargs["persistent_workers"] = True
+        kwargs["prefetch_factor"] = args.prefetch_factor
+    return kwargs
+
+
+def move_batch(batch, device: str):
+    return tuple(
+        item.to(device, non_blocking=True) if torch.is_tensor(item) else item
+        for item in batch
+    )
+
+
+def autocast_context(args: argparse.Namespace):
+    if args.amp == "bf16" and args.device.startswith("cuda"):
+        return torch.autocast("cuda", dtype=torch.bfloat16)
+    return nullcontext()
+
+
 def selection_value(metrics: dict[str, float], args: argparse.Namespace) -> float:
     value = metrics[args.select_metric]
     return -value if args.select_metric == "sign" else value
@@ -167,19 +192,15 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
     sign_n = 0
     n = 0
     for w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids in loader:
-        w = w.to(args.device)
-        b = b.to(args.device)
-        w_off = w_off.to(args.device)
-        b_off = b_off.to(args.device)
-        stm = stm.to(args.device)
-        y = y.to(args.device)
-        wdl = wdl.to(args.device)
-        phase_scale = phase_scale.to(args.device)
-        source_ids = source_ids.to(args.device)
+        w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = move_batch(
+            (w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids),
+            args.device,
+        )
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-        pred = model_forward(model, w, b, w_off, b_off, stm, phase_scale, args)
-        loss = score_loss(pred, y, wdl, source_ids, args)
+        with autocast_context(args):
+            pred = model_forward(model, w, b, w_off, b_off, stm, phase_scale, args)
+            loss = score_loss(pred.float(), y, wdl, source_ids, args)
         err = pred - y
         sign_mask = y != 0
         batch_n = len(y)
@@ -253,12 +274,10 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     train_loader = DataLoader(
         train_set, batch_size=args.batch_size, shuffle=True,
-        collate_fn=collate_fn, num_workers=args.workers,
-        pin_memory=args.device.startswith("cuda"))
+        collate_fn=collate_fn, **dataloader_kwargs(args))
     val_loader = (DataLoader(
         val_set, batch_size=args.batch_size, shuffle=False,
-        collate_fn=val_collate_fn, num_workers=args.workers,
-        pin_memory=args.device.startswith("cuda"))
+        collate_fn=val_collate_fn, **dataloader_kwargs(args))
         if val_set is not None else None)
 
     param_groups = optimizer_param_groups(model, args)
@@ -276,20 +295,16 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         n = 0
         batch_index = 0
         for w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids in train_loader:
-            w = w.to(args.device)
-            b = b.to(args.device)
-            w_off = w_off.to(args.device)
-            b_off = b_off.to(args.device)
-            stm = stm.to(args.device)
-            y = y.to(args.device)
-            wdl = wdl.to(args.device)
-            phase_scale = phase_scale.to(args.device)
-            source_ids = source_ids.to(args.device)
+            w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = move_batch(
+                (w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids),
+                args.device,
+            )
             if args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
 
-            pred = model_forward(model, w, b, w_off, b_off, stm, phase_scale, args)
-            loss = score_loss(pred, y, wdl, source_ids, args)
+            with autocast_context(args):
+                pred = model_forward(model, w, b, w_off, b_off, stm, phase_scale, args)
+                loss = score_loss(pred.float(), y, wdl, source_ids, args)
 
             opt.zero_grad()
             loss.backward()
@@ -393,6 +408,8 @@ def main() -> None:
     ap.add_argument("--target-clamp", type=float, default=0.0)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--workers", type=int, default=0)
+    ap.add_argument("--prefetch-factor", type=int, default=2)
+    ap.add_argument("--amp", default="off", choices=["off", "bf16"])
     ap.add_argument("--patience", type=int, default=0)
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
