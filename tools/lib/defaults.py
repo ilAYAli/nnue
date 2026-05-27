@@ -85,6 +85,7 @@ class CandidateDefaults:
     child_targets: str = ""
     child_broad_rows: int = 100000
     child_batch_size: int = 64
+    child_loss: str = "pairwise"
     ranking_weight: float = 1.0
     broad_preserve_weight: float = 0.1
     broad_deadzone_cp: int = 40

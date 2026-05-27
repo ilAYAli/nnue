@@ -64,6 +64,12 @@ Latest child-ranking result:
   broad rows are bad primary ranking targets: `broad_other` hit `3/15` and
   `quiet_broad` hit `8/15`, while conversion/pawn-race/queen-rook mostly
   learned and forcing was partial.
+- `child-ranking-lossv5-primary34-targetonly-lr1e4-e320`: failed the focused
+  primary target-only gate. Model gate: `.pt` `29/34`, `.nn` `27/34`.
+  Conversion, pawn-race, and queen/rook rows all learned; every miss was a
+  forcing row. Training pair accuracy was high (`728/748` on the final epoch),
+  so the pairwise objective is optimizing easy best-vs-neighbor pairs while the
+  group top1 gate still fails.
 
 Rejected lanes:
 
@@ -119,9 +125,10 @@ Secondary lanes:
 
 Run the next child-ranking ladder rung:
 
-1. Target-only diagnostic on the focused 34-group primary set.
+1. Listwise target-only diagnostic on the focused 34-group primary set.
    - Use `targets/child-ranking/losslogs_v5_signal34_primary.jsonl`.
    - It excludes `broad_other` and `quiet_broad` from primary ranking targets.
+   - Set `child_loss=listwise` so the loss optimizes group top1 directly.
    - Set `broad_preserve_weight=0.0`.
    - Require `.pt` and `.nn` model gates at least `30/34`.
    - Require corrected engine gate at least `30/34`.
@@ -135,9 +142,9 @@ Run the next child-ranking ladder rung:
    - run replay/failure-suite gates;
    - run a 200-300 game smoke before any full SPRT.
 
-If target-only fails below `30/34`, the child-ranking objective is not yet
-scaling from small capability proofs to broad loss-log groups. Stop and diagnose
-by category before launching another preserve run.
+If listwise target-only fails below `30/34`, the child-ranking objective is not
+yet scaling from small capability proofs to broad loss-log groups. Stop and
+diagnose the remaining forcing misses before launching another preserve run.
 
 ## Candidate Workflow
 
@@ -149,7 +156,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary34-targetonly-lr1e4-e320`
+- candidate name: `child-ranking-lossv5-primary34-listwise-targetonly-lr1e4-e320`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -157,8 +164,8 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: target-only ranking loss for the focused primary 34-group
-  diagnostic
+- objective: target-only listwise ranking loss for the focused primary
+  34-group diagnostic
 - current ladder target: `targets/child-ranking/losslogs_v5_signal34_primary.jsonl`
   - 34 groups, 235 positive-gap training pairs, selected from loss logs.
   - category balance: forcing `23`, queen/rook endgame `5`, conversion `5`,

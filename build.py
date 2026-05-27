@@ -266,6 +266,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--epochs", str(args.epochs),
                     "--batch-size", str(args.batch_size),
                     "--child-batch-size", str(args.child_batch_size),
+                    "--child-loss", args.child_loss,
                     "--lr", str(args.lr),
                     "--weight-decay", str(args.weight_decay),
                     "--target-clamp", str(args.target_clamp),
@@ -461,6 +462,8 @@ def add_create_args(
     parser.add_argument("--child-targets", default=value("child_targets", d.child_targets))
     parser.add_argument("--child-broad-rows", type=int, default=value("child_broad_rows", d.child_broad_rows))
     parser.add_argument("--child-batch-size", type=int, default=value("child_batch_size", d.child_batch_size))
+    parser.add_argument("--child-loss", default=value("child_loss", d.child_loss),
+                        choices=["pairwise", "listwise"])
     parser.add_argument("--ranking-weight", type=float, default=value("ranking_weight", d.ranking_weight))
     parser.add_argument("--broad-preserve-weight", type=float, default=value("broad_preserve_weight", d.broad_preserve_weight))
     parser.add_argument("--broad-deadzone-cp", type=int, default=value("broad_deadzone_cp", d.broad_deadzone_cp))

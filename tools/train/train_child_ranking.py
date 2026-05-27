@@ -59,6 +59,35 @@ class ChildRankingDataset(Dataset):
         return self.items[idx]
 
 
+class ChildGroupDataset(Dataset):
+    def __init__(self, groups: list[ChildRankGroup]) -> None:
+        self.items = []
+        for group in groups:
+            features = []
+            best_idx = -1
+            best_score = group.best.score_cp
+            second_score = None
+            for idx, move in enumerate(group.moves):
+                if move.move == group.best.move:
+                    best_idx = idx
+                else:
+                    second_score = (
+                        move.score_cp if second_score is None
+                        else max(second_score, move.score_cp)
+                    )
+                features.append(fen_features(child_fen(group.fen, move.move)))
+            if best_idx < 0:
+                raise ValueError(f"{group.group_id}: best move missing")
+            min_gap = 0.0 if second_score is None else max(0.0, best_score - second_score)
+            self.items.append((group.group_id, features, best_idx, min_gap))
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __getitem__(self, idx: int):
+        return self.items[idx]
+
+
 def collate_feature_rows(rows):
     w_all, b_all = [], []
     w_offsets, b_offsets = [0], [0]
@@ -88,6 +117,25 @@ def collate_rank_pairs(batch):
     return (*collate_feature_rows(best_rows),
             *collate_feature_rows(other_rows),
             gaps, margins)
+
+
+def collate_rank_groups(batch):
+    feature_rows = []
+    group_offsets = [0]
+    best_indices = []
+    min_gaps = []
+    for _group_id, features, best_idx, min_gap in batch:
+        feature_rows.extend(features)
+        best_indices.append(best_idx)
+        min_gaps.append(min_gap)
+        group_offsets.append(group_offsets[-1] + len(features))
+    return (
+        *collate_feature_rows(feature_rows),
+        torch.tensor(group_offsets[:-1], dtype=torch.long),
+        torch.tensor(group_offsets[1:], dtype=torch.long),
+        torch.tensor(best_indices, dtype=torch.long),
+        torch.tensor(min_gaps, dtype=torch.float32),
+    )
 
 
 def cycle(loader):
@@ -127,12 +175,58 @@ def maybe_compile_model(model: EnyoNNUE, args: argparse.Namespace):
     return model
 
 
+def pairwise_rank_loss(forward_model, rank_batch, args):
+    (bw, bb, bwo, bbo, bstm, bphase,
+     ow, ob, owo, obo, ostm, ophase,
+     target_gap, margin) = rank_batch
+    best_pred = forward_model(bw, bb, bwo, bbo, bstm, bphase)
+    other_pred = forward_model(ow, ob, owo, obo, ostm, ophase)
+    # Child evals are side-to-move POV after the parent move.
+    # Negate back to parent POV: best_parent - other_parent is
+    # other_child_stm - best_child_stm.
+    pred_margin = other_pred.float() - best_pred.float()
+    rank_loss = F.softplus((margin - pred_margin) / args.rank_temperature_cp).mean()
+    rank_correct = int((pred_margin.detach() > 0).sum())
+    rank_n = len(target_gap)
+    rank_gap = float(target_gap.sum())
+    return rank_loss, rank_correct, rank_n, rank_gap
+
+
+def listwise_rank_loss(forward_model, rank_batch, args):
+    (w, b, w_off, b_off, stm, phase,
+     group_starts, group_ends, best_indices, min_gaps) = rank_batch
+    child_pred = forward_model(w, b, w_off, b_off, stm, phase)
+    parent_scores = -child_pred.float()
+    losses = []
+    correct = 0
+    for start, end, best_idx in zip(group_starts, group_ends, best_indices):
+        start_i = int(start)
+        end_i = int(end)
+        best_i = int(best_idx)
+        logits = parent_scores[start_i:end_i] / args.rank_temperature_cp
+        target = torch.tensor([best_i], dtype=torch.long, device=logits.device)
+        losses.append(F.cross_entropy(logits.unsqueeze(0), target))
+        correct += int(torch.argmax(logits).item() == best_i)
+    rank_loss = torch.stack(losses).mean()
+    return rank_loss, correct, len(losses), float(min_gaps.sum())
+
+
 def train(args: argparse.Namespace) -> EnyoNNUE:
     groups = load_groups(args.child_targets, min_groups=args.min_groups)
-    rank_set = ChildRankingDataset(groups, rank_margin_cp=args.rank_margin_cp)
-    if len(rank_set) < args.min_pairs:
+    pair_set = ChildRankingDataset(groups, rank_margin_cp=args.rank_margin_cp)
+    if len(pair_set) < args.min_pairs:
         raise SystemExit(
-            f"valid_pairs={len(rank_set)} below min_pairs={args.min_pairs}")
+            f"valid_pairs={len(pair_set)} below min_pairs={args.min_pairs}")
+    if args.child_loss == "pairwise":
+        rank_set = pair_set
+        rank_collate = collate_rank_pairs
+        rank_loss_fn = pairwise_rank_loss
+    elif args.child_loss == "listwise":
+        rank_set = ChildGroupDataset(groups)
+        rank_collate = collate_rank_groups
+        rank_loss_fn = listwise_rank_loss
+    else:
+        raise SystemExit(f"unknown child loss: {args.child_loss}")
 
     broad_set, broad_collate = load_score_dataset(
         args.data, limit=args.max_rows, skip=args.skip_rows,
@@ -141,7 +235,8 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         raise SystemExit("no broad rows")
 
     print(f"child groups: {len(groups)}", flush=True)
-    print(f"child rank pairs: {len(rank_set)}", flush=True)
+    print(f"child rank pairs: {len(pair_set)}", flush=True)
+    print(f"child train rows: {len(rank_set)} loss={args.child_loss}", flush=True)
     print(f"broad rows: {len(broad_set)}", flush=True)
 
     if args.init_from_nn:
@@ -152,7 +247,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     rank_loader = DataLoader(
         rank_set, batch_size=args.child_batch_size, shuffle=True,
-        collate_fn=collate_rank_pairs, **dataloader_kwargs(args))
+        collate_fn=rank_collate, **dataloader_kwargs(args))
     broad_loader = DataLoader(
         broad_set, batch_size=args.batch_size, shuffle=True,
         collate_fn=broad_collate, **dataloader_kwargs(args))
@@ -177,9 +272,6 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
 
             rank_batch = move_batch(next(rank_iter), args.device)
-            (bw, bb, bwo, bbo, bstm, bphase,
-             ow, ob, owo, obo, ostm, ophase,
-             target_gap, margin) = rank_batch
 
             with autocast_context(args):
                 broad_pred = forward_model(w, b, w_off, b_off, stm, phase_scale)
@@ -189,13 +281,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                     broad_excess, torch.zeros_like(broad_excess),
                     beta=args.broad_beta, reduction="mean")
 
-                best_pred = forward_model(bw, bb, bwo, bbo, bstm, bphase)
-                other_pred = forward_model(ow, ob, owo, obo, ostm, ophase)
-                # Child evals are side-to-move POV after the parent move.
-                # Negate back to parent POV: best_parent - other_parent is
-                # other_child_stm - best_child_stm.
-                pred_margin = other_pred.float() - best_pred.float()
-                rank_loss = F.softplus((margin - pred_margin) / args.rank_temperature_cp).mean()
+                rank_loss, batch_rank_correct, batch_rank_n, batch_rank_gap = (
+                    rank_loss_fn(forward_model, rank_batch, args)
+                )
                 loss = (args.ranking_weight * rank_loss
                         + args.broad_preserve_weight * broad_loss)
 
@@ -203,10 +291,10 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             loss.backward()
             opt.step()
 
-            rank_correct += int((pred_margin.detach() > 0).sum())
-            rank_n += len(target_gap)
-            rank_gap_sum += float(target_gap.sum())
-            rank_loss_sum += float(rank_loss.detach()) * len(target_gap)
+            rank_correct += batch_rank_correct
+            rank_n += batch_rank_n
+            rank_gap_sum += batch_rank_gap
+            rank_loss_sum += float(rank_loss.detach()) * batch_rank_n
             broad_excess_sum += float(broad_excess.detach().sum())
             broad_n += len(y)
 
@@ -236,6 +324,8 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=1e-6)
     ap.add_argument("--weight-decay", type=float, default=1e-6)
     ap.add_argument("--target-clamp", type=float, default=1600.0)
+    ap.add_argument("--child-loss", default="pairwise",
+                    choices=["pairwise", "listwise"])
     ap.add_argument("--ranking-weight", type=float, default=1.0)
     ap.add_argument("--broad-preserve-weight", type=float, default=0.1)
     ap.add_argument("--broad-deadzone-cp", type=float, default=40.0)
