@@ -27,6 +27,9 @@ Latest child-ranking result:
 - `child-ranking-a4b4-a4d4-targetonly-lr1e4-e160`: passed the one-pair
   capability proof. `.pt` top1 `1/1` margin `+189cp`, `.nn` top1 `1/1` margin
   `+172cp`, engine gate top1 `1/1`.
+- `child-ranking-a4b4-neighbors-targetonly-lr1e4-e160`: passed the original
+  seven-neighbor group. `.pt` top1 `1/1` margin `+141cp`, `.nn` top1 `1/1`
+  margin `+113cp`, engine gate top1 `1/1`.
 
 Rejected lanes:
 
@@ -109,7 +112,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-a4b4-neighbors-targetonly-lr1e4-e160`
+- candidate name: `child-ranking-fourgroup-targetonly-lr1e4-e160`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -117,10 +120,10 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: target-only ranking loss for the one-group capability diagnostic
-- first ladder target: `targets/child-ranking/one_pair.jsonl`
-  - current contents restore the original `a4b4` group with seven scored
-    neighbor/bad moves after the one-pair gate passed.
+- objective: target-only ranking loss for the four-group capability diagnostic
+- first ladder target: `targets/child-ranking/four_groups.jsonl`
+  - current contents are four scored failure-suite groups converted from
+    existing search-aware targets after the one-group gate passed.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
