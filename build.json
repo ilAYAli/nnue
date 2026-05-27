@@ -41,7 +41,7 @@
     "device": "cuda",
     "workers": 4,
     "prefetch_factor": 2,
-    "amp": "off",
+    "amp": "bf16",
     "max_rows": 200000,
     "val_rows": 100000,
     "pack_limit": 200000,
