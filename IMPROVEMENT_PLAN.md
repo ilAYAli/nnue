@@ -91,7 +91,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-onepair-v1`
+- candidate name: `child-ranking-onepair-targetonly-lr3e5-e48`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -99,7 +99,7 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: ranking loss plus broad deadzone preservation
+- objective: target-only ranking loss for the one-pair capability diagnostic
 - first ladder target: `targets/child-ranking/one_pair.jsonl`
 - main knobs:
   - `ranking_weight`
