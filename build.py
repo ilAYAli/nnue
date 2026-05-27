@@ -131,6 +131,7 @@ def create_config(args: argparse.Namespace) -> dict:
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"
+    python = str(expand_user(args.python))
     steps = []
     if args.pack_dir:
         data_dir = str(expand_path(args.pack_dir))
@@ -140,7 +141,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "posgen_selfplay",
                 "command": [
-                    tool("posgen/posgen.py"), "selfplay",
+                    python, tool("posgen/posgen.py"), "selfplay",
                     "--runner", str(expand_path(args.runner)),
                     "--engine", str(expand_path(args.engine)),
                     "--nnue-file", str(expand_path(args.nnue_file)),
@@ -159,7 +160,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "posgen_extract",
                 "command": [
-                    tool("posgen/posgen.py"), "extract",
+                    python, tool("posgen/posgen.py"), "extract",
                     "{posgen}/selfplay.pgn",
                     "--output", "{posgen}/positions.jsonl",
                     "--stats", "{posgen}/extract_stats.json",
@@ -171,7 +172,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "posgen_sample",
                 "command": [
-                    tool("posgen/posgen.py"), "sample",
+                    python, tool("posgen/posgen.py"), "sample",
                     "--input", "{posgen}/positions.jsonl",
                     "--output", "{posgen}/source.jsonl",
                     "--preset", args.sample_preset,
@@ -185,7 +186,7 @@ def create_config(args: argparse.Namespace) -> dict:
             steps.append({
                 "name": f"score_{shard:02d}",
                 "command": [
-                    tool("score/score.py"), "uci",
+                    python, tool("score/score.py"), "uci",
                     "--input", "{posgen}/source.jsonl",
                     "--output", f"{{score}}/shards/label.{shard}.jsonl",
                     "--engine", str(expand_path(args.score_engine)),
@@ -211,12 +212,12 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "pack",
                 "command": [
-                    tool("pack/pack.py"), "build",
+                    python, tool("pack/pack.py"), "build",
                     "--input", "{score}/labeled.jsonl",
                     "--out-dir", "{pack}/train",
                     "--max-features", str(args.max_features),
                     "--progress", str(args.pack_progress),
-                    "--python", str(expand_user(args.python)),
+                    "--python", python,
                 ],
             },
         ])
@@ -225,7 +226,7 @@ def create_config(args: argparse.Namespace) -> dict:
         steps.append({
             "name": "train",
             "command": [
-                tool("train/train.py"), "run",
+                python, tool("train/train.py"), "run",
                 "--data", data_dir,
                 "--init-from-nn", str(expand_path(args.init_net)),
                 "--objective", args.objective,
@@ -246,7 +247,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--patience", str(args.patience),
                 "--val-rows", str(args.val_rows),
                 "--trainable", args.trainable,
-                "--python", str(expand_user(args.python)),
+                "--python", python,
                 "--out", f"{candidate_dir}/model.pt",
                 "--out-nn", f"{candidate_dir}/model.nn",
             ],
@@ -258,7 +259,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "train_child_ranking",
                 "command": [
-                    tool("train/train_child_ranking.py"),
+                    python, tool("train/train_child_ranking.py"),
                     "--data", data_dir,
                     "--child-targets", str(expand_path(args.child_targets)),
                     "--init-from-nn", str(expand_path(args.init_net)),
@@ -290,7 +291,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "validate_child_ranking_model",
                 "command": [
-                    tool("validate/child_rank_model_gate.py"),
+                    python, tool("validate/child_rank_model_gate.py"),
                     "--targets", str(expand_path(args.child_targets)),
                     "--net", f"{candidate_dir}/model.nn",
                     "--pt", f"{candidate_dir}/model.pt",
@@ -303,7 +304,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "validate_child_ranking_engine",
                 "command": [
-                    tool("validate/child_rank_engine_gate.py"),
+                    python, tool("validate/child_rank_engine_gate.py"),
                     "--targets", str(expand_path(args.child_targets)),
                     "--engine", str(expand_path(args.engine)),
                     "--net", f"{candidate_dir}/model.nn",
@@ -345,7 +346,7 @@ def cmd_create(args: argparse.Namespace) -> int:
     run_dir = expand_path(config["run"])
     config_path = write_config(run_dir, config)
     print(f"wrote {config_path}")
-    command = [sys.executable, tool("pipeline/pipeline.py"), "launch", str(config_path)]
+    command = [str(expand_user(args.python)), tool("pipeline/pipeline.py"), "launch", str(config_path)]
     if args.force:
         command.append("--force")
     return run(command)
