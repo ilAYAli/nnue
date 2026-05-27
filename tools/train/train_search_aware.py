@@ -246,7 +246,7 @@ def dataloader_kwargs(args: argparse.Namespace) -> dict[str, object]:
 
 
 def autocast_context(args: argparse.Namespace):
-    if args.amp == "bf16" and args.device.startswith("cuda"):
+    if getattr(args, "amp", "off") == "bf16" and args.device.startswith("cuda"):
         return torch.autocast("cuda", dtype=torch.bfloat16)
     return nullcontext()
 
