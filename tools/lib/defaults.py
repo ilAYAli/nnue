@@ -61,6 +61,7 @@ class CandidateDefaults:
     max_features: int = 32
     pack_progress: int = 250000
 
+    backend: str = "pytorch"
     objective: str = "huber"
     target_clamp: int = 800
     huber_beta: int = 200
@@ -79,6 +80,19 @@ class CandidateDefaults:
     select_metric: str = "mae"
     weight_decay: float = 1e-6
     trainable: str = "all"
+
+    child_targets: str = ""
+    child_broad_rows: int = 100000
+    child_batch_size: int = 64
+    ranking_weight: float = 1.0
+    broad_preserve_weight: float = 0.1
+    broad_deadzone_cp: int = 40
+    broad_beta: int = 100
+    rank_margin_cp: int = 100
+    rank_temperature_cp: int = 50
+    min_groups: int = 1
+    min_pairs: int = 1
+    child_model_gate_min_top1: int = 1
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

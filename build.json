@@ -1,9 +1,10 @@
 {
-  "description": "Active Enyo NNUE improvement-run config. Use this as the reviewed candidate recipe; code changes for the selected architecture branch live in the engine/trainer code.",
-  "experiment": "learned-material-phase-head-input",
-  "nps_gate": "pause and optimize first if the architecture branch costs more than about 3-5% NPS",
+  "description": "Active Enyo NNUE diagnostic: child-move ranking with broad deadzone preservation.",
+  "experiment": "child-ranking-onepair-v1",
   "create": {
-    "name": "arch-material-phase-v1",
+    "name": "child-ranking-onepair-v1",
+    "backend": "child-ranking",
+    "child_targets": "runs/child-ranking-targets/one_pair.jsonl",
     "selfplay_depth": 12,
     "selfplay_seed": 2026052101,
     "skip_plies": 8,
@@ -15,6 +16,17 @@
     "epochs": 8,
     "select_metric": "sign",
     "patience": 2,
+    "child_broad_rows": 100000,
+    "child_batch_size": 64,
+    "ranking_weight": 1.0,
+    "broad_preserve_weight": 0.1,
+    "broad_deadzone_cp": 40,
+    "broad_beta": 100,
+    "rank_margin_cp": 100,
+    "rank_temperature_cp": 50,
+    "min_groups": 1,
+    "min_pairs": 1,
+    "child_model_gate_min_top1": 1,
     "workers": 4,
     "prefetch_factor": 2,
     "amp": "bf16",
@@ -24,10 +36,11 @@
   },
   "validation": {
     "required_before_sprt": [
-      "static",
-      "failure-suite",
-      "move-choice gate",
-      "NPS benchmark for architecture changes"
+      "pt-vs-nn child ranking gate",
+      "exported engine child ranking gate",
+      "broad-preserve stability",
+      "replay/failure-suite",
+      "200-300 game smoke"
     ]
   }
 }

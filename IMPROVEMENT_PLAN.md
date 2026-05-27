@@ -39,83 +39,47 @@ Conclusion:
 
 ## Current Strategy
 
-Priority order:
+Primary lane:
 
-1. Architecture/features.
-   - This is the primary lane.
-   - First branch: learned material/phase head input.
-   - This is deliberately lower risk than king-bucket changes because it should
-     not change sparse feature indexing, accumulator updates, or `.nn` input
-     row count.
-   - Verify feature extraction, export/load, and roundtrip before training.
-   - Benchmark NPS before training; pause and optimize first if NPS drops more
-     than about `3-5%`.
-   - If NPS loss is above that threshold, require much stronger pre-SPRT
-     evidence before spending games.
-   - Train the changed architecture properly. Do not treat folded/drop-in
-     conversions as evidence.
-   - Do not widen the net until at least one small feature/bucket experiment
-     has failed cleanly.
+- Train move ranking from child-move groups, not only scalar position eval.
+- Each target group must contain one parent FEN, the oracle best move, the
+  engine/logged bad move, and a few engine-plausible neighbors.
+- Neighbor moves must be moves the engine actually considered or selected, not
+  random legal moves.
+- Oracle settings and `max_gap_cp` belong in the stored target data so target
+  semantics do not change silently between runs.
+- Broad preservation is a deadzone/leash, not a normal competing scalar
+  objective.
+- New candidates must use `./build.py create`; no manual training pipelines.
 
-2. Stronger or different teacher data.
-   - Treat Stockfish d16 as the bulk baseline, not the ceiling.
-   - Test d18/d20 only on high-value slices first: disagreement,
-     PV-instability, failure-suite, and high-loss move-choice rows.
-   - Do not spend a full bulk d20 label run unless a small slice improves
-     move-choice gates, not just MAE.
-   - External/prepared datasets are acceptable if converted once into the Enyo
-     row format and stored with provenance under `runs/` or `assets/`.
+Secondary lanes:
 
-3. Targeted move-choice data.
-   - Expand the fixed failure-suite and disagreement/PV-instability samplers.
-   - Train at most one isolated candidate from this signal at a time.
-   - Tail regressions can veto a candidate even when aggregate sum diff is
-     positive.
-   - Longer-term goal: optimize search decision quality, not only scalar
-     evaluation accuracy.
-   - Search-aware signals to track before training from them:
-     - top-move agreement.
-     - top-3 move overlap.
-     - eval ranking consistency for candidate moves.
-     - disagreement/PV-instability weighting.
-     - tactical surprise or large child-eval swing weighting.
-
-4. Tooling.
-   - Tooling work is justified only when it directly supports the lanes above.
-   - New candidates must use `./build.py create`.
-   - The reviewed active recipe lives in `build.json` and should be updated in
-     the same commit as the experiment decision.
-   - Manual step-by-step pipelines are historical/legacy only.
-   - Planned recipes should be concrete `build.py create` commands, not prose.
+- Architecture/features are paused until child-ranking can prove or disprove
+  exported move-ranking learning on small groups.
+- Stronger teacher data is useful only for high-value child groups first:
+  disagreement, PV-instability, failure-suite, and high-loss move-choice rows.
+- Static MAE/sign remains a rejection filter only.
 
 ## Next Concrete Experiment
 
-Run exactly one architecture/feature branch first.
+Run the child-ranking ladder:
 
-Preferred first branch:
+1. One target group.
+   - Exported `.nn` must rank the best child above the bad/neighbor children.
+   - `.pt` and `.nn` gates must agree.
+   - Broad deadzone excess must remain small.
+2. Four target groups.
+   - All groups should pass exported child ranking.
+   - No broad-preserve collapse.
+3. Sixteen target groups.
+   - At least `13/16` groups should pass exported child ranking.
+   - Worst margin and broad-preserve rows must remain acceptable.
 
-- learned material/phase head input.
+Only after the ladder passes:
 
-Reason:
-
-- low implementation risk.
-- easy known-FEN activation tests.
-- plausible effect on conversion, defense, and endgame calibration.
-- less invasive than king-bucket refinement or widening the net.
-
-Anti-confounding rule:
-
-- Do not change architecture and data source in the same first candidate.
-- Reuse the best-understood training source for the first architecture test:
-  the current signed-balanced d12 self-play plus Stockfish-d16 label recipe
-  expressed through `build.py`.
-- Because this moves the recipe through the new `build.py` pipeline, run the
-  pack/static/roundtrip sanity checks before training starts.
-
-Fallback:
-
-- king-bucket refinement with full trainer/engine support, trained properly.
-- Do not use another folded/drop-in shortcut as evidence.
+- build a larger loss-log/failure-suite child target set;
+- run replay/failure-suite gates;
+- run a 200-300 game smoke before any full SPRT.
 
 ## Candidate Workflow
 
@@ -127,14 +91,23 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `arch-material-phase-v1`
-- selected branch: learned material/phase head input
+- candidate name: `child-ranking-onepair-v1`
+- backend: `child-ranking`
+- target format: child-move groups with stored capped gaps
 - self-play depth: `12`
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: Huber, clamp `800`, beta `200`, lr `7e-7`, epochs `8`
-- checkpoint selection: `sign`, patience `2`
+- objective: ranking loss plus broad deadzone preservation
+- first ladder target: `runs/child-ranking-targets/one_pair.jsonl`
+- main knobs:
+  - `ranking_weight`
+  - `broad_preserve_weight`
+  - `broad_deadzone_cp`
+  - `rank_margin_cp`
+  - `rank_temperature_cp`
+  - `min_groups`
+  - `min_pairs`
 
 Rules:
 

@@ -214,7 +214,10 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--python", str(expand_user(args.python)),
             ],
         },
-        {
+    ])
+
+    if args.backend == "pytorch":
+        steps.append({
             "name": "train",
             "command": [
                 tool("train/train.py"), "run",
@@ -242,8 +245,59 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--out", f"{candidate_dir}/model.pt",
                 "--out-nn", f"{candidate_dir}/model.nn",
             ],
-        },
-    ])
+        })
+    elif args.backend == "child-ranking":
+        if not args.child_targets:
+            raise SystemExit("backend=child-ranking requires child_targets")
+        steps.extend([
+            {
+                "name": "train_child_ranking",
+                "command": [
+                    tool("train/train_child_ranking.py"),
+                    "--data", "{pack}/train",
+                    "--child-targets", str(expand_path(args.child_targets)),
+                    "--init-from-nn", str(expand_path(args.init_net)),
+                    "--epochs", str(args.epochs),
+                    "--batch-size", str(args.batch_size),
+                    "--child-batch-size", str(args.child_batch_size),
+                    "--lr", str(args.lr),
+                    "--weight-decay", str(args.weight_decay),
+                    "--target-clamp", str(args.target_clamp),
+                    "--ranking-weight", str(args.ranking_weight),
+                    "--broad-preserve-weight", str(args.broad_preserve_weight),
+                    "--broad-deadzone-cp", str(args.broad_deadzone_cp),
+                    "--broad-beta", str(args.broad_beta),
+                    "--rank-margin-cp", str(args.rank_margin_cp),
+                    "--rank-temperature-cp", str(args.rank_temperature_cp),
+                    "--min-groups", str(args.min_groups),
+                    "--min-pairs", str(args.min_pairs),
+                    "--device", args.device,
+                    "--workers", str(args.workers),
+                    "--prefetch-factor", str(args.prefetch_factor),
+                    "--amp", args.amp,
+                    "--torch-compile" if args.torch_compile else "--no-torch-compile",
+                    "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
+                    "--max-rows", str(args.child_broad_rows),
+                    "--out", f"{candidate_dir}/model.pt",
+                    "--out-nn", f"{candidate_dir}/model.nn",
+                ],
+            },
+            {
+                "name": "validate_child_ranking_model",
+                "command": [
+                    tool("validate/child_rank_model_gate.py"),
+                    "--targets", str(expand_path(args.child_targets)),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--pt", f"{candidate_dir}/model.pt",
+                    "--device", "cpu",
+                    "--min-groups", str(args.min_groups),
+                    "--fail-if-net-top1-below", str(args.child_model_gate_min_top1),
+                    "--fail-if-pt-top1-below", str(args.child_model_gate_min_top1),
+                ],
+            },
+        ])
+    else:
+        raise SystemExit(f"unknown backend: {args.backend}")
 
     config = {
         "name": name,
@@ -355,6 +409,8 @@ def add_create_args(
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))
 
     parser.add_argument("--init-net", default=value("init_net", d.init_net))
+    parser.add_argument("--backend", default=value("backend", d.backend),
+                        choices=["pytorch", "child-ranking"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -378,6 +434,18 @@ def add_create_args(
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "float-head", "output"])
+    parser.add_argument("--child-targets", default=value("child_targets", d.child_targets))
+    parser.add_argument("--child-broad-rows", type=int, default=value("child_broad_rows", d.child_broad_rows))
+    parser.add_argument("--child-batch-size", type=int, default=value("child_batch_size", d.child_batch_size))
+    parser.add_argument("--ranking-weight", type=float, default=value("ranking_weight", d.ranking_weight))
+    parser.add_argument("--broad-preserve-weight", type=float, default=value("broad_preserve_weight", d.broad_preserve_weight))
+    parser.add_argument("--broad-deadzone-cp", type=int, default=value("broad_deadzone_cp", d.broad_deadzone_cp))
+    parser.add_argument("--broad-beta", type=int, default=value("broad_beta", d.broad_beta))
+    parser.add_argument("--rank-margin-cp", type=int, default=value("rank_margin_cp", d.rank_margin_cp))
+    parser.add_argument("--rank-temperature-cp", type=int, default=value("rank_temperature_cp", d.rank_temperature_cp))
+    parser.add_argument("--min-groups", type=int, default=value("min_groups", d.min_groups))
+    parser.add_argument("--min-pairs", type=int, default=value("min_pairs", d.min_pairs))
+    parser.add_argument("--child-model-gate-min-top1", type=int, default=value("child_model_gate_min_top1", d.child_model_gate_min_top1))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
