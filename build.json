@@ -40,6 +40,7 @@
     "workers": 4,
     "prefetch_factor": 2,
     "amp": "bf16",
+    "torch_compile": true,
     "max_features": 32,
     "pack_limit": 10000,
     "pack_progress": 10000,
