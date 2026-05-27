@@ -53,6 +53,8 @@ def group_result(model: EnyoNNUE, group: ChildRankGroup, device: str) -> dict:
         if move != group.best_move
     )
     return {
+        "group_id": group.group_id,
+        "best": group.best_move,
         "selected": selected,
         "correct": selected == group.best_move,
         "selected_gap": selected_gap,
@@ -70,6 +72,15 @@ def summarize(model: EnyoNNUE, groups: list[ChildRankGroup], device: str,
         f"{label} top1={correct}/{len(groups)} "
         f"sum_gap={sum_gap:.0f} worst_margin={worst_margin:.1f}",
         flush=True)
+    for result in results:
+        if result["correct"]:
+            continue
+        print(
+            f"{label} miss {result['group_id']} "
+            f"best={result['best']} selected={result['selected']} "
+            f"gap={result['selected_gap']:.0f} "
+            f"worst_margin={result['worst_margin']:.1f}",
+            flush=True)
     return {
         "top1": correct,
         "groups": len(groups),

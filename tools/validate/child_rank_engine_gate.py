@@ -29,6 +29,8 @@ def group_result(engine: EnyoEval2, group: ChildRankGroup) -> dict:
         if move != group.best_move
     )
     return {
+        "group_id": group.group_id,
+        "best": group.best_move,
         "selected": selected,
         "correct": selected == group.best_move,
         "selected_gap": selected_gap,
@@ -45,6 +47,15 @@ def summarize(engine: EnyoEval2, groups: list[ChildRankGroup]) -> dict[str, floa
         f"engine top1={correct}/{len(groups)} "
         f"sum_gap={sum_gap:.0f} worst_margin={worst_margin:.1f}",
         flush=True)
+    for result in results:
+        if result["correct"]:
+            continue
+        print(
+            f"engine miss {result['group_id']} "
+            f"best={result['best']} selected={result['selected']} "
+            f"gap={result['selected_gap']:.0f} "
+            f"worst_margin={result['worst_margin']:.1f}",
+            flush=True)
     return {
         "top1": correct,
         "groups": len(groups),
