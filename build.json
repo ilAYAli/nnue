@@ -1,8 +1,8 @@
 {
-  "description": "Active Enyo NNUE diagnostic: isolated b6d7 child ranking target-only capability test.",
-  "experiment": "child-ranking-b6d7-neighbors-targetonly-lr1e4-e160",
+  "description": "Active Enyo NNUE diagnostic: isolated b6d7 child ranking target-only export-margin test.",
+  "experiment": "child-ranking-b6d7-neighbors-targetonly-lr1e4-e320",
   "create": {
-    "name": "child-ranking-b6d7-neighbors-targetonly-lr1e4-e160",
+    "name": "child-ranking-b6d7-neighbors-targetonly-lr1e4-e320",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/b6d7_group.jsonl",
@@ -14,7 +14,7 @@
     "huber_beta": 200,
     "target_clamp": 800,
     "lr": 0.0001,
-    "epochs": 160,
+    "epochs": 320,
     "select_metric": "sign",
     "patience": 2,
     "child_broad_rows": 100000,
