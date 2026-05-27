@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import random
 import statistics
@@ -227,7 +228,27 @@ def cycle(loader):
 
 
 def to_device(items, device: str):
-    return [item.to(device) if torch.is_tensor(item) else item for item in items]
+    return [
+        item.to(device, non_blocking=True) if torch.is_tensor(item) else item
+        for item in items
+    ]
+
+
+def dataloader_kwargs(args: argparse.Namespace) -> dict[str, object]:
+    kwargs: dict[str, object] = {
+        "num_workers": args.workers,
+        "pin_memory": args.device.startswith("cuda"),
+    }
+    if args.workers > 0:
+        kwargs["persistent_workers"] = True
+        kwargs["prefetch_factor"] = args.prefetch_factor
+    return kwargs
+
+
+def autocast_context(args: argparse.Namespace):
+    if args.amp == "bf16" and args.device.startswith("cuda"):
+        return torch.autocast("cuda", dtype=torch.bfloat16)
+    return nullcontext()
 
 
 def predict(model: EnyoNNUE, args, w_feats: torch.Tensor, b_feats: torch.Tensor,
@@ -376,10 +397,9 @@ def search_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
     for batch in loader:
         tensors = to_device(batch[:8], args.device)
         w, b, w_off, b_off, stm, phase_scale, group_offsets, best_indices = tensors
-        gaps = batch[8].to(args.device)
-        policies = batch[9].to(args.device)
-        group_weights = batch[10].to(args.device)
-        pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
+        gaps, policies, group_weights = to_device(batch[8:11], args.device)
+        with autocast_context(args):
+            pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale).float()
         _margin, _policy, _rank, metrics = target_loss_and_metrics(
             pred, group_offsets, best_indices, gaps, policies, group_weights, args)
         total += metrics["targets"]
@@ -469,8 +489,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     broad_loader = DataLoader(
         broad_set, batch_size=args.batch_size, shuffle=True,
-        collate_fn=broad_collate, num_workers=args.workers,
-        pin_memory=args.device.startswith("cuda"))
+        collate_fn=broad_collate, **dataloader_kwargs(args))
     target_loader = DataLoader(
         target_set,
         batch_size=args.search_target_batch_size,
@@ -500,22 +519,22 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = broad_batch
             if init_model is not None:
                 with torch.no_grad():
-                    y = predict(init_model, args, w, b, w_off, b_off, stm, phase_scale)
+                    with autocast_context(args):
+                        y = predict(init_model, args, w, b, w_off, b_off, stm, phase_scale).float()
             elif args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-            pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
-            broad_loss = score_loss(pred, y, wdl, source_ids, args)
 
             target_batch = next(target_iter)
             tensors = to_device(target_batch[:8], args.device)
             tw, tb, two, tbo, tstm, tphase, group_offsets, best_indices = tensors
-            gaps = target_batch[8].to(args.device)
-            policies = target_batch[9].to(args.device)
-            group_weights = target_batch[10].to(args.device)
-            target_pred = predict(model, args, tw, tb, two, tbo, tstm, tphase)
-            margin_loss, policy_loss, rank_loss, target_metrics = target_loss_and_metrics(
-                target_pred, group_offsets, best_indices, gaps, policies,
-                group_weights, args)
+            gaps, policies, group_weights = to_device(target_batch[8:11], args.device)
+            with autocast_context(args):
+                pred = predict(model, args, w, b, w_off, b_off, stm, phase_scale)
+                broad_loss = score_loss(pred.float(), y, wdl, source_ids, args)
+                target_pred = predict(model, args, tw, tb, two, tbo, tstm, tphase)
+                margin_loss, policy_loss, rank_loss, target_metrics = target_loss_and_metrics(
+                    target_pred.float(), group_offsets, best_indices, gaps, policies,
+                    group_weights, args)
 
             loss = (
                 broad_weight * broad_loss
@@ -638,6 +657,8 @@ def main() -> None:
                     help="Comma-separated target tag weights, e.g. mate_like=8,non_mate=1")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--workers", type=int, default=0)
+    ap.add_argument("--prefetch-factor", type=int, default=2)
+    ap.add_argument("--amp", default="off", choices=["off", "bf16"])
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
     ap.add_argument("--grad-norm-every", type=int, default=0)
