@@ -54,6 +54,10 @@ Latest child-ranking result:
   corrected engine gates at `33/64`. Diagnosis: the random 64-group sample
   contained too many tiny-gap rows and too many neighbors per group, so hard
   top1 was partly noise.
+- `child-ranking-lossv5-signal64-preserve001-lr1e4-e320`: still failed.
+  Model gate: `.pt` `42/64`, `.nn` `36/64`; corrected exported-engine gate:
+  `36/64`. This means cleaner targets helped but not enough under the `0.01`
+  broad leash.
 
 Rejected lanes:
 
@@ -109,22 +113,24 @@ Secondary lanes:
 
 Run the next child-ranking ladder rung:
 
-1. High-signal sixty-four loss-log target groups from `losslogs_v5`.
+1. Target-only diagnostic on the high-signal 64-group set.
    - Use `targets/child-ranking/losslogs_v5_signal64.jsonl`.
-   - Require meaningful best-vs-neighbor gaps before a row is eligible.
-   - Keep only best plus up to seven positive-gap neighbors per group.
-   - Use the same `broad_preserve_weight=0.01` that passed 16 groups.
+   - Set `broad_preserve_weight=0.0`.
    - Require `.pt` and `.nn` model gates at least `52/64`.
    - Require corrected engine gate at least `52/64`.
-   - Inspect misses by category before changing LR or weights.
-2. If the high-signal 64-group rung passes:
+   - This is a capability test, not a keeper candidate.
+2. If target-only passes:
+   - retry with a weaker broad leash (`0.005`) or a smaller 32-group preserve
+     rung before scaling again.
+3. If target-only fails:
    - expand to a larger category-balanced loss-log child set;
    - keep broad preservation active from epoch 0;
    - run replay/failure-suite gates;
    - run a 200-300 game smoke before any full SPRT.
 
-If the high-signal 64-group rung fails below `52/64`, stop and diagnose the misses. Do not
-launch a larger set until the failed categories are understood.
+If target-only fails below `52/64`, the child-ranking objective is not yet
+scaling from small capability proofs to broad loss-log groups. Stop and diagnose
+by category before launching another preserve run.
 
 ## Candidate Workflow
 
@@ -136,7 +142,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-signal64-preserve001-lr1e4-e320`
+- candidate name: `child-ranking-lossv5-signal64-targetonly-lr1e4-e320`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -144,7 +150,7 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: ranking loss plus a `0.01` broad deadzone preservation leash
+- objective: target-only ranking loss for the high-signal 64-group diagnostic
 - current ladder target: `targets/child-ranking/losslogs_v5_signal64.jsonl`
   - 64 groups, 445 positive-gap training pairs, category-balanced from loss
     logs.

@@ -1,8 +1,8 @@
 {
-  "description": "Active Enyo NNUE diagnostic: high-signal sixty-four loss-log child-ranking groups with broad deadzone preservation.",
-  "experiment": "child-ranking-lossv5-signal64-preserve001-lr1e4-e320",
+  "description": "Active Enyo NNUE diagnostic: high-signal sixty-four loss-log child-ranking target-only capability test.",
+  "experiment": "child-ranking-lossv5-signal64-targetonly-lr1e4-e320",
   "create": {
-    "name": "child-ranking-lossv5-signal64-preserve001-lr1e4-e320",
+    "name": "child-ranking-lossv5-signal64-targetonly-lr1e4-e320",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/losslogs_v5_signal64.jsonl",
@@ -20,7 +20,7 @@
     "child_broad_rows": 100000,
     "child_batch_size": 64,
     "ranking_weight": 1.0,
-    "broad_preserve_weight": 0.01,
+    "broad_preserve_weight": 0.0,
     "broad_deadzone_cp": 40,
     "broad_beta": 100,
     "rank_margin_cp": 250,
