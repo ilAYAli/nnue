@@ -80,6 +80,12 @@ Latest child-ranking result:
   corrected exported-engine gate: `31/34`. Broad drift stayed controlled
   (`broad_excess` about `53cp`). This is the first rung where the listwise
   objective learns and broad preservation does not immediately block it.
+- `child-ranking-lossv5-primary80-listwise-preserve005-lr1e4-e320`: failed
+  after scaling too broadly. Model gate: `.pt` `55/80`, `.nn` `47/80`;
+  corrected exported-engine gate also `47/80`. Broad drift stayed acceptable
+  (`broad_excess` about `61cp`), so preservation was not the blocker. The
+  target set mixed in 16 tiny-gap rows (`<30cp`) and too many hard forcing rows
+  at once.
 
 Rejected lanes:
 
@@ -135,17 +141,18 @@ Secondary lanes:
 
 Run the next child-ranking ladder rung:
 
-1. Listwise diagnostic on the scaled 80-group primary set with weak broad
+1. Listwise diagnostic on a high-signal 64-group primary set with weak broad
    preservation.
-   - Use `targets/child-ranking/losslogs_v5_primary80.jsonl`.
-   - It contains the successful 34-group primary set, all remaining scored
-     conversion/queen-rook/pawn-race primary rows with a positive best-vs-next
-     gap, and a deterministic stratified forcing sample.
+   - Use `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`.
+   - It filters the 80-group set to rows with a stored best-vs-next gap of at
+     least `30cp`.
    - It excludes `broad_other` and `quiet_broad` from primary ranking targets.
    - Set `child_loss=listwise` so the loss optimizes group top1 directly.
    - Set `broad_preserve_weight=0.005`.
-   - Require `.pt` and `.nn` model gates at least `70/80`.
-   - Require corrected engine gate at least `70/80`.
+   - Run `480` epochs, because the failed 80-group run was still reducing
+     listwise loss late in training.
+   - Require `.pt` and `.nn` model gates at least `52/64`.
+   - Require corrected engine gate at least `52/64`.
    - Treat `broad_excess <= 80cp` as the first useful drift target for this
      rung. If it passes the move gates but broad drift is still high, increase
      preservation before scaling.
@@ -169,7 +176,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary80-listwise-preserve005-lr1e4-e320`
+- candidate name: `child-ranking-lossv5-primary64-g30-listwise-preserve005-lr1e4-e480`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -178,11 +185,10 @@ Current `build.json` intent:
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: listwise ranking loss plus weak broad deadzone preservation for
-  the scaled primary 80-group diagnostic
-- current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
-  - 80 groups, 844 positive-gap training pairs, selected from loss logs.
-  - category balance: forcing `56`, queen/rook endgame `16`, conversion `7`,
-    pawn race `1`.
+  the high-signal primary 64-group diagnostic
+- current ladder target: `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`
+  - 64 groups, 642 positive-gap training pairs, selected from loss logs.
+  - category balance: forcing `56`, queen/rook endgame `3`, conversion `5`.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
