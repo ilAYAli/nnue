@@ -18,6 +18,8 @@ Tooling correction:
 - `child_rank_engine_gate.py` uses the engine eval path. Current reference
   binaries do not expose `eval2`, so the gate falls back to `eval <cp>` instead
   of timing out on `unknown command: 'eval2'`.
+- `nnue_event_ntfy.sh` now sends long-run `done` and `fail` events to
+  `AI_stdin` by default. Phase spam stays on the normal `nnue` topic.
 
 Latest child-ranking result:
 
@@ -30,6 +32,20 @@ Latest child-ranking result:
 - `child-ranking-a4b4-neighbors-targetonly-lr1e4-e160`: passed the original
   seven-neighbor group. `.pt` top1 `1/1` margin `+141cp`, `.nn` top1 `1/1`
   margin `+113cp`, engine gate top1 `1/1`.
+- `child-ranking-fourgroup-targetonly-lr1e4-e160`: failed at `3/4`; the
+  `b6d7` group exposed a quantization-margin miss.
+- `child-ranking-b6d7-neighbors-targetonly-lr1e4-e320`: passed the isolated
+  hard group after more epochs. `.nn` margin was only `+0.5cp`, so this is
+  barely export-visible.
+- `child-ranking-fourgroup-targetonly-lr1e4-e320`: passed `.pt`, `.nn`, and
+  engine gates at `4/4`, but broad drift was large (`broad_excess` about
+  `313cp`).
+- `child-ranking-fourgroup-preserve002-lr1e4-e320`: broad drift improved
+  (`broad_excess` about `54cp`) but the hard `b6d7` group failed again. A
+  `0.02` broad leash is too strong for this rung.
+- `child-ranking-fourgroup-preserve001-lr1e4-e320`: passed `.pt`, `.nn`, and
+  engine gates at `4/4` with `broad_excess` about `63cp`. This is the first
+  useful child-ranking preserve setting for the small ladder.
 
 Rejected lanes:
 
@@ -83,36 +99,34 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run the child-ranking ladder:
+Run the next child-ranking ladder rung:
 
-1. One target group.
-   - Exported `.nn` must rank the best child above the bad/neighbor children.
-   - `.pt` and `.nn` gates must agree.
-   - Broad deadzone excess must remain small.
-2. Four target groups.
-   - All groups should pass exported child ranking.
-   - No broad-preserve collapse.
-3. Sixteen target groups.
-   - At least `13/16` groups should pass exported child ranking.
-   - Worst margin and broad-preserve rows must remain acceptable.
+1. Sixteen loss-log target groups from `losslogs_v5`.
+   - Use `targets/child-ranking/losslogs_v5_16.jsonl`.
+   - Use `broad_preserve_weight=0.01`; `0.02` blocked the hard small group.
+   - Require `.pt` and `.nn` model gates at least `13/16`.
+   - Require engine gate at least `13/16`.
+   - Inspect misses by category before changing LR or weights.
+2. If the 16-group rung passes:
+   - expand to a larger category-balanced loss-log child set;
+   - keep broad preservation active from epoch 0;
+   - run replay/failure-suite gates;
+   - run a 200-300 game smoke before any full SPRT.
 
-Only after the ladder passes:
-
-- build a larger loss-log/failure-suite child target set;
-- run replay/failure-suite gates;
-- run a 200-300 game smoke before any full SPRT.
+If the 16-group rung fails below `13/16`, stop and diagnose the misses. Do not
+launch a larger set until the failed categories are understood.
 
 ## Candidate Workflow
 
 Normal candidate creation:
 
 ```sh
-./build.py -c build.json
+./build.py create -c build.json
 ```
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-fourgroup-targetonly-lr1e4-e160`
+- candidate name: `child-ranking-lossv5-16-preserve001-lr1e4-e320`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -120,10 +134,11 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: target-only ranking loss for the four-group capability diagnostic
-- first ladder target: `targets/child-ranking/four_groups.jsonl`
-  - current contents are four scored failure-suite groups converted from
-    existing search-aware targets after the one-group gate passed.
+- objective: ranking loss plus a `0.01` broad deadzone preservation leash
+- current ladder target: `targets/child-ranking/losslogs_v5_16.jsonl`
+  - 16 groups, 108 pairs.
+  - category balance: forcing `4`, queen/rook endgame `4`, conversion `2`,
+    pawn race `1`, broad-other `3`, quiet-broad `2`.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
@@ -208,26 +223,23 @@ SPRT:
 
 ## Architecture Sequence
 
-Use this sequence for the next serious attempt:
+Paused while child-ranking is still producing useful exported learning signal.
+
+Resume architecture work only if:
+
+- the 16-group child-ranking rung cannot reach `13/16` after miss diagnosis; or
+- a larger child-ranking set passes local gates but fails early game smoke.
+
+When resumed, use the normal architecture checklist:
 
 1. Freeze the current reference net, validation commands, and failure-suite
    input.
-2. Implement exactly one branch: learned material/phase head input.
-3. Add known-FEN feature activation checks.
+2. Implement exactly one separability change.
+3. Add known-FEN activation checks.
 4. Add export/load/roundtrip checks.
-5. Benchmark NPS before training; do not continue if the branch costs more
-   than about `3-5%` NPS without optimization.
-6. Train one candidate with `build.py`.
-7. Run static validation plus failure-suite/move-choice gates.
-8. Start SPRT only if gates are clean.
-
-If this architecture branch fails gates or SPRT:
-
-- Try at most one more independent small architecture branch before reassessing.
-- The next best candidate is king-bucket refinement with full trainer/engine
-  support, not a folded conversion.
-- If two independent architecture branches fail, stop spending bulk GPU/search
-  time and reassess base net, architecture family, and teacher source.
+5. Benchmark NPS before training; stop if the branch costs more than about
+   `3-5%` NPS without optimization.
+6. Train through `build.py`, not a manual script.
 
 ## Historical Notes
 
