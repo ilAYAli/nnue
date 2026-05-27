@@ -16,8 +16,9 @@ Tooling correction:
   target-only run exposed that the previous loss used child side-to-move POV
   with the wrong sign: loss went down while `.pt`/`.nn` gates got worse.
 - `child_rank_engine_gate.py` uses the engine eval path. Current reference
-  binaries do not expose `eval2`, so the gate falls back to `eval <cp>` instead
-  of timing out on `unknown command: 'eval2'`.
+  binaries do not expose `eval2`, so the gate falls back to `evalnet`. A bad
+  fallback to plain `eval` made old engine-gate results invalid because it did
+  not evaluate the requested child FEN.
 - `nnue_event_ntfy.sh` now sends long-run `done` and `fail` events to
   `AI_stdin` by default. Phase spam stays on the normal `nnue` topic.
 
@@ -47,8 +48,12 @@ Latest child-ranking result:
   engine gates at `4/4` with `broad_excess` about `63cp`. This is the first
   useful child-ranking preserve setting for the small ladder.
 - `child-ranking-lossv5-16-preserve001-lr1e4-e320`: passed the next rung.
-  Model gate: `.pt` and `.nn` `13/16`; misses were broad/quiet rows. Engine
-  gate: `16/16`. Final training broad excess was about `54cp`.
+  Corrected model and engine gates were `13/16`; misses were broad/quiet rows.
+  Final training broad excess was about `54cp`.
+- `child-ranking-lossv5-64-preserve001-lr1e4-e320`: failed the model and
+  corrected engine gates at `33/64`. Diagnosis: the random 64-group sample
+  contained too many tiny-gap rows and too many neighbors per group, so hard
+  top1 was partly noise.
 
 Rejected lanes:
 
@@ -104,19 +109,21 @@ Secondary lanes:
 
 Run the next child-ranking ladder rung:
 
-1. Sixty-four loss-log target groups from `losslogs_v5`.
-   - Use `targets/child-ranking/losslogs_v5_64.jsonl`.
+1. High-signal sixty-four loss-log target groups from `losslogs_v5`.
+   - Use `targets/child-ranking/losslogs_v5_signal64.jsonl`.
+   - Require meaningful best-vs-neighbor gaps before a row is eligible.
+   - Keep only best plus up to seven positive-gap neighbors per group.
    - Use the same `broad_preserve_weight=0.01` that passed 16 groups.
    - Require `.pt` and `.nn` model gates at least `52/64`.
-   - Require engine gate at least `52/64`.
+   - Require corrected engine gate at least `52/64`.
    - Inspect misses by category before changing LR or weights.
-2. If the 64-group rung passes:
+2. If the high-signal 64-group rung passes:
    - expand to a larger category-balanced loss-log child set;
    - keep broad preservation active from epoch 0;
    - run replay/failure-suite gates;
    - run a 200-300 game smoke before any full SPRT.
 
-If the 64-group rung fails below `52/64`, stop and diagnose the misses. Do not
+If the high-signal 64-group rung fails below `52/64`, stop and diagnose the misses. Do not
 launch a larger set until the failed categories are understood.
 
 ## Candidate Workflow
@@ -129,7 +136,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-64-preserve001-lr1e4-e320`
+- candidate name: `child-ranking-lossv5-signal64-preserve001-lr1e4-e320`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -138,11 +145,11 @@ Current `build.json` intent:
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: ranking loss plus a `0.01` broad deadzone preservation leash
-- current ladder target: `targets/child-ranking/losslogs_v5_64.jsonl`
-  - 64 groups, 891 positive-gap training pairs, category-balanced from loss
+- current ladder target: `targets/child-ranking/losslogs_v5_signal64.jsonl`
+  - 64 groups, 445 positive-gap training pairs, category-balanced from loss
     logs.
-  - category balance: forcing `13`, queen/rook endgame `18`, conversion `7`,
-    pawn race `1`, broad-other `13`, quiet-broad `12`.
+  - category balance: forcing `23`, queen/rook endgame `5`, conversion `5`,
+    pawn race `1`, broad-other `15`, quiet-broad `15`.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
