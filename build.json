@@ -39,7 +39,7 @@
     "device": "cuda",
     "workers": 4,
     "prefetch_factor": 2,
-    "amp": "off",
+    "amp": "bf16",
     "max_features": 32,
     "pack_limit": 10000,
     "pack_progress": 10000,
