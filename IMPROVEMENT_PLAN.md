@@ -113,6 +113,14 @@ Latest child-ranking result:
   Cross-checks: old focused set `32/34`, full primary80 `68/80`. This proves
   export-aware child ranking can fully learn the filtered 64-group set; the
   next useful test is scale, not another 64-set margin tweak.
+- `child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800`:
+  passed the primary80 scale check. Export-quantized `.pt`, exported `.nn`, and
+  corrected engine gate all reached `73/80`; final broad drift stayed
+  controlled (`broad_excess` about `61cp`). Primary80 baseline was only `41/80`.
+  Non-training cross-checks also improved versus baseline: signal64 `29/64` to
+  `42/64`, random losslogs64 `27/64` to `32/64`, and random worst regression
+  improved from `-1325cp` to `-210cp`. This is enough local signal for an early
+  game smoke, but not enough to call it a keeper.
 
 Rejected lanes:
 
@@ -166,24 +174,22 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Scale the export-aware listwise child-ranking run to the full primary80 set:
+Run an early game smoke for the primary80 child-ranking net:
 
-1. Use `targets/child-ranking/losslogs_v5_primary80.jsonl`.
-2. Set `child_loss=listwise`, `broad_preserve_weight=0.005`, and
-   `export_quantize_forward=true`.
-3. Run `800` epochs at `lr=1e-4`.
-4. Keep `rank_temperature_cp=15`.
-5. Require export-quantized `.pt`, `.nn`, and corrected engine gates at least
-   `70/80`.
+1. Use
+   `runs/child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800/train/child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800/model.nn`.
+2. Run a `256` game same-engine net-vs-reference smoke before any further
+   training.
+3. Compare against the current reference net
+   `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`.
 
 Interpretation:
 
-- The previous 64-group net already cross-checks at `68/80`. A primary80 run
-  must beat that without losing export parity.
-- If primary80 reaches at least `70/80` while keeping `broad_excess <= 80cp`,
-  run broader non-training validation before considering a game smoke.
-- If it fails below `70/80`, inspect misses by gap. Do not chase gap-1 to
-  gap-8 rows as primary failures.
+- If the smoke is neutral or positive, run a larger confirmation or broader
+  replay/failure-suite check before promotion.
+- If the smoke is clearly negative, stop fitting this target set and inspect
+  game losses; the local child-ranking gate is then necessary but not
+  sufficient.
 
 ## Candidate Workflow
 
@@ -204,7 +210,8 @@ Current `build.json` intent:
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: export-aware listwise ranking loss plus weak broad deadzone
-  preservation for the primary80 scale diagnostic
+  preservation for the primary80 scale diagnostic; currently under game smoke
+  validation
 - current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
   - 80 groups, 844 positive-gap training pairs, selected from loss logs.
   - includes the filtered 64 high-signal groups plus 16 low-gap/noisy rows that
