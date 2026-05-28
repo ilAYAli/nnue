@@ -10,6 +10,25 @@ kind of Stockfish-labeled Enyo self-play.
 
 No trained Enyo net is currently a keeper.
 
+Latest result:
+
+- `child-ranking-mixed-replayrefresh2838-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
+  passed the refreshed replay/LC0/smoke mixed child gates and broad static
+  checks. After root-selected move augmentation, replay-loss root search was
+  complete (`missing_selected=0`) and directionally positive on the refreshed
+  loss set (`1888/2838` versus reference `1853/2838`, compare
+  `candidate_better=295`, `reference_better=257`, `sum_diff=+4307cp`).
+  The `256`-game smoke still rejected it: `-13.6 +/- 30.4`, LOS `19.0%`,
+  draw `49.2%`. Do not promote it. Treat root-complete replay as a useful
+  rejection/diagnostic gate, not a sufficient Elo predictor.
+- `fkW8Ha8V` adds a fresh Lichess-loss diagnostic. Timed replay with the
+  actual local `v.90c53aa` binary reproduces both bad moves: `25. Qa7??`
+  instead of `b6+` (about `206cp` worse by oracle), and `29. Kh1??` instead
+  of `Kg2` (mate-scale loss). Fixed-node replay avoids the second blunder, so
+  `Kh1` is a search/time-path instability target rather than a plain static
+  child-ranking row. Keep it as a search diagnostic unless a fixed-node gate
+  also reproduces it.
+
 Tooling correction:
 
 - `train_child_ranking.py` now trains child margins in parent POV. The first
@@ -20,7 +39,10 @@ Tooling correction:
   fallback to plain `eval` made old engine-gate results invalid because it did
   not evaluate the requested child FEN.
 - `nnue_event_ntfy.sh` now sends long-run `done` and `fail` events to
-  `AI_stdin` by default. Phase spam stays on the normal `nnue` topic.
+  `AI_stdin` by default. Phase spam stays on the normal `nnue` topic. The hook
+  always posts directly to `AI_stdin` and only uses `notifai.sh` as a
+  best-effort additional path, because `notifai.sh` can report success without
+  reaching the active Codex session.
 - Policy-ranker runs now export an engine-loadable
   `policy_ranker.json` artifact and validate exported-score parity against the
   PyTorch checkpoint. Engine-side integration must consume this artifact, not a
