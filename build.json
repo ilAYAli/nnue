@@ -1,8 +1,8 @@
 {
-  "description": "Train a child-ranking candidate on the fresh fast4 replay-loss baseline mix.",
-  "experiment": "child-ranking-fast4-r13-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+  "description": "Train a fast4 child-ranking candidate with stronger ranking pressure.",
+  "experiment": "child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
   "create": {
-    "name": "child-ranking-fast4-r13-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+    "name": "child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
     "backend": "child-ranking",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "score_engine": "~/local/bin/stockfish",
@@ -16,7 +16,7 @@
     "epochs": 360,
     "batch_size": 8192,
     "child_batch_size": 64,
-    "ranking_weight": 1.0,
+    "ranking_weight": 2.0,
     "broad_preserve_weight": 0.2,
     "broad_anchor": "reference",
     "broad_deadzone_cp": 5,
@@ -53,9 +53,9 @@
   },
   "validation": {
     "expected_signal": [
-      "fresh fast4 replay targets should test whether replay extraction density mattered",
-      "smoke-loss gate still requires no missing selected moves before any game smoke",
-      "reject if broad static preservation regresses or smoke-loss search gate stays below reference"
+      "r13 preserved broad eval but under-moved on child ranking",
+      "rank2 tests whether stronger ranking pressure can clear model and engine gates without broad collapse",
+      "reject if smoke-loss search gate remains below reference after selected-move coverage is complete"
     ]
   }
 }
