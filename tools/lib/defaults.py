@@ -85,6 +85,10 @@ class CandidateDefaults:
 
     child_targets: str = ""
     child_broad_rows: int = 100000
+    child_static_gate_rows: int = 100000
+    child_static_gate_max_mae_regression_cp: float = 5.0
+    child_static_gate_max_sign_drop_pct: float = 1.0
+    child_static_gate_max_near_zero_sign_drop_pct: float = 2.0
     child_batch_size: int = 64
     child_loss: str = "pairwise"
     ranking_weight: float = 1.0

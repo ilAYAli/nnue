@@ -220,6 +220,10 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "export_quantize_forward",
         "trainable",
         "child_broad_rows",
+        "child_static_gate_rows",
+        "child_static_gate_max_mae_regression_cp",
+        "child_static_gate_max_sign_drop_pct",
+        "child_static_gate_max_near_zero_sign_drop_pct",
         "child_model_gate_min_top1",
         "child_engine_gate_min_top1",
     }
@@ -530,6 +534,22 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--jobs", str(args.child_engine_jobs),
                     "--min-groups", str(args.min_groups),
                     "--fail-if-top1-below", str(args.child_engine_gate_min_top1),
+                ],
+            },
+            {
+                "name": "validate_child_broad_static",
+                "command": [
+                    python, tool("validate/static_compare_gate.py"),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--reference-net", str(expand_path(args.init_net)),
+                    "--data", data_dir,
+                    "--rows", str(args.child_static_gate_rows),
+                    "--fail-if-mae-regression-gt",
+                    str(args.child_static_gate_max_mae_regression_cp),
+                    "--fail-if-sign-drop-gt",
+                    str(args.child_static_gate_max_sign_drop_pct),
+                    "--fail-if-near-zero-sign-drop-gt",
+                    str(args.child_static_gate_max_near_zero_sign_drop_pct),
                 ],
             },
         ])
@@ -1077,6 +1097,10 @@ def add_create_args(
                         choices=["all", "float-head", "output"])
     parser.add_argument("--child-targets", default=value("child_targets", d.child_targets))
     parser.add_argument("--child-broad-rows", type=int, default=value("child_broad_rows", d.child_broad_rows))
+    parser.add_argument("--child-static-gate-rows", type=int, default=value("child_static_gate_rows", d.child_static_gate_rows))
+    parser.add_argument("--child-static-gate-max-mae-regression-cp", type=float, default=value("child_static_gate_max_mae_regression_cp", d.child_static_gate_max_mae_regression_cp))
+    parser.add_argument("--child-static-gate-max-sign-drop-pct", type=float, default=value("child_static_gate_max_sign_drop_pct", d.child_static_gate_max_sign_drop_pct))
+    parser.add_argument("--child-static-gate-max-near-zero-sign-drop-pct", type=float, default=value("child_static_gate_max_near_zero_sign_drop_pct", d.child_static_gate_max_near_zero_sign_drop_pct))
     parser.add_argument("--child-batch-size", type=int, default=value("child_batch_size", d.child_batch_size))
     parser.add_argument("--child-loss", default=value("child_loss", d.child_loss),
                         choices=["pairwise", "listwise"])
