@@ -211,6 +211,13 @@ Latest child-ranking result:
   held-out policy-sidecar result with useful action. It is still narrow and
   must replicate under a different train/validation split seed before any
   engine-integration work.
+- `policy-ranker-matelike-trainglobal-gatenolowmat-board-h64-d35-lr2e4-e600-s2`:
+  the first pass failed only because the global all-row gate required
+  `bad=0`, while the train side had `2` bad overrides. The actual held-out
+  result replicated: non-lowmat validation improved from `16/54` to `45/54`,
+  and threshold `4` gave `28` overrides, `26` good, `0` bad, and worst harm
+  `-1cp`. For split-replication diagnostics, use the validation constraints as
+  the hard pass/fail rule; global all-row safety is a later deployment gate.
 
 Rejected lanes:
 

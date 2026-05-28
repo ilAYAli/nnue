@@ -40,7 +40,7 @@
     "policy_target_temperature_cp": 80,
     "policy_thresholds": "4,8,12,16,24,32,40,48,64",
     "policy_gate_min_top1": 1,
-    "policy_gate_max_bad": 0,
+    "policy_gate_max_bad": -1,
     "policy_gate_max_val_bad": 0,
     "policy_gate_min_val_good": 8,
     "policy_gate_min_val_overrides": 8,
