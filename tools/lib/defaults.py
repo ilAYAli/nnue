@@ -131,16 +131,25 @@ class CandidateDefaults:
     policy_export_threshold: float = 4.0
     policy_export_max_abs_diff: float = 1e-3
 
-    replay: str = "replay"
+    replay: str = default_executable("~/local/bin/replay", "replay")
     replay_logs: str = "~/code/cpp/chess/lichess/logs/loss"
     replay_candidate: str = "~/code/cpp/chess/assets/engines/reference"
     replay_reference: str = ""
     replay_oracle_nodes: int = 200000
     replay_jobs: int = 8
     replay_move: int = 8
+    replay_top_root_moves: int = 8
+    replay_include_checks: bool = True
+    replay_include_captures: bool = True
+    replay_include_promotions: bool = True
+    replay_max_moves_per_position: int = 16
+    replay_min_score_gap: int = 0
     replay_output: str = "targets/replay-loss-20260528/loss_replay.jsonl"
     replay_stderr: str = "targets/replay-loss-20260528/loss_replay.stderr"
     replay_min_rows: int = 1
+    replay_child_targets: str = "targets/replay-loss-20260528/loss_replay_child_targets.jsonl"
+    replay_child_summary: str = "targets/replay-loss-20260528/loss_replay_child_targets.summary.txt"
+    replay_child_min_groups: int = 1
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

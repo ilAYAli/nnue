@@ -274,9 +274,18 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "replay_oracle_nodes",
         "replay_jobs",
         "replay_move",
+        "replay_top_root_moves",
+        "replay_include_checks",
+        "replay_include_captures",
+        "replay_include_promotions",
+        "replay_max_moves_per_position",
+        "replay_min_score_gap",
         "replay_output",
         "replay_stderr",
         "replay_min_rows",
+        "replay_child_targets",
+        "replay_child_summary",
+        "replay_child_min_groups",
     }
     backend_keys = {
         "pytorch": pytorch,
@@ -635,13 +644,36 @@ err=$6
 oracle_nodes=$7
 jobs=$8
 move_no=$9
+top_root_moves=${{10}}
+include_checks=${{11}}
+include_captures=${{12}}
+include_promotions=${{13}}
+max_moves=${{14}}
+min_score_gap=${{15}}
 
 mkdir -p "$(dirname "$out")"
 cmd=("$replay_bin" --jsonl --candidate "$candidate")
 cmd+=(--reference "$reference")
-cmd+=(--oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no" -)
+cmd+=(--oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no")
+cmd+=(--top-root-moves "$top_root_moves")
+if [[ "$include_checks" == "1" ]]; then
+  cmd+=(--include-checks)
+else
+  cmd+=(--no-checks)
+fi
+if [[ "$include_captures" == "1" ]]; then
+  cmd+=(--include-captures)
+else
+  cmd+=(--no-captures)
+fi
+if [[ "$include_promotions" == "1" ]]; then
+  cmd+=(--include-promotions)
+else
+  cmd+=(--no-promotions)
+fi
+cmd+=(--max-moves-per-position "$max_moves" --min-score-gap "$min_score_gap" -)
 
-find "$logs" -name '*.log' | sort | "${cmd[@]}" > "$out" 2> "$err"
+find "$logs" -name '*.log' | sort | "${{cmd[@]}}" > "$out" 2> "$err"
 test -s "$out"
 wc -l "$out" > "$out.wc"
 """
@@ -656,6 +688,12 @@ wc -l "$out" > "$out.wc"
                 str(args.replay_oracle_nodes),
                 str(args.replay_jobs),
                 str(args.replay_move),
+                str(args.replay_top_root_moves),
+                "1" if args.replay_include_checks else "0",
+                "1" if args.replay_include_captures else "0",
+                "1" if args.replay_include_promotions else "0",
+                str(args.replay_max_moves_per_position),
+                str(args.replay_min_score_gap),
             ]
         else:
             replay_script = r"""
@@ -668,12 +706,35 @@ err=$5
 oracle_nodes=$6
 jobs=$7
 move_no=$8
+top_root_moves=$9
+include_checks=${{10}}
+include_captures=${{11}}
+include_promotions=${{12}}
+max_moves=${{13}}
+min_score_gap=${{14}}
 
 mkdir -p "$(dirname "$out")"
-find "$logs" -name '*.log' | sort | \
-  "$replay_bin" --jsonl --candidate "$candidate" \
-  --oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no" - \
-  > "$out" 2> "$err"
+cmd=("$replay_bin" --jsonl --candidate "$candidate")
+cmd+=(--oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no")
+cmd+=(--top-root-moves "$top_root_moves")
+if [[ "$include_checks" == "1" ]]; then
+  cmd+=(--include-checks)
+else
+  cmd+=(--no-checks)
+fi
+if [[ "$include_captures" == "1" ]]; then
+  cmd+=(--include-captures)
+else
+  cmd+=(--no-captures)
+fi
+if [[ "$include_promotions" == "1" ]]; then
+  cmd+=(--include-promotions)
+else
+  cmd+=(--no-promotions)
+fi
+cmd+=(--max-moves-per-position "$max_moves" --min-score-gap "$min_score_gap" -)
+
+find "$logs" -name '*.log' | sort | "${{cmd[@]}}" > "$out" 2> "$err"
 test -s "$out"
 wc -l "$out" > "$out.wc"
 """
@@ -687,6 +748,12 @@ wc -l "$out" > "$out.wc"
                 str(args.replay_oracle_nodes),
                 str(args.replay_jobs),
                 str(args.replay_move),
+                str(args.replay_top_root_moves),
+                "1" if args.replay_include_checks else "0",
+                "1" if args.replay_include_captures else "0",
+                "1" if args.replay_include_promotions else "0",
+                str(args.replay_max_moves_per_position),
+                str(args.replay_min_score_gap),
             ]
         steps.extend([
             {
@@ -700,6 +767,16 @@ wc -l "$out" > "$out.wc"
                     "--input", str(expand_user(args.replay_output)),
                     "--min-rows", str(args.replay_min_rows),
                     "--fail-if-dirty-candidate",
+                ],
+            },
+            {
+                "name": "convert_replay_child_targets",
+                "command": [
+                    python, tool("validate/replay_jsonl_to_child_targets.py"),
+                    "--input", str(expand_user(args.replay_output)),
+                    "--out", str(expand_user(args.replay_child_targets)),
+                    "--summary", str(expand_user(args.replay_child_summary)),
+                    "--min-groups", str(args.replay_child_min_groups),
                 ],
             },
         ])
@@ -908,9 +985,21 @@ def add_create_args(
     parser.add_argument("--replay-oracle-nodes", type=int, default=value("replay_oracle_nodes", d.replay_oracle_nodes))
     parser.add_argument("--replay-jobs", type=int, default=value("replay_jobs", d.replay_jobs))
     parser.add_argument("--replay-move", type=int, default=value("replay_move", d.replay_move))
+    parser.add_argument("--replay-top-root-moves", type=int, default=value("replay_top_root_moves", d.replay_top_root_moves))
+    parser.add_argument("--replay-include-checks", action=argparse.BooleanOptionalAction,
+                        default=value("replay_include_checks", d.replay_include_checks))
+    parser.add_argument("--replay-include-captures", action=argparse.BooleanOptionalAction,
+                        default=value("replay_include_captures", d.replay_include_captures))
+    parser.add_argument("--replay-include-promotions", action=argparse.BooleanOptionalAction,
+                        default=value("replay_include_promotions", d.replay_include_promotions))
+    parser.add_argument("--replay-max-moves-per-position", type=int, default=value("replay_max_moves_per_position", d.replay_max_moves_per_position))
+    parser.add_argument("--replay-min-score-gap", type=int, default=value("replay_min_score_gap", d.replay_min_score_gap))
     parser.add_argument("--replay-output", default=value("replay_output", d.replay_output))
     parser.add_argument("--replay-stderr", default=value("replay_stderr", d.replay_stderr))
     parser.add_argument("--replay-min-rows", type=int, default=value("replay_min_rows", d.replay_min_rows))
+    parser.add_argument("--replay-child-targets", default=value("replay_child_targets", d.replay_child_targets))
+    parser.add_argument("--replay-child-summary", default=value("replay_child_summary", d.replay_child_summary))
+    parser.add_argument("--replay-child-min-groups", type=int, default=value("replay_child_min_groups", d.replay_child_min_groups))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

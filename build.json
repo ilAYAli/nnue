@@ -3,23 +3,34 @@
   "create": {
     "name": "replay-loss-jsonl-20260528",
     "backend": "replay-jsonl",
-    "replay": "replay",
+    "replay": "~/local/bin/replay",
     "replay_logs": "~/code/cpp/chess/lichess/logs/loss",
     "replay_candidate": "~/code/cpp/chess/assets/engines/reference",
     "replay_reference": "",
     "replay_oracle_nodes": 200000,
     "replay_jobs": 8,
     "replay_move": 8,
+    "replay_top_root_moves": 8,
+    "replay_include_checks": true,
+    "replay_include_captures": true,
+    "replay_include_promotions": true,
+    "replay_max_moves_per_position": 16,
+    "replay_min_score_gap": 0,
     "replay_output": "targets/replay-loss-20260528/loss_replay.jsonl",
     "replay_stderr": "targets/replay-loss-20260528/loss_replay.stderr",
     "replay_min_rows": 1,
+    "replay_child_targets": "targets/replay-loss-20260528/loss_replay_child_targets.jsonl",
+    "replay_child_summary": "targets/replay-loss-20260528/loss_replay_child_targets.summary.txt",
+    "replay_child_min_groups": 1,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected": [
       "replay command omits --reference unless replay_reference is set",
+      "replay emits root alternatives, checks, captures, and promotions",
       "candidate provenance is clean and not dirty",
-      "JSONL validates as enyo.replay.v1"
+      "raw JSONL validates as enyo.replay.v1",
+      "trainable child-target JSONL is generated from rows with at least two scored moves"
     ]
   }
 }
