@@ -268,6 +268,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
     }
     replay = {
         "replay",
+        "score_engine",
         "replay_logs",
         "replay_candidate",
         "replay_reference",
@@ -653,10 +654,12 @@ include_promotions=${{13}}
 max_moves=${{14}}
 min_score_gap=${{15}}
 include_history_sensitive=${{16}}
+oracle=${{17}}
 
 mkdir -p "$(dirname "$out")"
 cmd=("$replay_bin" --jsonl --candidate "$candidate")
 cmd+=(--reference "$reference")
+cmd+=(--oracle "$oracle")
 cmd+=(--oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no")
 cmd+=(--top-root-moves "$top_root_moves")
 if [[ "$include_checks" == "1" ]]; then
@@ -701,6 +704,7 @@ wc -l "$out" > "$out.wc"
                 str(args.replay_max_moves_per_position),
                 str(args.replay_min_score_gap),
                 "1" if args.replay_include_history_sensitive else "0",
+                str(expand_user(args.score_engine)),
             ]
         else:
             replay_script = r"""
@@ -720,9 +724,11 @@ include_promotions=${{12}}
 max_moves=${{13}}
 min_score_gap=${{14}}
 include_history_sensitive=${{15}}
+oracle=${{16}}
 
 mkdir -p "$(dirname "$out")"
 cmd=("$replay_bin" --jsonl --candidate "$candidate")
+cmd+=(--oracle "$oracle")
 cmd+=(--oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no")
 cmd+=(--top-root-moves "$top_root_moves")
 if [[ "$include_checks" == "1" ]]; then
@@ -766,6 +772,7 @@ wc -l "$out" > "$out.wc"
                 str(args.replay_max_moves_per_position),
                 str(args.replay_min_score_gap),
                 "1" if args.replay_include_history_sensitive else "0",
+                str(expand_user(args.score_engine)),
             ]
         steps.extend([
             {
