@@ -86,6 +86,13 @@ Latest child-ranking result:
   (`broad_excess` about `61cp`), so preservation was not the blocker. The
   target set mixed in 16 tiny-gap rows (`<30cp`) and too many hard forcing rows
   at once.
+- `child-ranking-lossv5-primary64-g30-listwise-preserve005-lr1e4-e480`:
+  passed the filtered high-signal rung. Model gate: `.pt` `61/64`, `.nn`
+  `55/64`; corrected exported-engine gate: `56/64`. Broad drift stayed
+  controlled (`broad_excess` about `56cp`). Cross-checks on the completed net:
+  engine gate `28/34` on the old focused set and `60/80` on the full primary80
+  set. The full-set misses are dominated by tiny-gap rows, so do not chase
+  gap-1 to gap-8 rows as primary targets.
 
 Rejected lanes:
 
@@ -139,32 +146,21 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run the next child-ranking ladder rung:
+Run a target-only ceiling check on the same filtered 64-group set:
 
-1. Listwise diagnostic on a high-signal 64-group primary set with weak broad
-   preservation.
-   - Use `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`.
-   - It filters the 80-group set to rows with a stored best-vs-next gap of at
-     least `30cp`.
-   - It excludes `broad_other` and `quiet_broad` from primary ranking targets.
-   - Set `child_loss=listwise` so the loss optimizes group top1 directly.
-   - Set `broad_preserve_weight=0.005`.
-   - Run `480` epochs, because the failed 80-group run was still reducing
-     listwise loss late in training.
-   - Require `.pt` and `.nn` model gates at least `52/64`.
-   - Require corrected engine gate at least `52/64`.
-   - Treat `broad_excess <= 80cp` as the first useful drift target for this
-     rung. If it passes the move gates but broad drift is still high, increase
-     preservation before scaling.
-2. If the weak-preserve rung passes:
-   - run the corrected engine gate;
-   - inspect broad drift from the training log;
-   - then scale to the next category-balanced child set.
-3. If the weak-preserve rung fails:
-   - diagnose whether the two forcing misses reappeared or preservation blocked
-     many more groups;
-   - do not launch another same-shape run without changing either target
-     composition or the preservation weight.
+1. Use `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`.
+2. Set `child_loss=listwise` and `broad_preserve_weight=0.0`.
+3. Run `480` epochs at `lr=1e-4`.
+4. Require `.pt`, `.nn`, and corrected engine gates at least `58/64`.
+
+Interpretation:
+
+- If target-only reaches materially above the weak-preserve result, the next
+  keeper-shaped run should relax preservation slightly or increase ranking
+  pressure while keeping `broad_excess <= 80cp`.
+- If target-only stays near `56/64`, the remaining rows are not a preservation
+  problem. Do not scale blindly; inspect the repeated forcing misses and change
+  target composition or representation.
 
 ## Candidate Workflow
 
@@ -176,7 +172,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary64-g30-listwise-preserve005-lr1e4-e480`
+- candidate name: `child-ranking-lossv5-primary64-g30-listwise-targetonly-lr1e4-e480`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -184,8 +180,8 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: listwise ranking loss plus weak broad deadzone preservation for
-  the high-signal primary 64-group diagnostic
+- objective: listwise ranking target-only ceiling check for the high-signal
+  primary 64-group diagnostic
 - current ladder target: `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`
   - 64 groups, 642 positive-gap training pairs, selected from loss logs.
   - category balance: forcing `56`, queen/rook endgame `3`, conversion `5`.
