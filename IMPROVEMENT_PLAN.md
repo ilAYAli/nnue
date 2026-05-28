@@ -12,6 +12,20 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `child-ranking-fast4-r20-r14init-smokeguard29-listwise-qfwd-refpreserve30-childguard5-dz5-lr1e6-e240`
+  is rejected. It trained on the base `5842` mixed corpus and used the `29`
+  r18-vs-r14 smoke-worse rows only as a child-level reference-preserve guard
+  against r14. Broad static stayed safe (`MAE 120.162` versus r14 `121.808`,
+  sign `91.58%` versus `91.60%`), but root search did not preserve r14:
+  combined search gate candidate `3704/6132`, reference `3936/6132`,
+  `candidate_better=538`, `reference_better=679`, `sum_diff=-8144cp`, and
+  `missing_selected=254`. On the focused `29` smoke-worse rows, r20 improved
+  over r19 (`16/29` versus `9/29`) but remained far behind r14 (`27/29`).
+  The important diagnosis is that these rows are search-emergent. r14 static
+  `.nn`/engine child eval is only `14/29` on the same rows, while r14 root
+  search is `27/29`. More root-child static guards are therefore the wrong
+  next experiment; the next target must capture search/PV-descendant behavior
+  or search policy, not just root child eval.
 - `child-ranking-mixed-replaylatest2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
   trained on the latest synced loss-log replay rows plus LC0-oracle and the
   previous failed-smoke rows. It passed model, engine, and broad-static gates:
@@ -459,43 +473,44 @@ Secondary lanes:
 
 ## Current Result
 
-- `child-ranking-mixed-replayloss2677-lc0oracle1000-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
-  passed local target/static gates but failed a 256-game smoke:
-  `-35.4 +/- 29.4`, LOS `0.9%`, draw `52.3%`.
-- A smoke-PGN target extractor was added and run on that failed smoke. With
-  clean per-position `ucinewgame` probing, the failed candidate measured:
-  `95/210` root-search top1 versus reference `101/210`, `sum_diff=-283cp`.
-- `child-ranking-mixed-replayloss2677-lc0oracle1000-smoke210...` passed
-  combined child model/engine gates and broad static (`MAE -4.98cp`,
-  sign drop `+0.64pp`) but failed root-search:
-  `88/210`, `missing_selected=27`.
-- `child-ranking-mixed-replayloss2677-lc0oracle1000-smoker1x5...` also passed
-  combined child engine and broad static (`MAE -4.44cp`, sign drop `+0.52pp`)
-  but failed root-search:
-  `83/191`, `missing_selected=30`.
+- `r14` remains the keeper baseline. It was neutral versus Berserk in the
+  latest 1000-game smoke (`-0.3 +/- 15.7`, LOS `48.3%`, draw `47.1%`).
+- `r18` improved root-search gates after root-selected augmentation, but failed
+  a 256-game smoke versus r14 (`-12.2 +/- 30.8`, LOS `21.7%`). The failed smoke
+  produced `29` candidate-worse rows.
+- `r19` trained those `29` rows as repeated primary targets. It regressed the
+  combined search gate and scored only `9/29` on the focused smoke-worse rows.
+- `r20` used those `29` rows as child-level reference guards instead. It
+  protected broad scalar eval but still scored only `16/29` in root search,
+  while r14 scores `27/29`.
 
-Conclusion: static child-ranking gradients can improve exported eval and broad
-static metrics without controlling Enyo's root-search selected move. This lane
-is not game-safe until the training target includes the moves selected by the
-current candidate under root search.
+Conclusion: the recent smoke regressions are not ordinary root child-eval
+failures. They are positions where r14's correct move is produced by search
+despite weak static child eval. Static root-child ranking and child-level
+reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Refresh the replay-loss target corpus before more training:
+Build a search-descendant diagnostic before more training:
 
-1. Sync the latest `lichess/logs/loss` from localhost to `pwa-5090`.
-2. Regenerate replay JSONL using the current clean reference engine and dense
-   replay move output.
-3. Convert replay JSONL to child targets and build one mixed corpus:
-   replay-loss dense rows + LC0-oracle rows + failed-smoke root-search rows.
-4. Before training, run reference and last failed candidate through the new
-   root-search gate and require `missing_selected=0`; if selected moves are
-   missing, regenerate the target with those moves scored.
-5. Train exactly one new `build.json` candidate. It must pass:
-   - combined model/engine child gates above reference baseline;
-   - broad static gate;
-   - failed-smoke/replay root-search gate with `missing_selected=0`;
-   - only then a 256-game smoke.
+1. Use the focused `29` r18-vs-r14 smoke-worse rows.
+2. For each row, record r14 and candidate root selected moves and principal
+   variation descendants at the same fixed-node search setting.
+3. Oracle-score the descendant positions/moves in parent POV, using the same
+   oracle settings as the current child targets.
+4. Identify where r14's selected root move becomes correct: immediate child,
+   first PV descendant, later PV descendant, or only full search.
+5. Only train a new candidate if the diagnostic yields concrete descendant
+   child-ranking groups. If it does not, stop this eval-training loop and treat
+   the remaining issue as search-policy rather than NNUE scalar training.
+
+Pass condition for the diagnostic:
+
+- r14-search-good rows must become explainable by scored descendant targets for
+  most of the `29` rows;
+- no ordinary training run is launched unless the new target file has complete
+  scored selected moves and `missing_selected=0` under both r14 and the current
+  candidate.
 
 ## Candidate Workflow
 
