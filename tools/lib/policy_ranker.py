@@ -23,6 +23,7 @@ from .nnue_model import EnyoNNUE, load_model_from_nn
 @dataclass
 class PolicyGroup:
     group_id: str
+    tags: tuple[str, ...]
     moves: tuple[str, ...]
     features: torch.Tensor
     oracle_scores: torch.Tensor
@@ -253,6 +254,7 @@ class PolicyFeatureBuilder:
 
         return PolicyGroup(
             group_id=group.group_id,
+            tags=group.tags,
             moves=tuple(moves),
             features=torch.tensor(rows, dtype=torch.float32),
             oracle_scores=torch.tensor(oracle_scores, dtype=torch.float32),

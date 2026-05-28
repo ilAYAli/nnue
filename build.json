@@ -33,6 +33,7 @@
     "policy_feature_set": "board",
     "policy_dropout": 0.35,
     "policy_include_tags": "mate_like",
+    "policy_breakdown_tags": "source:losslogs_v5,source:gamebalanced_v3,source:lichess_lowmat_mc12,sample:forcing,sample:conversion,sample:queen_rook_endgame,sample:queen_endgame,sample:rook_endgame,sample:pawn_race,sample:broad_other,sample:quiet_broad,phase:endgame,phase:late,phase:midgame",
     "policy_val_fraction": 0.25,
     "policy_target_temperature_cp": 80,
     "policy_thresholds": "4,8,12,16,24,32,40,48,64",

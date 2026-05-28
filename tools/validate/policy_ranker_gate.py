@@ -35,6 +35,10 @@ def parse_thresholds(raw: str) -> list[float]:
     return [float(item) for item in raw.split(",") if item.strip()]
 
 
+def parse_tags(raw: str) -> list[str]:
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 @torch.no_grad()
 def build_rows(model: PolicyRanker, groups, mean: torch.Tensor,
                std: torch.Tensor, device: str):
@@ -126,6 +130,18 @@ def summarize_rows(label: str, rows, thresholds: list[float]
     return out
 
 
+def summarize_breakdowns(label: str, rows, thresholds: list[float],
+                         tags: list[str]) -> None:
+    for tag in tags:
+        tagged_rows = [
+            row for row in rows
+            if tag in set(row["group"].tags)
+        ]
+        if not tagged_rows:
+            continue
+        summarize_rows(f"{label}:{tag}", tagged_rows, thresholds)
+
+
 @torch.no_grad()
 def evaluate(args: argparse.Namespace) -> dict[str, list[dict[str, float]]]:
     model, checkpoint = load_ranker(args.model, args.device)
@@ -143,21 +159,20 @@ def evaluate(args: argparse.Namespace) -> dict[str, list[dict[str, float]]]:
     mean = checkpoint["mean"].to(args.device)
     std = checkpoint["std"].to(args.device)
     thresholds = parse_thresholds(args.thresholds)
+    breakdown_tags = parse_tags(args.breakdown_tags)
 
-    out = {
-        "all": summarize_rows(
-            "all", build_rows(model, groups, mean, std, args.device),
-            thresholds),
-    }
+    all_rows = build_rows(model, groups, mean, std, args.device)
+    out = {"all": summarize_rows("all", all_rows, thresholds)}
+    summarize_breakdowns("all", all_rows, thresholds, breakdown_tags)
     if args.split_val_fraction > 0.0:
         train_groups, val_groups = split_policy_groups(
             groups, args.split_seed, args.split_val_fraction)
-        out["train"] = summarize_rows(
-            "train", build_rows(model, train_groups, mean, std, args.device),
-            thresholds)
-        out["val"] = summarize_rows(
-            "val", build_rows(model, val_groups, mean, std, args.device),
-            thresholds)
+        train_rows = build_rows(model, train_groups, mean, std, args.device)
+        val_rows = build_rows(model, val_groups, mean, std, args.device)
+        out["train"] = summarize_rows("train", train_rows, thresholds)
+        summarize_breakdowns("train", train_rows, thresholds, breakdown_tags)
+        out["val"] = summarize_rows("val", val_rows, thresholds)
+        summarize_breakdowns("val", val_rows, thresholds, breakdown_tags)
     return out
 
 
@@ -199,6 +214,7 @@ def main() -> None:
     ap.add_argument("--thresholds", default="0,1,2,4,8")
     ap.add_argument("--include-tags", default="")
     ap.add_argument("--exclude-tags", default="")
+    ap.add_argument("--breakdown-tags", default="")
     ap.add_argument("--split-seed", type=int, default=1)
     ap.add_argument("--split-val-fraction", type=float, default=0.0)
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)

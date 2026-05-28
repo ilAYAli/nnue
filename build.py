@@ -367,6 +367,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--feature-set", args.policy_feature_set,
                     "--include-tags", args.policy_include_tags,
                     "--exclude-tags", args.policy_exclude_tags,
+                    "--breakdown-tags", args.policy_breakdown_tags,
                     "--min-groups", str(args.min_groups),
                     "--thresholds", args.policy_thresholds,
                     "--split-seed", str(args.selfplay_seed),
@@ -551,6 +552,7 @@ def add_create_args(
     parser.add_argument("--policy-dropout", type=float, default=value("policy_dropout", d.policy_dropout))
     parser.add_argument("--policy-include-tags", default=value("policy_include_tags", d.policy_include_tags))
     parser.add_argument("--policy-exclude-tags", default=value("policy_exclude_tags", d.policy_exclude_tags))
+    parser.add_argument("--policy-breakdown-tags", default=value("policy_breakdown_tags", d.policy_breakdown_tags))
     parser.add_argument("--policy-val-fraction", type=float, default=value("policy_val_fraction", d.policy_val_fraction))
     parser.add_argument("--policy-target-temperature-cp", type=int, default=value("policy_target_temperature_cp", d.policy_target_temperature_cp))
     parser.add_argument("--policy-thresholds", default=value("policy_thresholds", d.policy_thresholds))
