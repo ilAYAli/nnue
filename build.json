@@ -1,31 +1,21 @@
 {
-  "description": "Augment the r5 replay-loss child target set with root moves selected by the even-smoke mixed child-ranking candidate.",
-  "experiment": "replay-loss-latest-rootaugment-r6-smokeeven-20260528",
+  "description": "Mix complete replay-loss r6, LC0 oracle, and evenly sampled failed-smoke child-ranking targets.",
+  "experiment": "mixed-replaylatest-r6-2854-lc0oracle1000-smokeeven1387-20260528",
   "create": {
-    "name": "replay-loss-latest-rootaugment-r6-smokeeven-20260528",
-    "backend": "augment-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "child_augment_input": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r5_smokeallcandidate.jsonl",
-    "child_augment_output": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r6_smokeevencandidate.jsonl",
-    "child_augment_summary": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r6_smokeevencandidate.summary.txt",
-    "child_augment_search_nets": "runs/child-ranking-mixed-r5-lc0-smokeeven-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-mixed-r5-lc0-smokeeven-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn,~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "child_augment_search_nodes": 20000,
-    "child_augment_search_depth": 0,
-    "child_augment_jobs": 8,
-    "child_augment_min_groups": 2854,
-    "child_augment_max_missing_after": 0,
-    "child_augment_oracle_nodes": 200000,
-    "child_augment_oracle_depth": 0,
-    "child_augment_oracle_threads": 1,
-    "child_augment_oracle_hash": 64,
+    "name": "mixed-replaylatest-r6-2854-lc0oracle1000-smokeeven1387-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r6_smokeevencandidate.jsonl:2854,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl:1000,targets/smoke1000-r3-r4complete-even-20260528/smoke_child_targets.jsonl:1387",
+    "mix_output": "targets/mixed-replaylatest-r6-2854-lc0oracle1000-smokeeven1387-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-replaylatest-r6-2854-lc0oracle1000-smokeeven1387-20260528/mixed_child_targets.summary.txt",
+    "mix_seed": 2026052806,
+    "mix_progress": 1000,
+    "mix_min_rows": 5241,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "the even-smoke mixed candidate passed model, engine, and broad static gates",
-      "the replay search gate was positive on scored rows but incomplete: missing_selected=65",
-      "r6 must close missing_selected to 0 before deciding whether this candidate deserves a smoke"
+      "mixed rows should be 5241 = replay r6 2854 + lc0 oracle 1000 + even smoke 1387",
+      "this is the next corpus for one retrain after the r6 complete gate stayed marginally negative"
     ]
   }
 }
