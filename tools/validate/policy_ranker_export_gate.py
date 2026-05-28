@@ -48,7 +48,10 @@ def main() -> None:
     ap.add_argument("--max-abs-diff", type=float, default=1e-4)
     args = ap.parse_args()
 
-    model, checkpoint = load_ranker(args.model, args.device)
+    # Compare the exported artifact to the CPU PyTorch path. The engine-side
+    # implementation will use ordinary scalar CPU arithmetic, while CUDA matmul
+    # can differ by a few 1e-4 in logits without changing move choices.
+    model, checkpoint = load_ranker(args.model, "cpu")
     payload = load_policy_ranker_export(args.export)
     feature_set = args.feature_set
     if feature_set == "auto":
@@ -65,14 +68,14 @@ def main() -> None:
     builder = PolicyFeatureBuilder(
         args.base_net, device=args.device, feature_set=feature_set)
     groups = [builder.build_group(group) for group in raw_groups]
-    mean = checkpoint["mean"].to(args.device)
-    std = checkpoint["std"].to(args.device)
+    mean = checkpoint["mean"].cpu()
+    std = checkpoint["std"].cpu()
 
     max_abs_diff = 0.0
     argmax_mismatches = 0
     score_count = 0
     for group in groups:
-        pt_scores = score_group(model, group, mean, std, args.device)
+        pt_scores = score_group(model, group, mean, std, "cpu")
         exported_scores = score_group_export(payload, group)
         diff = torch.max(torch.abs(pt_scores - exported_scores)).item()
         max_abs_diff = max(max_abs_diff, float(diff))
