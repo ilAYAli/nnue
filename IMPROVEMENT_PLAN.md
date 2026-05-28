@@ -153,6 +153,14 @@ Latest child-ranking result:
   and `8` bad. This proves the sidecar can learn useful corrections, but the
   primary-only target mix is unsafe; the next run must include random/broad
   "do not override" groups.
+- `policy-ranker-mix144-h64-lr5e4-e2500`: trained on primary80 plus random
+  `losslogs_v5_64`. The combined gate found one clean threshold:
+  threshold `48` had `11` good overrides, `0` bad, selected top1 `79/144`.
+  Cross-target transfer was still weak. On the full 773-group losslogs set,
+  both the primary80-only and mix144 models produced almost no safe action
+  (`2` and `1` zero-bad overrides respectively). This makes the small-rung
+  policy models diagnostic only; the next run must train on the full loss-log
+  corpus.
 
 Rejected lanes:
 
@@ -233,7 +241,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `policy-ranker-mix144-h64-lr5e4-e2500`
+- candidate name: `policy-ranker-full773-h64-lr2e4-e3000`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
@@ -242,13 +250,13 @@ Current `build.json` intent:
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: separate move-ranking sidecar, not scalar eval fine-tuning
-- current ladder targets:
-  - `targets/child-ranking/losslogs_v5_primary80.jsonl`
-  - `targets/child-ranking/losslogs_v5_64.jsonl`
-  - union is 144 groups with no duplicate ids.
-  - reason: the primary80-only ranker learned high-signal repair rows, but
-    harmed random loss-log rows; the next diagnostic must include both repair
-    and "do not override" examples.
+- current ladder target:
+  - `targets/child-ranking/losslogs_v5_full773.jsonl`
+  - normalized from the full losslogs-v5 target builder output.
+  - 773 valid groups, 11987 scored moves; three source rows with fewer than
+    two scored moves were dropped.
+  - gate is deliberately strict: require a zero-bad threshold with selected
+    top1 at least `220/773`, above the base `201/773`.
 - main knobs:
   - `policy_hidden`
   - `policy_val_fraction`
