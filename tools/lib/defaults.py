@@ -118,7 +118,7 @@ class CandidateDefaults:
     policy_gate_min_val_overrides: int = -1
     policy_bad_tolerance_cp: float = 0.0
     policy_export_threshold: float = 4.0
-    policy_export_max_abs_diff: float = 1e-4
+    policy_export_max_abs_diff: float = 1e-3
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

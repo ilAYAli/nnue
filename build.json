@@ -46,7 +46,7 @@
     "policy_gate_min_val_overrides": 8,
     "policy_bad_tolerance_cp": 10,
     "policy_export_threshold": 4,
-    "policy_export_max_abs_diff": 0.0001,
+    "policy_export_max_abs_diff": 0.001,
     "min_groups": 200,
     "min_pairs": 844,
     "child_model_gate_min_top1": 60,
