@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import os
 import queue
 import statistics
 import subprocess
@@ -16,8 +17,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib.child_rank_targets import ChildRankGroup, load_groups, target_gap_cp
 
 
+def resolve_net_path(net: Path) -> Path:
+    path = Path(os.path.expandvars(str(net))).expanduser()
+    if not path.is_file():
+        raise RuntimeError(f"NNUE file not found: {path}")
+    return path.resolve()
+
+
 class SearchEngine:
     def __init__(self, engine: Path, net: Path, threads: int, hash_mb: int):
+        net = resolve_net_path(net)
         self.proc = subprocess.Popen(
             [str(engine)],
             stdin=subprocess.PIPE,
@@ -37,9 +46,7 @@ class SearchEngine:
         self.wait_for("uciok", 10.0)
         self.send(f"setoption name Threads value {threads}")
         self.send(f"setoption name Hash value {hash_mb}")
-        self.send(f"setoption name nnue_file value {net}")
-        self.send("isready")
-        self.wait_for("readyok", 20.0)
+        self.load_nnue(net)
 
     def close(self) -> None:
         if self.proc.poll() is None:
@@ -76,6 +83,28 @@ class SearchEngine:
             line = self.read_line(timeout)
             if token in line:
                 return
+
+    def load_nnue(self, net: Path) -> None:
+        self.send("debug on")
+        self.send(f"setoption name nnue_file value {net}")
+        self.send("isready")
+        loaded = False
+        warnings: list[str] = []
+        while True:
+            line = self.read_line(20.0)
+            if "WARNING: nnue_file" in line:
+                warnings.append(line)
+            if (
+                ("network loaded from" in line or "embedded evaluator loaded from" in line)
+                and str(net) in line
+            ):
+                loaded = True
+            if "readyok" in line:
+                break
+        if warnings:
+            raise RuntimeError("; ".join(warnings))
+        if not loaded:
+            raise RuntimeError(f"engine did not confirm NNUE load: {net}")
 
     def newgame(self) -> None:
         self.send("ucinewgame")

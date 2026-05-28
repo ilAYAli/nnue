@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -23,6 +24,13 @@ SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
 def mate_to_cp(mate: int) -> int:
     sign = 1 if mate > 0 else -1
     return sign * (32000 - min(abs(mate), 1000))
+
+
+def resolve_net_path(net: str) -> str:
+    path = Path(os.path.expandvars(net)).expanduser()
+    if not path.is_file():
+        raise RuntimeError(f"NNUE file not found: {path}")
+    return str(path.resolve())
 
 
 def phase_tag(board: chess.Board) -> str:
@@ -58,9 +66,10 @@ class UciEngine:
         self.setoption("Threads", str(threads))
         self.setoption("Hash", str(hash_mb))
         if net:
-            self.setoption("nnue_file", net)
-        self.send("isready")
-        self.wait_for("readyok")
+            self.load_nnue(resolve_net_path(net))
+        else:
+            self.send("isready")
+            self.wait_for("readyok")
 
     def close(self) -> None:
         try:
@@ -93,6 +102,28 @@ class UciEngine:
 
     def setoption(self, name: str, value: str) -> None:
         self.send(f"setoption name {name} value {value}")
+
+    def load_nnue(self, net: str) -> None:
+        self.send("debug on")
+        self.setoption("nnue_file", net)
+        self.send("isready")
+        loaded = False
+        warnings: list[str] = []
+        while True:
+            line = self.readline()
+            if "WARNING: nnue_file" in line:
+                warnings.append(line)
+            if (
+                ("network loaded from" in line or "embedded evaluator loaded from" in line)
+                and net in line
+            ):
+                loaded = True
+            if line == "readyok":
+                break
+        if warnings:
+            raise RuntimeError("; ".join(warnings))
+        if not loaded:
+            raise RuntimeError(f"engine did not confirm NNUE load: {net}")
 
     def newgame(self) -> None:
         self.send("ucinewgame")

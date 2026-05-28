@@ -29,12 +29,19 @@ def expand(value: str) -> str:
     return str(Path(os.path.expandvars(value)).expanduser())
 
 
+def resolve_net_path(net: str) -> str:
+    path = Path(os.path.expandvars(net)).expanduser()
+    if not path.is_file():
+        raise RuntimeError(f"NNUE file not found: {path}")
+    return str(path.resolve())
+
+
 def parse_search_net(raw: str) -> tuple[str, str]:
     if "=" in raw:
         label, path = raw.split("=", 1)
-        return label.strip(), expand(path.strip())
+        return label.strip(), resolve_net_path(path.strip())
     path = expand(raw.strip())
-    return Path(path).stem, path
+    return Path(path).stem, resolve_net_path(path)
 
 
 class UciEngine:
@@ -65,9 +72,10 @@ class UciEngine:
         self.setoption("Threads", str(threads))
         self.setoption("Hash", str(hash_mb))
         if net:
-            self.setoption("nnue_file", net)
-        self.send("isready")
-        self.wait_for("readyok", 20.0)
+            self.load_nnue(net)
+        else:
+            self.send("isready")
+            self.wait_for("readyok", 20.0)
 
     def close(self) -> None:
         if self.proc.poll() is None:
@@ -107,6 +115,28 @@ class UciEngine:
 
     def setoption(self, name: str, value: str) -> None:
         self.send(f"setoption name {name} value {value}")
+
+    def load_nnue(self, net: str) -> None:
+        self.send("debug on")
+        self.setoption("nnue_file", net)
+        self.send("isready")
+        loaded = False
+        warnings: list[str] = []
+        while True:
+            line = self.read_line(20.0)
+            if "WARNING: nnue_file" in line:
+                warnings.append(line)
+            if (
+                ("network loaded from" in line or "embedded evaluator loaded from" in line)
+                and net in line
+            ):
+                loaded = True
+            if "readyok" in line:
+                break
+        if warnings:
+            raise RuntimeError("; ".join(warnings))
+        if not loaded:
+            raise RuntimeError(f"engine did not confirm NNUE load: {net}")
 
     def newgame(self) -> None:
         self.send("ucinewgame")
