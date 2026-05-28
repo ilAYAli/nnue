@@ -1,43 +1,23 @@
 {
-  "description": "Extract child-ranking targets from the full 1000-game smoke PGN for the r3 mixed child-ranking candidate.",
-  "experiment": "smoke1000-r3-r4complete-all-targets-20260528",
+  "description": "Build a mixed child-ranking corpus from r4-complete replay-loss rows, LC0 oracle rows, and full-smoke real-game rows.",
+  "experiment": "mixed-replaylatest-r4-2854-lc0oracle1000-smokeall571-20260528",
   "create": {
-    "name": "smoke1000-r3-r4complete-all-targets-20260528",
-    "backend": "smoke-pgn-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "smoke_pgn": "runs/child-ranking-mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/child-ranking-mixed-r3-r4complete-smoke1000/sprt_confirm_20260528_200256/child-ranking-mixed-r3-r4complete-smoke1000_vs_refnet.pgn",
-    "smoke_child_targets": "targets/smoke1000-r3-r4complete-all-20260528/smoke_child_targets.jsonl",
-    "smoke_child_summary": "targets/smoke1000-r3-r4complete-all-20260528/smoke_child_targets.summary.txt",
-    "smoke_candidate_net": "runs/child-ranking-mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "smoke_reference_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "smoke_search_nodes": 20000,
-    "smoke_search_depth": 0,
-    "smoke_oracle_nodes": 200000,
-    "smoke_oracle_depth": 0,
-    "smoke_jobs": 8,
-    "smoke_threads": 1,
-    "smoke_hash": 64,
-    "smoke_oracle_threads": 1,
-    "smoke_oracle_hash": 64,
-    "smoke_min_ply": 8,
-    "smoke_max_per_game": 4,
-    "smoke_max_positions": 3000,
-    "smoke_max_gap_cp": 800,
-    "smoke_min_oracle_gap_cp": 20,
-    "smoke_min_groups": 500,
-    "smoke_unique_fen": true,
-    "smoke_only_candidate_losses": false,
-    "smoke_candidate_name": "candidate",
-    "smoke_reference_name": "reference",
+    "name": "mixed-replaylatest-r4-2854-lc0oracle1000-smokeall571-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r4_r3candidate.jsonl:2854,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl:1000,targets/smoke1000-r3-r4complete-all-20260528/smoke_child_targets.jsonl:571",
+    "mix_output": "targets/mixed-replaylatest-r4-2854-lc0oracle1000-smokeall571-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-replaylatest-r4-2854-lc0oracle1000-smokeall571-20260528/mixed_child_targets.summary.txt",
+    "mix_seed": 2026052804,
+    "mix_min_rows": 4425,
+    "mix_progress": 1000,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
       "the 1000-game smoke rejected the candidate at -10.4 +/- 15.4 Elo",
       "the candidate-loss-only extraction was not candidate-negative, so direct repair would chase noise",
-      "this all-games extraction should measure whether the candidate is worse on the actual smoke distribution",
-      "use these rows as a real-game preserve/diagnostic set before launching another training run"
+      "the all-games smoke extraction was also nearly neutral, so use it as real-game distribution coverage",
+      "next training run should test whether adding smoke-distribution rows improves game transfer"
     ]
   }
 }
