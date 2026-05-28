@@ -9,6 +9,8 @@ AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 EVENTS=${NNUE_NTFY_EVENTS:-done,fail,test}
 AI_EVENTS=${NNUE_AI_STDIN_EVENTS:-done,fail}
 AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
+NOTIFAI=${NNUE_NOTIFAI:-$HOME/scripts/notifai.sh}
+NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-${NOTIFAI_TARGET:-codex_1}}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -119,9 +121,26 @@ esac
 
 publish "$NNUE_URL" "$body" "Enyo NNUE $event_name" "$priority"
 
+publish_ai() {
+    local prompt="$1"
+    local title="$2"
+    local priority="$3"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        printf '%s\n' "$prompt"
+        return
+    fi
+
+    if [ -x "$NOTIFAI" ] && "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1; then
+        return
+    fi
+
+    publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"
+}
+
 if [ "$AI_ENABLE" = "1" ] && [ -n "$ai_prompt" ]; then
     case ",$AI_EVENTS," in
-        *,"$event_name",*) publish "$AI_STDIN_URL" "$ai_prompt" "Enyo NNUE $event_name" "$priority" ;;
+        *,"$event_name",*) publish_ai "$ai_prompt" "Enyo NNUE $event_name" "$priority" ;;
     esac
 fi
 
