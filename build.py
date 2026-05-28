@@ -368,6 +368,23 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "smoke_candidate_name",
         "smoke_reference_name",
     }
+    augment_child = {
+        "child_augment_input",
+        "child_augment_output",
+        "child_augment_summary",
+        "child_augment_search_nets",
+        "child_augment_search_nodes",
+        "child_augment_search_depth",
+        "child_augment_jobs",
+        "child_augment_min_groups",
+        "child_augment_max_missing_after",
+        "child_augment_oracle_nodes",
+        "child_augment_oracle_depth",
+        "child_augment_oracle_threads",
+        "child_augment_oracle_hash",
+        "engine",
+        "score_engine",
+    }
     backend_keys = {
         "pytorch": pytorch,
         "child-ranking": child,
@@ -376,6 +393,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "lc0-jsonl": lc0,
         "lc0-oracle-jsonl": lc0,
         "smoke-pgn-child-targets": smoke,
+        "augment-child-targets": augment_child,
     }
     return common | backend_keys.get(args.backend, set())
 
@@ -1050,6 +1068,42 @@ wc -l "$out" > "$out.wc"
                  else "--no-only-candidate-losses"),
             ],
         })
+    elif args.backend == "augment-child-targets":
+        if not args.child_augment_input:
+            raise SystemExit(
+                "backend=augment-child-targets requires child_augment_input")
+        search_nets = [
+            item.strip()
+            for item in str(args.child_augment_search_nets).split(",")
+            if item.strip()
+        ]
+        if not search_nets:
+            raise SystemExit(
+                "backend=augment-child-targets requires child_augment_search_nets")
+        steps.append({
+            "name": "augment_child_root_selected",
+            "command": [
+                python, tool("validate/augment_child_targets_root_selected.py"),
+                "--input", str(expand_user(args.child_augment_input)),
+                "--out", str(expand_user(args.child_augment_output)),
+                "--summary", str(expand_user(args.child_augment_summary)),
+                "--engine", str(expand_user(args.engine)),
+                *sum((["--search-net", net] for net in search_nets), []),
+                "--search-nodes", str(args.child_augment_search_nodes),
+                "--search-depth", str(args.child_augment_search_depth),
+                "--threads", "1",
+                "--hash", "64",
+                "--oracle-engine", str(expand_user(args.score_engine)),
+                "--oracle-nodes", str(args.child_augment_oracle_nodes),
+                "--oracle-depth", str(args.child_augment_oracle_depth),
+                "--oracle-threads", str(args.child_augment_oracle_threads),
+                "--oracle-hash", str(args.child_augment_oracle_hash),
+                "--jobs", str(args.child_augment_jobs),
+                "--min-groups", str(args.child_augment_min_groups),
+                "--fail-if-missing-after",
+                str(args.child_augment_max_missing_after),
+            ],
+        })
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -1174,7 +1228,8 @@ def add_create_args(
                         choices=["pytorch", "child-ranking", "policy-ranking",
                                  "replay-jsonl", "lc0-jsonl",
                                  "lc0-oracle-jsonl",
-                                 "smoke-pgn-child-targets"])
+                                 "smoke-pgn-child-targets",
+                                 "augment-child-targets"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -1231,6 +1286,19 @@ def add_create_args(
     parser.add_argument("--child-search-gate-min-top1", type=int, default=value("child_search_gate_min_top1", d.child_search_gate_min_top1))
     parser.add_argument("--child-search-gate-max-missing", type=int, default=value("child_search_gate_max_missing", d.child_search_gate_max_missing))
     parser.add_argument("--child-search-gate-max-reference-better", type=int, default=value("child_search_gate_max_reference_better", d.child_search_gate_max_reference_better))
+    parser.add_argument("--child-augment-input", default=value("child_augment_input", d.child_augment_input))
+    parser.add_argument("--child-augment-output", default=value("child_augment_output", d.child_augment_output))
+    parser.add_argument("--child-augment-summary", default=value("child_augment_summary", d.child_augment_summary))
+    parser.add_argument("--child-augment-search-nets", default=value("child_augment_search_nets", d.child_augment_search_nets))
+    parser.add_argument("--child-augment-search-nodes", type=int, default=value("child_augment_search_nodes", d.child_augment_search_nodes))
+    parser.add_argument("--child-augment-search-depth", type=int, default=value("child_augment_search_depth", d.child_augment_search_depth))
+    parser.add_argument("--child-augment-jobs", type=int, default=value("child_augment_jobs", d.child_augment_jobs))
+    parser.add_argument("--child-augment-min-groups", type=int, default=value("child_augment_min_groups", d.child_augment_min_groups))
+    parser.add_argument("--child-augment-max-missing-after", type=int, default=value("child_augment_max_missing_after", d.child_augment_max_missing_after))
+    parser.add_argument("--child-augment-oracle-nodes", type=int, default=value("child_augment_oracle_nodes", d.child_augment_oracle_nodes))
+    parser.add_argument("--child-augment-oracle-depth", type=int, default=value("child_augment_oracle_depth", d.child_augment_oracle_depth))
+    parser.add_argument("--child-augment-oracle-threads", type=int, default=value("child_augment_oracle_threads", d.child_augment_oracle_threads))
+    parser.add_argument("--child-augment-oracle-hash", type=int, default=value("child_augment_oracle_hash", d.child_augment_oracle_hash))
     parser.add_argument("--policy-targets", default=value("policy_targets", d.policy_targets))
     parser.add_argument("--policy-hidden", type=int, default=value("policy_hidden", d.policy_hidden))
     parser.add_argument("--policy-feature-set", default=value("policy_feature_set", d.policy_feature_set),
