@@ -38,13 +38,12 @@ def group_result(engine: EnyoEval2, group: ChildRankGroup) -> dict:
     }
 
 
-def summarize(engine: EnyoEval2, groups: list[ChildRankGroup]) -> dict[str, float]:
-    results = [group_result(engine, group) for group in groups]
+def summarize(results: list[dict]) -> dict[str, float]:
     correct = sum(1 for result in results if result["correct"])
     sum_gap = sum(float(result["selected_gap"]) for result in results)
     worst_margin = min((float(result["worst_margin"]) for result in results), default=0.0)
     print(
-        f"engine top1={correct}/{len(groups)} "
+        f"engine top1={correct}/{len(results)} "
         f"sum_gap={sum_gap:.0f} worst_margin={worst_margin:.1f}",
         flush=True)
     for result in results:
@@ -58,7 +57,7 @@ def summarize(engine: EnyoEval2, groups: list[ChildRankGroup]) -> dict[str, floa
             flush=True)
     return {
         "top1": correct,
-        "groups": len(groups),
+        "groups": len(results),
         "sum_gap": sum_gap,
         "worst_margin": worst_margin,
     }
@@ -78,7 +77,8 @@ def main() -> None:
     groups = load_groups(args.targets, min_groups=args.min_groups)
     engine = EnyoEval2(args.engine, args.net, args.threads, args.hash)
     try:
-        summary = summarize(engine, groups)
+        results = [group_result(engine, group) for group in groups]
+        summary = summarize(results)
     finally:
         engine.close()
 
