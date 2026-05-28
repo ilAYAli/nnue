@@ -485,6 +485,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--net", f"{candidate_dir}/model.nn",
                     "--threads", "1",
                     "--hash", "64",
+                    "--jobs", str(args.child_engine_jobs),
                     "--min-groups", str(args.min_groups),
                     "--fail-if-top1-below", str(args.child_engine_gate_min_top1),
                 ],
@@ -945,6 +946,7 @@ def add_create_args(
     parser.add_argument("--min-pairs", type=int, default=value("min_pairs", d.min_pairs))
     parser.add_argument("--child-model-gate-min-top1", type=int, default=value("child_model_gate_min_top1", d.child_model_gate_min_top1))
     parser.add_argument("--child-engine-gate-min-top1", type=int, default=value("child_engine_gate_min_top1", d.child_engine_gate_min_top1))
+    parser.add_argument("--child-engine-jobs", type=int, default=value("child_engine_jobs", d.child_engine_jobs))
     parser.add_argument("--policy-targets", default=value("policy_targets", d.policy_targets))
     parser.add_argument("--policy-hidden", type=int, default=value("policy_hidden", d.policy_hidden))
     parser.add_argument("--policy-feature-set", default=value("policy_feature_set", d.policy_feature_set),

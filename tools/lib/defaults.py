@@ -98,6 +98,7 @@ class CandidateDefaults:
     min_pairs: int = 1
     child_model_gate_min_top1: int = 1
     child_engine_gate_min_top1: int = 1
+    child_engine_jobs: int = 4
     policy_targets: str = ""
     policy_hidden: int = 128
     policy_feature_set: str = "compact"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import sys
 from pathlib import Path
 
@@ -63,6 +64,57 @@ def summarize(results: list[dict]) -> dict[str, float]:
     }
 
 
+def group_chunks(
+    groups: list[ChildRankGroup],
+    jobs: int,
+) -> list[list[ChildRankGroup]]:
+    if jobs <= 1 or len(groups) <= 1:
+        return [groups]
+    jobs = min(jobs, len(groups))
+    chunk_size = (len(groups) + jobs - 1) // jobs
+    return [
+        groups[i:i + chunk_size]
+        for i in range(0, len(groups), chunk_size)
+    ]
+
+
+def chunk_results(
+    groups: list[ChildRankGroup],
+    engine_path: Path,
+    net_path: Path,
+    threads: int,
+    hash_mb: int,
+) -> list[dict]:
+    engine = EnyoEval2(engine_path, net_path, threads, hash_mb)
+    try:
+        return [group_result(engine, group) for group in groups]
+    finally:
+        engine.close()
+
+
+def evaluate_groups(
+    groups: list[ChildRankGroup],
+    engine_path: Path,
+    net_path: Path,
+    threads: int,
+    hash_mb: int,
+    jobs: int,
+) -> list[dict]:
+    chunks = group_chunks(groups, jobs)
+    if len(chunks) == 1:
+        return chunk_results(chunks[0], engine_path, net_path, threads, hash_mb)
+    results: list[dict] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as executor:
+        futures = [
+            executor.submit(
+                chunk_results, chunk, engine_path, net_path, threads, hash_mb)
+            for chunk in chunks
+        ]
+        for future in futures:
+            results.extend(future.result())
+    return results
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--targets", required=True, type=Path)
@@ -70,17 +122,17 @@ def main() -> None:
     ap.add_argument("--net", required=True, type=Path)
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--hash", type=int, default=64)
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="Number of parallel engine processes.")
     ap.add_argument("--min-groups", type=int, default=1)
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)
     args = ap.parse_args()
 
     groups = load_groups(args.targets, min_groups=args.min_groups)
-    engine = EnyoEval2(args.engine, args.net, args.threads, args.hash)
-    try:
-        results = [group_result(engine, group) for group in groups]
-        summary = summarize(results)
-    finally:
-        engine.close()
+    results = evaluate_groups(
+        groups, args.engine, args.net, args.threads, args.hash,
+        max(1, args.jobs))
+    summary = summarize(results)
 
     if (
         args.fail_if_top1_below >= 0
