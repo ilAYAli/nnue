@@ -79,6 +79,13 @@ Latest LC0 diagnostic:
   `84.53% -> 81.59%`. This confirms the new broad gate catches unsafe target
   gains early. Next run keeps the same mixed target file and tightens reference
   preservation instead of changing data.
+- `child-ranking-mixed-replayloss2677-lc0oracle1000-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`:
+  passed local gates: `.pt` `1287/3677`, engine `1271/3677`, and broad static
+  stayed within caps with sign `91.63%` versus reference `92.32%`, near-zero
+  bucket `82.56%` versus reference `84.53%`. The required `256`-game smoke
+  rejected it anyway: `-35.4 +/- 29.4`, LOS `0.9%`, draw `52.3%`. This is the
+  first clean demonstration that passing mixed target gates plus broad static
+  preservation is still not sufficient for game strength.
 - Conclusion: LC0-oracle child targets are a real exported/engine-side signal,
   but target-gate gains still do not imply Elo. Do not promote this candidate.
   Do not scale LC0-oracle blindly until broad sign/order preservation is part
