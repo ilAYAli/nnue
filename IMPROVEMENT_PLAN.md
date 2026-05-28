@@ -218,6 +218,10 @@ Latest child-ranking result:
   and threshold `4` gave `28` overrides, `26` good, `0` bad, and worst harm
   `-1cp`. For split-replication diagnostics, use the validation constraints as
   the hard pass/fail rule; global all-row safety is a later deployment gate.
+  Rerunning the same checkpoint with `policy_gate_max_bad=-1` passed. The
+  policy-sidecar lane has now replicated useful held-out action on two splits.
+  Do not keep tuning the offline model shape until an engine-side integration
+  design exists.
 
 Rejected lanes:
 
@@ -260,6 +264,11 @@ Primary lane:
 - Broad preservation is a deadzone/leash, not a normal competing scalar
   objective.
 - New candidates must use `./build.py create`; no manual training pipelines.
+- Policy-sidecar diagnostics are now promising only for a narrow `mate_like`
+  non-lowmat slice. The next useful work is an engine-side design for a gated
+  move-ordering or tie-break signal that cannot corrupt scalar eval. Do not
+  run SPRT until the sidecar is integrated and an engine gate shows actual
+  search move changes on the same held-out target style.
 
 Secondary lanes:
 
