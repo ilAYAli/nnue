@@ -94,6 +94,8 @@ def main() -> None:
     ap.add_argument("--targets", required=True)
     ap.add_argument("--net", required=True)
     ap.add_argument("--pt")
+    ap.add_argument("--pt-export-quantize-forward", default=False,
+                    action=argparse.BooleanOptionalAction)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--min-groups", type=int, default=1)
     ap.add_argument("--fail-if-net-top1-below", type=int, default=-1)
@@ -106,6 +108,7 @@ def main() -> None:
     if args.pt:
         pt_model = EnyoNNUE().to(args.device)
         pt_model.load_state_dict(torch.load(args.pt, map_location=args.device))
+        pt_model.export_quantize_forward = args.pt_export_quantize_forward
         pt_model.eval()
         pt_summary = summarize(pt_model, groups, args.device, "pt")
         failed |= (

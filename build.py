@@ -284,6 +284,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--amp", args.amp,
                     "--torch-compile" if args.torch_compile else "--no-torch-compile",
                     "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
+                    "--export-quantize-forward" if args.export_quantize_forward else "--no-export-quantize-forward",
                     "--max-rows", str(args.child_broad_rows),
                     "--out", f"{candidate_dir}/model.pt",
                     "--out-nn", f"{candidate_dir}/model.nn",
@@ -296,6 +297,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--targets", str(expand_path(args.child_targets)),
                     "--net", f"{candidate_dir}/model.nn",
                     "--pt", f"{candidate_dir}/model.pt",
+                    "--pt-export-quantize-forward" if args.export_quantize_forward else "--no-pt-export-quantize-forward",
                     "--device", "cpu",
                     "--min-groups", str(args.min_groups),
                     "--fail-if-net-top1-below", str(args.child_model_gate_min_top1),
@@ -452,6 +454,8 @@ def add_create_args(
                         default=value("torch_compile", d.torch_compile))
     parser.add_argument("--dataset-in-memory", action=argparse.BooleanOptionalAction,
                         default=value("dataset_in_memory", d.dataset_in_memory))
+    parser.add_argument("--export-quantize-forward", action=argparse.BooleanOptionalAction,
+                        default=value("export_quantize_forward", d.export_quantize_forward))
     parser.add_argument("--val-rows", type=int, default=value("val_rows", d.val_rows))
     parser.add_argument("--patience", type=int, default=value("patience", d.patience))
     parser.add_argument("--select-metric", default=value("select_metric", d.select_metric),

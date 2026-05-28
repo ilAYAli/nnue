@@ -1,8 +1,8 @@
 {
-  "description": "Active Enyo NNUE diagnostic: high-signal primary loss-log child-ranking listwise target-only ceiling check.",
-  "experiment": "child-ranking-lossv5-primary64-g30-listwise-targetonly-lr1e4-e480",
+  "description": "Active Enyo NNUE diagnostic: export-aware high-signal child-ranking listwise run with weak broad preservation.",
+  "experiment": "child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-lr1e4-e480",
   "create": {
-    "name": "child-ranking-lossv5-primary64-g30-listwise-targetonly-lr1e4-e480",
+    "name": "child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-lr1e4-e480",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/losslogs_v5_primary64_g30.jsonl",
@@ -21,7 +21,7 @@
     "child_batch_size": 64,
     "child_loss": "listwise",
     "ranking_weight": 1.0,
-    "broad_preserve_weight": 0.0,
+    "broad_preserve_weight": 0.005,
     "broad_deadzone_cp": 40,
     "broad_beta": 100,
     "rank_margin_cp": 250,
@@ -35,6 +35,7 @@
     "amp": "bf16",
     "torch_compile": true,
     "dataset_in_memory": true,
+    "export_quantize_forward": true,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {

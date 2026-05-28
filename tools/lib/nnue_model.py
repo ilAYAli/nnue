@@ -7,13 +7,16 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn_pt
+import torch.nn.functional as F
 
 from . import enyo_nnue as nn2
 
 
 class EnyoNNUE(nn_pt.Module):
-    def __init__(self, init: str = "kaiming"):
+    def __init__(self, init: str = "kaiming",
+                 export_quantize_forward: bool = False):
         super().__init__()
+        self.export_quantize_forward = export_quantize_forward
         self.embed = nn_pt.EmbeddingBag(
             nn2.N_FEATURES, nn2.N_HIDDEN, mode="sum")
         self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
@@ -37,7 +40,23 @@ class EnyoNNUE(nn_pt.Module):
 
     def accumulator(self, feats: torch.Tensor, offsets: torch.Tensor
                     ) -> torch.Tensor:
-        return self.embed(feats, offsets) + self.input_bias
+        if not self.export_quantize_forward:
+            return self.embed(feats, offsets) + self.input_bias
+        weight = self._ste_round_clip(
+            self.embed.weight,
+            float(np.iinfo(np.int16).min),
+            float(np.iinfo(np.int16).max))
+        bias = self._ste_round_clip(
+            self.input_bias,
+            float(np.iinfo(np.int16).min),
+            float(np.iinfo(np.int16).max))
+        return F.embedding_bag(feats, weight, offsets, mode="sum") + bias
+
+    @staticmethod
+    def _ste_round_clip(x: torch.Tensor, lo: float, hi: float) -> torch.Tensor:
+        rounded = torch.round(x)
+        clipped = torch.clamp(rounded, min=lo, max=hi)
+        return x + (clipped - x).detach()
 
     @staticmethod
     def _quantized_input_relu(acc: torch.Tensor) -> torch.Tensor:
@@ -58,7 +77,19 @@ class EnyoNNUE(nn_pt.Module):
         acc = torch.cat([us, them], dim=-1)
 
         x0 = self._quantized_input_relu(acc)
-        x1 = torch.relu(x0 @ self.l1_weight.t() + self.l1_bias)
+        if self.export_quantize_forward:
+            l1_weight = self._ste_round_clip(
+                self.l1_weight,
+                float(np.iinfo(np.int8).min),
+                float(np.iinfo(np.int8).max))
+            l1_bias = self._ste_round_clip(
+                self.l1_bias,
+                float(np.iinfo(np.int32).min),
+                float(np.iinfo(np.int32).max))
+        else:
+            l1_weight = self.l1_weight
+            l1_bias = self.l1_bias
+        x1 = torch.relu(x0 @ l1_weight.t() + l1_bias)
         x2 = torch.relu(self.l2(x1))
         return self.output(x2).squeeze(-1) / nn2.EVAL_DIVISOR
 

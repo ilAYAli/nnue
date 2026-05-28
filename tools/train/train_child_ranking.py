@@ -243,6 +243,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         model = load_model_from_nn(args.init_from_nn, device=args.device)
     else:
         model = EnyoNNUE(init=args.init).to(args.device)
+    model.export_quantize_forward = args.export_quantize_forward
+    if args.export_quantize_forward:
+        print("export quantized forward enabled", flush=True)
     forward_model = maybe_compile_model(model, args)
 
     rank_loader = DataLoader(
@@ -341,6 +344,8 @@ def main() -> None:
     ap.add_argument("--torch-compile", default=False,
                     action=argparse.BooleanOptionalAction)
     ap.add_argument("--dataset-in-memory", default=False,
+                    action=argparse.BooleanOptionalAction)
+    ap.add_argument("--export-quantize-forward", default=False,
                     action=argparse.BooleanOptionalAction)
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)

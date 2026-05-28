@@ -93,6 +93,12 @@ Latest child-ranking result:
   engine gate `28/34` on the old focused set and `60/80` on the full primary80
   set. The full-set misses are dominated by tiny-gap rows, so do not chase
   gap-1 to gap-8 rows as primary targets.
+- `child-ranking-lossv5-primary64-g30-listwise-targetonly-lr1e4-e480`: failed
+  the model gate. Float `.pt` reached `62/64`, but exported `.nn` stayed at
+  `55/64`, essentially identical to the weak-preserve run, while broad drift
+  grew to about `208cp`. This closes the "preservation is blocking the
+  remaining rows" hypothesis for this target set. The active blocker is
+  export-visible movement / quantization.
 
 Rejected lanes:
 
@@ -146,20 +152,22 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run a target-only ceiling check on the same filtered 64-group set:
+Run an export-aware preserve check on the same filtered 64-group set:
 
 1. Use `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`.
-2. Set `child_loss=listwise` and `broad_preserve_weight=0.0`.
+2. Set `child_loss=listwise`, `broad_preserve_weight=0.005`, and
+   `export_quantize_forward=true`.
 3. Run `480` epochs at `lr=1e-4`.
-4. Require `.pt`, `.nn`, and corrected engine gates at least `58/64`.
+4. Require export-quantized `.pt`, `.nn`, and corrected engine gates at least
+   `58/64`.
 
 Interpretation:
 
-- If target-only reaches materially above the weak-preserve result, the next
-  keeper-shaped run should relax preservation slightly or increase ranking
-  pressure while keeping `broad_excess <= 80cp`.
-- If target-only stays near `56/64`, the remaining rows are not a preservation
-  problem. Do not scale blindly; inspect the repeated forcing misses and change
+- If export-aware training improves `.nn`/engine top1 above the weak-preserve
+  `55-56/64` result while keeping `broad_excess <= 80cp`, keep this path and
+  scale cautiously.
+- If export-aware training still stays near `56/64`, do not run more
+  same-shape listwise variants. Inspect the repeated forcing misses and change
   target composition or representation.
 
 ## Candidate Workflow
@@ -172,7 +180,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary64-g30-listwise-targetonly-lr1e4-e480`
+- candidate name: `child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-lr1e4-e480`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -180,8 +188,8 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: listwise ranking target-only ceiling check for the high-signal
-  primary 64-group diagnostic
+- objective: export-aware listwise ranking loss plus weak broad deadzone
+  preservation for the high-signal primary 64-group diagnostic
 - current ladder target: `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`
   - 64 groups, 642 positive-gap training pairs, selected from loss logs.
   - category balance: forcing `56`, queen/rook endgame `3`, conversion `5`.

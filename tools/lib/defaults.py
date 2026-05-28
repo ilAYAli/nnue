@@ -76,6 +76,7 @@ class CandidateDefaults:
     amp: Literal["off", "bf16"] = "bf16"
     torch_compile: bool = True
     dataset_in_memory: bool = True
+    export_quantize_forward: bool = False
     val_rows: int = 100000
     patience: int = 2
     select_metric: str = "mae"
