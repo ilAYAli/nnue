@@ -226,6 +226,15 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "child_static_gate_max_near_zero_sign_drop_pct",
         "child_model_gate_min_top1",
         "child_engine_gate_min_top1",
+        "child_search_gate_targets",
+        "child_search_gate_reference_net",
+        "child_search_gate_nodes",
+        "child_search_gate_depth",
+        "child_search_gate_jobs",
+        "child_search_gate_min_groups",
+        "child_search_gate_min_top1",
+        "child_search_gate_max_missing",
+        "child_search_gate_max_reference_better",
     }
     policy = {
         "init_net",
@@ -582,6 +591,33 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             },
         ])
+        if args.child_search_gate_targets:
+            steps.append({
+                "name": "validate_child_search",
+                "command": [
+                    python, tool("validate/child_rank_search_gate.py"),
+                    "--targets", str(expand_path(args.child_search_gate_targets)),
+                    "--engine", str(expand_path(args.engine)),
+                    "--net", f"{candidate_dir}/model.nn",
+                    *(
+                        ["--reference-net",
+                         str(expand_path(args.child_search_gate_reference_net))]
+                        if args.child_search_gate_reference_net else []
+                    ),
+                    "--threads", "1",
+                    "--hash", "64",
+                    "--jobs", str(args.child_search_gate_jobs),
+                    "--nodes", str(args.child_search_gate_nodes),
+                    "--depth", str(args.child_search_gate_depth),
+                    "--min-groups", str(args.child_search_gate_min_groups),
+                    "--fail-if-top1-below",
+                    str(args.child_search_gate_min_top1),
+                    "--fail-if-missing-above",
+                    str(args.child_search_gate_max_missing),
+                    "--fail-if-reference-better-above",
+                    str(args.child_search_gate_max_reference_better),
+                ],
+            })
     elif args.backend == "policy-ranking":
         policy_targets = args.policy_targets or args.child_targets
         if not policy_targets:
@@ -1186,6 +1222,15 @@ def add_create_args(
     parser.add_argument("--child-model-gate-min-top1", type=int, default=value("child_model_gate_min_top1", d.child_model_gate_min_top1))
     parser.add_argument("--child-engine-gate-min-top1", type=int, default=value("child_engine_gate_min_top1", d.child_engine_gate_min_top1))
     parser.add_argument("--child-engine-jobs", type=int, default=value("child_engine_jobs", d.child_engine_jobs))
+    parser.add_argument("--child-search-gate-targets", default=value("child_search_gate_targets", d.child_search_gate_targets))
+    parser.add_argument("--child-search-gate-reference-net", default=value("child_search_gate_reference_net", d.child_search_gate_reference_net))
+    parser.add_argument("--child-search-gate-nodes", type=int, default=value("child_search_gate_nodes", d.child_search_gate_nodes))
+    parser.add_argument("--child-search-gate-depth", type=int, default=value("child_search_gate_depth", d.child_search_gate_depth))
+    parser.add_argument("--child-search-gate-jobs", type=int, default=value("child_search_gate_jobs", d.child_search_gate_jobs))
+    parser.add_argument("--child-search-gate-min-groups", type=int, default=value("child_search_gate_min_groups", d.child_search_gate_min_groups))
+    parser.add_argument("--child-search-gate-min-top1", type=int, default=value("child_search_gate_min_top1", d.child_search_gate_min_top1))
+    parser.add_argument("--child-search-gate-max-missing", type=int, default=value("child_search_gate_max_missing", d.child_search_gate_max_missing))
+    parser.add_argument("--child-search-gate-max-reference-better", type=int, default=value("child_search_gate_max_reference_better", d.child_search_gate_max_reference_better))
     parser.add_argument("--policy-targets", default=value("policy_targets", d.policy_targets))
     parser.add_argument("--policy-hidden", type=int, default=value("policy_hidden", d.policy_hidden))
     parser.add_argument("--policy-feature-set", default=value("policy_feature_set", d.policy_feature_set),

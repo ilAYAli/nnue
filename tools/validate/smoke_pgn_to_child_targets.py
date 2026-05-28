@@ -446,8 +446,35 @@ def main() -> int:
             handle.write(json.dumps(row, separators=(",", ":")) + "\n")
 
     written_tags: Counter[str] = Counter()
+    search_metrics: Counter[str] = Counter()
     for row in rows:
         written_tags.update(str(tag) for tag in row.get("tags", []))
+        scores = {
+            str(move["move"]): int(move["score_cp"])
+            for move in row.get("moves", [])
+        }
+        candidate_move = str(row.get("candidate_move", ""))
+        reference_move = str(row.get("reference_move", ""))
+        best_move = str(row.get("best_move", ""))
+        if (
+            candidate_move in scores
+            and reference_move in scores
+            and best_move in scores
+        ):
+            best_score = scores[best_move]
+            candidate_loss = best_score - scores[candidate_move]
+            reference_loss = best_score - scores[reference_move]
+            diff = reference_loss - candidate_loss
+            search_metrics["search_compared"] += 1
+            search_metrics["candidate_search_loss_cp"] += candidate_loss
+            search_metrics["reference_search_loss_cp"] += reference_loss
+            search_metrics["search_sum_diff_cp"] += diff
+            if diff > 0:
+                search_metrics["candidate_search_better"] += 1
+            elif diff < 0:
+                search_metrics["reference_search_better"] += 1
+            else:
+                search_metrics["search_equal"] += 1
 
     elapsed = time.monotonic() - start
     lines = [
@@ -456,6 +483,13 @@ def main() -> int:
         f"candidate_reference_differ={counters['candidate_reference_differ']}",
         f"candidate_best={counters['candidate_best']}",
         f"reference_best={counters['reference_best']}",
+        f"search_compared={search_metrics['search_compared']}",
+        f"candidate_search_better={search_metrics['candidate_search_better']}",
+        f"reference_search_better={search_metrics['reference_search_better']}",
+        f"search_equal={search_metrics['search_equal']}",
+        f"search_sum_diff_cp={search_metrics['search_sum_diff_cp']}",
+        f"candidate_search_loss_cp={search_metrics['candidate_search_loss_cp']}",
+        f"reference_search_loss_cp={search_metrics['reference_search_loss_cp']}",
         f"skipped_same_moves={counters['skipped_same_moves']}",
         f"skipped_low_oracle_gap={counters['skipped_low_oracle_gap']}",
         f"skipped_no_bestmove={counters['skipped_no_bestmove']}",

@@ -103,6 +103,15 @@ class CandidateDefaults:
     child_model_gate_min_top1: int = 1
     child_engine_gate_min_top1: int = 1
     child_engine_jobs: int = 4
+    child_search_gate_targets: str = ""
+    child_search_gate_reference_net: str = ""
+    child_search_gate_nodes: int = 20000
+    child_search_gate_depth: int = 0
+    child_search_gate_jobs: int = 8
+    child_search_gate_min_groups: int = 1
+    child_search_gate_min_top1: int = -1
+    child_search_gate_max_missing: int = 0
+    child_search_gate_max_reference_better: int = -1
     policy_targets: str = ""
     policy_hidden: int = 128
     policy_feature_set: str = "compact"
