@@ -170,9 +170,9 @@ class CandidateDefaults:
     lc0_child_max_groups: int = 0
     lc0_child_unique_fen: bool = True
     lc0_best_source: str = "top-policy"
-    lc0_policy_score_scale_cp: float = 200.0
+    lc0_policy_score_scale_cp: float = 50.0
     lc0_policy_floor: float = 1e-4
-    lc0_child_max_gap_cp: float = 800.0
+    lc0_child_max_gap_cp: float = 300.0
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

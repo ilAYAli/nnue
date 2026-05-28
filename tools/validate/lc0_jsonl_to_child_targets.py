@@ -156,9 +156,9 @@ def main() -> int:
                     default=True)
     ap.add_argument("--best-source", choices=["top-policy", "best", "played"],
                     default="top-policy")
-    ap.add_argument("--policy-score-scale-cp", type=float, default=200.0)
+    ap.add_argument("--policy-score-scale-cp", type=float, default=50.0)
     ap.add_argument("--policy-floor", type=float, default=1e-4)
-    ap.add_argument("--max-gap-cp", type=float, default=800.0)
+    ap.add_argument("--max-gap-cp", type=float, default=300.0)
     args = ap.parse_args()
 
     counters: Counter[str] = Counter()
