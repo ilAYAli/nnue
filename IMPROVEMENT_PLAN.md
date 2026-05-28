@@ -71,6 +71,14 @@ Latest LC0 diagnostic:
   to candidate `731/2677`. Static MAE improved from `129.5` to `120.3`, but
   sign dropped from `92.32%` to `90.77%`. The `256`-game smoke was neutral
   negative: `-4.1 +/- 31.4`, LOS `40.0%`, draw `45.7%`.
+- `child-ranking-mixed-replayloss2677-lc0oracle1000-listwise-qfwd-refpreserve10-dz10-lr7e5-e360`:
+  combined `2677` replay-loss rows with `1000` LC0-oracle rows. It improved the
+  combined exported/engine child gate from the reference baseline `1245/3677`
+  to engine `1299/3677`, but the new broad static gate rejected it before smoke:
+  sign dropped `92.32% -> 91.13%` and the near-zero bucket dropped
+  `84.53% -> 81.59%`. This confirms the new broad gate catches unsafe target
+  gains early. Next run keeps the same mixed target file and tightens reference
+  preservation instead of changing data.
 - Conclusion: LC0-oracle child targets are a real exported/engine-side signal,
   but target-gate gains still do not imply Elo. Do not promote this candidate.
   Do not scale LC0-oracle blindly until broad sign/order preservation is part
