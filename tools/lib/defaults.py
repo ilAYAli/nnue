@@ -175,6 +175,19 @@ class CandidateDefaults:
     lc0_child_max_gap_cp: float = 300.0
     lc0_min_best_policy: float = 0.0
     lc0_min_policy_gap_cp: float = 0.0
+    lc0_oracle_child_targets: str = "targets/lc0-oracle-smoke-20260528/lc0_oracle_child_targets.jsonl"
+    lc0_oracle_child_summary: str = "targets/lc0-oracle-smoke-20260528/lc0_oracle_child_targets.summary.txt"
+    lc0_oracle_min_groups: int = 1
+    lc0_oracle_max_groups: int = 0
+    lc0_oracle_nodes: int = 200000
+    lc0_oracle_depth: int = 12
+    lc0_oracle_jobs: int = 8
+    lc0_oracle_threads: int = 1
+    lc0_oracle_hash: int = 128
+    lc0_oracle_max_moves_per_position: int = 8
+    lc0_oracle_max_gap_cp: float = 800.0
+    lc0_oracle_min_gap_cp: float = 0.0
+    lc0_oracle_preselect_multiplier: int = 3
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
