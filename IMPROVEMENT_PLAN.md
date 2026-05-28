@@ -39,6 +39,12 @@ Latest child-ranking result:
   drift: training `broad_excess` rose to about `229cp`, so this is not a smoke
   candidate yet. Next run keeps the same target source and raises reference
   preservation from `0.02` to `0.10`.
+- `child-ranking-replayloss-dense-v1-listwise-qfwd-refpreserve10-lr1e4-e640`:
+  failed the model gate. Stronger reference preservation worked on broad drift
+  (`broad_excess` about `41cp`) but blocked too much target learning:
+  `.pt`/`.nn` reached only `1222/4432`, below the `1300/4432` gate. This
+  brackets the useful preservation range: `0.02` learns but drifts too much,
+  `0.10` preserves but underlearns. Next run is the midpoint `0.05`.
 - `child-ranking-a4b4-a4d4-targetonly-lr3e5-e48`: failed one-pair model gate
   after moving in the right direction (`.pt` margin `-269cp`, `.nn` margin
   `-271cp`).
