@@ -393,6 +393,30 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "engine",
         "score_engine",
     }
+    search_descendant = {
+        "search_descendant_input",
+        "search_descendant_output",
+        "search_descendant_summary",
+        "search_descendant_candidate_net",
+        "search_descendant_reference_net",
+        "search_descendant_root_nodes",
+        "search_descendant_root_depth",
+        "search_descendant_nodes",
+        "search_descendant_depth",
+        "search_descendant_jobs",
+        "search_descendant_min_ply",
+        "search_descendant_max_ply",
+        "search_descendant_max_gap_cp",
+        "search_descendant_min_oracle_gap_cp",
+        "search_descendant_min_input_groups",
+        "search_descendant_min_output_groups",
+        "search_descendant_oracle_nodes",
+        "search_descendant_oracle_depth",
+        "search_descendant_oracle_threads",
+        "search_descendant_oracle_hash",
+        "engine",
+        "score_engine",
+    }
     mix = {
         "mix_sources",
         "mix_output",
@@ -410,6 +434,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "lc0-oracle-jsonl": lc0,
         "smoke-pgn-child-targets": smoke,
         "augment-child-targets": augment_child,
+        "search-descendant-child-targets": search_descendant,
         "mix-jsonl": mix,
     }
     return common | backend_keys.get(args.backend, set())
@@ -1138,6 +1163,55 @@ wc -l "$out" > "$out.wc"
                 str(args.child_augment_max_missing_after),
             ],
         })
+    elif args.backend == "search-descendant-child-targets":
+        if not args.search_descendant_input:
+            raise SystemExit(
+                "backend=search-descendant-child-targets requires "
+                "search_descendant_input")
+        if not args.search_descendant_candidate_net:
+            raise SystemExit(
+                "backend=search-descendant-child-targets requires "
+                "search_descendant_candidate_net")
+        if not args.search_descendant_reference_net:
+            raise SystemExit(
+                "backend=search-descendant-child-targets requires "
+                "search_descendant_reference_net")
+        steps.append({
+            "name": "build_search_descendant_child_targets",
+            "command": [
+                python, tool("validate/search_descendant_child_targets.py"),
+                "--input", str(expand_user(args.search_descendant_input)),
+                "--out", str(expand_user(args.search_descendant_output)),
+                "--summary", str(expand_user(args.search_descendant_summary)),
+                "--engine", str(expand_user(args.engine)),
+                "--candidate-net",
+                str(expand_user(args.search_descendant_candidate_net)),
+                "--reference-net",
+                str(expand_user(args.search_descendant_reference_net)),
+                "--oracle-engine", str(expand_user(args.score_engine)),
+                "--root-search-nodes", str(args.search_descendant_root_nodes),
+                "--root-search-depth", str(args.search_descendant_root_depth),
+                "--descendant-search-nodes", str(args.search_descendant_nodes),
+                "--descendant-search-depth", str(args.search_descendant_depth),
+                "--oracle-nodes", str(args.search_descendant_oracle_nodes),
+                "--oracle-depth", str(args.search_descendant_oracle_depth),
+                "--threads", "1",
+                "--hash", "64",
+                "--oracle-threads",
+                str(args.search_descendant_oracle_threads),
+                "--oracle-hash", str(args.search_descendant_oracle_hash),
+                "--jobs", str(args.search_descendant_jobs),
+                "--min-descendant-ply", str(args.search_descendant_min_ply),
+                "--max-descendant-ply", str(args.search_descendant_max_ply),
+                "--max-gap-cp", str(args.search_descendant_max_gap_cp),
+                "--min-oracle-gap-cp",
+                str(args.search_descendant_min_oracle_gap_cp),
+                "--min-input-groups",
+                str(args.search_descendant_min_input_groups),
+                "--min-output-groups",
+                str(args.search_descendant_min_output_groups),
+            ],
+        })
     elif args.backend == "mix-jsonl":
         sources = [
             item.strip()
@@ -1359,6 +1433,26 @@ def add_create_args(
     parser.add_argument("--child-augment-oracle-depth", type=int, default=value("child_augment_oracle_depth", d.child_augment_oracle_depth))
     parser.add_argument("--child-augment-oracle-threads", type=int, default=value("child_augment_oracle_threads", d.child_augment_oracle_threads))
     parser.add_argument("--child-augment-oracle-hash", type=int, default=value("child_augment_oracle_hash", d.child_augment_oracle_hash))
+    parser.add_argument("--search-descendant-input", default=value("search_descendant_input", d.search_descendant_input))
+    parser.add_argument("--search-descendant-output", default=value("search_descendant_output", d.search_descendant_output))
+    parser.add_argument("--search-descendant-summary", default=value("search_descendant_summary", d.search_descendant_summary))
+    parser.add_argument("--search-descendant-candidate-net", default=value("search_descendant_candidate_net", d.search_descendant_candidate_net))
+    parser.add_argument("--search-descendant-reference-net", default=value("search_descendant_reference_net", d.search_descendant_reference_net))
+    parser.add_argument("--search-descendant-root-nodes", type=int, default=value("search_descendant_root_nodes", d.search_descendant_root_nodes))
+    parser.add_argument("--search-descendant-root-depth", type=int, default=value("search_descendant_root_depth", d.search_descendant_root_depth))
+    parser.add_argument("--search-descendant-nodes", type=int, default=value("search_descendant_nodes", d.search_descendant_nodes))
+    parser.add_argument("--search-descendant-depth", type=int, default=value("search_descendant_depth", d.search_descendant_depth))
+    parser.add_argument("--search-descendant-jobs", type=int, default=value("search_descendant_jobs", d.search_descendant_jobs))
+    parser.add_argument("--search-descendant-min-ply", type=int, default=value("search_descendant_min_ply", d.search_descendant_min_ply))
+    parser.add_argument("--search-descendant-max-ply", type=int, default=value("search_descendant_max_ply", d.search_descendant_max_ply))
+    parser.add_argument("--search-descendant-max-gap-cp", type=float, default=value("search_descendant_max_gap_cp", d.search_descendant_max_gap_cp))
+    parser.add_argument("--search-descendant-min-oracle-gap-cp", type=float, default=value("search_descendant_min_oracle_gap_cp", d.search_descendant_min_oracle_gap_cp))
+    parser.add_argument("--search-descendant-min-input-groups", type=int, default=value("search_descendant_min_input_groups", d.search_descendant_min_input_groups))
+    parser.add_argument("--search-descendant-min-output-groups", type=int, default=value("search_descendant_min_output_groups", d.search_descendant_min_output_groups))
+    parser.add_argument("--search-descendant-oracle-nodes", type=int, default=value("search_descendant_oracle_nodes", d.search_descendant_oracle_nodes))
+    parser.add_argument("--search-descendant-oracle-depth", type=int, default=value("search_descendant_oracle_depth", d.search_descendant_oracle_depth))
+    parser.add_argument("--search-descendant-oracle-threads", type=int, default=value("search_descendant_oracle_threads", d.search_descendant_oracle_threads))
+    parser.add_argument("--search-descendant-oracle-hash", type=int, default=value("search_descendant_oracle_hash", d.search_descendant_oracle_hash))
     parser.add_argument("--mix-sources", default=value("mix_sources", d.mix_sources))
     parser.add_argument("--mix-output", default=value("mix_output", d.mix_output))
     parser.add_argument("--mix-summary", default=value("mix_summary", d.mix_summary))
