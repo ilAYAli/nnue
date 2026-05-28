@@ -128,6 +128,15 @@ Latest child-ranking result:
   MAE while failing to preserve the reference net's search surface. Static
   validation reflected this: the candidate had much better MAE but worse sign
   than the reference, and played catastrophically.
+- `child-ranking-lossv5-primary80-listwise-qfwd-refpreserve02-t15-lr1e4-e800`:
+  passed local gates with reference-anchored broad preservation: `.pt`, `.nn`,
+  and engine all reached `71/80`. This fixed the label-MAE collapse but not
+  game safety. On 100k broad rows it had `mae=169.45`, close to reference
+  `169.91`, but sign was still much worse: `86.70%` versus reference `90.52%`.
+  The near-zero bucket was the main damage (`69.39%` versus `77.98%`). A
+  64-game smoke was a hard reject: `-325.9 +/- 107.6`, `0.0%` LOS, `17.2%`
+  draws. This shows a `40cp` reference deadzone still permits search-destroying
+  sign/order drift.
 
 Rejected lanes:
 
@@ -181,23 +190,22 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run the same primary80 child-ranking diagnostic with reference-anchored broad
-preservation:
+Run one strict reference-preservation diagnostic before closing scalar
+child-ranking:
 
 1. Train from the current reference net.
 2. Optimize the same primary80 listwise child-ranking targets.
-3. Apply the broad deadzone against the frozen initial/reference net output,
-   not against Stockfish labels.
+3. Apply the broad leash against the frozen initial/reference net output with
+   no deadzone.
 4. Keep export-quantized forward enabled.
 
 Interpretation:
 
-- If local child gates pass and reference drift stays controlled, run an early
-  game smoke before any deeper replay work.
-- If local child gates fail, reduce reference-preserve weight once; do not add
-  more rows.
-- If local gates pass but smoke is still catastrophic, close this scalar
-  child-ranking lane and move to a non-eval policy/correction mechanism.
+- If local child gates pass, broad sign is close to reference, and a short
+  smoke is not catastrophic, tune within this strict-preserve family.
+- If local gates fail or broad sign still degrades materially, close scalar
+  child-ranking and move to a non-eval policy/correction mechanism.
+- Do not add more child-ranking rows until this safety question is answered.
 
 ## Candidate Workflow
 
@@ -209,7 +217,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary80-listwise-qfwd-refpreserve02-t15-lr1e4-e800`
+- candidate name: `child-ranking-lossv5-primary80-listwise-qfwd-refpreserve05-dz0-t15-lr1e4-e800`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -217,8 +225,8 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: export-aware listwise ranking loss plus reference-anchored broad
-  deadzone preservation
+- objective: export-aware listwise ranking loss plus strict reference-anchored
+  broad preservation
 - current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
   - 80 groups, 844 positive-gap training pairs, selected from loss logs.
   - includes the filtered 64 high-signal groups plus 16 low-gap/noisy rows that
