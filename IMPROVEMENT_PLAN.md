@@ -121,6 +121,13 @@ Latest child-ranking result:
   `42/64`, random losslogs64 `27/64` to `32/64`, and random worst regression
   improved from `-1325cp` to `-210cp`. This is enough local signal for an early
   game smoke, but not enough to call it a keeper.
+- The early 256-game smoke for that net was aborted as a clear reject at
+  `86/256`: about `-772 Elo`, `0.0%` LOS, `2.3%` draws. The engine binary and
+  net loading were not the issue. The important diagnosis is that the old
+  child-ranking broad leash was label-anchored, so it improved Stockfish-label
+  MAE while failing to preserve the reference net's search surface. Static
+  validation reflected this: the candidate had much better MAE but worse sign
+  than the reference, and played catastrophically.
 
 Rejected lanes:
 
@@ -174,22 +181,23 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run an early game smoke for the primary80 child-ranking net:
+Run the same primary80 child-ranking diagnostic with reference-anchored broad
+preservation:
 
-1. Use
-   `runs/child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800/train/child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800/model.nn`.
-2. Run a `256` game same-engine net-vs-reference smoke before any further
-   training.
-3. Compare against the current reference net
-   `~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn`.
+1. Train from the current reference net.
+2. Optimize the same primary80 listwise child-ranking targets.
+3. Apply the broad deadzone against the frozen initial/reference net output,
+   not against Stockfish labels.
+4. Keep export-quantized forward enabled.
 
 Interpretation:
 
-- If the smoke is neutral or positive, run a larger confirmation or broader
-  replay/failure-suite check before promotion.
-- If the smoke is clearly negative, stop fitting this target set and inspect
-  game losses; the local child-ranking gate is then necessary but not
-  sufficient.
+- If local child gates pass and reference drift stays controlled, run an early
+  game smoke before any deeper replay work.
+- If local child gates fail, reduce reference-preserve weight once; do not add
+  more rows.
+- If local gates pass but smoke is still catastrophic, close this scalar
+  child-ranking lane and move to a non-eval policy/correction mechanism.
 
 ## Candidate Workflow
 
@@ -201,7 +209,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800`
+- candidate name: `child-ranking-lossv5-primary80-listwise-qfwd-refpreserve02-t15-lr1e4-e800`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -209,9 +217,8 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: export-aware listwise ranking loss plus weak broad deadzone
-  preservation for the primary80 scale diagnostic; currently under game smoke
-  validation
+- objective: export-aware listwise ranking loss plus reference-anchored broad
+  deadzone preservation
 - current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
   - 80 groups, 844 positive-gap training pairs, selected from loss logs.
   - includes the filtered 64 high-signal groups plus 16 low-gap/noisy rows that
@@ -219,6 +226,7 @@ Current `build.json` intent:
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
+  - `broad_anchor`
   - `broad_deadzone_cp`
   - `rank_margin_cp`
   - `rank_temperature_cp`

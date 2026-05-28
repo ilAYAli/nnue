@@ -89,6 +89,7 @@ class CandidateDefaults:
     child_loss: str = "pairwise"
     ranking_weight: float = 1.0
     broad_preserve_weight: float = 0.1
+    broad_anchor: str = "label"
     broad_deadzone_cp: int = 40
     broad_beta: int = 100
     rank_margin_cp: int = 100

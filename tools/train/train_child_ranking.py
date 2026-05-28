@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import sys
 from pathlib import Path
 
@@ -175,6 +176,19 @@ def maybe_compile_model(model: EnyoNNUE, args: argparse.Namespace):
     return model
 
 
+def configure_trainable(model: EnyoNNUE, trainable: str) -> None:
+    if trainable == "all":
+        return
+    for param in model.parameters():
+        param.requires_grad_(False)
+    if trainable in ("float-head", "output"):
+        for param in model.output.parameters():
+            param.requires_grad_(True)
+    if trainable == "float-head":
+        for param in model.l2.parameters():
+            param.requires_grad_(True)
+
+
 def pairwise_rank_loss(forward_model, rank_batch, args):
     (bw, bb, bwo, bbo, bstm, bphase,
      ow, ob, owo, obo, ostm, ophase,
@@ -244,6 +258,18 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     else:
         model = EnyoNNUE(init=args.init).to(args.device)
     model.export_quantize_forward = args.export_quantize_forward
+    anchor_model = None
+    if args.broad_anchor == "reference":
+        anchor_model = copy.deepcopy(model).eval()
+        for param in anchor_model.parameters():
+            param.requires_grad_(False)
+        print("broad anchor: reference net", flush=True)
+    else:
+        print("broad anchor: labels", flush=True)
+    configure_trainable(model, args.trainable)
+    trainable_params = sum(
+        p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"trainable={args.trainable} params={trainable_params}", flush=True)
     if args.export_quantize_forward:
         print("export quantized forward enabled", flush=True)
     forward_model = maybe_compile_model(model, args)
@@ -278,7 +304,13 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
             with autocast_context(args):
                 broad_pred = forward_model(w, b, w_off, b_off, stm, phase_scale)
-                broad_abs = (broad_pred.float() - y).abs()
+                if anchor_model is not None:
+                    with torch.no_grad():
+                        broad_target = anchor_model(
+                            w, b, w_off, b_off, stm, phase_scale).float()
+                else:
+                    broad_target = y
+                broad_abs = (broad_pred.float() - broad_target).abs()
                 broad_excess = torch.relu(broad_abs - args.broad_deadzone_cp)
                 broad_loss = F.smooth_l1_loss(
                     broad_excess, torch.zeros_like(broad_excess),
@@ -331,6 +363,8 @@ def main() -> None:
                     choices=["pairwise", "listwise"])
     ap.add_argument("--ranking-weight", type=float, default=1.0)
     ap.add_argument("--broad-preserve-weight", type=float, default=0.1)
+    ap.add_argument("--broad-anchor", default="label",
+                    choices=["label", "reference"])
     ap.add_argument("--broad-deadzone-cp", type=float, default=40.0)
     ap.add_argument("--broad-beta", type=float, default=100.0)
     ap.add_argument("--rank-margin-cp", type=float, default=100.0)
@@ -347,6 +381,8 @@ def main() -> None:
                     action=argparse.BooleanOptionalAction)
     ap.add_argument("--export-quantize-forward", default=False,
                     action=argparse.BooleanOptionalAction)
+    ap.add_argument("--trainable", default="all",
+                    choices=["all", "float-head", "output"])
     ap.add_argument("--max-rows", type=int, default=0)
     ap.add_argument("--skip-rows", type=int, default=0)
     args = ap.parse_args()

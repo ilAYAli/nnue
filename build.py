@@ -272,6 +272,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--target-clamp", str(args.target_clamp),
                     "--ranking-weight", str(args.ranking_weight),
                     "--broad-preserve-weight", str(args.broad_preserve_weight),
+                    "--broad-anchor", args.broad_anchor,
                     "--broad-deadzone-cp", str(args.broad_deadzone_cp),
                     "--broad-beta", str(args.broad_beta),
                     "--rank-margin-cp", str(args.rank_margin_cp),
@@ -285,6 +286,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--torch-compile" if args.torch_compile else "--no-torch-compile",
                     "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
                     "--export-quantize-forward" if args.export_quantize_forward else "--no-export-quantize-forward",
+                    "--trainable", args.trainable,
                     "--max-rows", str(args.child_broad_rows),
                     "--out", f"{candidate_dir}/model.pt",
                     "--out-nn", f"{candidate_dir}/model.nn",
@@ -470,6 +472,8 @@ def add_create_args(
                         choices=["pairwise", "listwise"])
     parser.add_argument("--ranking-weight", type=float, default=value("ranking_weight", d.ranking_weight))
     parser.add_argument("--broad-preserve-weight", type=float, default=value("broad_preserve_weight", d.broad_preserve_weight))
+    parser.add_argument("--broad-anchor", default=value("broad_anchor", d.broad_anchor),
+                        choices=["label", "reference"])
     parser.add_argument("--broad-deadzone-cp", type=int, default=value("broad_deadzone_cp", d.broad_deadzone_cp))
     parser.add_argument("--broad-beta", type=int, default=value("broad_beta", d.broad_beta))
     parser.add_argument("--rank-margin-cp", type=int, default=value("rank_margin_cp", d.rank_margin_cp))

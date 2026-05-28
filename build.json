@@ -1,8 +1,8 @@
 {
-  "description": "Active Enyo NNUE diagnostic: export-aware child-ranking scale check on primary80 with weak broad preservation.",
-  "experiment": "child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800",
+  "description": "Active Enyo NNUE diagnostic: export-aware child-ranking with reference-anchored broad preservation.",
+  "experiment": "child-ranking-lossv5-primary80-listwise-qfwd-refpreserve02-t15-lr1e4-e800",
   "create": {
-    "name": "child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800",
+    "name": "child-ranking-lossv5-primary80-listwise-qfwd-refpreserve02-t15-lr1e4-e800",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/losslogs_v5_primary80.jsonl",
@@ -21,7 +21,8 @@
     "child_batch_size": 64,
     "child_loss": "listwise",
     "ranking_weight": 1.0,
-    "broad_preserve_weight": 0.005,
+    "broad_preserve_weight": 0.02,
+    "broad_anchor": "reference",
     "broad_deadzone_cp": 40,
     "broad_beta": 100,
     "rank_margin_cp": 250,
