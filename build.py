@@ -366,6 +366,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "smoke_min_groups",
         "smoke_unique_fen",
         "smoke_only_candidate_losses",
+        "smoke_only_candidate_worse",
         "smoke_candidate_name",
         "smoke_reference_name",
     }
@@ -1077,6 +1078,9 @@ wc -l "$out" > "$out.wc"
                 ("--only-candidate-losses"
                  if args.smoke_only_candidate_losses
                  else "--no-only-candidate-losses"),
+                ("--only-candidate-worse"
+                 if args.smoke_only_candidate_worse
+                 else "--no-only-candidate-worse"),
             ],
         })
     elif args.backend == "augment-child-targets":
@@ -1455,6 +1459,8 @@ def add_create_args(
                         default=value("smoke_unique_fen", d.smoke_unique_fen))
     parser.add_argument("--smoke-only-candidate-losses", action=argparse.BooleanOptionalAction,
                         default=value("smoke_only_candidate_losses", d.smoke_only_candidate_losses))
+    parser.add_argument("--smoke-only-candidate-worse", action=argparse.BooleanOptionalAction,
+                        default=value("smoke_only_candidate_worse", d.smoke_only_candidate_worse))
     parser.add_argument("--smoke-candidate-name", default=value("smoke_candidate_name", d.smoke_candidate_name))
     parser.add_argument("--smoke-reference-name", default=value("smoke_reference_name", d.smoke_reference_name))
 

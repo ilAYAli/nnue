@@ -244,6 +244,7 @@ class CandidateDefaults:
     smoke_min_groups: int = 1
     smoke_unique_fen: bool = True
     smoke_only_candidate_losses: bool = False
+    smoke_only_candidate_worse: bool = False
     smoke_candidate_name: str = "candidate"
     smoke_reference_name: str = "reference"
 

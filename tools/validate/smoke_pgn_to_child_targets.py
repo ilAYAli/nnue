@@ -445,6 +445,26 @@ def convert_chunk(
     return out
 
 
+def candidate_worse_than_reference(row: dict) -> bool:
+    scores = {
+        str(move["move"]): int(move["score_cp"])
+        for move in row.get("moves", [])
+    }
+    best_move = str(row.get("best_move", ""))
+    candidate_move = str(row.get("candidate_move", ""))
+    reference_move = str(row.get("reference_move", ""))
+    if (
+        best_move not in scores
+        or candidate_move not in scores
+        or reference_move not in scores
+    ):
+        return False
+    best_score = scores[best_move]
+    candidate_loss = best_score - scores[candidate_move]
+    reference_loss = best_score - scores[reference_move]
+    return candidate_loss > reference_loss
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Build oracle-scored child-ranking targets from smoke PGN positions.")
@@ -477,6 +497,8 @@ def main() -> int:
                     default=True)
     ap.add_argument("--only-candidate-losses", action=argparse.BooleanOptionalAction,
                     default=False)
+    ap.add_argument("--only-candidate-worse", action=argparse.BooleanOptionalAction,
+                    default=False)
     args = ap.parse_args()
 
     if args.search_nodes <= 0 and args.search_depth <= 0:
@@ -506,6 +528,9 @@ def main() -> int:
     for _case_id, row, row_counters in results:
         counters.update(row_counters)
         if row is not None:
+            if args.only_candidate_worse and not candidate_worse_than_reference(row):
+                counters["skipped_candidate_not_worse"] += 1
+                continue
             rows.append(row)
 
     if len(rows) < args.min_groups:
@@ -563,6 +588,7 @@ def main() -> int:
         f"reference_search_loss_cp={search_metrics['reference_search_loss_cp']}",
         f"skipped_same_moves={counters['skipped_same_moves']}",
         f"skipped_low_oracle_gap={counters['skipped_low_oracle_gap']}",
+        f"skipped_candidate_not_worse={counters['skipped_candidate_not_worse']}",
         f"skipped_no_bestmove={counters['skipped_no_bestmove']}",
         f"skipped_no_oracle_score={counters['skipped_no_oracle_score']}",
         f"search_nodes={args.search_nodes}",

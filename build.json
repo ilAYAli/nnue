@@ -1,14 +1,14 @@
 {
-  "description": "Build child-ranking targets from r18-vs-r14 smoke losses before another training run.",
-  "experiment": "smoke256-r18-vs-r14-loss-targets-20260529",
+  "description": "Build child-ranking targets where r18 was worse than r14 in the smoke loss games.",
+  "experiment": "smoke256-r18-vs-r14-worse-targets-20260529",
   "create": {
-    "name": "smoke256-r18-vs-r14-loss-targets-20260529",
+    "name": "smoke256-r18-vs-r14-worse-targets-20260529",
     "backend": "smoke-pgn-child-targets",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "score_engine": "~/local/bin/stockfish",
     "smoke_pgn": "runs/child-ranking-fast4-r18-r14init-r17c-listwise-qfwd-refpreserve30-dz5-lr2e6-e240/child-ranking-r18-vs-r14-smoke256/sprt_confirm_20260529_010352/child-ranking-r18-vs-r14-smoke256_vs_refnet.pgn",
-    "smoke_child_targets": "targets/smoke256-r18-vs-r14-loss-20260529/smoke_child_targets.jsonl",
-    "smoke_child_summary": "targets/smoke256-r18-vs-r14-loss-20260529/smoke_child_targets.summary.txt",
+    "smoke_child_targets": "targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl",
+    "smoke_child_summary": "targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.summary.txt",
     "smoke_candidate_net": "runs/child-ranking-fast4-r18-r14init-r17c-listwise-qfwd-refpreserve30-dz5-lr2e6-e240/train/child-ranking-fast4-r18-r14init-r17c-listwise-qfwd-refpreserve30-dz5-lr2e6-e240/model.nn",
     "smoke_reference_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
     "smoke_candidate_name": "candidate",
@@ -28,9 +28,10 @@
     "smoke_max_positions": 600,
     "smoke_max_gap_cp": 800,
     "smoke_min_oracle_gap_cp": 20,
-    "smoke_min_groups": 100,
+    "smoke_min_groups": 25,
     "smoke_unique_fen": true,
     "smoke_only_candidate_losses": true,
+    "smoke_only_candidate_worse": true,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
@@ -41,6 +42,7 @@
     ],
     "pass_intent": [
       "sample only r18 candidate-loss games from the smoke PGN",
+      "keep only rows where r18 selected a worse move than r14 under oracle scoring",
       "score r18-selected, r14-selected, and logged moves with the same oracle settings",
       "use the output only as diagnostic/future mix input, not as proof of strength"
     ]
