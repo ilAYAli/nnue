@@ -333,6 +333,10 @@ def create_config(args: argparse.Namespace) -> dict:
         if not policy_targets:
             raise SystemExit("backend=policy-ranking requires policy_targets")
         policy_target_paths = expand_path_list(str(policy_targets))
+        policy_gate_include_tags = (
+            args.policy_gate_include_tags or args.policy_include_tags)
+        policy_gate_exclude_tags = (
+            args.policy_gate_exclude_tags or args.policy_exclude_tags)
         steps.extend([
             {
                 "name": "train_policy_ranker",
@@ -365,8 +369,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--base-net", str(expand_path(args.init_net)),
                     "--device", args.device,
                     "--feature-set", args.policy_feature_set,
-                    "--include-tags", args.policy_include_tags,
-                    "--exclude-tags", args.policy_exclude_tags,
+                    "--include-tags", policy_gate_include_tags,
+                    "--exclude-tags", policy_gate_exclude_tags,
                     "--breakdown-tags", args.policy_breakdown_tags,
                     "--min-groups", str(args.min_groups),
                     "--thresholds", args.policy_thresholds,
@@ -553,6 +557,8 @@ def add_create_args(
     parser.add_argument("--policy-dropout", type=float, default=value("policy_dropout", d.policy_dropout))
     parser.add_argument("--policy-include-tags", default=value("policy_include_tags", d.policy_include_tags))
     parser.add_argument("--policy-exclude-tags", default=value("policy_exclude_tags", d.policy_exclude_tags))
+    parser.add_argument("--policy-gate-include-tags", default=value("policy_gate_include_tags", d.policy_gate_include_tags))
+    parser.add_argument("--policy-gate-exclude-tags", default=value("policy_gate_exclude_tags", d.policy_gate_exclude_tags))
     parser.add_argument("--policy-breakdown-tags", default=value("policy_breakdown_tags", d.policy_breakdown_tags))
     parser.add_argument("--policy-val-fraction", type=float, default=value("policy_val_fraction", d.policy_val_fraction))
     parser.add_argument("--policy-target-temperature-cp", type=int, default=value("policy_target_temperature_cp", d.policy_target_temperature_cp))

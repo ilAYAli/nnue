@@ -196,6 +196,12 @@ Latest child-ranking result:
   tiny oracle tie around `-4cp`. The next run excludes
   `source:lichess_lowmat_mc12` and uses a `10cp` bad-override tolerance so
   real harm is separated from noise-level ties.
+- `policy-ranker-matelike-nolowmat-board-h64-d35-lr2e4-e600`: failed. Removing
+  the lowmat source from training made generalization worse, not better:
+  validation policy top1 was only `19/54` with real `-800cp` bad overrides.
+  The lowmat rows are unsafe as a deployment/gate slice, but their presence in
+  training appears to regularize the sidecar. The next diagnostic trains on
+  all `mate_like` rows and gates only the non-lowmat slice.
 
 Rejected lanes:
 
