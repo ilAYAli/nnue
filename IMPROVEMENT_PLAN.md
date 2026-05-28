@@ -28,6 +28,17 @@ Tooling correction:
 
 Latest child-ranking result:
 
+- `child-ranking-replayloss-dense-v1-listwise-qfwd-preserve02-lr1e4-e640-r2`:
+  passed the dense replay-loss JSONL gate generated from Lichess losses. The
+  replay target set has `4432` groups and `14105` valid rank pairs. Baseline
+  exported model/engine top1 was `1024/4432` and `964/4432`; the trained net
+  reached `.pt`/`.nn` `1438/4432` and engine `1492/4432`. Engine sum gap
+  improved from about `1011033cp` to `644668cp`, and worst engine margin
+  improved from about `-2663cp` to `-2348cp`. This proves the dense replay-loss
+  child-ranking signal moves exported engine choices. The problem is broad
+  drift: training `broad_excess` rose to about `229cp`, so this is not a smoke
+  candidate yet. Next run keeps the same target source and raises reference
+  preservation from `0.02` to `0.10`.
 - `child-ranking-a4b4-a4d4-targetonly-lr3e5-e48`: failed one-pair model gate
   after moving in the right direction (`.pt` margin `-269cp`, `.nn` margin
   `-271cp`).
