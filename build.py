@@ -301,6 +301,15 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "lc0_min_rows",
         "lc0_min_played_legal_pct",
         "lc0_min_best_legal_pct",
+        "lc0_child_targets",
+        "lc0_child_summary",
+        "lc0_child_min_groups",
+        "lc0_child_max_groups",
+        "lc0_child_unique_fen",
+        "lc0_best_source",
+        "lc0_policy_score_scale_cp",
+        "lc0_policy_floor",
+        "lc0_child_max_gap_cp",
     }
     backend_keys = {
         "pytorch": pytorch,
@@ -838,20 +847,38 @@ wc -l "$out" > "$out.wc"
             },
         ])
     elif args.backend == "lc0-jsonl":
-        steps.append({
-            "name": "extract_lc0_jsonl",
-            "command": [
-                python, tool("posgen/lc0_to_jsonl.py"),
-                "--input", str(expand_user(args.lc0_input)),
-                "--out", str(expand_user(args.lc0_output)),
-                "--summary", str(expand_user(args.lc0_summary)),
-                "--max-records", str(args.lc0_max_records),
-                "--top-policy", str(args.lc0_top_policy),
-                "--min-rows", str(args.lc0_min_rows),
-                "--min-played-legal-pct", str(args.lc0_min_played_legal_pct),
-                "--min-best-legal-pct", str(args.lc0_min_best_legal_pct),
-            ],
-        })
+        steps.extend([
+            {
+                "name": "extract_lc0_jsonl",
+                "command": [
+                    python, tool("posgen/lc0_to_jsonl.py"),
+                    "--input", str(expand_user(args.lc0_input)),
+                    "--out", str(expand_user(args.lc0_output)),
+                    "--summary", str(expand_user(args.lc0_summary)),
+                    "--max-records", str(args.lc0_max_records),
+                    "--top-policy", str(args.lc0_top_policy),
+                    "--min-rows", str(args.lc0_min_rows),
+                    "--min-played-legal-pct", str(args.lc0_min_played_legal_pct),
+                    "--min-best-legal-pct", str(args.lc0_min_best_legal_pct),
+                ],
+            },
+            {
+                "name": "convert_lc0_child_targets",
+                "command": [
+                    python, tool("validate/lc0_jsonl_to_child_targets.py"),
+                    "--input", str(expand_user(args.lc0_output)),
+                    "--out", str(expand_user(args.lc0_child_targets)),
+                    "--summary", str(expand_user(args.lc0_child_summary)),
+                    "--min-groups", str(args.lc0_child_min_groups),
+                    "--max-groups", str(args.lc0_child_max_groups),
+                    "--unique-fen" if args.lc0_child_unique_fen else "--no-unique-fen",
+                    "--best-source", args.lc0_best_source,
+                    "--policy-score-scale-cp", str(args.lc0_policy_score_scale_cp),
+                    "--policy-floor", str(args.lc0_policy_floor),
+                    "--max-gap-cp", str(args.lc0_child_max_gap_cp),
+                ],
+            },
+        ])
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -1086,6 +1113,17 @@ def add_create_args(
     parser.add_argument("--lc0-min-rows", type=int, default=value("lc0_min_rows", d.lc0_min_rows))
     parser.add_argument("--lc0-min-played-legal-pct", type=float, default=value("lc0_min_played_legal_pct", d.lc0_min_played_legal_pct))
     parser.add_argument("--lc0-min-best-legal-pct", type=float, default=value("lc0_min_best_legal_pct", d.lc0_min_best_legal_pct))
+    parser.add_argument("--lc0-child-targets", default=value("lc0_child_targets", d.lc0_child_targets))
+    parser.add_argument("--lc0-child-summary", default=value("lc0_child_summary", d.lc0_child_summary))
+    parser.add_argument("--lc0-child-min-groups", type=int, default=value("lc0_child_min_groups", d.lc0_child_min_groups))
+    parser.add_argument("--lc0-child-max-groups", type=int, default=value("lc0_child_max_groups", d.lc0_child_max_groups))
+    parser.add_argument("--lc0-child-unique-fen", action=argparse.BooleanOptionalAction,
+                        default=value("lc0_child_unique_fen", d.lc0_child_unique_fen))
+    parser.add_argument("--lc0-best-source", default=value("lc0_best_source", d.lc0_best_source),
+                        choices=["top-policy", "best", "played"])
+    parser.add_argument("--lc0-policy-score-scale-cp", type=float, default=value("lc0_policy_score_scale_cp", d.lc0_policy_score_scale_cp))
+    parser.add_argument("--lc0-policy-floor", type=float, default=value("lc0_policy_floor", d.lc0_policy_floor))
+    parser.add_argument("--lc0-child-max-gap-cp", type=float, default=value("lc0_child_max_gap_cp", d.lc0_child_max_gap_cp))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

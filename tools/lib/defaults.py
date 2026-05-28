@@ -164,6 +164,15 @@ class CandidateDefaults:
     lc0_min_rows: int = 1
     lc0_min_played_legal_pct: float = 99.0
     lc0_min_best_legal_pct: float = 99.0
+    lc0_child_targets: str = "targets/lc0-smoke-20260528/lc0_child_targets.jsonl"
+    lc0_child_summary: str = "targets/lc0-smoke-20260528/lc0_child_targets.summary.txt"
+    lc0_child_min_groups: int = 1
+    lc0_child_max_groups: int = 0
+    lc0_child_unique_fen: bool = True
+    lc0_best_source: str = "top-policy"
+    lc0_policy_score_scale_cp: float = 200.0
+    lc0_policy_floor: float = 1e-4
+    lc0_child_max_gap_cp: float = 800.0
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
