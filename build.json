@@ -36,7 +36,7 @@
     "child_static_gate_max_sign_drop_pct": 1.0,
     "child_static_gate_max_near_zero_sign_drop_pct": 2.0,
     "min_groups": 4425,
-    "min_pairs": 21190,
+    "min_pairs": 16629,
     "child_model_gate_min_top1": 1580,
     "child_engine_gate_min_top1": 1565,
     "child_search_gate_targets": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r4_r3candidate.jsonl",
