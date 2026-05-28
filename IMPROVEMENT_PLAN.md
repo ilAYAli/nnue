@@ -12,6 +12,18 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `child-ranking-mixed-replaylatest2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
+  trained on the latest synced loss-log replay rows plus LC0-oracle and the
+  previous failed-smoke rows. It passed model, engine, and broad-static gates:
+  `.pt/.nn` `1462/4045`, engine `1444/4045`, static MAE improved
+  `129.476 -> 124.522`, sign stayed within cap (`92.32% -> 91.71%`).
+  The first root-search gate exposed `79` missing selected moves. After r2
+  root augmentation (`missing_after=0`), the complete replay-search verdict was
+  not promotion-grade: candidate `1872/2854`, reference `1863/2854`,
+  `candidate_better=301`, `reference_better=284`, but `sum_diff=-1958cp`.
+  Do not smoke this net. The next run trains on
+  `loss_replay_child_targets_rootaug_r2_latestcandidate.jsonl` and must improve
+  over this complete-gate baseline before any SPRT.
 - `child-ranking-mixed-replayrefresh2838-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
   passed the refreshed replay/LC0/smoke mixed child gates and broad static
   checks. After root-selected move augmentation, replay-loss root search was
