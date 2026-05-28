@@ -25,6 +25,9 @@ Tooling correction:
   `policy_ranker.json` artifact and validate exported-score parity against the
   PyTorch checkpoint. Engine-side integration must consume this artifact, not a
   Python checkpoint.
+- Replay JSONL target extraction now treats replay/history-sensitive rows as
+  diagnostic-only. Normal `backend=replay-jsonl` runs do not pass
+  `--include-history-sensitive` and validation fails if any such row appears.
 
 Latest child-ranking result:
 
@@ -55,6 +58,15 @@ Latest child-ranking result:
   sign/order. Next run keeps the replay-loss dense target source but uses
   zero-deadzone reference preservation at lower weight:
   `child-ranking-replayloss-dense-v1-listwise-qfwd-refpreserve02-dz0-lr1e4-e640`.
+- `child-ranking-replayloss-dense-v1-listwise-qfwd-refpreserve02-dz0-lr1e4-e640`:
+  passed the local replay-loss child-ranking gates but made broad behavior much
+  worse. Export-quantized `.pt` and exported `.nn` both reached `1433/4432`;
+  engine reached `1488/4432`. Training broad excess climbed to about `247cp`.
+  Static validation rejected it hard: sign `79.85%` versus reference `90.52%`,
+  wrong-sign rows `18838/93479` versus reference `8861/93479`, and the near-zero
+  bucket fell to `64.45%` versus reference `77.98%`. This closes dense scalar
+  replay-loss child-ranking as a near-term promotion lane. The signal is useful,
+  but it must not replace or fine-tune the scalar eval surface.
 - `child-ranking-a4b4-a4d4-targetonly-lr3e5-e48`: failed one-pair model gate
   after moving in the right direction (`.pt` margin `-269cp`, `.nn` margin
   `-271cp`).
