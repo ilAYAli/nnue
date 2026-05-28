@@ -311,6 +311,7 @@ def main() -> int:
 
     start = time.monotonic()
     selected: list[tuple[int, dict]] = []
+    input_rows = 0
     preselect_limit = (
         args.max_groups * max(1, args.preselect_multiplier)
         if args.max_groups > 0 else 0
@@ -319,6 +320,7 @@ def main() -> int:
         for line_no, line in enumerate(src, 1):
             if not line.strip():
                 continue
+            input_rows += 1
             row = json.loads(line)
             if not preselect_row(row, args):
                 continue
@@ -343,6 +345,7 @@ def main() -> int:
         if converted is not None:
             written_rows.append((index, converted))
     written_rows.sort(key=lambda item: item[0])
+    converted_groups = len(written_rows)
     if args.max_groups > 0:
         written_rows = written_rows[:args.max_groups]
 
@@ -355,9 +358,17 @@ def main() -> int:
     if written < args.min_groups:
         raise SystemExit(f"written_groups={written} below min_groups={args.min_groups}")
 
+    written_tags: Counter[str] = Counter()
+    for _index, row in written_rows:
+        for tag in row.get("tags", []):
+            written_tags[str(tag)] += 1
+
     elapsed = time.monotonic() - start
     lines = [
-        f"rows={counters['rows']}",
+        f"input_rows={input_rows}",
+        f"preselected_rows={len(selected)}",
+        f"scored_rows={counters['rows']}",
+        f"converted_groups={converted_groups}",
         f"written_groups={written}",
         f"skipped_schema={counters['skipped_schema']}",
         f"skipped_few_moves={counters['skipped_few_moves']}",
@@ -378,9 +389,8 @@ def main() -> int:
         f"min_policy_gap_cp={args.min_policy_gap_cp}",
         f"elapsed_s={elapsed:.3f}",
         "tags=" + ",".join(
-            f"{key[4:]}:{value}"
-            for key, value in sorted(counters.items())
-            if key.startswith("tag:")
+            f"{key}:{value}"
+            for key, value in sorted(written_tags.items())
         ),
         f"output={args.out}",
     ]
