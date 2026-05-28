@@ -331,6 +331,34 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "lc0_oracle_min_gap_cp",
         "lc0_oracle_preselect_multiplier",
     }
+    smoke = {
+        "smoke_pgn",
+        "smoke_child_targets",
+        "smoke_child_summary",
+        "smoke_candidate_net",
+        "smoke_reference_net",
+        "score_engine",
+        "engine",
+        "smoke_search_nodes",
+        "smoke_search_depth",
+        "smoke_oracle_nodes",
+        "smoke_oracle_depth",
+        "smoke_jobs",
+        "smoke_threads",
+        "smoke_hash",
+        "smoke_oracle_threads",
+        "smoke_oracle_hash",
+        "smoke_min_ply",
+        "smoke_max_per_game",
+        "smoke_max_positions",
+        "smoke_max_gap_cp",
+        "smoke_min_oracle_gap_cp",
+        "smoke_min_groups",
+        "smoke_unique_fen",
+        "smoke_only_candidate_losses",
+        "smoke_candidate_name",
+        "smoke_reference_name",
+    }
     backend_keys = {
         "pytorch": pytorch,
         "child-ranking": child,
@@ -338,6 +366,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "replay-jsonl": replay,
         "lc0-jsonl": lc0,
         "lc0-oracle-jsonl": lc0,
+        "smoke-pgn-child-targets": smoke,
     }
     return common | backend_keys.get(args.backend, set())
 
@@ -946,6 +975,45 @@ wc -l "$out" > "$out.wc"
                     str(args.lc0_oracle_preselect_multiplier),
                 ],
             })
+    elif args.backend == "smoke-pgn-child-targets":
+        if not args.smoke_pgn:
+            raise SystemExit("backend=smoke-pgn-child-targets requires smoke_pgn")
+        if not args.smoke_candidate_net:
+            raise SystemExit("backend=smoke-pgn-child-targets requires smoke_candidate_net")
+        steps.append({
+            "name": "build_smoke_pgn_child_targets",
+            "command": [
+                python, tool("validate/smoke_pgn_to_child_targets.py"),
+                "--pgn", str(expand_user(args.smoke_pgn)),
+                "--out", str(expand_user(args.smoke_child_targets)),
+                "--summary", str(expand_user(args.smoke_child_summary)),
+                "--engine", str(expand_user(args.engine)),
+                "--candidate-net", str(expand_user(args.smoke_candidate_net)),
+                "--reference-net", str(expand_user(args.smoke_reference_net)),
+                "--oracle-engine", str(expand_user(args.score_engine)),
+                "--candidate-name", args.smoke_candidate_name,
+                "--reference-name", args.smoke_reference_name,
+                "--search-nodes", str(args.smoke_search_nodes),
+                "--search-depth", str(args.smoke_search_depth),
+                "--oracle-nodes", str(args.smoke_oracle_nodes),
+                "--oracle-depth", str(args.smoke_oracle_depth),
+                "--threads", str(args.smoke_threads),
+                "--hash", str(args.smoke_hash),
+                "--oracle-threads", str(args.smoke_oracle_threads),
+                "--oracle-hash", str(args.smoke_oracle_hash),
+                "--jobs", str(args.smoke_jobs),
+                "--min-ply", str(args.smoke_min_ply),
+                "--max-per-game", str(args.smoke_max_per_game),
+                "--max-positions", str(args.smoke_max_positions),
+                "--max-gap-cp", str(args.smoke_max_gap_cp),
+                "--min-oracle-gap-cp", str(args.smoke_min_oracle_gap_cp),
+                "--min-groups", str(args.smoke_min_groups),
+                "--unique-fen" if args.smoke_unique_fen else "--no-unique-fen",
+                ("--only-candidate-losses"
+                 if args.smoke_only_candidate_losses
+                 else "--no-only-candidate-losses"),
+            ],
+        })
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -1069,7 +1137,8 @@ def add_create_args(
     parser.add_argument("--backend", default=value("backend", d.backend),
                         choices=["pytorch", "child-ranking", "policy-ranking",
                                  "replay-jsonl", "lc0-jsonl",
-                                 "lc0-oracle-jsonl"])
+                                 "lc0-oracle-jsonl",
+                                 "smoke-pgn-child-targets"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -1211,6 +1280,32 @@ def add_create_args(
     parser.add_argument("--lc0-oracle-max-gap-cp", type=float, default=value("lc0_oracle_max_gap_cp", d.lc0_oracle_max_gap_cp))
     parser.add_argument("--lc0-oracle-min-gap-cp", type=float, default=value("lc0_oracle_min_gap_cp", d.lc0_oracle_min_gap_cp))
     parser.add_argument("--lc0-oracle-preselect-multiplier", type=int, default=value("lc0_oracle_preselect_multiplier", d.lc0_oracle_preselect_multiplier))
+    parser.add_argument("--smoke-pgn", default=value("smoke_pgn", d.smoke_pgn))
+    parser.add_argument("--smoke-child-targets", default=value("smoke_child_targets", d.smoke_child_targets))
+    parser.add_argument("--smoke-child-summary", default=value("smoke_child_summary", d.smoke_child_summary))
+    parser.add_argument("--smoke-candidate-net", default=value("smoke_candidate_net", d.smoke_candidate_net))
+    parser.add_argument("--smoke-reference-net", default=value("smoke_reference_net", d.smoke_reference_net))
+    parser.add_argument("--smoke-search-nodes", type=int, default=value("smoke_search_nodes", d.smoke_search_nodes))
+    parser.add_argument("--smoke-search-depth", type=int, default=value("smoke_search_depth", d.smoke_search_depth))
+    parser.add_argument("--smoke-oracle-nodes", type=int, default=value("smoke_oracle_nodes", d.smoke_oracle_nodes))
+    parser.add_argument("--smoke-oracle-depth", type=int, default=value("smoke_oracle_depth", d.smoke_oracle_depth))
+    parser.add_argument("--smoke-jobs", type=int, default=value("smoke_jobs", d.smoke_jobs))
+    parser.add_argument("--smoke-threads", type=int, default=value("smoke_threads", d.smoke_threads))
+    parser.add_argument("--smoke-hash", type=int, default=value("smoke_hash", d.smoke_hash))
+    parser.add_argument("--smoke-oracle-threads", type=int, default=value("smoke_oracle_threads", d.smoke_oracle_threads))
+    parser.add_argument("--smoke-oracle-hash", type=int, default=value("smoke_oracle_hash", d.smoke_oracle_hash))
+    parser.add_argument("--smoke-min-ply", type=int, default=value("smoke_min_ply", d.smoke_min_ply))
+    parser.add_argument("--smoke-max-per-game", type=int, default=value("smoke_max_per_game", d.smoke_max_per_game))
+    parser.add_argument("--smoke-max-positions", type=int, default=value("smoke_max_positions", d.smoke_max_positions))
+    parser.add_argument("--smoke-max-gap-cp", type=float, default=value("smoke_max_gap_cp", d.smoke_max_gap_cp))
+    parser.add_argument("--smoke-min-oracle-gap-cp", type=float, default=value("smoke_min_oracle_gap_cp", d.smoke_min_oracle_gap_cp))
+    parser.add_argument("--smoke-min-groups", type=int, default=value("smoke_min_groups", d.smoke_min_groups))
+    parser.add_argument("--smoke-unique-fen", action=argparse.BooleanOptionalAction,
+                        default=value("smoke_unique_fen", d.smoke_unique_fen))
+    parser.add_argument("--smoke-only-candidate-losses", action=argparse.BooleanOptionalAction,
+                        default=value("smoke_only_candidate_losses", d.smoke_only_candidate_losses))
+    parser.add_argument("--smoke-candidate-name", default=value("smoke_candidate_name", d.smoke_candidate_name))
+    parser.add_argument("--smoke-reference-name", default=value("smoke_reference_name", d.smoke_reference_name))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

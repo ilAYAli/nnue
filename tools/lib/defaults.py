@@ -193,6 +193,31 @@ class CandidateDefaults:
     lc0_oracle_min_gap_cp: float = 0.0
     lc0_oracle_preselect_multiplier: int = 3
 
+    smoke_pgn: str = ""
+    smoke_child_targets: str = "targets/smoke-pgn-20260528/smoke_child_targets.jsonl"
+    smoke_child_summary: str = "targets/smoke-pgn-20260528/smoke_child_targets.summary.txt"
+    smoke_candidate_net: str = ""
+    smoke_reference_net: str = "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn"
+    smoke_search_nodes: int = 20000
+    smoke_search_depth: int = 0
+    smoke_oracle_nodes: int = 100000
+    smoke_oracle_depth: int = 12
+    smoke_jobs: int = 8
+    smoke_threads: int = 1
+    smoke_hash: int = 64
+    smoke_oracle_threads: int = 1
+    smoke_oracle_hash: int = 128
+    smoke_min_ply: int = 8
+    smoke_max_per_game: int = 8
+    smoke_max_positions: int = 1000
+    smoke_max_gap_cp: float = 800.0
+    smoke_min_oracle_gap_cp: float = 20.0
+    smoke_min_groups: int = 1
+    smoke_unique_fen: bool = True
+    smoke_only_candidate_losses: bool = False
+    smoke_candidate_name: str = "candidate"
+    smoke_reference_name: str = "reference"
+
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
     sprt_concurrency: int = 10
