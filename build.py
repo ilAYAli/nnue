@@ -310,6 +310,8 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "lc0_policy_score_scale_cp",
         "lc0_policy_floor",
         "lc0_child_max_gap_cp",
+        "lc0_min_best_policy",
+        "lc0_min_policy_gap_cp",
     }
     backend_keys = {
         "pytorch": pytorch,
@@ -876,6 +878,8 @@ wc -l "$out" > "$out.wc"
                     "--policy-score-scale-cp", str(args.lc0_policy_score_scale_cp),
                     "--policy-floor", str(args.lc0_policy_floor),
                     "--max-gap-cp", str(args.lc0_child_max_gap_cp),
+                    "--min-best-policy", str(args.lc0_min_best_policy),
+                    "--min-policy-gap-cp", str(args.lc0_min_policy_gap_cp),
                 ],
             },
         ])
@@ -1124,6 +1128,8 @@ def add_create_args(
     parser.add_argument("--lc0-policy-score-scale-cp", type=float, default=value("lc0_policy_score_scale_cp", d.lc0_policy_score_scale_cp))
     parser.add_argument("--lc0-policy-floor", type=float, default=value("lc0_policy_floor", d.lc0_policy_floor))
     parser.add_argument("--lc0-child-max-gap-cp", type=float, default=value("lc0_child_max_gap_cp", d.lc0_child_max_gap_cp))
+    parser.add_argument("--lc0-min-best-policy", type=float, default=value("lc0_min_best_policy", d.lc0_min_best_policy))
+    parser.add_argument("--lc0-min-policy-gap-cp", type=float, default=value("lc0_min_policy_gap_cp", d.lc0_min_policy_gap_cp))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

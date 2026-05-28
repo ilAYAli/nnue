@@ -96,6 +96,9 @@ def convert_row(row: dict, args: argparse.Namespace,
     if best_policy <= 0.0:
         counters["skipped_zero_best_policy"] += 1
         return None
+    if best_policy < args.min_best_policy:
+        counters["skipped_low_best_policy"] += 1
+        return None
 
     out_moves = []
     for raw in legal_moves:
@@ -115,6 +118,17 @@ def convert_row(row: dict, args: argparse.Namespace,
             "policy": float(raw.get("policy", 0.0)),
             "origins": roles,
         })
+
+    best_score = next(move["score_cp"] for move in out_moves
+                      if move["move"] == best_move)
+    second_score = max(
+        (move["score_cp"] for move in out_moves if move["move"] != best_move),
+        default=best_score,
+    )
+    top2_gap = best_score - second_score
+    if top2_gap < args.min_policy_gap_cp:
+        counters["skipped_low_policy_gap"] += 1
+        return None
 
     tags = list(dict.fromkeys([
         *[str(tag) for tag in row.get("tags", [])],
@@ -139,6 +153,8 @@ def convert_row(row: dict, args: argparse.Namespace,
         "score_pov": "parent_policy",
         "policy_score_scale_cp": float(args.policy_score_scale_cp),
         "policy_floor": float(args.policy_floor),
+        "best_policy": float(best_policy),
+        "policy_top2_gap_cp": float(top2_gap),
         "lc0": row.get("lc0", {}),
         "tags": tags,
     }
@@ -159,6 +175,8 @@ def main() -> int:
     ap.add_argument("--policy-score-scale-cp", type=float, default=50.0)
     ap.add_argument("--policy-floor", type=float, default=1e-4)
     ap.add_argument("--max-gap-cp", type=float, default=300.0)
+    ap.add_argument("--min-best-policy", type=float, default=0.0)
+    ap.add_argument("--min-policy-gap-cp", type=float, default=0.0)
     args = ap.parse_args()
 
     counters: Counter[str] = Counter()
@@ -196,10 +214,14 @@ def main() -> int:
         f"skipped_missing_best={counters['skipped_missing_best']}",
         f"skipped_few_moves={counters['skipped_few_moves']}",
         f"skipped_illegal_move={counters['skipped_illegal_move']}",
+        f"skipped_low_best_policy={counters['skipped_low_best_policy']}",
+        f"skipped_low_policy_gap={counters['skipped_low_policy_gap']}",
         f"best_source={args.best_source}",
         f"policy_score_scale_cp={args.policy_score_scale_cp}",
         f"policy_floor={args.policy_floor}",
         f"max_gap_cp={args.max_gap_cp}",
+        f"min_best_policy={args.min_best_policy}",
+        f"min_policy_gap_cp={args.min_policy_gap_cp}",
         "tags=" + ",".join(
             f"{key[4:]}:{value}"
             for key, value in sorted(counters.items())
