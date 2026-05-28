@@ -1,8 +1,8 @@
 {
   "description": "Extract child-ranking targets from the failed r5 1000-game smoke, restricted to candidate losses and sampled evenly through each game.",
-  "experiment": "smoke1000-r5-loss-even-targets-20260528",
+  "experiment": "smoke1000-r5-loss-even-targets-m400-20260528",
   "create": {
-    "name": "smoke1000-r5-loss-even-targets-20260528",
+    "name": "smoke1000-r5-loss-even-targets-m400-20260528",
     "backend": "smoke-pgn-child-targets",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "score_engine": "~/local/bin/stockfish",
@@ -26,7 +26,7 @@
     "smoke_max_positions": 2500,
     "smoke_max_gap_cp": 800,
     "smoke_min_oracle_gap_cp": 20,
-    "smoke_min_groups": 800,
+    "smoke_min_groups": 400,
     "smoke_unique_fen": true,
     "smoke_only_candidate_losses": true,
     "smoke_candidate_name": "candidate",
