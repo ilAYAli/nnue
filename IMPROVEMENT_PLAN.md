@@ -99,6 +99,13 @@ Latest child-ranking result:
   grew to about `208cp`. This closes the "preservation is blocking the
   remaining rows" hypothesis for this target set. The active blocker is
   export-visible movement / quantization.
+- `child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-lr1e4-e480`:
+  passed and fixed the export gap. Export-quantized `.pt`, exported `.nn`, and
+  corrected engine gate all reached `62/64`; broad drift stayed controlled
+  (`broad_excess` about `59cp`). Cross-checks: old focused set `30/34`, full
+  primary80 `66/80`, and `.pt == .nn` on primary80. The two trained-set misses
+  had margins only around `-2cp` and `-1cp`, so the next check should push
+  margin, not change target source.
 
 Rejected lanes:
 
@@ -152,23 +159,23 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run an export-aware preserve check on the same filtered 64-group set:
+Run a longer, sharper export-aware preserve check on the same filtered
+64-group set:
 
 1. Use `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`.
 2. Set `child_loss=listwise`, `broad_preserve_weight=0.005`, and
    `export_quantize_forward=true`.
-3. Run `480` epochs at `lr=1e-4`.
-4. Require export-quantized `.pt`, `.nn`, and corrected engine gates at least
-   `58/64`.
+3. Run `800` epochs at `lr=1e-4`.
+4. Set `rank_temperature_cp=15` to push the near-zero remaining margins.
+5. Require export-quantized `.pt`, `.nn`, and corrected engine gates at least
+   `63/64`.
 
 Interpretation:
 
-- If export-aware training improves `.nn`/engine top1 above the weak-preserve
-  `55-56/64` result while keeping `broad_excess <= 80cp`, keep this path and
-  scale cautiously.
-- If export-aware training still stays near `56/64`, do not run more
-  same-shape listwise variants. Inspect the repeated forcing misses and change
-  target composition or representation.
+- If the longer/sharper run reaches `63/64` or better while keeping
+  `broad_excess <= 80cp`, scale to the next high-signal target set.
+- If it remains at `62/64`, treat the two repeated misses as hard rows and
+  scale anyway only after excluding low-gap/noisy rows from the larger set.
 
 ## Candidate Workflow
 
@@ -180,7 +187,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-lr1e4-e480`
+- candidate name: `child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-t15-lr1e4-e800`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
