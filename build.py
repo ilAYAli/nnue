@@ -355,6 +355,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--preserve-weight", str(args.policy_preserve_weight),
                     "--preserve-margin", str(args.policy_preserve_margin),
                     "--preserve-max-groups", str(args.policy_preserve_max_groups),
+                    "--preserve-val-fraction", str(args.policy_preserve_val_fraction),
                     "--epochs", str(args.epochs),
                     "--lr", str(args.lr),
                     "--weight-decay", str(args.weight_decay),
@@ -391,6 +392,32 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             },
         ])
+        steps.append({
+            "name": "validate_policy_ranker_deploy",
+            "command": [
+                python, tool("validate/policy_ranker_gate.py"),
+                "--targets", *policy_target_paths,
+                "--model", f"{candidate_dir}/model.pt",
+                "--base-net", str(expand_path(args.init_net)),
+                "--device", args.device,
+                "--feature-set", args.policy_feature_set,
+                "--include-tags", policy_gate_include_tags,
+                "--exclude-tags", policy_gate_exclude_tags,
+                "--breakdown-tags", args.policy_breakdown_tags,
+                "--min-groups", str(args.min_groups),
+                "--thresholds", str(args.policy_export_threshold),
+                "--split-seed", str(args.selfplay_seed),
+                "--split-val-fraction", str(args.policy_val_fraction),
+                "--fail-if-top1-below", str(args.policy_gate_min_top1),
+                "--fail-if-bad-above", str(args.policy_gate_max_bad),
+                "--fail-if-val-top1-below", str(args.policy_gate_min_val_top1),
+                "--fail-if-val-bad-above", str(args.policy_gate_max_val_bad),
+                "--fail-if-val-good-below", str(args.policy_gate_min_val_good),
+                "--fail-if-val-overrides-below",
+                str(args.policy_gate_min_val_overrides),
+                "--bad-tolerance-cp", str(args.policy_bad_tolerance_cp),
+            ],
+        })
         if (args.policy_broad_gate_include_tags
                 or args.policy_broad_gate_exclude_tags):
             steps.append({
@@ -618,6 +645,7 @@ def add_create_args(
     parser.add_argument("--policy-preserve-weight", type=float, default=value("policy_preserve_weight", d.policy_preserve_weight))
     parser.add_argument("--policy-preserve-margin", type=float, default=value("policy_preserve_margin", d.policy_preserve_margin))
     parser.add_argument("--policy-preserve-max-groups", type=int, default=value("policy_preserve_max_groups", d.policy_preserve_max_groups))
+    parser.add_argument("--policy-preserve-val-fraction", type=float, default=value("policy_preserve_val_fraction", d.policy_preserve_val_fraction))
     parser.add_argument("--policy-gate-include-tags", default=value("policy_gate_include_tags", d.policy_gate_include_tags))
     parser.add_argument("--policy-gate-exclude-tags", default=value("policy_gate_exclude_tags", d.policy_gate_exclude_tags))
     parser.add_argument("--policy-broad-gate-include-tags", default=value("policy_broad_gate_include_tags", d.policy_broad_gate_include_tags))

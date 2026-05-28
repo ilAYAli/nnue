@@ -106,6 +106,7 @@ def main() -> None:
     ap.add_argument("--preserve-weight", type=float, default=0.0)
     ap.add_argument("--preserve-margin", type=float, default=4.0)
     ap.add_argument("--preserve-max-groups", type=int, default=0)
+    ap.add_argument("--preserve-val-fraction", type=float, default=-1.0)
     ap.add_argument("--val-fraction", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--device", default="cpu")
@@ -133,8 +134,12 @@ def main() -> None:
     preserve_groups = [builder.build_group(group) for group in raw_preserve_groups]
     train_groups, val_groups = split_policy_groups(
         groups, args.seed, args.val_fraction)
+    preserve_val_fraction = (
+        args.val_fraction
+        if args.preserve_val_fraction < 0.0
+        else args.preserve_val_fraction)
     train_preserve_groups, val_preserve_groups = split_policy_groups(
-        preserve_groups, args.seed, args.val_fraction) if preserve_groups else ([], [])
+        preserve_groups, args.seed, preserve_val_fraction) if preserve_groups else ([], [])
     if not train_groups:
         raise SystemExit("no train groups")
 
@@ -223,6 +228,7 @@ def main() -> None:
                     "preserve_exclude_tags": args.preserve_exclude_tags,
                     "preserve_weight": args.preserve_weight,
                     "preserve_margin": args.preserve_margin,
+                    "preserve_val_fraction": preserve_val_fraction,
                 }
 
     if best_state is None:

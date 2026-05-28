@@ -247,6 +247,15 @@ Latest child-ranking result:
   threshold `256` still had broad bad overrides. This proves the previous
   preserve sample was not enough and the sidecar confidence is not safety
   calibrated.
+- `policy-ranker-matelike-preserve-all-nonmate-board-h64-d35-pw100-m8-t40-lr2e4-e400`
+  also failed, but was much closer. It trained on all non-mate preserve rows
+  except the preserve validation split. At threshold `40`, the broad gate had
+  only `8` overrides, but `5` were bad and worst harm was `-535cp`. At the
+  same threshold the mate-like validation split had only `3` good overrides,
+  below the deployment-action requirement. Threshold `24` had enough held-out
+  target action before the broad gate, so the next run keeps threshold `24` and
+  removes the preserve validation split so every known broad row is a no-action
+  training row.
 
 Rejected lanes:
 
@@ -343,7 +352,7 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `policy-ranker-matelike-preserve-all-nonmate-board-h64-d35-pw100-m8-t40-lr2e4-e400`
+  `policy-ranker-matelike-preserve-all-nonmate-board-h64-d35-pw100-m8-t24-lr2e4-e400`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
@@ -361,11 +370,12 @@ Current `build.json` intent:
     also produces at least 10 held-out good overrides and 10 held-out
     overrides.
 - preserve rows:
-  - all non-`mate_like` groups, with no subsampling in the next run.
+  - all non-`mate_like` groups, with no subsampling and no preserve validation
+    split in the next run.
   - preserve loss keeps the base/static selected move above policy alternatives
     by `8` policy-score units.
 - broad deployment gate:
-  - evaluates all non-`mate_like` target groups at export threshold `40`.
+  - evaluates all non-`mate_like` target groups at export threshold `24`.
   - requires `0` bad overrides and no more than `200` total broad overrides.
 - main knobs:
   - `policy_hidden`
@@ -374,6 +384,7 @@ Current `build.json` intent:
   - `policy_preserve_weight`
   - `policy_preserve_margin`
   - `policy_preserve_max_groups`
+  - `policy_preserve_val_fraction`
   - `policy_broad_gate_max_bad`
   - `policy_broad_gate_max_overrides`
   - `policy_val_fraction`

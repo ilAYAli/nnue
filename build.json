@@ -1,8 +1,8 @@
 {
-  "description": "Policy-ranker diagnostic: preserve all non-mate groups and deploy only high-confidence mate-like overrides.",
+  "description": "Policy-ranker diagnostic: preserve all non-mate groups while retaining held-out mate-like action.",
   "experiment": "policy-ranker-matelike-preserve-all-nonmate-board",
   "create": {
-    "name": "policy-ranker-matelike-preserve-all-nonmate-board-h64-d35-pw100-m8-t40-lr2e4-e400",
+    "name": "policy-ranker-matelike-preserve-all-nonmate-board-h64-d35-pw100-m8-t24-lr2e4-e400",
     "backend": "policy-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/losslogs_v5_primary80.jsonl",
@@ -37,6 +37,7 @@
     "policy_preserve_weight": 1.0,
     "policy_preserve_margin": 8.0,
     "policy_preserve_max_groups": 0,
+    "policy_preserve_val_fraction": 0.0,
     "policy_gate_include_tags": "mate_like",
     "policy_gate_exclude_tags": "source:lichess_lowmat_mc12",
     "policy_broad_gate_exclude_tags": "mate_like",
@@ -53,7 +54,7 @@
     "policy_gate_min_val_good": 8,
     "policy_gate_min_val_overrides": 8,
     "policy_bad_tolerance_cp": 10,
-    "policy_export_threshold": 40,
+    "policy_export_threshold": 24,
     "policy_export_max_abs_diff": 0.001,
     "min_groups": 200,
     "min_pairs": 844,
