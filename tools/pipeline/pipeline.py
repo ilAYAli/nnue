@@ -154,17 +154,27 @@ def validation_commands(run_dir: Path, net: Path) -> list[str]:
 
 def completion_extra(run_dir: Path) -> dict[str, Any]:
     nets = candidate_nets(run_dir)
-    if not nets:
+    policy_rankers = sorted(run_dir.glob("train/*/policy_ranker.json"))
+    models = sorted(run_dir.glob("train/*/model.pt"))
+    if not nets and not policy_rankers:
         return {}
-    net = nets[-1]
-    commands = validation_commands(run_dir, net)
-    return {
-        "candidate_net": str(net),
+    extra: dict[str, Any] = {
         "candidate_nets": [str(path) for path in nets],
-        "validation_commands": commands,
-        "validate_static": commands[0],
-        "validate_sprt": commands[1],
+        "candidate_models": [str(path) for path in models],
+        "candidate_policy_rankers": [str(path) for path in policy_rankers],
     }
+    if nets:
+        net = nets[-1]
+        commands = validation_commands(run_dir, net)
+        extra.update({
+            "candidate_net": str(net),
+            "validation_commands": commands,
+            "validate_static": commands[0],
+            "validate_sprt": commands[1],
+        })
+    if policy_rankers:
+        extra["candidate_policy_ranker"] = str(policy_rankers[-1])
+    return extra
 
 
 def cmd_launch(args: argparse.Namespace) -> int:
@@ -306,6 +316,8 @@ def cmd_launch(args: argparse.Namespace) -> int:
     print(f"run complete: {run_dir}", flush=True)
     if extra.get("candidate_net"):
         print(f"candidate net: {extra['candidate_net']}", flush=True)
+    if extra.get("candidate_policy_ranker"):
+        print(f"candidate policy ranker: {extra['candidate_policy_ranker']}", flush=True)
     commands = extra.get("validation_commands", [])
     if commands:
         print("validate:", flush=True)

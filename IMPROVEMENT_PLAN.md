@@ -21,6 +21,10 @@ Tooling correction:
   not evaluate the requested child FEN.
 - `nnue_event_ntfy.sh` now sends long-run `done` and `fail` events to
   `AI_stdin` by default. Phase spam stays on the normal `nnue` topic.
+- Policy-ranker runs now export an engine-loadable
+  `policy_ranker.json` artifact and validate exported-score parity against the
+  PyTorch checkpoint. Engine-side integration must consume this artifact, not a
+  Python checkpoint.
 
 Latest child-ranking result:
 
@@ -266,9 +270,10 @@ Primary lane:
 - New candidates must use `./build.py create`; no manual training pipelines.
 - Policy-sidecar diagnostics are now promising only for a narrow `mate_like`
   non-lowmat slice. The next useful work is an engine-side design for a gated
-  move-ordering or tie-break signal that cannot corrupt scalar eval. Do not
-  run SPRT until the sidecar is integrated and an engine gate shows actual
-  search move changes on the same held-out target style.
+  move-ordering or tie-break signal that cannot corrupt scalar eval. The bridge
+  step is exported-policy parity first, then C++ inference/root-only gating.
+  Do not run SPRT until the sidecar is integrated and an engine gate shows
+  actual search move changes on the same held-out target style.
 
 Secondary lanes:
 
@@ -286,7 +291,9 @@ Move the child-ranking signal out of the scalar eval net:
 2. Train a separate move-ranking/correction model on the same child groups.
 3. Use it only as a gated move-order/tie-break signal in validation, not as an
    eval replacement.
-4. Require broad game-safety before considering engine integration.
+4. Export the trained sidecar to `policy_ranker.json` and require parity with
+   the PyTorch checkpoint.
+5. Require broad game-safety before considering engine integration.
 
 Interpretation:
 

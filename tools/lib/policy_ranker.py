@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import random
+from typing import Any
 
 import chess
 import torch
@@ -277,3 +279,72 @@ def score_group(model: PolicyRanker, group: PolicyGroup,
                 device: str) -> torch.Tensor:
     x = ((group.features.to(device) - mean.to(device)) / std.to(device))
     return model(x).detach().cpu()
+
+
+def _tensor_json(tensor: torch.Tensor) -> list[Any]:
+    return tensor.detach().cpu().tolist()
+
+
+def export_policy_ranker_checkpoint(model_path: str | Path,
+                                    out_path: str | Path,
+                                    threshold: float) -> None:
+    checkpoint = torch.load(model_path, map_location="cpu")
+    state = checkpoint["model"]
+    payload = {
+        "format": "enyo-policy-ranker-v1",
+        "input_dim": int(checkpoint["input_dim"]),
+        "hidden": int(checkpoint["hidden"]),
+        "feature_set": str(checkpoint.get("feature_set", "compact")),
+        "threshold": float(threshold),
+        "mean": _tensor_json(checkpoint["mean"]),
+        "std": _tensor_json(checkpoint["std"]),
+        "layers": [
+            {
+                "weight": _tensor_json(state["net.0.weight"]),
+                "bias": _tensor_json(state["net.0.bias"]),
+                "activation": "relu",
+            },
+            {
+                "weight": _tensor_json(state["net.3.weight"]),
+                "bias": _tensor_json(state["net.3.bias"]),
+                "activation": "relu",
+            },
+            {
+                "weight": _tensor_json(state["net.6.weight"]),
+                "bias": _tensor_json(state["net.6.bias"]),
+                "activation": "linear",
+            },
+        ],
+        "metadata": {
+            "base_net": checkpoint.get("base_net", ""),
+            "targets": checkpoint.get("targets", []),
+            "include_tags": checkpoint.get("include_tags", ""),
+            "exclude_tags": checkpoint.get("exclude_tags", ""),
+            "seed": checkpoint.get("seed", None),
+            "val_fraction": checkpoint.get("val_fraction", None),
+        },
+    }
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def load_policy_ranker_export(path: str | Path) -> dict[str, Any]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if payload.get("format") != "enyo-policy-ranker-v1":
+        raise ValueError(f"{path}: unsupported policy ranker format")
+    return payload
+
+
+def score_group_export(payload: dict[str, Any], group: PolicyGroup) -> torch.Tensor:
+    x = (group.features - torch.tensor(payload["mean"], dtype=torch.float32))
+    x = x / torch.tensor(payload["std"], dtype=torch.float32)
+    for layer in payload["layers"]:
+        weight = torch.tensor(layer["weight"], dtype=torch.float32)
+        bias = torch.tensor(layer["bias"], dtype=torch.float32)
+        x = x @ weight.t() + bias
+        if layer["activation"] == "relu":
+            x = torch.relu(x)
+        elif layer["activation"] != "linear":
+            raise ValueError(f"unknown activation: {layer['activation']}")
+    return x.squeeze(-1)

@@ -385,6 +385,31 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--bad-tolerance-cp", str(args.policy_bad_tolerance_cp),
                 ],
             },
+            {
+                "name": "export_policy_ranker",
+                "command": [
+                    python, tool("train/export_policy_ranker.py"),
+                    "--model", f"{candidate_dir}/model.pt",
+                    "--out", f"{candidate_dir}/policy_ranker.json",
+                    "--threshold", str(args.policy_export_threshold),
+                ],
+            },
+            {
+                "name": "validate_policy_ranker_export",
+                "command": [
+                    python, tool("validate/policy_ranker_export_gate.py"),
+                    "--targets", *policy_target_paths,
+                    "--model", f"{candidate_dir}/model.pt",
+                    "--export", f"{candidate_dir}/policy_ranker.json",
+                    "--base-net", str(expand_path(args.init_net)),
+                    "--device", args.device,
+                    "--feature-set", args.policy_feature_set,
+                    "--include-tags", policy_gate_include_tags,
+                    "--exclude-tags", policy_gate_exclude_tags,
+                    "--min-groups", str(args.min_groups),
+                    "--max-abs-diff", str(args.policy_export_max_abs_diff),
+                ],
+            },
         ])
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
@@ -570,6 +595,8 @@ def add_create_args(
     parser.add_argument("--policy-gate-min-val-good", type=int, default=value("policy_gate_min_val_good", d.policy_gate_min_val_good))
     parser.add_argument("--policy-gate-min-val-overrides", type=int, default=value("policy_gate_min_val_overrides", d.policy_gate_min_val_overrides))
     parser.add_argument("--policy-bad-tolerance-cp", type=float, default=value("policy_bad_tolerance_cp", d.policy_bad_tolerance_cp))
+    parser.add_argument("--policy-export-threshold", type=float, default=value("policy_export_threshold", d.policy_export_threshold))
+    parser.add_argument("--policy-export-max-abs-diff", type=float, default=value("policy_export_max_abs_diff", d.policy_export_max_abs_diff))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
