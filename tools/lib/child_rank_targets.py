@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import sys
 
 import chess
 
@@ -102,13 +103,24 @@ def parse_group(raw: dict, line_no: int) -> ChildRankGroup:
     )
 
 
-def load_groups(path: str | Path, *, min_groups: int = 1
+def load_groups(path: str | Path, *, min_groups: int = 1,
+                skip_invalid: bool = False
                 ) -> list[ChildRankGroup]:
     groups: list[ChildRankGroup] = []
+    skipped = 0
     with Path(path).open(encoding="utf-8") as handle:
         for line_no, line in enumerate(handle, 1):
-            if line.strip():
+            if not line.strip():
+                continue
+            try:
                 groups.append(parse_group(json.loads(line), line_no))
+            except ValueError:
+                if not skip_invalid:
+                    raise
+                skipped += 1
+
+    if skipped:
+        print(f"{path}: skipped_invalid_groups={skipped}", file=sys.stderr)
 
     if len(groups) < min_groups:
         raise SystemExit(
