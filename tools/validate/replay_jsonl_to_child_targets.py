@@ -9,10 +9,7 @@ from pathlib import Path
 import chess
 
 
-def move_role(row: dict, move: dict) -> str:
-    move_uci = str(move["move"])
-    if move_uci == row.get("best_move"):
-        return "best"
+def move_role(move: dict) -> str:
     roles = move.get("role", [])
     if isinstance(roles, str):
         roles = [roles]
@@ -25,10 +22,10 @@ def move_role(row: dict, move: dict) -> str:
     return "neighbor"
 
 
-def convert_row(row: dict) -> dict | None:
+def convert_row(row: dict) -> tuple[dict, bool, bool] | None:
     fen = str(row["fen"])
     board = chess.Board(fen)
-    best_move = str(row["best_move"])
+    raw_best_move = str(row.get("best_move", ""))
 
     moves = []
     seen: set[str] = set()
@@ -43,22 +40,31 @@ def convert_row(row: dict) -> dict | None:
         moves.append({
             "move": move_uci,
             "score_cp": float(raw["score_cp"]),
-            "role": move_role(row, raw),
+            "role": move_role(raw),
             "rank": raw.get("rank"),
             "origins": raw.get("origins", raw.get("role", [])),
         })
 
-    if best_move not in seen or len(moves) < 2:
+    if len(moves) < 2:
         return None
+
+    best = max(moves, key=lambda item: item["score_cp"])
+    best_move = str(best["move"])
+    raw_best_missing = bool(raw_best_move and raw_best_move not in seen)
+    best_overridden = bool(raw_best_move and raw_best_move != best_move)
+    for move in moves:
+        if move["move"] == best_move:
+            move["role"] = "best"
 
     tags = list(row.get("tags", []))
     if "source:replay_loss" not in tags:
         tags.append("source:replay_loss")
 
-    return {
+    converted = {
         "id": str(row.get("id") or row.get("group_id")),
         "fen": fen,
         "best_move": best_move,
+        "replay_best_move": raw_best_move,
         "max_gap_cp": float(row.get("max_gap_cp", 800)),
         "moves": moves,
         "source": "replay_loss",
@@ -76,6 +82,7 @@ def convert_row(row: dict) -> dict | None:
         "tags": tags,
         "score_pov": row.get("score_pov", "parent"),
     }
+    return converted, best_overridden, raw_best_missing
 
 
 def main() -> int:
@@ -90,6 +97,8 @@ def main() -> int:
     rows = 0
     written = 0
     skipped = 0
+    best_overrides = 0
+    raw_best_missing = 0
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.input.open(encoding="utf-8") as src, args.out.open(
             "w", encoding="utf-8") as dst:
@@ -101,7 +110,10 @@ def main() -> int:
             if converted is None:
                 skipped += 1
                 continue
-            dst.write(json.dumps(converted, separators=(",", ":")) + "\n")
+            row, best_overridden, missing = converted
+            best_overrides += int(best_overridden)
+            raw_best_missing += int(missing)
+            dst.write(json.dumps(row, separators=(",", ":")) + "\n")
             written += 1
 
     if written < args.min_groups:
@@ -112,6 +124,8 @@ def main() -> int:
         f"rows={rows}\n"
         f"written_groups={written}\n"
         f"skipped_groups={skipped}\n"
+        f"best_overrides={best_overrides}\n"
+        f"raw_best_missing={raw_best_missing}\n"
         f"output={args.out}\n"
     )
     print(summary, end="")
