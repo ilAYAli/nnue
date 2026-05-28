@@ -2,7 +2,7 @@
   "description": "Active Enyo NNUE diagnostic: board-aware sidecar policy ranker with held-out action gating.",
   "experiment": "policy-ranker-broadmix-board-v1",
   "create": {
-    "name": "policy-ranker-lossv5-v3x6-lowmat-board-h64-d25-lr3e4-e120-r2",
+    "name": "policy-ranker-lossv5-v3x6-lowmat-board-h64-d25-lr3e4-e120-r3",
     "backend": "policy-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/losslogs_v5_primary80.jsonl",
@@ -40,7 +40,7 @@
     "policy_gate_max_val_bad": 0,
     "policy_gate_min_val_good": 100,
     "policy_gate_min_val_overrides": 100,
-    "min_groups": 12000,
+    "min_groups": 6500,
     "min_pairs": 844,
     "child_model_gate_min_top1": 60,
     "child_engine_gate_min_top1": 60,
