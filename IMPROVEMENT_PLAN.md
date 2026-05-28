@@ -55,6 +55,26 @@ Latest LC0 diagnostic:
   `-2845cp`, final broad excess about `33cp`. This is not candidate-quality.
   LC0 policy labels are useful as a diagnostic signal and position source, but
   not yet as a direct scalar eval training lane.
+- New LC0-oracle path: use LC0 policy only to select plausible legal moves,
+  then score the child positions with Stockfish in parent POV. This produces
+  normal child-ranking JSONL with oracle cp/mate scores, not LC0 policy-logit
+  pseudo-scores.
+- `lc0-oracle-smoke-200-20260528`: generated `200` groups at `20k` nodes.
+  Training with reference preservation moved the engine target gate from
+  reference `104/200` to candidate `123/200`.
+- `lc0-oracle-1k-n50k-20260528`: generated `1000` groups at `50k` nodes from
+  `20000` LC0 rows. Phase mix was `79` endgame, `505` late, `364` midgame,
+  `52` opening.
+- `child-ranking-lc0oracle1k-listwise-qfwd-refpreserve05-dz20-lr1e4-t35-e320-20260528`:
+  improved the LC0-oracle engine gate from reference `544/1000` to candidate
+  `560/1000`, and improved replay-loss cross-gate from reference `701/2677`
+  to candidate `731/2677`. Static MAE improved from `129.5` to `120.3`, but
+  sign dropped from `92.32%` to `90.77%`. The `256`-game smoke was neutral
+  negative: `-4.1 +/- 31.4`, LOS `40.0%`, draw `45.7%`.
+- Conclusion: LC0-oracle child targets are a real exported/engine-side signal,
+  but target-gate gains still do not imply Elo. Do not promote this candidate.
+  Do not scale LC0-oracle blindly until broad sign/order preservation is part
+  of the gate and/or loss.
 
 Latest child-ranking result:
 
@@ -355,6 +375,9 @@ Conclusion:
 Primary lane:
 
 - Train move ranking from child-move groups, not only scalar position eval.
+- Use LC0 as a source of diverse positions and plausible candidate moves only
+  after oracle rescoring. Do not train scalar eval directly from LC0 policy
+  logits.
 - Each target group must contain one parent FEN, the oracle best move, the
   engine/logged bad move, and a few engine-plausible neighbors.
 - Neighbor moves must be moves the engine actually considered or selected, not
@@ -364,12 +387,9 @@ Primary lane:
 - Broad preservation is a deadzone/leash, not a normal competing scalar
   objective.
 - New candidates must use `./build.py create`; no manual training pipelines.
-- Policy-sidecar diagnostics are now promising only for a narrow `mate_like`
-  non-lowmat slice. Exported-policy parity, C++ feature parity, and the
-  disabled root diagnostic are done. The current artifact fires on at least one
-  trivial broad position, so the next useful work is not search integration; it
-  is a broad no-action gate/training pass. Do not run SPRT until an engine gate
-  shows useful target overrides and near-zero broad overrides.
+- A candidate must pass an early game smoke after target gates. Recent LC0 and
+  replay-loss candidates improved engine target gates but failed or stayed
+  neutral in games.
 
 Secondary lanes:
 
@@ -381,31 +401,21 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Move the child-ranking signal out of the scalar eval net:
+Make LC0-oracle/replay-loss ranking game-safe before scaling:
 
-1. Keep the current reference `.nn` unchanged.
-2. Train a separate move-ranking/correction model on the same child groups.
-3. Use it only as a gated move-order/tie-break signal in validation, not as an
-   eval replacement.
-4. Done: export the trained sidecar to `policy_ranker.json` and require parity
-   with the PyTorch checkpoint.
-5. Done: add Enyo-side artifact loading and board-feature parity tests.
-6. Done: add a disabled-by-default `policyrank` root diagnostic.
-7. Done: add `build.py` support for policy preserve/no-action training rows and
-   a broad gate at the deployed export threshold.
-8. Next: train a `mate_like` sidecar with non-`mate_like` preserve rows active
-   from epoch 0. The run must pass both the split-aware mate-like gate and a
-   broad no-action gate before export is considered useful.
-9. Require broad game-safety before considering any default-enabled integration.
-
-Interpretation:
-
-- First diagnostic must answer whether the separate ranker can improve the
-  primary80 selected moves while leaving the base eval untouched.
-- If that works locally, test game action rate and harm rate with an offline
-  gate before touching search.
-- If it cannot produce clean high-confidence corrections, move to architecture
-  or feature work rather than more scalar fine-tuning.
+1. Add a broad static gate to the child-ranking pipeline, not just manual
+   post-run validation. At minimum report candidate/reference sign, near-zero
+   bucket sign, and MAE on the compatible broad pack.
+2. Treat broad sign/order loss as a hard rejection even when target top1
+   improves. The latest LC0-oracle run improved target gates but lost broad
+   sign and failed the smoke.
+3. Build a mixed child-ranking target set from:
+   - replay-loss rows where Enyo actually failed;
+   - LC0-oracle rows as diverse, oracle-scored candidate-move coverage.
+4. Train with reference preservation and require improvement on both target
+   families before any SPRT.
+5. Run a `256`-game smoke immediately after local gates. Stop the family if
+   three consecutive candidates pass target gates but fail this smoke.
 
 ## Candidate Workflow
 
