@@ -1,50 +1,27 @@
 {
-  "description": "Build child-ranking targets where r18 was worse than r14 in the smoke loss games.",
-  "experiment": "smoke256-r18-vs-r14-worse-targets-20260529",
+  "description": "Mix the completed r17c corpus with the focused r18 smoke-regression rows for r19 training.",
+  "experiment": "mixed-fast4-r19-r17c-smokeworse29-20260529",
   "create": {
-    "name": "smoke256-r18-vs-r14-worse-targets-20260529",
-    "backend": "smoke-pgn-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "smoke_pgn": "runs/child-ranking-fast4-r18-r14init-r17c-listwise-qfwd-refpreserve30-dz5-lr2e6-e240/child-ranking-r18-vs-r14-smoke256/sprt_confirm_20260529_010352/child-ranking-r18-vs-r14-smoke256_vs_refnet.pgn",
-    "smoke_child_targets": "targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl",
-    "smoke_child_summary": "targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.summary.txt",
-    "smoke_candidate_net": "runs/child-ranking-fast4-r18-r14init-r17c-listwise-qfwd-refpreserve30-dz5-lr2e6-e240/train/child-ranking-fast4-r18-r14init-r17c-listwise-qfwd-refpreserve30-dz5-lr2e6-e240/model.nn",
-    "smoke_reference_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "smoke_candidate_name": "candidate",
-    "smoke_reference_name": "reference",
-    "smoke_search_nodes": 20000,
-    "smoke_search_depth": 0,
-    "smoke_oracle_nodes": 200000,
-    "smoke_oracle_depth": 0,
-    "smoke_jobs": 8,
-    "smoke_threads": 1,
-    "smoke_hash": 64,
-    "smoke_oracle_threads": 1,
-    "smoke_oracle_hash": 128,
-    "smoke_min_ply": 8,
-    "smoke_max_per_game": 8,
-    "smoke_sample_mode": "even",
-    "smoke_max_positions": 600,
-    "smoke_max_gap_cp": 800,
-    "smoke_min_oracle_gap_cp": 20,
-    "smoke_min_groups": 25,
-    "smoke_unique_fen": true,
-    "smoke_only_candidate_losses": true,
-    "smoke_only_candidate_worse": true,
+    "name": "mixed-fast4-r19-r17c-smokeworse29-20260529",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17c.jsonl:5842,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29,targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl:29",
+    "mix_output": "targets/mixed-fast4-r19-r17c-smokeworse29-20260529/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-fast4-r19-r17c-smokeworse29-20260529/mixed_child_targets.summary.json",
+    "mix_seed": 2026052919,
+    "mix_progress": 250000,
+    "mix_min_rows": 6132,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "baseline": [
-      "r18 completed search gate vs r14: 3680/5842 vs 3649/5842, candidate_better=739, reference_better=694, sum_diff=+2159cp",
-      "r18 smoke256 vs r14: -12.2 +/- 30.8 Elo, LOS 21.7%, draw 48.0%",
-      "r18 is rejected as a candidate despite the positive completed search gate"
+      "r14 remains keeper",
+      "r18 completed search gate was positive but smoke256 vs r14 was -12.2 +/- 30.8 Elo",
+      "focused smoke-regression extraction produced 29 rows: candidate_better=0, reference_better=29, sum_diff=-1379cp"
     ],
     "pass_intent": [
-      "sample only r18 candidate-loss games from the smoke PGN",
-      "keep only rows where r18 selected a worse move than r14 under oracle scoring",
-      "score r18-selected, r14-selected, and logged moves with the same oracle settings",
-      "use the output only as diagnostic/future mix input, not as proof of strength"
+      "create a training corpus that keeps the full completed r17c distribution",
+      "give the actual r18 smoke regressions enough weight to discourage the same drift",
+      "train from r14 only after this mix is built"
     ]
   }
 }
