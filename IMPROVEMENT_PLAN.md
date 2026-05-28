@@ -44,7 +44,17 @@ Latest child-ranking result:
   (`broad_excess` about `41cp`) but blocked too much target learning:
   `.pt`/`.nn` reached only `1222/4432`, below the `1300/4432` gate. This
   brackets the useful preservation range: `0.02` learns but drifts too much,
-  `0.10` preserves but underlearns. Next run is the midpoint `0.05`.
+  `0.10` preserves but underlearns.
+- `child-ranking-replayloss-dense-v1-listwise-qfwd-refpreserve05-lr1e4-e640`:
+  passed the local replay-loss child-ranking gates exactly enough to be useful:
+  `.pt`/`.nn` `1300/4432`, engine `1281/4432`, and final broad excess about
+  `85cp`. It is still rejected before smoke because static broad sign collapsed:
+  candidate sign `85.40%` versus reference `90.52%`, with the near-zero bucket
+  `68.04%` versus `77.98%`. MAE improved, but this is the same unsafe pattern
+  as earlier child-ranking candidates: better target ranking plus worse broad
+  sign/order. Next run keeps the replay-loss dense target source but uses
+  zero-deadzone reference preservation at lower weight:
+  `child-ranking-replayloss-dense-v1-listwise-qfwd-refpreserve02-dz0-lr1e4-e640`.
 - `child-ranking-a4b4-a4d4-targetonly-lr3e5-e48`: failed one-pair model gate
   after moving in the right direction (`.pt` margin `-269cp`, `.nn` margin
   `-271cp`).
