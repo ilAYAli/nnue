@@ -1,38 +1,22 @@
 {
-  "description": "Build PV/search-descendant child targets from the r18-vs-r14 smoke regressions.",
-  "experiment": "search-descendant-r20-smokeworse29-20260529",
+  "description": "Mix the stable r17c base child corpus with r20 search-descendant targets for r21.",
+  "experiment": "mixed-fast4-r21-r17c-searchdescx5-20260529",
   "create": {
-    "name": "search-descendant-r20-smokeworse29-20260529",
-    "backend": "search-descendant-child-targets",
-    "search_descendant_input": "targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl",
-    "search_descendant_output": "targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl",
-    "search_descendant_summary": "targets/search-descendant-r20-smokeworse29-20260529/search_descendant.summary.txt",
-    "search_descendant_candidate_net": "runs/child-ranking-fast4-r20-r14init-smokeguard29-listwise-qfwd-refpreserve30-childguard5-dz5-lr1e6-e240/train/child-ranking-fast4-r20-r14init-smokeguard29-listwise-qfwd-refpreserve30-childguard5-dz5-lr1e6-e240/model.nn",
-    "search_descendant_reference_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "engine": "/home/petter/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "/home/petter/local/bin/stockfish",
-    "search_descendant_root_nodes": 20000,
-    "search_descendant_root_depth": 0,
-    "search_descendant_nodes": 10000,
-    "search_descendant_depth": 0,
-    "search_descendant_jobs": 4,
-    "search_descendant_min_ply": 1,
-    "search_descendant_max_ply": 4,
-    "search_descendant_max_gap_cp": 800.0,
-    "search_descendant_min_oracle_gap_cp": 20.0,
-    "search_descendant_min_input_groups": 29,
-    "search_descendant_min_output_groups": 10,
-    "search_descendant_oracle_nodes": 200000,
-    "search_descendant_oracle_depth": 0,
-    "search_descendant_oracle_threads": 1,
-    "search_descendant_oracle_hash": 128,
+    "name": "mixed-fast4-r21-r17c-searchdescx5-20260529",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17c.jsonl:5842,targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl:74,targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl:74,targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl:74,targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl:74,targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl:74",
+    "mix_output": "targets/mixed-fast4-r21-r17c-searchdescx5-20260529/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-fast4-r21-r17c-searchdescx5-20260529/mixed_child_targets.summary.json",
+    "mix_seed": 20260529,
+    "mix_progress": 100000,
+    "mix_min_rows": 6212,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "intent": [
-      "do not train another static root-child guard run",
-      "diagnose whether r14's smoke-worse root-search behavior is explainable by scored descendant targets",
-      "use any emitted child target file only if it has complete scored search-selected moves"
+      "keep the stable base corpus unchanged",
+      "repeat the 74 search-descendant rows five times so the first training attempt has enough gradient",
+      "train from r14 only after this mix is built"
     ]
   }
 }
