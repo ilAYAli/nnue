@@ -187,6 +187,15 @@ Latest child-ranking result:
   (`5` good, `0` bad at threshold `32`; `3` good, `0` bad at threshold `40`).
   The universal sidecar is therefore too broad; the next diagnostic is a
   motif-restricted `mate_like` policy ranker.
+- `policy-ranker-matelike-mix-board-h64-d35-lr2e4-e600`: failed the
+  split-aware gate. It solved train (`354/398`) but validation stayed weak
+  (`45/133`) and every useful threshold had held-out bad overrides. Breakdown
+  showed the bad overrides came mainly from `source:lichess_lowmat_mc12`
+  (`6` good / `8` bad at threshold `32`), while losslogs/gamebalanced
+  mate-like rows were much cleaner and their worst non-lowmat bad was only a
+  tiny oracle tie around `-4cp`. The next run excludes
+  `source:lichess_lowmat_mc12` and uses a `10cp` bad-override tolerance so
+  real harm is separated from noise-level ties.
 
 Rejected lanes:
 

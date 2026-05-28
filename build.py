@@ -378,6 +378,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--fail-if-val-bad-above", str(args.policy_gate_max_val_bad),
                     "--fail-if-val-good-below", str(args.policy_gate_min_val_good),
                     "--fail-if-val-overrides-below", str(args.policy_gate_min_val_overrides),
+                    "--bad-tolerance-cp", str(args.policy_bad_tolerance_cp),
                 ],
             },
         ])
@@ -562,6 +563,7 @@ def add_create_args(
     parser.add_argument("--policy-gate-max-val-bad", type=int, default=value("policy_gate_max_val_bad", d.policy_gate_max_val_bad))
     parser.add_argument("--policy-gate-min-val-good", type=int, default=value("policy_gate_min_val_good", d.policy_gate_min_val_good))
     parser.add_argument("--policy-gate-min-val-overrides", type=int, default=value("policy_gate_min_val_overrides", d.policy_gate_min_val_overrides))
+    parser.add_argument("--policy-bad-tolerance-cp", type=float, default=value("policy_bad_tolerance_cp", d.policy_bad_tolerance_cp))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

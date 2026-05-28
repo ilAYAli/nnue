@@ -57,7 +57,8 @@ def build_rows(model: PolicyRanker, groups, mean: torch.Tensor,
     return rows
 
 
-def summarize_rows(label: str, rows, thresholds: list[float]
+def summarize_rows(label: str, rows, thresholds: list[float],
+                   bad_tolerance_cp: float
                    ) -> list[dict[str, float]]:
     out: list[dict[str, float]] = []
     base_top1 = sum(1 for row in rows if row["base_idx"] == row["group"].best_idx)
@@ -94,9 +95,9 @@ def summarize_rows(label: str, rows, thresholds: list[float]
             base_gap = float(group.gaps[base_idx])
             selected_gap = float(group.gaps[selected_idx])
             diff = base_gap - selected_gap
-            if diff > 0:
+            if diff > bad_tolerance_cp:
                 good += 1
-            elif diff < 0:
+            elif diff < -bad_tolerance_cp:
                 bad += 1
             else:
                 same += 1
@@ -131,7 +132,7 @@ def summarize_rows(label: str, rows, thresholds: list[float]
 
 
 def summarize_breakdowns(label: str, rows, thresholds: list[float],
-                         tags: list[str]) -> None:
+                         tags: list[str], bad_tolerance_cp: float) -> None:
     for tag in tags:
         tagged_rows = [
             row for row in rows
@@ -139,7 +140,8 @@ def summarize_breakdowns(label: str, rows, thresholds: list[float],
         ]
         if not tagged_rows:
             continue
-        summarize_rows(f"{label}:{tag}", tagged_rows, thresholds)
+        summarize_rows(
+            f"{label}:{tag}", tagged_rows, thresholds, bad_tolerance_cp)
 
 
 @torch.no_grad()
@@ -162,17 +164,27 @@ def evaluate(args: argparse.Namespace) -> dict[str, list[dict[str, float]]]:
     breakdown_tags = parse_tags(args.breakdown_tags)
 
     all_rows = build_rows(model, groups, mean, std, args.device)
-    out = {"all": summarize_rows("all", all_rows, thresholds)}
-    summarize_breakdowns("all", all_rows, thresholds, breakdown_tags)
+    out = {
+        "all": summarize_rows(
+            "all", all_rows, thresholds, args.bad_tolerance_cp),
+    }
+    summarize_breakdowns(
+        "all", all_rows, thresholds, breakdown_tags, args.bad_tolerance_cp)
     if args.split_val_fraction > 0.0:
         train_groups, val_groups = split_policy_groups(
             groups, args.split_seed, args.split_val_fraction)
         train_rows = build_rows(model, train_groups, mean, std, args.device)
         val_rows = build_rows(model, val_groups, mean, std, args.device)
-        out["train"] = summarize_rows("train", train_rows, thresholds)
-        summarize_breakdowns("train", train_rows, thresholds, breakdown_tags)
-        out["val"] = summarize_rows("val", val_rows, thresholds)
-        summarize_breakdowns("val", val_rows, thresholds, breakdown_tags)
+        out["train"] = summarize_rows(
+            "train", train_rows, thresholds, args.bad_tolerance_cp)
+        summarize_breakdowns(
+            "train", train_rows, thresholds, breakdown_tags,
+            args.bad_tolerance_cp)
+        out["val"] = summarize_rows(
+            "val", val_rows, thresholds, args.bad_tolerance_cp)
+        summarize_breakdowns(
+            "val", val_rows, thresholds, breakdown_tags,
+            args.bad_tolerance_cp)
     return out
 
 
@@ -215,6 +227,7 @@ def main() -> None:
     ap.add_argument("--include-tags", default="")
     ap.add_argument("--exclude-tags", default="")
     ap.add_argument("--breakdown-tags", default="")
+    ap.add_argument("--bad-tolerance-cp", type=float, default=0.0)
     ap.add_argument("--split-seed", type=int, default=1)
     ap.add_argument("--split-val-fraction", type=float, default=0.0)
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)

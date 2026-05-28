@@ -114,6 +114,7 @@ class CandidateDefaults:
     policy_gate_max_val_bad: int = -1
     policy_gate_min_val_good: int = -1
     policy_gate_min_val_overrides: int = -1
+    policy_bad_tolerance_cp: float = 0.0
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
