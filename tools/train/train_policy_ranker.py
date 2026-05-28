@@ -107,6 +107,7 @@ def main() -> None:
     ap.add_argument("--preserve-margin", type=float, default=4.0)
     ap.add_argument("--preserve-max-groups", type=int, default=0)
     ap.add_argument("--preserve-val-fraction", type=float, default=-1.0)
+    ap.add_argument("--base-best-preserve-weight", type=float, default=0.0)
     ap.add_argument("--val-fraction", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--device", default="cpu")
@@ -170,6 +171,9 @@ def main() -> None:
         for group in train_groups:
             opt.zero_grad(set_to_none=True)
             loss = group_loss(model, group, mean, std, args)
+            if args.base_best_preserve_weight > 0.0 and group.base_idx == group.best_idx:
+                loss = loss + args.base_best_preserve_weight * preserve_loss(
+                    model, group, mean, std, args)
             loss.backward()
             opt.step()
             loss_sum += float(loss.detach().cpu())
@@ -229,6 +233,7 @@ def main() -> None:
                     "preserve_weight": args.preserve_weight,
                     "preserve_margin": args.preserve_margin,
                     "preserve_val_fraction": preserve_val_fraction,
+                    "base_best_preserve_weight": args.base_best_preserve_weight,
                 }
 
     if best_state is None:
