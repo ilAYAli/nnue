@@ -209,6 +209,12 @@ git push -u origin HEAD:refs/heads/feature/<short-name>
 - If a branch is hundreds of commits ahead of `main`, it is contaminated. Do
   not merge it; create a clean branch from `origin/main` and cherry-pick or
   reapply only the intended commits.
+- Keep one feature, fix, or experiment in one logical commit whenever
+  practical, so it is easy to revert.
+- Refactor or cleanup work found while developing should preferably be amended
+  or squashed into the commit that introduced the code. Use a separate refactor
+  commit only when the refactor is independently useful and does not change
+  behavior.
 - Stage only files that belong to the requested change.
 - Squash local fixup churn before merge.
 - Do not commit unrelated run artifacts.
@@ -244,9 +250,11 @@ scripts/make_candidate.sh
 
 - Run all long-running tasks on `pwa-5090` in the tmux session `nnue_native`.
 - Localhost is for short edits, dry-runs, syntax checks, and git only.
-- Every long-running task must notify `AI_stdin` on `done` and `fail`.
-  `nnue_event_ntfy.sh` defaults to this; do not disable it unless the user
-  explicitly asks.
+- Every long-running task must notify `AI_stdin` on `done` and `fail` by using
+  `~/scripts/notifai.sh` through `tools/events/nnue_event_ntfy.sh`.
+  Do not post directly to `AI_stdin` unless `notifai.sh` is unavailable and the
+  hook falls back to authenticated ntfy publishing. Do not disable this unless
+  the user explicitly asks.
 - Before starting a long run, verify the host, branch, and tmux session:
 
 ```sh
