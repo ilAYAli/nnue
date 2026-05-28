@@ -94,7 +94,13 @@ class UciEngine:
     def setoption(self, name: str, value: str) -> None:
         self.send(f"setoption name {name} value {value}")
 
+    def newgame(self) -> None:
+        self.send("ucinewgame")
+        self.send("isready")
+        self.wait_for("readyok")
+
     def bestmove(self, fen: str, *, nodes: int, depth: int) -> str | None:
+        self.newgame()
         self.send(f"position fen {fen}")
         if nodes > 0:
             self.send(f"go nodes {nodes}")
@@ -107,6 +113,7 @@ class UciEngine:
                 return None if move == "(none)" else move
 
     def score_stm_cp(self, fen: str, *, nodes: int, depth: int) -> int | None:
+        self.newgame()
         self.send(f"position fen {fen}")
         if nodes > 0:
             self.send(f"go nodes {nodes}")

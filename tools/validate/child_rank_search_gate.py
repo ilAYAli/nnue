@@ -77,7 +77,13 @@ class SearchEngine:
             if token in line:
                 return
 
+    def newgame(self) -> None:
+        self.send("ucinewgame")
+        self.send("isready")
+        self.wait_for("readyok", 20.0)
+
     def bestmove(self, fen: str, nodes: int, depth: int) -> str | None:
+        self.newgame()
         self.send(f"position fen {fen}")
         if nodes > 0:
             self.send(f"go nodes {nodes}")
