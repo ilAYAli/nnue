@@ -28,6 +28,33 @@ Tooling correction:
 - Replay JSONL target extraction now treats replay/history-sensitive rows as
   diagnostic-only. Normal `backend=replay-jsonl` runs do not pass
   `--include-history-sensitive` and validation fails if any such row appears.
+- Broad-preserve packs must match the current feature layout. The old
+  `runs/bullet-enyo-format-smoke-100k/pack/train` pack has feature indices up
+  to `24574`, while the current 16-bucket model has `12288` input rows. Do not
+  use that pack for broad preservation. Use a compatible pack such as
+  `runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/pack/train`
+  (`max_feature=12287`) or another audited pack.
+
+Latest LC0 diagnostic:
+
+- LCZero V6 records from `training-run1--20210605-0516.tar` can now be decoded
+  to FEN JSONL and converted to child-ranking targets. On the first `100k`
+  records, decoding produced `100000` valid rows, with played legality
+  `99.94%`, best legality `99.94%`, and top-policy legality `96.22%`.
+- Raw LC0 policy-logit child targets are noisy for scalar NNUE training. A
+  `2k` target-only diagnostic moved export-visible behavior only slightly:
+  baseline engine top1 `692/2000`, trained engine top1 `713/2000`. It did,
+  however, improve worst engine margin from `-1639cp` to `-375cp`.
+- Filtering to high-confidence LC0 rows is necessary. The current filtered set
+  requires best policy `>=0.55` and top-2 policy gap `>=50cp`, producing
+  `10000` groups from `22107` rows. Target-only training moved engine top1
+  `4541/10000 -> 4649/10000`, sum gap `926800cp -> 896818cp`, and worst margin
+  `-3058cp -> -479cp`.
+- Adding weak reference preservation with a compatible broad pack kept only part
+  of the LC0 gain: engine top1 `4583/10000`, sum gap `906914cp`, worst margin
+  `-2845cp`, final broad excess about `33cp`. This is not candidate-quality.
+  LC0 policy labels are useful as a diagnostic signal and position source, but
+  not yet as a direct scalar eval training lane.
 
 Latest child-ranking result:
 
