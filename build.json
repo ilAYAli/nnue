@@ -1,31 +1,22 @@
 {
-  "description": "Augment the latest replay-loss child target corpus with the root-selected moves from the r2 mixed child-ranking candidate.",
-  "experiment": "replay-loss-latest-rootaugment-r3-20260528",
+  "description": "Mix the r3 root-complete replay-loss corpus with LC0 oracle and failed-smoke preserve rows.",
+  "experiment": "mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-20260528",
   "create": {
-    "name": "replay-loss-latest-rootaugment-r3-20260528",
-    "backend": "augment-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "child_augment_input": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r2_latestcandidate.jsonl",
-    "child_augment_output": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r3_r2candidate.jsonl",
-    "child_augment_summary": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r3_r2candidate.summary.txt",
-    "child_augment_search_nets": "candidate=runs/child-ranking-mixed-replaylatest-r2-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-mixed-replaylatest-r2-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn,reference=~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "child_augment_search_nodes": 20000,
-    "child_augment_search_depth": 0,
-    "child_augment_jobs": 8,
-    "child_augment_min_groups": 2854,
-    "child_augment_max_missing_after": 0,
-    "child_augment_oracle_nodes": 200000,
-    "child_augment_oracle_depth": 0,
-    "child_augment_oracle_threads": 1,
-    "child_augment_oracle_hash": 128,
+    "name": "mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r3_r2candidate.jsonl:2854,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl:1000,targets/smoke-pgn-smoke210-r1-clean-20260528/smoke_child_targets.jsonl:191",
+    "mix_output": "targets/mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-20260528/mix.summary.json",
+    "mix_seed": 2026052810,
+    "mix_progress": 250000,
+    "mix_min_rows": 4045,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "all root-selected candidate and reference moves must be present in the output corpus",
-      "missing_after must be zero",
-      "the output becomes the replay-loss source for the next mixed child-ranking candidate"
+      "the output must contain 4045 mixed child-ranking groups",
+      "the r3 replay-loss corpus must contribute all 2854 root-complete groups",
+      "the output becomes the child_targets file for the next child-ranking candidate"
     ]
   }
 }
