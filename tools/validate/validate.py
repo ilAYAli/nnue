@@ -142,7 +142,7 @@ def cmd_sprt(args: argparse.Namespace) -> int:
     )
     rc = run(command, env=env)
     emit_event(
-        run_dir, "phase_done" if rc == 0 else "fail",
+        run_dir, "done" if rc == 0 else "fail",
         stage="validate_sprt", status="ok" if rc == 0 else "failed",
         rc=rc, command=command, hook_command=args.event_command or "",
         extra={"tag": args.tag or "", "games": args.games, "tc": args.tc},
