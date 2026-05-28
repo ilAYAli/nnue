@@ -131,10 +131,9 @@ publish_ai() {
         return
     fi
 
-    if [ -x "$NOTIFAI" ] && "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1; then
-        return
+    if [ -x "$NOTIFAI" ]; then
+        "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1 || true
     fi
-
     publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"
 }
 
