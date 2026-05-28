@@ -98,6 +98,13 @@ class CandidateDefaults:
     min_pairs: int = 1
     child_model_gate_min_top1: int = 1
     child_engine_gate_min_top1: int = 1
+    policy_targets: str = ""
+    policy_hidden: int = 128
+    policy_val_fraction: float = 0.2
+    policy_target_temperature_cp: int = 80
+    policy_thresholds: str = "0,1,2,4,8"
+    policy_gate_min_top1: int = 1
+    policy_gate_max_bad: int = -1
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

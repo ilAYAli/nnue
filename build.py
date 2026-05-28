@@ -320,6 +320,44 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             },
         ])
+    elif args.backend == "policy-ranking":
+        policy_targets = args.policy_targets or args.child_targets
+        if not policy_targets:
+            raise SystemExit("backend=policy-ranking requires policy_targets")
+        steps.extend([
+            {
+                "name": "train_policy_ranker",
+                "command": [
+                    python, tool("train/train_policy_ranker.py"),
+                    "--targets", str(expand_path(policy_targets)),
+                    "--base-net", str(expand_path(args.init_net)),
+                    "--out", f"{candidate_dir}/model.pt",
+                    "--hidden", str(args.policy_hidden),
+                    "--epochs", str(args.epochs),
+                    "--lr", str(args.lr),
+                    "--weight-decay", str(args.weight_decay),
+                    "--rank-temperature-cp", str(args.rank_temperature_cp),
+                    "--target-temperature-cp", str(args.policy_target_temperature_cp),
+                    "--val-fraction", str(args.policy_val_fraction),
+                    "--seed", str(args.selfplay_seed),
+                    "--device", args.device,
+                ],
+            },
+            {
+                "name": "validate_policy_ranker",
+                "command": [
+                    python, tool("validate/policy_ranker_gate.py"),
+                    "--targets", str(expand_path(policy_targets)),
+                    "--model", f"{candidate_dir}/model.pt",
+                    "--base-net", str(expand_path(args.init_net)),
+                    "--device", args.device,
+                    "--min-groups", str(args.min_groups),
+                    "--thresholds", args.policy_thresholds,
+                    "--fail-if-top1-below", str(args.policy_gate_min_top1),
+                    "--fail-if-bad-above", str(args.policy_gate_max_bad),
+                ],
+            },
+        ])
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -370,6 +408,8 @@ def cmd_report(args: argparse.Namespace) -> int:
     print(f"run={run_dir}")
     for net in sorted(run_dir.glob("train/*/model.nn")):
         print(f"candidate={net}")
+    for model in sorted(run_dir.glob("train/*/model.pt")):
+        print(f"model={model}")
     for summary in sorted(run_dir.glob("validate/**/summary.txt")):
         print(f"summary={summary}")
         print(summary.read_text(encoding="utf-8", errors="replace").strip())
@@ -439,7 +479,7 @@ def add_create_args(
 
     parser.add_argument("--init-net", default=value("init_net", d.init_net))
     parser.add_argument("--backend", default=value("backend", d.backend),
-                        choices=["pytorch", "child-ranking"])
+                        choices=["pytorch", "child-ranking", "policy-ranking"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -482,6 +522,13 @@ def add_create_args(
     parser.add_argument("--min-pairs", type=int, default=value("min_pairs", d.min_pairs))
     parser.add_argument("--child-model-gate-min-top1", type=int, default=value("child_model_gate_min_top1", d.child_model_gate_min_top1))
     parser.add_argument("--child-engine-gate-min-top1", type=int, default=value("child_engine_gate_min_top1", d.child_engine_gate_min_top1))
+    parser.add_argument("--policy-targets", default=value("policy_targets", d.policy_targets))
+    parser.add_argument("--policy-hidden", type=int, default=value("policy_hidden", d.policy_hidden))
+    parser.add_argument("--policy-val-fraction", type=float, default=value("policy_val_fraction", d.policy_val_fraction))
+    parser.add_argument("--policy-target-temperature-cp", type=int, default=value("policy_target_temperature_cp", d.policy_target_temperature_cp))
+    parser.add_argument("--policy-thresholds", default=value("policy_thresholds", d.policy_thresholds))
+    parser.add_argument("--policy-gate-min-top1", type=int, default=value("policy_gate_min_top1", d.policy_gate_min_top1))
+    parser.add_argument("--policy-gate-max-bad", type=int, default=value("policy_gate_max_bad", d.policy_gate_max_bad))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

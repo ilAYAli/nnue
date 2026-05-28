@@ -226,29 +226,28 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `none; scalar child-ranking is closed for now`
-- backend: `child-ranking`
+- candidate name: `policy-ranker-primary80-v1-lr1e3-e2000`
+- backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
-- broad-preserve data: existing packed broad data via `pack_dir`
+- base net: current reference `.nn`; scalar eval is unchanged
 - self-play depth: `12`
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: next work is a separate policy/correction diagnostic, not scalar
-  eval fine-tuning
+- objective: separate move-ranking sidecar, not scalar eval fine-tuning
 - current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
   - 80 groups, 844 positive-gap training pairs, selected from loss logs.
   - includes the filtered 64 high-signal groups plus 16 low-gap/noisy rows that
     should not dominate interpretation.
 - main knobs:
-  - `ranking_weight`
-  - `broad_preserve_weight`
-  - `broad_anchor`
-  - `broad_deadzone_cp`
-  - `rank_margin_cp`
+  - `policy_hidden`
+  - `policy_val_fraction`
+  - `policy_target_temperature_cp`
+  - `policy_thresholds`
+  - `policy_gate_min_top1`
+  - `policy_gate_max_bad`
   - `rank_temperature_cp`
   - `min_groups`
-  - `min_pairs`
 
 Rules:
 
@@ -258,6 +257,9 @@ Rules:
 - Use `--select-metric` and `--patience`; do not blindly export the final epoch.
 - Use `--trainable float-head` or `--trainable output` only for quick probes.
   Keeper attempts normally train all weights.
+- For `policy-ranking`, there is no exported `.nn` keeper yet. The first
+  success criterion is an offline high-confidence override gate with useful
+  action rate and low harm; engine integration is a separate later change.
 - Keep new run data under `runs/<run-name>/`.
 - Do not assume old manual packed data and new `build.py` packed data are
   interchangeable until a roundtrip/static sanity check confirms it.
