@@ -1,8 +1,8 @@
 {
   "description": "Train the r8 child-ranking candidate on the r5 corpus plus failed-smoke loss targets.",
-  "experiment": "child-ranking-mixed-r8-smokeloss-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+  "experiment": "child-ranking-mixed-r8-smokeloss-listwise-qfwd-refpreserve20-dz5-lr5e5-e360-r2",
   "create": {
-    "name": "child-ranking-mixed-r8-smokeloss-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+    "name": "child-ranking-mixed-r8-smokeloss-listwise-qfwd-refpreserve20-dz5-lr5e5-e360-r2",
     "backend": "child-ranking",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "score_engine": "~/local/bin/stockfish",
@@ -24,7 +24,7 @@
     "rank_margin_cp": 250,
     "rank_temperature_cp": 35,
     "min_groups": 5700,
-    "min_pairs": 18319,
+    "min_pairs": 18183,
     "child_model_gate_min_top1": 2050,
     "child_engine_gate_min_top1": 2030,
     "child_engine_jobs": 4,
