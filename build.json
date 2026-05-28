@@ -1,42 +1,20 @@
 {
-  "description": "Extract child-ranking targets from the failed r5 1000-game smoke, restricted to candidate losses and sampled evenly through each game.",
-  "experiment": "smoke1000-r5-loss-even-targets-m400-20260528",
+  "description": "Mix the r5 child-ranking corpus with the failed 1000-game smoke loss targets.",
+  "experiment": "mixed-r8-r5-smokeloss459-20260528",
   "create": {
-    "name": "smoke1000-r5-loss-even-targets-m400-20260528",
-    "backend": "smoke-pgn-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "smoke_pgn": "runs/child-ranking-mixed-r5-lc0-smokeeven-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/child-ranking-mixed-r5-smoke1000/sprt_confirm_20260528_211321/child-ranking-mixed-r5-smoke1000_vs_refnet.pgn",
-    "smoke_child_targets": "targets/smoke1000-r5-loss-even-20260528/smoke_child_targets.jsonl",
-    "smoke_child_summary": "targets/smoke1000-r5-loss-even-20260528/smoke_child_targets.summary.txt",
-    "smoke_candidate_net": "runs/child-ranking-mixed-r5-lc0-smokeeven-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-mixed-r5-lc0-smokeeven-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "smoke_reference_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "smoke_search_nodes": 20000,
-    "smoke_search_depth": 0,
-    "smoke_oracle_nodes": 100000,
-    "smoke_oracle_depth": 12,
-    "smoke_jobs": 8,
-    "smoke_threads": 1,
-    "smoke_hash": 64,
-    "smoke_oracle_threads": 1,
-    "smoke_oracle_hash": 128,
-    "smoke_min_ply": 8,
-    "smoke_max_per_game": 8,
-    "smoke_sample_mode": "even",
-    "smoke_max_positions": 2500,
-    "smoke_max_gap_cp": 800,
-    "smoke_min_oracle_gap_cp": 20,
-    "smoke_min_groups": 400,
-    "smoke_unique_fen": true,
-    "smoke_only_candidate_losses": true,
-    "smoke_candidate_name": "candidate",
-    "smoke_reference_name": "reference",
+    "name": "mixed-r8-r5-smokeloss459-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r5_smokeallcandidate.jsonl:2854,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl:1000,targets/smoke1000-r3-r4complete-even-20260528/smoke_child_targets.jsonl:1387,targets/smoke1000-r5-loss-even-20260528/smoke_child_targets.jsonl:459",
+    "mix_output": "targets/mixed-r8-r5-smokeloss459-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-r8-r5-smokeloss459-20260528/mixed_child_targets.summary.txt",
+    "mix_seed": 2026052808,
+    "mix_min_rows": 5700,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "r5 passed static/search gates but failed the 1000-game smoke at -13.9 +/- 15.2 Elo",
-      "the target set should identify candidate-loss positions where the r5 net diverges from the reference under search"
+      "the mixed corpus keeps the previous replay, LC0, and even-smoke sources",
+      "the new smoke-loss rows add real game positions where r5 underperformed the reference"
     ]
   }
 }
