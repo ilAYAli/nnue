@@ -385,6 +385,14 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "engine",
         "score_engine",
     }
+    mix = {
+        "mix_sources",
+        "mix_output",
+        "mix_summary",
+        "mix_seed",
+        "mix_progress",
+        "mix_min_rows",
+    }
     backend_keys = {
         "pytorch": pytorch,
         "child-ranking": child,
@@ -394,6 +402,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "lc0-oracle-jsonl": lc0,
         "smoke-pgn-child-targets": smoke,
         "augment-child-targets": augment_child,
+        "mix-jsonl": mix,
     }
     return common | backend_keys.get(args.backend, set())
 
@@ -1104,6 +1113,26 @@ wc -l "$out" > "$out.wc"
                 str(args.child_augment_max_missing_after),
             ],
         })
+    elif args.backend == "mix-jsonl":
+        sources = [
+            item.strip()
+            for item in str(args.mix_sources).split(",")
+            if item.strip()
+        ]
+        if not sources:
+            raise SystemExit("backend=mix-jsonl requires mix_sources")
+        steps.append({
+            "name": "mix_jsonl",
+            "command": [
+                python, tool("posgen/mix_jsonl.py"),
+                "--output", str(expand_user(args.mix_output)),
+                "--summary", str(expand_user(args.mix_summary)),
+                *sum((["--source", source] for source in sources), []),
+                "--seed", str(args.mix_seed),
+                "--progress", str(args.mix_progress),
+                "--min-rows", str(args.mix_min_rows),
+            ],
+        })
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -1229,7 +1258,7 @@ def add_create_args(
                                  "replay-jsonl", "lc0-jsonl",
                                  "lc0-oracle-jsonl",
                                  "smoke-pgn-child-targets",
-                                 "augment-child-targets"])
+                                 "augment-child-targets", "mix-jsonl"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -1299,6 +1328,12 @@ def add_create_args(
     parser.add_argument("--child-augment-oracle-depth", type=int, default=value("child_augment_oracle_depth", d.child_augment_oracle_depth))
     parser.add_argument("--child-augment-oracle-threads", type=int, default=value("child_augment_oracle_threads", d.child_augment_oracle_threads))
     parser.add_argument("--child-augment-oracle-hash", type=int, default=value("child_augment_oracle_hash", d.child_augment_oracle_hash))
+    parser.add_argument("--mix-sources", default=value("mix_sources", d.mix_sources))
+    parser.add_argument("--mix-output", default=value("mix_output", d.mix_output))
+    parser.add_argument("--mix-summary", default=value("mix_summary", d.mix_summary))
+    parser.add_argument("--mix-seed", type=int, default=value("mix_seed", d.mix_seed))
+    parser.add_argument("--mix-progress", type=int, default=value("mix_progress", d.mix_progress))
+    parser.add_argument("--mix-min-rows", type=int, default=value("mix_min_rows", d.mix_min_rows))
     parser.add_argument("--policy-targets", default=value("policy_targets", d.policy_targets))
     parser.add_argument("--policy-hidden", type=int, default=value("policy_hidden", d.policy_hidden))
     parser.add_argument("--policy-feature-set", default=value("policy_feature_set", d.policy_feature_set),

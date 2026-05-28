@@ -52,10 +52,12 @@ def selected_lines(source: Source, rng: random.Random):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", required=True)
+    ap.add_argument("--summary")
     ap.add_argument("--source", action="append", required=True,
                     help="Source spec PATH:ROWS. Repeat for each dataset.")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--progress", type=int, default=250000)
+    ap.add_argument("--min-rows", type=int, default=1)
     ap.add_argument("--unique-fen", action="store_true",
                     help="Rejected for large streaming mixes; dedupe inputs first.")
     args = ap.parse_args()
@@ -125,7 +127,14 @@ def main() -> None:
         item["written"] = source.written
 
     stats["written_rows"] = written
-    print(json.dumps(stats, indent=2), flush=True)
+    summary = json.dumps(stats, indent=2) + "\n"
+    print(summary, end="", flush=True)
+    if args.summary:
+        summary_path = Path(args.summary).expanduser()
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(summary, encoding="utf-8")
+    if written < args.min_rows:
+        raise SystemExit(f"written_rows={written} below min_rows={args.min_rows}")
 
 
 if __name__ == "__main__":

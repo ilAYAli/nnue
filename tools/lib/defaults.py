@@ -125,6 +125,12 @@ class CandidateDefaults:
     child_augment_oracle_depth: int = 0
     child_augment_oracle_threads: int = 1
     child_augment_oracle_hash: int = 128
+    mix_sources: str = ""
+    mix_output: str = "targets/mixed/mixed.jsonl"
+    mix_summary: str = "targets/mixed/mix.summary.json"
+    mix_seed: int = 1
+    mix_progress: int = 250000
+    mix_min_rows: int = 1
     policy_targets: str = ""
     policy_hidden: int = 128
     policy_feature_set: str = "compact"
