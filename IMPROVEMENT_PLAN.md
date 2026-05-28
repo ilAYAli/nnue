@@ -137,6 +137,15 @@ Latest child-ranking result:
   64-game smoke was a hard reject: `-325.9 +/- 107.6`, `0.0%` LOS, `17.2%`
   draws. This shows a `40cp` reference deadzone still permits search-destroying
   sign/order drift.
+- `child-ranking-lossv5-primary80-listwise-qfwd-refpreserve05-dz0-t15-lr1e4-e800`:
+  was the strict reference-preserve safety check. It passed only the relaxed
+  local gate: `.pt/.nn` `67/80`, engine `68/80`, worst engine margin `-82cp`.
+  Static broad behavior improved versus the previous reference-anchored run but
+  was still materially worse than reference: sign `88.62%` versus `90.52%`;
+  near-zero bucket `73.40%` versus `77.98%`. No smoke was run. This closes
+  scalar child-ranking as a near-term promotion lane: preserving the scalar
+  reference eval tightly enough blocks target learning, while enough target
+  learning damages broad search behavior.
 
 Rejected lanes:
 
@@ -190,22 +199,22 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run one strict reference-preservation diagnostic before closing scalar
-child-ranking:
+Move the child-ranking signal out of the scalar eval net:
 
-1. Train from the current reference net.
-2. Optimize the same primary80 listwise child-ranking targets.
-3. Apply the broad leash against the frozen initial/reference net output with
-   no deadzone.
-4. Keep export-quantized forward enabled.
+1. Keep the current reference `.nn` unchanged.
+2. Train a separate move-ranking/correction model on the same child groups.
+3. Use it only as a gated move-order/tie-break signal in validation, not as an
+   eval replacement.
+4. Require broad game-safety before considering engine integration.
 
 Interpretation:
 
-- If local child gates pass, broad sign is close to reference, and a short
-  smoke is not catastrophic, tune within this strict-preserve family.
-- If local gates fail or broad sign still degrades materially, close scalar
-  child-ranking and move to a non-eval policy/correction mechanism.
-- Do not add more child-ranking rows until this safety question is answered.
+- First diagnostic must answer whether the separate ranker can improve the
+  primary80 selected moves while leaving the base eval untouched.
+- If that works locally, test game action rate and harm rate with an offline
+  gate before touching search.
+- If it cannot produce clean high-confidence corrections, move to architecture
+  or feature work rather than more scalar fine-tuning.
 
 ## Candidate Workflow
 
@@ -217,7 +226,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary80-listwise-qfwd-refpreserve05-dz0-t15-lr1e4-e800`
+- candidate name: `none; scalar child-ranking is closed for now`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -225,8 +234,8 @@ Current `build.json` intent:
 - self-play seed: `2026052101`
 - skipped opening plies: `8`
 - score depth: `16`
-- objective: export-aware listwise ranking loss plus strict reference-anchored
-  broad preservation
+- objective: next work is a separate policy/correction diagnostic, not scalar
+  eval fine-tuning
 - current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
   - 80 groups, 844 positive-gap training pairs, selected from loss logs.
   - includes the filtered 64 high-signal groups plus 16 low-gap/noisy rows that

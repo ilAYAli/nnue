@@ -1,6 +1,6 @@
 {
-  "description": "Active Enyo NNUE diagnostic: strict reference-preserved child-ranking safety check.",
-  "experiment": "child-ranking-lossv5-primary80-listwise-qfwd-refpreserve05-dz0-t15-lr1e4-e800",
+  "description": "Active Enyo NNUE diagnostic: scalar child-ranking closed; next work is a separate policy/correction model.",
+  "experiment": "child-ranking-scalar-closed",
   "create": {
     "name": "child-ranking-lossv5-primary80-listwise-qfwd-refpreserve05-dz0-t15-lr1e4-e800",
     "backend": "child-ranking",
