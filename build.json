@@ -2,7 +2,7 @@
   "description": "Child-ranking diagnostic on dense replay-loss JSONL targets generated from Lichess losses.",
   "experiment": "child-ranking-replayloss-dense-v1",
   "create": {
-    "name": "child-ranking-replayloss-dense-v1-listwise-qfwd-preserve02-lr1e4-e640",
+    "name": "child-ranking-replayloss-dense-v1-listwise-qfwd-preserve02-lr1e4-e640-r2",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
@@ -22,7 +22,7 @@
     "rank_margin_cp": 250,
     "rank_temperature_cp": 15,
     "min_groups": 4000,
-    "min_pairs": 15000,
+    "min_pairs": 14000,
     "child_broad_rows": 100000,
     "child_model_gate_min_top1": 1300,
     "child_engine_gate_min_top1": 1200,
