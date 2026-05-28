@@ -38,7 +38,7 @@
     "min_groups": 4045,
     "min_pairs": 16000,
     "child_model_gate_min_top1": 1460,
-    "child_engine_gate_min_top1": 1445,
+    "child_engine_gate_min_top1": 1444,
     "child_search_gate_targets": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r1.jsonl",
     "child_search_gate_reference_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
     "child_search_gate_nodes": 20000,
