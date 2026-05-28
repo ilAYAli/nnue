@@ -202,6 +202,15 @@ Latest child-ranking result:
   The lowmat rows are unsafe as a deployment/gate slice, but their presence in
   training appears to regularize the sidecar. The next diagnostic trains on
   all `mate_like` rows and gates only the non-lowmat slice.
+- `policy-ranker-matelike-trainglobal-gatenolowmat-board-h64-d35-lr2e4-e600`:
+  passed the split-aware policy gate. Training used all `mate_like` rows, while
+  the gate excluded `source:lichess_lowmat_mc12`. On the non-lowmat validation
+  split, base top1 was `19/54`, policy-only was `39/54`, and threshold `4`
+  selected `38/54` with `22` overrides, `20` good, `0` bad, and worst
+  noise-level harm `-4cp` under the `10cp` tie tolerance. This is the first
+  held-out policy-sidecar result with useful action. It is still narrow and
+  must replicate under a different train/validation split seed before any
+  engine-integration work.
 
 Rejected lanes:
 

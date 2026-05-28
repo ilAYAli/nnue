@@ -1,13 +1,13 @@
 {
-  "description": "Active Enyo NNUE diagnostic: mate-like sidecar trained broad, gated without unsafe low-material Lichess source.",
-  "experiment": "policy-ranker-matelike-trainglobal-gatenolowmat-board-v1",
+  "description": "Active Enyo NNUE diagnostic: replicate mate-like sidecar split with a different seed.",
+  "experiment": "policy-ranker-matelike-trainglobal-gatenolowmat-board-seed2",
   "create": {
-    "name": "policy-ranker-matelike-trainglobal-gatenolowmat-board-h64-d35-lr2e4-e600",
+    "name": "policy-ranker-matelike-trainglobal-gatenolowmat-board-h64-d35-lr2e4-e600-s2",
     "backend": "policy-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/losslogs_v5_primary80.jsonl",
     "selfplay_depth": 12,
-    "selfplay_seed": 2026052101,
+    "selfplay_seed": 2026052102,
     "skip_plies": 8,
     "score_depth": 16,
     "objective": "huber",
