@@ -1,8 +1,8 @@
 {
   "description": "Fine-tune r15b on the completed r17 corpus with r15b and Berserk root-selected moves scored.",
-  "experiment": "child-ranking-fast4-r17-r15binit-rootaug-listwise-qfwd-refpreserve20-dz5-lr5e6-e240",
+  "experiment": "child-ranking-fast4-r17b-r15binit-rootaug-listwise-qfwd-refpreserve20-dz5-lr5e6-e240",
   "create": {
-    "name": "child-ranking-fast4-r17-r15binit-rootaug-listwise-qfwd-refpreserve20-dz5-lr5e6-e240",
+    "name": "child-ranking-fast4-r17b-r15binit-rootaug-listwise-qfwd-refpreserve20-dz5-lr5e6-e240",
     "backend": "child-ranking",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "init_net": "runs/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/train/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/model.nn",
@@ -36,7 +36,7 @@
     "rank_margin_cp": 250,
     "rank_temperature_cp": 35,
     "min_groups": 5842,
-    "min_pairs": 18518,
+    "min_pairs": 18380,
     "child_model_gate_min_top1": 2346,
     "child_engine_gate_min_top1": 2329,
     "child_search_gate_targets": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17baseline.jsonl",
@@ -52,7 +52,7 @@
   },
   "validation": {
     "baseline": [
-      "completed r17 corpus: 5842 groups, 18518 pairs, missing_after=0",
+      "completed r17 corpus: 5842 groups, 18380 trainer-valid pairs, missing_after=0",
       "r15b model top1 on completed r17 corpus: 2345/5842",
       "r15b engine-eval top1 on completed r17 corpus: 2328/5842",
       "r15b root-search top1 on completed r17 corpus: 3704/5842",
