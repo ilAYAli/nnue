@@ -207,6 +207,12 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "broad_anchor",
         "broad_deadzone_cp",
         "broad_beta",
+        "child_preserve_targets",
+        "child_preserve_weight",
+        "child_preserve_deadzone_cp",
+        "child_preserve_beta",
+        "child_preserve_batch_size",
+        "child_preserve_min_groups",
         "rank_margin_cp",
         "rank_temperature_cp",
         "min_groups",
@@ -545,6 +551,11 @@ def create_config(args: argparse.Namespace) -> dict:
                     python, tool("train/train_child_ranking.py"),
                     "--data", data_dir,
                     "--child-targets", str(expand_path(args.child_targets)),
+                    *(
+                        ["--child-preserve-targets",
+                         str(expand_path(args.child_preserve_targets))]
+                        if args.child_preserve_targets else []
+                    ),
                     "--init-from-nn", str(expand_path(args.init_net)),
                     "--epochs", str(args.epochs),
                     "--batch-size", str(args.batch_size),
@@ -558,6 +569,14 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--broad-anchor", args.broad_anchor,
                     "--broad-deadzone-cp", str(args.broad_deadzone_cp),
                     "--broad-beta", str(args.broad_beta),
+                    "--child-preserve-weight", str(args.child_preserve_weight),
+                    "--child-preserve-deadzone-cp",
+                    str(args.child_preserve_deadzone_cp),
+                    "--child-preserve-beta", str(args.child_preserve_beta),
+                    "--child-preserve-batch-size",
+                    str(args.child_preserve_batch_size),
+                    "--child-preserve-min-groups",
+                    str(args.child_preserve_min_groups),
                     "--rank-margin-cp", str(args.rank_margin_cp),
                     "--rank-temperature-cp", str(args.rank_temperature_cp),
                     "--min-groups", str(args.min_groups),
@@ -1305,6 +1324,12 @@ def add_create_args(
                         choices=["label", "reference"])
     parser.add_argument("--broad-deadzone-cp", type=int, default=value("broad_deadzone_cp", d.broad_deadzone_cp))
     parser.add_argument("--broad-beta", type=int, default=value("broad_beta", d.broad_beta))
+    parser.add_argument("--child-preserve-targets", default=value("child_preserve_targets", d.child_preserve_targets))
+    parser.add_argument("--child-preserve-weight", type=float, default=value("child_preserve_weight", d.child_preserve_weight))
+    parser.add_argument("--child-preserve-deadzone-cp", type=int, default=value("child_preserve_deadzone_cp", d.child_preserve_deadzone_cp))
+    parser.add_argument("--child-preserve-beta", type=int, default=value("child_preserve_beta", d.child_preserve_beta))
+    parser.add_argument("--child-preserve-batch-size", type=int, default=value("child_preserve_batch_size", d.child_preserve_batch_size))
+    parser.add_argument("--child-preserve-min-groups", type=int, default=value("child_preserve_min_groups", d.child_preserve_min_groups))
     parser.add_argument("--rank-margin-cp", type=int, default=value("rank_margin_cp", d.rank_margin_cp))
     parser.add_argument("--rank-temperature-cp", type=int, default=value("rank_temperature_cp", d.rank_temperature_cp))
     parser.add_argument("--min-groups", type=int, default=value("min_groups", d.min_groups))

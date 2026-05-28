@@ -96,6 +96,12 @@ class CandidateDefaults:
     broad_anchor: str = "label"
     broad_deadzone_cp: int = 40
     broad_beta: int = 100
+    child_preserve_targets: str = ""
+    child_preserve_weight: float = 0.0
+    child_preserve_deadzone_cp: int = 5
+    child_preserve_beta: int = 100
+    child_preserve_batch_size: int = 64
+    child_preserve_min_groups: int = 1
     rank_margin_cp: int = 100
     rank_temperature_cp: int = 50
     min_groups: int = 1

@@ -90,6 +90,23 @@ class ChildGroupDataset(Dataset):
         return self.items[idx]
 
 
+class ChildPreserveDataset(Dataset):
+    def __init__(self, groups: list[ChildRankGroup]) -> None:
+        self.items = []
+        for group in groups:
+            features = [
+                fen_features(child_fen(group.fen, move.move))
+                for move in group.moves
+            ]
+            self.items.append((group.group_id, features))
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __getitem__(self, idx: int):
+        return self.items[idx]
+
+
 def collate_feature_rows(rows):
     w_all, b_all = [], []
     w_offsets, b_offsets = [0], [0]
@@ -137,6 +154,19 @@ def collate_rank_groups(batch):
         torch.tensor(group_offsets[1:], dtype=torch.long),
         torch.tensor(best_indices, dtype=torch.long),
         torch.tensor(min_gaps, dtype=torch.float32),
+    )
+
+
+def collate_preserve_groups(batch):
+    feature_rows = []
+    group_offsets = [0]
+    for _group_id, features in batch:
+        feature_rows.extend(features)
+        group_offsets.append(group_offsets[-1] + len(features))
+    return (
+        *collate_feature_rows(feature_rows),
+        torch.tensor(group_offsets[:-1], dtype=torch.long),
+        torch.tensor(group_offsets[1:], dtype=torch.long),
     )
 
 
@@ -226,6 +256,19 @@ def listwise_rank_loss(forward_model, rank_batch, args):
     return rank_loss, correct, len(losses), float(min_gaps.sum())
 
 
+def child_preserve_loss(forward_model, anchor_model, preserve_batch, args):
+    (w, b, w_off, b_off, stm, phase, _group_starts, _group_ends) = preserve_batch
+    pred = forward_model(w, b, w_off, b_off, stm, phase)
+    with torch.no_grad():
+        target = anchor_model(w, b, w_off, b_off, stm, phase).float()
+    excess = torch.relu(
+        (pred.float() - target).abs() - args.child_preserve_deadzone_cp)
+    loss = F.smooth_l1_loss(
+        excess, torch.zeros_like(excess),
+        beta=args.child_preserve_beta, reduction="mean")
+    return loss, float(excess.detach().sum()), int(excess.numel())
+
+
 def train(args: argparse.Namespace) -> EnyoNNUE:
     groups = load_groups(args.child_targets, min_groups=args.min_groups)
     pair_set = ChildRankingDataset(groups, rank_margin_cp=args.rank_margin_cp)
@@ -244,6 +287,10 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         raise SystemExit(f"unknown child loss: {args.child_loss}")
 
     use_broad_preserve = args.broad_preserve_weight > 0.0
+    use_child_preserve = (
+        bool(args.child_preserve_targets)
+        and args.child_preserve_weight > 0.0
+    )
     broad_set = None
     broad_collate = None
     if use_broad_preserve:
@@ -252,6 +299,14 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             in_memory=args.dataset_in_memory)
         if len(broad_set) == 0:
             raise SystemExit("no broad rows")
+    preserve_set = None
+    if use_child_preserve:
+        preserve_groups = load_groups(
+            args.child_preserve_targets,
+            min_groups=args.child_preserve_min_groups)
+        preserve_set = ChildPreserveDataset(preserve_groups)
+        if len(preserve_set) == 0:
+            raise SystemExit("no child preserve rows")
 
     print(f"child groups: {len(groups)}", flush=True)
     print(f"child rank pairs: {len(pair_set)}", flush=True)
@@ -261,6 +316,11 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         print(f"broad rows: {len(broad_set)}", flush=True)
     else:
         print("broad preservation disabled", flush=True)
+    if use_child_preserve:
+        assert preserve_set is not None
+        print(f"child preserve groups: {len(preserve_set)}", flush=True)
+    else:
+        print("child preservation disabled", flush=True)
 
     if args.init_from_nn:
         model = load_model_from_nn(args.init_from_nn, device=args.device)
@@ -268,11 +328,17 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         model = EnyoNNUE(init=args.init).to(args.device)
     model.export_quantize_forward = args.export_quantize_forward
     anchor_model = None
-    if use_broad_preserve and args.broad_anchor == "reference":
+    if ((use_broad_preserve and args.broad_anchor == "reference")
+            or use_child_preserve):
         anchor_model = copy.deepcopy(model).eval()
         for param in anchor_model.parameters():
             param.requires_grad_(False)
-        print("broad anchor: reference net", flush=True)
+        if use_broad_preserve and args.broad_anchor == "reference":
+            print("broad anchor: reference net", flush=True)
+        elif use_broad_preserve:
+            print("broad anchor: labels", flush=True)
+        if use_child_preserve:
+            print("child preserve anchor: reference net", flush=True)
     elif use_broad_preserve:
         print("broad anchor: labels", flush=True)
     configure_trainable(model, args.trainable)
@@ -297,6 +363,13 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             steps_per_epoch = max(1, math.ceil(args.max_rows / args.batch_size))
         else:
             steps_per_epoch = max(1, len(rank_loader))
+    if use_child_preserve:
+        assert preserve_set is not None
+        preserve_loader = DataLoader(
+            preserve_set, batch_size=args.child_preserve_batch_size,
+            shuffle=True, collate_fn=collate_preserve_groups,
+            **dataloader_kwargs(args))
+        preserve_iter = cycle(preserve_loader)
 
     opt = torch.optim.AdamW(
         (p for p in model.parameters() if p.requires_grad),
@@ -309,6 +382,8 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         rank_loss_sum = 0.0
         broad_excess_sum = 0.0
         broad_n = 0
+        child_preserve_excess_sum = 0.0
+        child_preserve_n = 0
 
         for step in range(steps_per_epoch):
             rank_batch = move_batch(next(rank_iter), args.device)
@@ -330,7 +405,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                         y = torch.clamp(y, -args.target_clamp, args.target_clamp)
                     broad_pred = forward_model(
                         w, b, w_off, b_off, stm, phase_scale)
-                    if anchor_model is not None:
+                    if args.broad_anchor == "reference" and anchor_model is not None:
                         with torch.no_grad():
                             broad_target = anchor_model(
                                 w, b, w_off, b_off, stm, phase_scale).float()
@@ -344,6 +419,15 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                         beta=args.broad_beta, reduction="mean")
                     loss = loss + args.broad_preserve_weight * broad_loss
 
+                if use_child_preserve:
+                    assert anchor_model is not None
+                    preserve_batch = move_batch(next(preserve_iter), args.device)
+                    preserve_loss, preserve_excess, preserve_n = (
+                        child_preserve_loss(
+                            forward_model, anchor_model, preserve_batch, args)
+                    )
+                    loss = loss + args.child_preserve_weight * preserve_loss
+
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -355,13 +439,18 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             if use_broad_preserve:
                 broad_excess_sum += float(broad_excess.detach().sum())
                 broad_n += len(y)
+            if use_child_preserve:
+                child_preserve_excess_sum += preserve_excess
+                child_preserve_n += preserve_n
 
         print(
             f"epoch {epoch:4d}"
             f" rank_correct={rank_correct}/{max(1, rank_n)}"
             f" rank_loss={rank_loss_sum / max(1, rank_n):.6f}"
             f" target_gap={rank_gap_sum / max(1, rank_n):.2f}"
-            f" broad_excess={broad_excess_sum / max(1, broad_n):.2f}",
+            f" broad_excess={broad_excess_sum / max(1, broad_n):.2f}"
+            f" child_preserve_excess="
+            f"{child_preserve_excess_sum / max(1, child_preserve_n):.2f}",
             flush=True)
 
     return model
@@ -371,6 +460,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
     ap.add_argument("--child-targets", required=True)
+    ap.add_argument("--child-preserve-targets", default="")
     ap.add_argument("--out", required=True)
     ap.add_argument("--out-nn", default=None)
     ap.add_argument("--init-from-nn")
@@ -390,6 +480,11 @@ def main() -> None:
                     choices=["label", "reference"])
     ap.add_argument("--broad-deadzone-cp", type=float, default=40.0)
     ap.add_argument("--broad-beta", type=float, default=100.0)
+    ap.add_argument("--child-preserve-weight", type=float, default=0.0)
+    ap.add_argument("--child-preserve-deadzone-cp", type=float, default=5.0)
+    ap.add_argument("--child-preserve-beta", type=float, default=100.0)
+    ap.add_argument("--child-preserve-batch-size", type=int, default=64)
+    ap.add_argument("--child-preserve-min-groups", type=int, default=1)
     ap.add_argument("--rank-margin-cp", type=float, default=100.0)
     ap.add_argument("--rank-temperature-cp", type=float, default=50.0)
     ap.add_argument("--min-groups", type=int, default=1)
