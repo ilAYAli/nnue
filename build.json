@@ -1,12 +1,18 @@
 {
-  "description": "Train r19 from the r14 keeper on the completed r17c corpus plus focused r18 smoke-regression rows.",
-  "experiment": "child-ranking-fast4-r19-r14init-smokeworse-listwise-qfwd-refpreserve30-dz5-lr1e6-e240",
+  "description": "Train r20 from the r14 keeper with the smoke-regression rows as child-level reference guards.",
+  "experiment": "child-ranking-fast4-r20-r14init-smokeguard29-listwise-qfwd-refpreserve30-childguard5-dz5-lr1e6-e240",
   "create": {
-    "name": "child-ranking-fast4-r19-r14init-smokeworse-listwise-qfwd-refpreserve30-dz5-lr1e6-e240",
+    "name": "child-ranking-fast4-r20-r14init-smokeguard29-listwise-qfwd-refpreserve30-childguard5-dz5-lr1e6-e240",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/pack/train",
     "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "child_targets": "targets/mixed-fast4-r19-r17c-smokeworse29-20260529/mixed_child_targets.jsonl",
+    "child_targets": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17c.jsonl",
+    "child_preserve_targets": "targets/smoke256-r18-vs-r14-worse-20260529/smoke_child_targets.jsonl",
+    "child_preserve_weight": 5.0,
+    "child_preserve_deadzone_cp": 5,
+    "child_preserve_beta": 100,
+    "child_preserve_batch_size": 64,
+    "child_preserve_min_groups": 29,
     "child_broad_rows": 100000,
     "child_static_gate_rows": 100000,
     "child_static_gate_max_mae_regression_cp": 5.0,
@@ -24,7 +30,7 @@
     "broad_beta": 100,
     "rank_margin_cp": 250,
     "rank_temperature_cp": 35,
-    "min_groups": 6132,
+    "min_groups": 5842,
     "min_pairs": 18380,
     "child_model_gate_min_top1": 2253,
     "child_engine_gate_min_top1": 2229,
@@ -53,12 +59,12 @@
     "baseline": [
       "r14 remains keeper: 1000-game smoke vs Berserk was -0.3 +/- 15.7 Elo",
       "r18 improved the completed search gate but lost the 256-game smoke vs r14 at -12.2 +/- 30.8 Elo",
-      "r18 smoke-worse extraction produced 29 rows where r18 was worse than r14: candidate_better=0, reference_better=29, sum_diff=-1379cp"
+      "r19 treated the 29 smoke-regression rows as primary targets and failed them: r19 9/29 vs r14 27/29, sum_diff=-668cp"
     ],
     "pass_intent": [
-      "move less aggressively than r18 by starting from r14 and lowering lr from 2e-6 to 1e-6",
-      "preserve the completed r17c distribution while overweighting the exact r18 smoke regressions",
-      "use the search gate as a diagnostic first; if missing_selected is nonzero, root-augment before judging the candidate"
+      "train on the completed 5842-row corpus only as the primary ranking objective",
+      "use the 29 r18 smoke-regression rows as reference-preserve guards anchored to r14",
+      "reject if the smoke guard still drifts or if the combined search gate stays negative"
     ]
   }
 }
