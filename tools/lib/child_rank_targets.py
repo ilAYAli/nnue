@@ -23,6 +23,7 @@ class ChildRankGroup:
     max_gap_cp: float
     moves: tuple[ChildMoveTarget, ...]
     best_move: str
+    tags: tuple[str, ...] = ()
 
     @property
     def best(self) -> ChildMoveTarget:
@@ -100,6 +101,7 @@ def parse_group(raw: dict, line_no: int) -> ChildRankGroup:
         max_gap_cp=max_gap_cp,
         moves=tuple(moves),
         best_move=best_move,
+        tags=tuple(str(tag) for tag in raw.get("tags", [])),
     )
 
 

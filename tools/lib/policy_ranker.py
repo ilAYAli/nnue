@@ -31,12 +31,25 @@ class PolicyGroup:
     gaps: torch.Tensor
 
 
+def _parse_tags(raw: str) -> set[str]:
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
 def load_policy_source_groups(paths: list[str | Path], *,
-                              min_groups: int = 1) -> list[ChildRankGroup]:
+                              min_groups: int = 1,
+                              include_tags: str = "",
+                              exclude_tags: str = "") -> list[ChildRankGroup]:
     groups: list[ChildRankGroup] = []
     seen: set[str] = set()
+    include = _parse_tags(include_tags)
+    exclude = _parse_tags(exclude_tags)
     for path in paths:
         for group in load_groups(path, min_groups=0, skip_invalid=True):
+            tags = set(group.tags)
+            if include and not include.issubset(tags):
+                continue
+            if exclude and exclude.intersection(tags):
+                continue
             if group.group_id in seen:
                 continue
             seen.add(group.group_id)

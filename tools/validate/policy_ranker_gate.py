@@ -132,7 +132,11 @@ def evaluate(args: argparse.Namespace) -> dict[str, list[dict[str, float]]]:
     feature_set = args.feature_set
     if feature_set == "auto":
         feature_set = str(checkpoint.get("feature_set", "compact"))
-    raw_groups = load_policy_source_groups(args.targets, min_groups=args.min_groups)
+    raw_groups = load_policy_source_groups(
+        args.targets,
+        min_groups=args.min_groups,
+        include_tags=args.include_tags,
+        exclude_tags=args.exclude_tags)
     builder = PolicyFeatureBuilder(
         args.base_net, device=args.device, feature_set=feature_set)
     groups = [builder.build_group(group) for group in raw_groups]
@@ -193,6 +197,8 @@ def main() -> None:
                     default="auto")
     ap.add_argument("--min-groups", type=int, default=1)
     ap.add_argument("--thresholds", default="0,1,2,4,8")
+    ap.add_argument("--include-tags", default="")
+    ap.add_argument("--exclude-tags", default="")
     ap.add_argument("--split-seed", type=int, default=1)
     ap.add_argument("--split-val-fraction", type=float, default=0.0)
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)

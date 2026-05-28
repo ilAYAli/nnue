@@ -71,13 +71,18 @@ def main() -> None:
     ap.add_argument("--weight-decay", type=float, default=1e-4)
     ap.add_argument("--rank-temperature-cp", type=float, default=1.0)
     ap.add_argument("--target-temperature-cp", type=float, default=80.0)
+    ap.add_argument("--include-tags", default="")
+    ap.add_argument("--exclude-tags", default="")
     ap.add_argument("--val-fraction", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--print-rate", type=int, default=100)
     args = ap.parse_args()
 
-    raw_groups = load_policy_source_groups(args.targets)
+    raw_groups = load_policy_source_groups(
+        args.targets,
+        include_tags=args.include_tags,
+        exclude_tags=args.exclude_tags)
     builder = PolicyFeatureBuilder(
         args.base_net, device=args.device, feature_set=args.feature_set)
     groups = [builder.build_group(group) for group in raw_groups]
@@ -145,6 +150,8 @@ def main() -> None:
                     "val_group_ids": [group.group_id for group in val_groups],
                     "targets": list(args.targets),
                     "base_net": args.base_net,
+                    "include_tags": args.include_tags,
+                    "exclude_tags": args.exclude_tags,
                 }
 
     if best_state is None:

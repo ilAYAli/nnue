@@ -344,6 +344,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--hidden", str(args.policy_hidden),
                     "--feature-set", args.policy_feature_set,
                     "--dropout", str(args.policy_dropout),
+                    "--include-tags", args.policy_include_tags,
+                    "--exclude-tags", args.policy_exclude_tags,
                     "--epochs", str(args.epochs),
                     "--lr", str(args.lr),
                     "--weight-decay", str(args.weight_decay),
@@ -363,6 +365,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--base-net", str(expand_path(args.init_net)),
                     "--device", args.device,
                     "--feature-set", args.policy_feature_set,
+                    "--include-tags", args.policy_include_tags,
+                    "--exclude-tags", args.policy_exclude_tags,
                     "--min-groups", str(args.min_groups),
                     "--thresholds", args.policy_thresholds,
                     "--split-seed", str(args.selfplay_seed),
@@ -545,6 +549,8 @@ def add_create_args(
     parser.add_argument("--policy-feature-set", default=value("policy_feature_set", d.policy_feature_set),
                         choices=["compact", "board"])
     parser.add_argument("--policy-dropout", type=float, default=value("policy_dropout", d.policy_dropout))
+    parser.add_argument("--policy-include-tags", default=value("policy_include_tags", d.policy_include_tags))
+    parser.add_argument("--policy-exclude-tags", default=value("policy_exclude_tags", d.policy_exclude_tags))
     parser.add_argument("--policy-val-fraction", type=float, default=value("policy_val_fraction", d.policy_val_fraction))
     parser.add_argument("--policy-target-temperature-cp", type=int, default=value("policy_target_temperature_cp", d.policy_target_temperature_cp))
     parser.add_argument("--policy-thresholds", default=value("policy_thresholds", d.policy_thresholds))

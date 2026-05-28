@@ -178,6 +178,15 @@ Latest child-ranking result:
   being made split-aware so a full-corpus pass cannot hide train-only action.
   Next policy runs must show same-threshold held-out overrides, not just full
   target-set improvement.
+- `policy-ranker-lossv5-v3x6-lowmat-board-h64-d25-lr3e4-e120-r3`: broadened
+  the board-aware sidecar to 6906 unique groups from the losslogs/v3/lowmat
+  mix. It failed the split-aware gate. Policy-only improved validation only
+  from `440/1726` to `469/1726`. Low thresholds produced many held-out bad
+  overrides; zero-bad held-out thresholds had only `2-3` good overrides. Tag
+  breakdown showed the only promising held-out slice was `mate_like`
+  (`5` good, `0` bad at threshold `32`; `3` good, `0` bad at threshold `40`).
+  The universal sidecar is therefore too broad; the next diagnostic is a
+  motif-restricted `mate_like` policy ranker.
 
 Rejected lanes:
 
@@ -258,7 +267,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `policy-ranker-lossv5-v3x6-lowmat-board-h64-d25-lr3e4-e120`
+- candidate name: `policy-ranker-matelike-mix-board-h64-d35-lr2e4-e600`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
@@ -271,9 +280,10 @@ Current `build.json` intent:
   - `targets/child-ranking/losslogs_v5_full773.jsonl`.
   - plus the generated v3/low-material policy mix from
     `nnue_native_hidden/runs/policy-mix-v3x6-lowmat5k-20260527`.
-  - gate is deliberately stricter than the previous full-corpus gate: require
-    a single zero-bad threshold that also produces at least 100 held-out good
-    overrides and 100 held-out overrides.
+  - current filter: `mate_like` only.
+  - gate is deliberately split-aware: require a single zero-bad threshold that
+    also produces at least 10 held-out good overrides and 10 held-out
+    overrides.
 - main knobs:
   - `policy_hidden`
   - `policy_feature_set`
@@ -288,12 +298,11 @@ Current `build.json` intent:
 
 Current hypothesis:
 
-- Board geometry is necessary but not sufficient. On 773 groups, it mostly
-  memorized train rows. The next test is whether the same board-aware sidecar
-  can produce held-out safe action when trained on a much broader real-game /
-  low-material policy corpus. If held-out action remains flat, pause simple
-  sidecar MLP work and move to either a larger policy corpus with better
-  feature batching or a different representation.
+- Board geometry is necessary but not sufficient. On broad groups, the universal
+  sidecar still produced unsafe held-out overrides. The next test is whether a
+  motif-restricted sidecar can be safe for `mate_like` positions. If that also
+  fails, pause simple sidecar MLP work and move to either stronger policy data
+  construction or a different representation.
 
 Rules:
 

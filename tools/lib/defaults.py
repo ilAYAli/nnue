@@ -102,6 +102,8 @@ class CandidateDefaults:
     policy_hidden: int = 128
     policy_feature_set: str = "compact"
     policy_dropout: float = 0.0
+    policy_include_tags: str = ""
+    policy_exclude_tags: str = ""
     policy_val_fraction: float = 0.2
     policy_target_temperature_cp: int = 80
     policy_thresholds: str = "0,1,2,4,8"
