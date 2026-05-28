@@ -44,6 +44,8 @@ def convert_row(row: dict) -> dict | None:
             "move": move_uci,
             "score_cp": float(raw["score_cp"]),
             "role": move_role(row, raw),
+            "rank": raw.get("rank"),
+            "origins": raw.get("origins", raw.get("role", [])),
         })
 
     if best_move not in seen or len(moves) < 2:
@@ -60,6 +62,17 @@ def convert_row(row: dict) -> dict | None:
         "max_gap_cp": float(row.get("max_gap_cp", 800)),
         "moves": moves,
         "source": "replay_loss",
+        "source_log": row.get("source_log", row.get("log_path")),
+        "source_file": row.get("source_file"),
+        "game_id": row.get("game_id"),
+        "ply": row.get("ply"),
+        "fullmove": row.get("fullmove"),
+        "side_to_move": row.get("side_to_move"),
+        "candidate_move": row.get("candidate_move"),
+        "reference_move": row.get("reference_move"),
+        "logged_move": row.get("logged_move"),
+        "oracle_move": row.get("oracle_move"),
+        "history_sensitive": bool(row.get("history_sensitive", False)),
         "tags": tags,
         "score_pov": row.get("score_pov", "parent"),
     }
