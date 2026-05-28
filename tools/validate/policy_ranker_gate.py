@@ -10,8 +10,12 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lib.child_rank_targets import load_groups
-from lib.policy_ranker import PolicyFeatureBuilder, PolicyRanker, score_group
+from lib.policy_ranker import (
+    PolicyFeatureBuilder,
+    PolicyRanker,
+    load_policy_source_groups,
+    score_group,
+)
 
 
 def load_ranker(path: str, device: str):
@@ -31,7 +35,7 @@ def parse_thresholds(raw: str) -> list[float]:
 
 @torch.no_grad()
 def evaluate(args: argparse.Namespace) -> list[dict[str, float]]:
-    raw_groups = load_groups(args.targets, min_groups=args.min_groups)
+    raw_groups = load_policy_source_groups(args.targets, min_groups=args.min_groups)
     builder = PolicyFeatureBuilder(args.base_net, device=args.device)
     groups = [builder.build_group(group) for group in raw_groups]
     model, mean, std = load_ranker(args.model, args.device)
@@ -121,7 +125,7 @@ def evaluate(args: argparse.Namespace) -> list[dict[str, float]]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--targets", required=True)
+    ap.add_argument("--targets", nargs="+", required=True)
     ap.add_argument("--model", required=True)
     ap.add_argument("--base-net", required=True)
     ap.add_argument("--device", default="cpu")

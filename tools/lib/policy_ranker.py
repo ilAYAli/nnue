@@ -9,7 +9,13 @@ import torch
 import torch.nn as nn
 
 from . import enyo_nnue as nn2
-from .child_rank_targets import ChildRankGroup, ChildMoveTarget, child_fen, target_gap_cp
+from .child_rank_targets import (
+    ChildRankGroup,
+    ChildMoveTarget,
+    child_fen,
+    load_groups,
+    target_gap_cp,
+)
 from .nnue_model import EnyoNNUE, load_model_from_nn
 
 
@@ -22,6 +28,23 @@ class PolicyGroup:
     best_idx: int
     base_idx: int
     gaps: torch.Tensor
+
+
+def load_policy_source_groups(paths: list[str | Path], *,
+                              min_groups: int = 1) -> list[ChildRankGroup]:
+    groups: list[ChildRankGroup] = []
+    seen: set[str] = set()
+    for path in paths:
+        for group in load_groups(path):
+            if group.group_id in seen:
+                continue
+            seen.add(group.group_id)
+            groups.append(group)
+
+    if len(groups) < min_groups:
+        raise SystemExit(
+            f"valid_groups={len(groups)} below min_groups={min_groups}")
+    return groups
 
 
 class PolicyRanker(nn.Module):

@@ -146,6 +146,13 @@ Latest child-ranking result:
   scalar child-ranking as a near-term promotion lane: preserving the scalar
   reference eval tightly enough blocks target learning, while enough target
   learning damages broad search behavior.
+- `policy-ranker-primary80-v1-lr1e3-e2000`: first sidecar diagnostic. On the
+  primary80 gate, base was `41/80`; policy-only reached `69/80`. Gated
+  threshold `16` gave `17` overrides, all good, `0` bad. However, transfer was
+  poor on random `losslogs_v5_64`: at threshold `16`, only `2` good overrides
+  and `8` bad. This proves the sidecar can learn useful corrections, but the
+  primary-only target mix is unsafe; the next run must include random/broad
+  "do not override" groups.
 
 Rejected lanes:
 
@@ -226,7 +233,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `policy-ranker-primary80-v1-lr1e3-e2000`
+- candidate name: `policy-ranker-mix144-h64-lr5e4-e2500`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
@@ -235,10 +242,13 @@ Current `build.json` intent:
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: separate move-ranking sidecar, not scalar eval fine-tuning
-- current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
-  - 80 groups, 844 positive-gap training pairs, selected from loss logs.
-  - includes the filtered 64 high-signal groups plus 16 low-gap/noisy rows that
-    should not dominate interpretation.
+- current ladder targets:
+  - `targets/child-ranking/losslogs_v5_primary80.jsonl`
+  - `targets/child-ranking/losslogs_v5_64.jsonl`
+  - union is 144 groups with no duplicate ids.
+  - reason: the primary80-only ranker learned high-signal repair rows, but
+    harmed random loss-log rows; the next diagnostic must include both repair
+    and "do not override" examples.
 - main knobs:
   - `policy_hidden`
   - `policy_val_fraction`

@@ -12,11 +12,11 @@ import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lib.child_rank_targets import load_groups
 from lib.policy_ranker import (
     PolicyFeatureBuilder,
     PolicyGroup,
     PolicyRanker,
+    load_policy_source_groups,
     normalize_features,
     score_group,
 )
@@ -69,7 +69,7 @@ def summarize(label: str, model: PolicyRanker, groups: list[PolicyGroup],
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--targets", required=True)
+    ap.add_argument("--targets", nargs="+", required=True)
     ap.add_argument("--base-net", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--hidden", type=int, default=128)
@@ -84,7 +84,7 @@ def main() -> None:
     ap.add_argument("--print-rate", type=int, default=100)
     args = ap.parse_args()
 
-    raw_groups = load_groups(args.targets)
+    raw_groups = load_policy_source_groups(args.targets)
     builder = PolicyFeatureBuilder(args.base_net, device=args.device)
     groups = [builder.build_group(group) for group in raw_groups]
     train_groups, val_groups = split_groups(groups, args.seed, args.val_fraction)
@@ -141,7 +141,7 @@ def main() -> None:
                     "input_dim": input_dim,
                     "hidden": args.hidden,
                     "seed": args.seed,
-                    "targets": args.targets,
+                    "targets": list(args.targets),
                     "base_net": args.base_net,
                 }
 

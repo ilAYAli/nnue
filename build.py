@@ -20,6 +20,14 @@ def expand_path(value: str | Path) -> Path:
     return Path(os.path.expandvars(str(value))).expanduser().resolve()
 
 
+def expand_path_list(raw: str) -> list[str]:
+    return [
+        str(expand_path(item.strip()))
+        for item in raw.split(",")
+        if item.strip()
+    ]
+
+
 def expand_user(value: str | Path) -> Path:
     return Path(os.path.expandvars(str(value))).expanduser()
 
@@ -324,12 +332,13 @@ def create_config(args: argparse.Namespace) -> dict:
         policy_targets = args.policy_targets or args.child_targets
         if not policy_targets:
             raise SystemExit("backend=policy-ranking requires policy_targets")
+        policy_target_paths = expand_path_list(str(policy_targets))
         steps.extend([
             {
                 "name": "train_policy_ranker",
                 "command": [
                     python, tool("train/train_policy_ranker.py"),
-                    "--targets", str(expand_path(policy_targets)),
+                    "--targets", *policy_target_paths,
                     "--base-net", str(expand_path(args.init_net)),
                     "--out", f"{candidate_dir}/model.pt",
                     "--hidden", str(args.policy_hidden),
@@ -347,7 +356,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 "name": "validate_policy_ranker",
                 "command": [
                     python, tool("validate/policy_ranker_gate.py"),
-                    "--targets", str(expand_path(policy_targets)),
+                    "--targets", *policy_target_paths,
                     "--model", f"{candidate_dir}/model.pt",
                     "--base-net", str(expand_path(args.init_net)),
                     "--device", args.device,
