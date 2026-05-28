@@ -1,15 +1,15 @@
 {
-  "description": "Train r15 child-ranking on the fast4 r15 mixed corpus with the r14 rank2 objective.",
-  "experiment": "child-ranking-fast4-r15-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+  "description": "Fine-tune the r14 child-ranking candidate on the r15 mixed corpus.",
+  "experiment": "child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240",
   "create": {
-    "name": "child-ranking-fast4-r15-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+    "name": "child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240",
     "backend": "child-ranking",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
     "pack_dir": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/pack/train",
     "target_clamp": 1600,
-    "lr": 0.00005,
-    "epochs": 360,
+    "lr": 0.00001,
+    "epochs": 240,
     "batch_size": 8192,
     "device": "cuda",
     "workers": 4,
@@ -37,8 +37,8 @@
     "rank_temperature_cp": 35,
     "min_groups": 5447,
     "min_pairs": 17356,
-    "child_model_gate_min_top1": 2200,
-    "child_engine_gate_min_top1": 2180,
+    "child_model_gate_min_top1": 2193,
+    "child_engine_gate_min_top1": 2177,
     "child_search_gate_targets": "targets/smoke1000-r14-loss-20260528/smoke_child_targets.jsonl",
     "child_search_gate_reference_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
     "child_search_gate_nodes": 20000,
@@ -54,12 +54,12 @@
     "baseline": [
       "r14 on this mixed corpus: pt/nn top1=2192/5447",
       "r14 on this mixed corpus: engine top1=2176/5447",
-      "r14 smoke1000 loss extraction: candidate_best=93/206 reference_best=100/206"
+      "r15 from Berserk failed: pt/nn top1=2191/5447 and engine top1=2172/5447"
     ],
     "pass_intent": [
-      "beat r14 model and engine top1 on the mixed corpus",
-      "keep broad static regression within existing r14-style caps",
-      "improve the r14 smoke1000 loss-distribution search gate without missing selected moves"
+      "test whether the r14 local point can be nudged toward its own smoke1000 losses",
+      "reject if it cannot beat r14 model and engine top1",
+      "do not run smoke games unless model, engine, broad, and r14-loss search gates pass"
     ]
   }
 }
