@@ -1,40 +1,31 @@
 {
-  "description": "Refresh replay-loss JSONL and child targets from the current synced Lichess loss logs. This is fixed-node normal NNUE target extraction; timed/history-sensitive rows stay diagnostic-only.",
-  "experiment": "replay-loss-jsonl-latest-20260528",
+  "description": "Augment the latest replay-loss child targets with root-selected moves from the current candidate and the reference before retraining.",
+  "experiment": "replay-loss-latest-rootaugment-r1-20260528",
   "create": {
-    "name": "replay-loss-jsonl-latest-20260528",
-    "backend": "replay-jsonl",
-    "replay_logs": "~/code/cpp/chess/lichess/logs/loss",
-    "replay": "~/local/bin/replay",
-    "replay_candidate": "~/code/cpp/chess/assets/engines/reference",
-    "replay_reference": "",
+    "name": "replay-loss-latest-rootaugment-r1-20260528",
+    "backend": "augment-child-targets",
+    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "score_engine": "~/local/bin/stockfish",
-    "replay_oracle_nodes": 200000,
-    "replay_jobs": 8,
-    "replay_move": 8,
-    "replay_top_root_moves": 8,
-    "replay_include_checks": true,
-    "replay_include_captures": true,
-    "replay_include_promotions": true,
-    "replay_include_history_sensitive": false,
-    "replay_max_moves_per_position": 16,
-    "replay_min_score_gap": 0,
-    "replay_output": "targets/replay-loss-20260528-latest/loss_replay.jsonl",
-    "replay_stderr": "targets/replay-loss-20260528-latest/loss_replay.stderr",
-    "replay_min_rows": 100,
-    "replay_child_targets": "targets/replay-loss-20260528-latest/loss_replay_child_targets.jsonl",
-    "replay_child_summary": "targets/replay-loss-20260528-latest/loss_replay_child_targets.summary.txt",
-    "replay_child_min_groups": 100,
+    "child_augment_input": "targets/replay-loss-20260528-latest/loss_replay_child_targets.jsonl",
+    "child_augment_output": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r1.jsonl",
+    "child_augment_summary": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r1.summary.txt",
+    "child_augment_search_nets": "candidate=runs/child-ranking-mixed-replayrefresh2838-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-mixed-replayrefresh2838-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn,reference=~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
+    "child_augment_search_nodes": 20000,
+    "child_augment_search_depth": 0,
+    "child_augment_jobs": 8,
+    "child_augment_min_groups": 2854,
+    "child_augment_max_missing_after": 0,
+    "child_augment_oracle_nodes": 200000,
+    "child_augment_oracle_depth": 0,
+    "child_augment_oracle_threads": 1,
+    "child_augment_oracle_hash": 128,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "replay rows should include the newly synced fkW8Ha8V loss",
-      "history_sensitive must be zero for the normal NNUE corpus",
-      "child target conversion must derive best_move from scored legal moves"
-    ],
-    "excluded_from_normal_training": [
-      "timed-search-only mate blunders such as fkW8Ha8V move 29 Kh1"
+      "candidate and reference missing_selected must be zero after augmentation",
+      "newly scored root-selected moves use the same Stockfish 200k-node oracle settings as the replay corpus",
+      "if this passes, build the next mixed child-ranking corpus from this root-complete replay target plus LC0-oracle and failed-smoke rows"
     ]
   }
 }
