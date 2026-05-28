@@ -239,6 +239,8 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "policy_preserve_max_groups",
         "policy_preserve_val_fraction",
         "policy_base_best_preserve_weight",
+        "policy_no_harm_weight",
+        "policy_no_harm_gap_cp",
         "epochs",
         "lr",
         "weight_decay",
@@ -524,6 +526,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--preserve-val-fraction", str(args.policy_preserve_val_fraction),
                     "--base-best-preserve-weight",
                     str(args.policy_base_best_preserve_weight),
+                    "--no-harm-weight", str(args.policy_no_harm_weight),
+                    "--no-harm-gap-cp", str(args.policy_no_harm_gap_cp),
                     "--epochs", str(args.epochs),
                     "--lr", str(args.lr),
                     "--weight-decay", str(args.weight_decay),
@@ -1002,6 +1006,8 @@ def add_create_args(
     parser.add_argument("--policy-preserve-max-groups", type=int, default=value("policy_preserve_max_groups", d.policy_preserve_max_groups))
     parser.add_argument("--policy-preserve-val-fraction", type=float, default=value("policy_preserve_val_fraction", d.policy_preserve_val_fraction))
     parser.add_argument("--policy-base-best-preserve-weight", type=float, default=value("policy_base_best_preserve_weight", d.policy_base_best_preserve_weight))
+    parser.add_argument("--policy-no-harm-weight", type=float, default=value("policy_no_harm_weight", d.policy_no_harm_weight))
+    parser.add_argument("--policy-no-harm-gap-cp", type=float, default=value("policy_no_harm_gap_cp", d.policy_no_harm_gap_cp))
     parser.add_argument("--policy-gate-include-tags", default=value("policy_gate_include_tags", d.policy_gate_include_tags))
     parser.add_argument("--policy-gate-exclude-tags", default=value("policy_gate_exclude_tags", d.policy_gate_exclude_tags))
     parser.add_argument("--policy-broad-gate-include-tags", default=value("policy_broad_gate_include_tags", d.policy_broad_gate_include_tags))

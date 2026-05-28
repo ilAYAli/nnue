@@ -112,6 +112,8 @@ class CandidateDefaults:
     policy_preserve_max_groups: int = 0
     policy_preserve_val_fraction: float = -1.0
     policy_base_best_preserve_weight: float = 0.0
+    policy_no_harm_weight: float = 0.0
+    policy_no_harm_gap_cp: float = 10.0
     policy_gate_include_tags: str = ""
     policy_gate_exclude_tags: str = ""
     policy_broad_gate_include_tags: str = ""

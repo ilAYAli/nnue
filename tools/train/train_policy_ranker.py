@@ -53,6 +53,21 @@ def preserve_loss(model: PolicyRanker, group: PolicyGroup,
     return torch.relu(logits[mask] - base + args.preserve_margin).mean()
 
 
+def no_harm_loss(model: PolicyRanker, group: PolicyGroup,
+                 mean: torch.Tensor, std: torch.Tensor,
+                 args: argparse.Namespace) -> torch.Tensor:
+    x = ((group.features.to(args.device) - mean.to(args.device)) / std.to(args.device))
+    logits = model(x)
+    base = logits[group.base_idx]
+    gaps = group.gaps.to(args.device)
+    base_gap = gaps[group.base_idx]
+    mask = gaps > base_gap + args.no_harm_gap_cp
+    mask[group.base_idx] = False
+    if not torch.any(mask):
+        return logits.sum() * 0.0
+    return torch.relu(logits[mask] - base + args.preserve_margin).mean()
+
+
 @torch.no_grad()
 def summarize(label: str, model: PolicyRanker, groups: list[PolicyGroup],
               mean: torch.Tensor, std: torch.Tensor,
@@ -108,6 +123,8 @@ def main() -> None:
     ap.add_argument("--preserve-max-groups", type=int, default=0)
     ap.add_argument("--preserve-val-fraction", type=float, default=-1.0)
     ap.add_argument("--base-best-preserve-weight", type=float, default=0.0)
+    ap.add_argument("--no-harm-weight", type=float, default=0.0)
+    ap.add_argument("--no-harm-gap-cp", type=float, default=10.0)
     ap.add_argument("--val-fraction", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--device", default="cpu")
@@ -174,6 +191,9 @@ def main() -> None:
             if args.base_best_preserve_weight > 0.0 and group.base_idx == group.best_idx:
                 loss = loss + args.base_best_preserve_weight * preserve_loss(
                     model, group, mean, std, args)
+            if args.no_harm_weight > 0.0:
+                loss = loss + args.no_harm_weight * no_harm_loss(
+                    model, group, mean, std, args)
             loss.backward()
             opt.step()
             loss_sum += float(loss.detach().cpu())
@@ -234,6 +254,8 @@ def main() -> None:
                     "preserve_margin": args.preserve_margin,
                     "preserve_val_fraction": preserve_val_fraction,
                     "base_best_preserve_weight": args.base_best_preserve_weight,
+                    "no_harm_weight": args.no_harm_weight,
+                    "no_harm_gap_cp": args.no_harm_gap_cp,
                 }
 
     if best_state is None:
