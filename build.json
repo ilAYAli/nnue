@@ -1,43 +1,22 @@
 {
-  "description": "Extract child targets from r15b smoke256 candidate losses.",
-  "experiment": "smoke256-r15b-loss-targets-20260528",
+  "description": "Mix r15 corpus with r15b smoke-loss targets.",
+  "experiment": "mixed-fast4-r16-r15b-smokeloss105-20260528",
   "create": {
-    "name": "smoke256-r15b-loss-targets-20260528",
-    "backend": "smoke-pgn-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "smoke_pgn": "runs/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/child-ranking-r15b-r14loss-smoke256/sprt_confirm_20260528_233628/child-ranking-r15b-r14loss-smoke256_vs_refnet.pgn",
-    "smoke_child_targets": "targets/smoke256-r15b-loss-20260528/smoke_child_targets.jsonl",
-    "smoke_child_summary": "targets/smoke256-r15b-loss-20260528/smoke_child_targets.summary.txt",
-    "smoke_candidate_net": "runs/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/train/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/model.nn",
-    "smoke_reference_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "smoke_search_nodes": 20000,
-    "smoke_search_depth": 0,
-    "smoke_oracle_nodes": 200000,
-    "smoke_oracle_depth": 0,
-    "smoke_jobs": 8,
-    "smoke_threads": 1,
-    "smoke_hash": 64,
-    "smoke_oracle_threads": 1,
-    "smoke_oracle_hash": 128,
-    "smoke_min_ply": 8,
-    "smoke_max_per_game": 8,
-    "smoke_sample_mode": "even",
-    "smoke_max_positions": 512,
-    "smoke_max_gap_cp": 800,
-    "smoke_min_oracle_gap_cp": 20,
-    "smoke_min_groups": 80,
-    "smoke_unique_fen": true,
-    "smoke_only_candidate_losses": true,
-    "smoke_candidate_name": "candidate",
-    "smoke_reference_name": "reference",
+    "name": "mixed-fast4-r16-r15b-smokeloss105-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/mixed-fast4-r15-lc0oracle1000-smokeeven1387-r14loss206-20260528/mixed_child_targets.jsonl:5447,targets/smoke256-r15b-loss-20260528/smoke_child_targets.jsonl:105",
+    "mix_output": "targets/mixed-fast4-r16-r15b-smokeloss105-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-fast4-r16-r15b-smokeloss105-20260528/mixed_child_targets.summary.txt",
+    "mix_seed": 2026052816,
+    "mix_progress": 250000,
+    "mix_min_rows": 5552,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "r15b passed static/search gates after root augmentation but smoke256 was -5.4 +/- 29.9",
-      "extract only the positions from games r15b lost as candidate",
-      "do not train on this unless the extracted corpus is large enough and has meaningful oracle gaps"
+      "r15b smoke256 was -5.4 +/- 29.9 despite passing local gates",
+      "r15b smoke-loss extraction produced 105 groups with candidate search loss 192023cp vs reference 158453cp",
+      "build a single reproducible r16 corpus before trying any training"
     ]
   }
 }
