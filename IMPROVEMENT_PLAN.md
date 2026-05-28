@@ -390,9 +390,18 @@ Conclusion:
 Primary lane:
 
 - Train move ranking from child-move groups, not only scalar position eval.
+- Static child-eval ranking is not a promotion gate by itself. A candidate can
+  pass child model/engine gates, preserve broad static eval, and still lose
+  games because root search selects different unscored moves.
+- Every candidate that reaches local gates must now pass a root-search
+  child-ranking gate built from failed smoke/replay positions before any game
+  smoke.
 - Use LC0 as a source of diverse positions and plausible candidate moves only
   after oracle rescoring. Do not train scalar eval directly from LC0 policy
   logits.
+- Use replay JSONL as the preferred source for Enyo loss data because it stores
+  scored legal moves and provenance in one format. CSV-era target files are
+  legacy only.
 - Each target group must contain one parent FEN, the oracle best move, the
   engine/logged bad move, and a few engine-plausible neighbors.
 - Neighbor moves must be moves the engine actually considered or selected, not
@@ -414,23 +423,45 @@ Secondary lanes:
   disagreement, PV-instability, failure-suite, and high-loss move-choice rows.
 - Static MAE/sign remains a rejection filter only.
 
+## Current Result
+
+- `child-ranking-mixed-replayloss2677-lc0oracle1000-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
+  passed local target/static gates but failed a 256-game smoke:
+  `-35.4 +/- 29.4`, LOS `0.9%`, draw `52.3%`.
+- A smoke-PGN target extractor was added and run on that failed smoke. With
+  clean per-position `ucinewgame` probing, the failed candidate measured:
+  `95/210` root-search top1 versus reference `101/210`, `sum_diff=-283cp`.
+- `child-ranking-mixed-replayloss2677-lc0oracle1000-smoke210...` passed
+  combined child model/engine gates and broad static (`MAE -4.98cp`,
+  sign drop `+0.64pp`) but failed root-search:
+  `88/210`, `missing_selected=27`.
+- `child-ranking-mixed-replayloss2677-lc0oracle1000-smoker1x5...` also passed
+  combined child engine and broad static (`MAE -4.44cp`, sign drop `+0.52pp`)
+  but failed root-search:
+  `83/191`, `missing_selected=30`.
+
+Conclusion: static child-ranking gradients can improve exported eval and broad
+static metrics without controlling Enyo's root-search selected move. This lane
+is not game-safe until the training target includes the moves selected by the
+current candidate under root search.
+
 ## Next Concrete Experiment
 
-Make LC0-oracle/replay-loss ranking game-safe before scaling:
+Refresh the replay-loss target corpus before more training:
 
-1. Add a broad static gate to the child-ranking pipeline, not just manual
-   post-run validation. At minimum report candidate/reference sign, near-zero
-   bucket sign, and MAE on the compatible broad pack.
-2. Treat broad sign/order loss as a hard rejection even when target top1
-   improves. The latest LC0-oracle run improved target gates but lost broad
-   sign and failed the smoke.
-3. Build a mixed child-ranking target set from:
-   - replay-loss rows where Enyo actually failed;
-   - LC0-oracle rows as diverse, oracle-scored candidate-move coverage.
-4. Train with reference preservation and require improvement on both target
-   families before any SPRT.
-5. Run a `256`-game smoke immediately after local gates. Stop the family if
-   three consecutive candidates pass target gates but fail this smoke.
+1. Sync the latest `lichess/logs/loss` from localhost to `pwa-5090`.
+2. Regenerate replay JSONL using the current clean reference engine and dense
+   replay move output.
+3. Convert replay JSONL to child targets and build one mixed corpus:
+   replay-loss dense rows + LC0-oracle rows + failed-smoke root-search rows.
+4. Before training, run reference and last failed candidate through the new
+   root-search gate and require `missing_selected=0`; if selected moves are
+   missing, regenerate the target with those moves scored.
+5. Train exactly one new `build.json` candidate. It must pass:
+   - combined model/engine child gates above reference baseline;
+   - broad static gate;
+   - failed-smoke/replay root-search gate with `missing_selected=0`;
+   - only then a 256-game smoke.
 
 ## Candidate Workflow
 
@@ -443,31 +474,20 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `policy-ranker-matelike-preserve-all-nonmate-board-h64-d35-pw100-m8-t24-lr2e4-e400`
-- backend: `policy-ranking`
+  `child-ranking-mixed-replayloss2677-lc0oracle1000-smoker1x5-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
+- backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
-- base net: current reference `.nn`; scalar eval is unchanged
-- self-play depth: `12`
-- self-play seed: `2026052801`
-- skipped opening plies: `8`
-- score depth: `16`
-- objective: separate move-ranking sidecar, not scalar eval fine-tuning
-- current ladder target:
-  - `targets/child-ranking/losslogs_v5_full773.jsonl`.
-  - plus the generated v3/low-material policy mix from
-    `nnue_native_hidden/runs/policy-mix-v3x6-lowmat5k-20260527`.
-  - current filter: `mate_like` only.
-  - gate is deliberately split-aware: require a single zero-bad threshold that
-    also produces at least 10 held-out good overrides and 10 held-out
-    overrides.
-- preserve rows:
-  - all non-`mate_like` groups, with no subsampling and no preserve validation
-    split in the next run.
-  - preserve loss keeps the base/static selected move above policy alternatives
-    by `8` policy-score units.
-- broad deployment gate:
-  - evaluates all non-`mate_like` target groups at export threshold `24`.
-  - requires `0` bad overrides and no more than `200` total broad overrides.
+- base net: current reference `.nn`
+- objective: listwise child ranking with quantized-forward export behavior
+- broad preserve: reference-anchor deadzone (`weight=0.20`, `deadzone=5cp`)
+- current target mix:
+  - replay-loss dense rows;
+  - LC0-oracle rows;
+  - failed-smoke root-search rows weighted x5.
+- hard gates:
+  - model/engine child gates above reference baseline;
+  - broad static gate;
+  - root-search gate on failed-smoke rows before any game smoke.
 - main knobs:
   - `policy_hidden`
   - `policy_feature_set`
