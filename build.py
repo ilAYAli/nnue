@@ -135,15 +135,168 @@ def write_config(run_dir: Path, config: dict) -> Path:
     return path
 
 
+def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
+    common = {
+        "backend",
+        "config",
+        "event_command",
+        "force",
+        "name",
+        "python",
+        "run_dir",
+    }
+    data = {
+        "pack_dir",
+        "engine",
+        "nnue_file",
+        "book",
+        "runner",
+        "selfplay_games",
+        "selfplay_shard_games",
+        "selfplay_concurrency",
+        "selfplay_threads",
+        "selfplay_hash",
+        "selfplay_depth",
+        "selfplay_seed",
+        "skip_plies",
+        "source_max_abs_cp",
+        "sample_preset",
+        "score_engine",
+        "score_depth",
+        "score_shards",
+        "score_threads",
+        "score_hash",
+        "score_max_abs_cp",
+        "score_progress",
+        "max_features",
+        "pack_progress",
+    }
+    pytorch = data | {
+        "init_net",
+        "objective",
+        "target_clamp",
+        "huber_beta",
+        "wdl_lambda",
+        "lr",
+        "epochs",
+        "batch_size",
+        "device",
+        "workers",
+        "prefetch_factor",
+        "amp",
+        "torch_compile",
+        "dataset_in_memory",
+        "val_rows",
+        "patience",
+        "select_metric",
+        "weight_decay",
+        "trainable",
+    }
+    child = data | {
+        "init_net",
+        "child_targets",
+        "epochs",
+        "batch_size",
+        "child_batch_size",
+        "child_loss",
+        "lr",
+        "weight_decay",
+        "target_clamp",
+        "ranking_weight",
+        "broad_preserve_weight",
+        "broad_anchor",
+        "broad_deadzone_cp",
+        "broad_beta",
+        "rank_margin_cp",
+        "rank_temperature_cp",
+        "min_groups",
+        "min_pairs",
+        "device",
+        "workers",
+        "prefetch_factor",
+        "amp",
+        "torch_compile",
+        "dataset_in_memory",
+        "export_quantize_forward",
+        "trainable",
+        "child_broad_rows",
+        "child_model_gate_min_top1",
+        "child_engine_gate_min_top1",
+    }
+    policy = {
+        "init_net",
+        "policy_targets",
+        "child_targets",
+        "policy_hidden",
+        "policy_feature_set",
+        "policy_dropout",
+        "policy_include_tags",
+        "policy_exclude_tags",
+        "policy_preserve_include_tags",
+        "policy_preserve_exclude_tags",
+        "policy_preserve_weight",
+        "policy_preserve_margin",
+        "policy_preserve_max_groups",
+        "policy_preserve_val_fraction",
+        "epochs",
+        "lr",
+        "weight_decay",
+        "rank_temperature_cp",
+        "policy_target_temperature_cp",
+        "policy_val_fraction",
+        "selfplay_seed",
+        "device",
+        "policy_gate_include_tags",
+        "policy_gate_exclude_tags",
+        "policy_broad_gate_include_tags",
+        "policy_broad_gate_exclude_tags",
+        "policy_broad_gate_min_groups",
+        "policy_broad_gate_max_bad",
+        "policy_broad_gate_max_overrides",
+        "policy_breakdown_tags",
+        "policy_thresholds",
+        "policy_gate_min_top1",
+        "policy_gate_max_bad",
+        "policy_gate_min_val_top1",
+        "policy_gate_max_val_bad",
+        "policy_gate_min_val_good",
+        "policy_gate_min_val_overrides",
+        "policy_bad_tolerance_cp",
+        "policy_export_threshold",
+        "policy_export_max_abs_diff",
+        "min_groups",
+    }
+    replay = {
+        "replay",
+        "replay_logs",
+        "replay_candidate",
+        "replay_reference",
+        "replay_oracle_nodes",
+        "replay_jobs",
+        "replay_move",
+        "replay_output",
+        "replay_stderr",
+        "replay_min_rows",
+    }
+    backend_keys = {
+        "pytorch": pytorch,
+        "child-ranking": child,
+        "policy-ranking": policy,
+        "replay-jsonl": replay,
+    }
+    return common | backend_keys.get(args.backend, set())
+
+
 def create_config(args: argparse.Namespace) -> dict:
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"
     python = str(expand_user(args.python))
     steps = []
-    if args.pack_dir:
+    data_dir = ""
+    if args.backend in {"pytorch", "child-ranking"} and args.pack_dir:
         data_dir = str(expand_path(args.pack_dir))
-    else:
+    elif args.backend in {"pytorch", "child-ranking"}:
         data_dir = "{pack}/train"
         steps.extend([
             {
@@ -469,6 +622,87 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             },
         ])
+    elif args.backend == "replay-jsonl":
+        if args.replay_reference:
+            replay_script = r"""
+set -euo pipefail
+logs=$1
+replay_bin=$2
+candidate=$3
+reference=$4
+out=$5
+err=$6
+oracle_nodes=$7
+jobs=$8
+move_no=$9
+
+mkdir -p "$(dirname "$out")"
+cmd=("$replay_bin" --jsonl --candidate "$candidate")
+cmd+=(--reference "$reference")
+cmd+=(--oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no" -)
+
+find "$logs" -name '*.log' | sort | "${cmd[@]}" > "$out" 2> "$err"
+test -s "$out"
+wc -l "$out" > "$out.wc"
+"""
+            replay_command = [
+                "bash", "-lc", replay_script, "extract-replay-jsonl",
+                str(expand_user(args.replay_logs)),
+                str(expand_user(args.replay)),
+                str(expand_user(args.replay_candidate)),
+                str(expand_user(args.replay_reference)),
+                str(expand_user(args.replay_output)),
+                str(expand_user(args.replay_stderr)),
+                str(args.replay_oracle_nodes),
+                str(args.replay_jobs),
+                str(args.replay_move),
+            ]
+        else:
+            replay_script = r"""
+set -euo pipefail
+logs=$1
+replay_bin=$2
+candidate=$3
+out=$4
+err=$5
+oracle_nodes=$6
+jobs=$7
+move_no=$8
+
+mkdir -p "$(dirname "$out")"
+find "$logs" -name '*.log' | sort | \
+  "$replay_bin" --jsonl --candidate "$candidate" \
+  --oracle-nodes "$oracle_nodes" --jobs "$jobs" --move "$move_no" - \
+  > "$out" 2> "$err"
+test -s "$out"
+wc -l "$out" > "$out.wc"
+"""
+            replay_command = [
+                "bash", "-lc", replay_script, "extract-replay-jsonl",
+                str(expand_user(args.replay_logs)),
+                str(expand_user(args.replay)),
+                str(expand_user(args.replay_candidate)),
+                str(expand_user(args.replay_output)),
+                str(expand_user(args.replay_stderr)),
+                str(args.replay_oracle_nodes),
+                str(args.replay_jobs),
+                str(args.replay_move),
+            ]
+        steps.extend([
+            {
+                "name": "extract_replay_jsonl",
+                "command": replay_command,
+            },
+            {
+                "name": "validate_replay_jsonl",
+                "command": [
+                    python, tool("validate/validate_replay_jsonl.py"),
+                    "--input", str(expand_user(args.replay_output)),
+                    "--min-rows", str(args.replay_min_rows),
+                    "--fail-if-dirty-candidate",
+                ],
+            },
+        ])
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -481,7 +715,7 @@ def create_config(args: argparse.Namespace) -> dict:
         "create_args": {
             key: value
             for key, value in vars(args).items()
-            if key not in {"command", "config", "func"}
+            if key in recorded_create_arg_keys(args)
         },
         "steps": steps,
     }
@@ -590,7 +824,8 @@ def add_create_args(
 
     parser.add_argument("--init-net", default=value("init_net", d.init_net))
     parser.add_argument("--backend", default=value("backend", d.backend),
-                        choices=["pytorch", "child-ranking", "policy-ranking"])
+                        choices=["pytorch", "child-ranking", "policy-ranking",
+                                 "replay-jsonl"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -666,6 +901,16 @@ def add_create_args(
     parser.add_argument("--policy-bad-tolerance-cp", type=float, default=value("policy_bad_tolerance_cp", d.policy_bad_tolerance_cp))
     parser.add_argument("--policy-export-threshold", type=float, default=value("policy_export_threshold", d.policy_export_threshold))
     parser.add_argument("--policy-export-max-abs-diff", type=float, default=value("policy_export_max_abs_diff", d.policy_export_max_abs_diff))
+    parser.add_argument("--replay", default=value("replay", d.replay))
+    parser.add_argument("--replay-logs", default=value("replay_logs", d.replay_logs))
+    parser.add_argument("--replay-candidate", default=value("replay_candidate", d.replay_candidate))
+    parser.add_argument("--replay-reference", default=value("replay_reference", d.replay_reference))
+    parser.add_argument("--replay-oracle-nodes", type=int, default=value("replay_oracle_nodes", d.replay_oracle_nodes))
+    parser.add_argument("--replay-jobs", type=int, default=value("replay_jobs", d.replay_jobs))
+    parser.add_argument("--replay-move", type=int, default=value("replay_move", d.replay_move))
+    parser.add_argument("--replay-output", default=value("replay_output", d.replay_output))
+    parser.add_argument("--replay-stderr", default=value("replay_stderr", d.replay_stderr))
+    parser.add_argument("--replay-min-rows", type=int, default=value("replay_min_rows", d.replay_min_rows))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
