@@ -1,36 +1,21 @@
 {
-  "description": "Extract a fresh fast replay-loss JSONL corpus from the current synced loss logs.",
-  "experiment": "replay-loss-latest-fast4-20260528",
+  "description": "Mix the fresh fast4 replay-loss corpus with LC0 oracle and even-smoke guard targets.",
+  "experiment": "mixed-fast4-r13-lc0oracle1000-smokeeven1387-20260528",
   "create": {
-    "name": "replay-loss-latest-fast4-20260528",
-    "backend": "replay-jsonl",
-    "replay_logs": "~/code/cpp/chess/lichess/logs/loss",
-    "replay_candidate": "~/code/cpp/chess/assets/engines/reference",
-    "replay_reference": "",
-    "score_engine": "~/local/bin/stockfish",
-    "replay_oracle_nodes": 200000,
-    "replay_jobs": 8,
-    "replay_move": 8,
-    "replay_top_root_moves": 4,
-    "replay_include_checks": true,
-    "replay_include_captures": true,
-    "replay_include_promotions": true,
-    "replay_include_history_sensitive": false,
-    "replay_max_moves_per_position": 16,
-    "replay_min_score_gap": 0,
-    "replay_output": "targets/replay-loss-latest-fast4-20260528/loss_replay.jsonl",
-    "replay_stderr": "targets/replay-loss-latest-fast4-20260528/loss_replay.stderr",
-    "replay_min_rows": 2500,
-    "replay_child_targets": "targets/replay-loss-latest-fast4-20260528/loss_replay_child_targets.jsonl",
-    "replay_child_summary": "targets/replay-loss-latest-fast4-20260528/loss_replay_child_targets.summary.txt",
-    "replay_child_min_groups": 2500,
+    "name": "mixed-fast4-r13-lc0oracle1000-smokeeven1387-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/replay-loss-latest-fast4-20260528/loss_replay_child_targets.jsonl:2854,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl:1000,targets/smoke1000-r3-r4complete-even-20260528/smoke_child_targets.jsonl:1387",
+    "mix_output": "targets/mixed-fast4-r13-lc0oracle1000-smokeeven1387-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-fast4-r13-lc0oracle1000-smokeeven1387-20260528/mixed_child_targets.summary.txt",
+    "mix_seed": 2026052813,
+    "mix_min_rows": 5241,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "top-root-moves=4 keeps replay extraction cheaper than the dense replay corpus",
-      "later root-augmentation loops must still enforce missing_selected=0 before training gates are trusted",
-      "history-sensitive rows remain excluded from normal NNUE training targets"
+      "uses the freshly extracted fast4 replay-loss corpus",
+      "does not repeat the rejected r9-r12 smoke-loss overweighting loop",
+      "provides a comparable baseline mix before another child-ranking training run"
     ]
   }
 }
