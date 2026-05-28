@@ -683,7 +683,15 @@ fi
 cmd+=(--max-moves-per-position "$max_moves" --min-score-gap "$min_score_gap" -)
 
 find "$logs" -name '*.log' ! -iname '*conflicted*copy*.log' |
-  sort | "${{cmd[@]}}" > "$out" 2> "$err"
+  sort |
+  while IFS= read -r log_file; do
+    if grep -Eq '(^|[[:space:]])go([[:space:]]|$)' "$log_file" &&
+       grep -Eq '(^|[[:space:]])bestmove([[:space:]]|$)' "$log_file"; then
+      printf '%s\n' "$log_file"
+    else
+      printf 'skip unreplayable log: %s\n' "$log_file" >&2
+    fi
+  done | "${{cmd[@]}}" > "$out" 2> "$err"
 test -s "$out"
 wc -l "$out" > "$out.wc"
 """
@@ -753,7 +761,15 @@ fi
 cmd+=(--max-moves-per-position "$max_moves" --min-score-gap "$min_score_gap" -)
 
 find "$logs" -name '*.log' ! -iname '*conflicted*copy*.log' |
-  sort | "${{cmd[@]}}" > "$out" 2> "$err"
+  sort |
+  while IFS= read -r log_file; do
+    if grep -Eq '(^|[[:space:]])go([[:space:]]|$)' "$log_file" &&
+       grep -Eq '(^|[[:space:]])bestmove([[:space:]]|$)' "$log_file"; then
+      printf '%s\n' "$log_file"
+    else
+      printf 'skip unreplayable log: %s\n' "$log_file" >&2
+    fi
+  done | "${{cmd[@]}}" > "$out" 2> "$err"
 test -s "$out"
 wc -l "$out" > "$out.wc"
 """
