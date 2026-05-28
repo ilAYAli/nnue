@@ -1,41 +1,21 @@
 {
-  "description": "Extract evenly sampled child-ranking targets from the failed r3 1000-game smoke PGN so late/endgame positions are represented.",
-  "experiment": "smoke1000-r3-r4complete-even-targets-20260528",
+  "description": "Mix complete replay-loss, LC0 oracle, and evenly sampled failed-smoke child-ranking targets.",
+  "experiment": "mixed-replaylatest-r5-2854-lc0oracle1000-smokeeven1387-20260528",
   "create": {
-    "name": "smoke1000-r3-r4complete-even-targets-20260528",
-    "backend": "smoke-pgn-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "smoke_pgn": "runs/child-ranking-mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/child-ranking-mixed-r3-r4complete-smoke1000/sprt_confirm_20260528_200256/child-ranking-mixed-r3-r4complete-smoke1000_vs_refnet.pgn",
-    "smoke_child_targets": "targets/smoke1000-r3-r4complete-even-20260528/smoke_child_targets.jsonl",
-    "smoke_child_summary": "targets/smoke1000-r3-r4complete-even-20260528/smoke_child_targets.summary.txt",
-    "smoke_candidate_net": "runs/child-ranking-mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-mixed-replaylatest-r3-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "smoke_reference_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "smoke_search_nodes": 20000,
-    "smoke_search_depth": 0,
-    "smoke_oracle_nodes": 200000,
-    "smoke_oracle_depth": 0,
-    "smoke_jobs": 8,
-    "smoke_threads": 1,
-    "smoke_hash": 64,
-    "smoke_oracle_threads": 1,
-    "smoke_oracle_hash": 64,
-    "smoke_min_ply": 8,
-    "smoke_max_per_game": 8,
-    "smoke_sample_mode": "even",
-    "smoke_max_positions": 8000,
-    "smoke_max_gap_cp": 800,
-    "smoke_min_oracle_gap_cp": 20,
-    "smoke_min_groups": 1000,
-    "smoke_unique_fen": true,
-    "smoke_only_candidate_losses": false,
+    "name": "mixed-replaylatest-r5-2854-lc0oracle1000-smokeeven1387-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r5_smokeallcandidate.jsonl:2854,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl:1000,targets/smoke1000-r3-r4complete-even-20260528/smoke_child_targets.jsonl:1387",
+    "mix_output": "targets/mixed-replaylatest-r5-2854-lc0oracle1000-smokeeven1387-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-replaylatest-r5-2854-lc0oracle1000-smokeeven1387-20260528/mixed_child_targets.summary.txt",
+    "mix_seed": 2026052805,
+    "mix_progress": 1000,
+    "mix_min_rows": 5241,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "the previous smoke1000 all-game target set was too early-biased: phase:late=1 and no useful endgame coverage",
-      "this run should produce substantially more late/endgame rows before another training attempt",
-      "do not train on this target set unless the summary shows useful late/endgame distribution"
+      "mixed rows should be 5241 = replay r5 2854 + lc0 oracle 1000 + even smoke 1387",
+      "do not launch training until this mix succeeds and the summary confirms all three sources are present"
     ]
   }
 }
