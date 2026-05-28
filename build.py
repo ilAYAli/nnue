@@ -278,6 +278,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "replay_include_checks",
         "replay_include_captures",
         "replay_include_promotions",
+        "replay_include_history_sensitive",
         "replay_max_moves_per_position",
         "replay_min_score_gap",
         "replay_output",
@@ -651,6 +652,7 @@ include_captures=${{12}}
 include_promotions=${{13}}
 max_moves=${{14}}
 min_score_gap=${{15}}
+include_history_sensitive=${{16}}
 
 mkdir -p "$(dirname "$out")"
 cmd=("$replay_bin" --jsonl --candidate "$candidate")
@@ -671,6 +673,9 @@ if [[ "$include_promotions" == "1" ]]; then
   cmd+=(--include-promotions)
 else
   cmd+=(--no-promotions)
+fi
+if [[ "$include_history_sensitive" == "1" ]]; then
+  cmd+=(--include-history-sensitive)
 fi
 cmd+=(--max-moves-per-position "$max_moves" --min-score-gap "$min_score_gap" -)
 
@@ -695,6 +700,7 @@ wc -l "$out" > "$out.wc"
                 "1" if args.replay_include_promotions else "0",
                 str(args.replay_max_moves_per_position),
                 str(args.replay_min_score_gap),
+                "1" if args.replay_include_history_sensitive else "0",
             ]
         else:
             replay_script = r"""
@@ -713,6 +719,7 @@ include_captures=${{11}}
 include_promotions=${{12}}
 max_moves=${{13}}
 min_score_gap=${{14}}
+include_history_sensitive=${{15}}
 
 mkdir -p "$(dirname "$out")"
 cmd=("$replay_bin" --jsonl --candidate "$candidate")
@@ -732,6 +739,9 @@ if [[ "$include_promotions" == "1" ]]; then
   cmd+=(--include-promotions)
 else
   cmd+=(--no-promotions)
+fi
+if [[ "$include_history_sensitive" == "1" ]]; then
+  cmd+=(--include-history-sensitive)
 fi
 cmd+=(--max-moves-per-position "$max_moves" --min-score-gap "$min_score_gap" -)
 
@@ -755,6 +765,7 @@ wc -l "$out" > "$out.wc"
                 "1" if args.replay_include_promotions else "0",
                 str(args.replay_max_moves_per_position),
                 str(args.replay_min_score_gap),
+                "1" if args.replay_include_history_sensitive else "0",
             ]
         steps.extend([
             {
@@ -768,6 +779,8 @@ wc -l "$out" > "$out.wc"
                     "--input", str(expand_user(args.replay_output)),
                     "--min-rows", str(args.replay_min_rows),
                     "--fail-if-dirty-candidate",
+                    *([] if args.replay_include_history_sensitive
+                      else ["--fail-if-history-sensitive"]),
                 ],
             },
             {
@@ -994,6 +1007,8 @@ def add_create_args(
                         default=value("replay_include_captures", d.replay_include_captures))
     parser.add_argument("--replay-include-promotions", action=argparse.BooleanOptionalAction,
                         default=value("replay_include_promotions", d.replay_include_promotions))
+    parser.add_argument("--replay-include-history-sensitive", action=argparse.BooleanOptionalAction,
+                        default=value("replay_include_history_sensitive", d.replay_include_history_sensitive))
     parser.add_argument("--replay-max-moves-per-position", type=int, default=value("replay_max_moves_per_position", d.replay_max_moves_per_position))
     parser.add_argument("--replay-min-score-gap", type=int, default=value("replay_min_score_gap", d.replay_min_score_gap))
     parser.add_argument("--replay-output", default=value("replay_output", d.replay_output))

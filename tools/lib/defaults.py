@@ -143,6 +143,7 @@ class CandidateDefaults:
     replay_include_checks: bool = True
     replay_include_captures: bool = True
     replay_include_promotions: bool = True
+    replay_include_history_sensitive: bool = False
     replay_max_moves_per_position: int = 16
     replay_min_score_gap: int = 0
     replay_output: str = "targets/replay-loss-20260528/loss_replay.jsonl"

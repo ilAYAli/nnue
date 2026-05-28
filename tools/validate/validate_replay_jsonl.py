@@ -83,6 +83,7 @@ def main() -> int:
     ap.add_argument("--input", required=True, type=Path)
     ap.add_argument("--min-rows", type=int, default=1)
     ap.add_argument("--fail-if-dirty-candidate", action="store_true")
+    ap.add_argument("--fail-if-history-sensitive", action="store_true")
     args = ap.parse_args()
 
     rows = 0
@@ -107,6 +108,9 @@ def main() -> int:
 
     require(rows >= args.min_rows,
             f"rows={rows} below min_rows={args.min_rows}")
+    if args.fail_if_history_sensitive:
+        require(history_sensitive == 0,
+                f"history_sensitive={history_sensitive} rows are not valid normal training targets")
     print(
         f"rows={rows} scored_moves={scored_moves} "
         f"history_sensitive={history_sensitive}")
