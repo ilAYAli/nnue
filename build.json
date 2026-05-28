@@ -1,30 +1,20 @@
 {
-  "description": "Augment the r5 smoke-loss target set with root moves selected by the r8 candidate.",
-  "experiment": "smoke1000-r5-loss-even-rootaugment-r8-20260528",
+  "description": "Mix the child-ranking corpus with the r8-augmented smoke-loss targets.",
+  "experiment": "mixed-r9-r8-smokeloss459-20260528",
   "create": {
-    "name": "smoke1000-r5-loss-even-rootaugment-r8-20260528",
-    "backend": "augment-child-targets",
-    "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
-    "score_engine": "~/local/bin/stockfish",
-    "child_augment_input": "targets/smoke1000-r5-loss-even-20260528/smoke_child_targets.jsonl",
-    "child_augment_output": "targets/smoke1000-r5-loss-even-20260528/smoke_child_targets_rootaug_r8.jsonl",
-    "child_augment_summary": "targets/smoke1000-r5-loss-even-20260528/smoke_child_targets_rootaug_r8.summary.txt",
-    "child_augment_search_nets": "runs/child-ranking-mixed-r8-smokeloss-listwise-qfwd-refpreserve20-dz5-lr5e5-e360-r2/train/child-ranking-mixed-r8-smokeloss-listwise-qfwd-refpreserve20-dz5-lr5e5-e360-r2/model.nn,~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
-    "child_augment_search_nodes": 20000,
-    "child_augment_search_depth": 0,
-    "child_augment_jobs": 8,
-    "child_augment_min_groups": 459,
-    "child_augment_max_missing_after": 0,
-    "child_augment_oracle_nodes": 200000,
-    "child_augment_oracle_depth": 0,
-    "child_augment_oracle_threads": 1,
-    "child_augment_oracle_hash": 128,
+    "name": "mixed-r9-r8-smokeloss459-20260528",
+    "backend": "mix-jsonl",
+    "mix_sources": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r5_smokeallcandidate.jsonl:2854,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl:1000,targets/smoke1000-r3-r4complete-even-20260528/smoke_child_targets.jsonl:1387,targets/smoke1000-r5-loss-even-20260528/smoke_child_targets_rootaug_r8.jsonl:459",
+    "mix_output": "targets/mixed-r9-r8-smokeloss459-20260528/mixed_child_targets.jsonl",
+    "mix_summary": "targets/mixed-r9-r8-smokeloss459-20260528/mixed_child_targets.summary.txt",
+    "mix_seed": 2026052809,
+    "mix_min_rows": 5700,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
-      "r8 selected 52 unscored moves in the smoke-loss search gate",
-      "augmentation must close missing_selected to zero before deciding whether r8 failed"
+      "r8 smoke-loss comparison is complete but still negative on top1 and sum_diff",
+      "the r9 corpus keeps the same source mix while replacing smoke-loss rows with rootaug-r8 scored moves"
     ]
   }
 }
