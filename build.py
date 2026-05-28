@@ -292,11 +292,22 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "replay_child_summary",
         "replay_child_min_groups",
     }
+    lc0 = {
+        "lc0_input",
+        "lc0_output",
+        "lc0_summary",
+        "lc0_max_records",
+        "lc0_top_policy",
+        "lc0_min_rows",
+        "lc0_min_played_legal_pct",
+        "lc0_min_best_legal_pct",
+    }
     backend_keys = {
         "pytorch": pytorch,
         "child-ranking": child,
         "policy-ranking": policy,
         "replay-jsonl": replay,
+        "lc0-jsonl": lc0,
     }
     return common | backend_keys.get(args.backend, set())
 
@@ -826,6 +837,21 @@ wc -l "$out" > "$out.wc"
                 ],
             },
         ])
+    elif args.backend == "lc0-jsonl":
+        steps.append({
+            "name": "extract_lc0_jsonl",
+            "command": [
+                python, tool("posgen/lc0_to_jsonl.py"),
+                "--input", str(expand_user(args.lc0_input)),
+                "--out", str(expand_user(args.lc0_output)),
+                "--summary", str(expand_user(args.lc0_summary)),
+                "--max-records", str(args.lc0_max_records),
+                "--top-policy", str(args.lc0_top_policy),
+                "--min-rows", str(args.lc0_min_rows),
+                "--min-played-legal-pct", str(args.lc0_min_played_legal_pct),
+                "--min-best-legal-pct", str(args.lc0_min_best_legal_pct),
+            ],
+        })
     else:
         raise SystemExit(f"unknown backend: {args.backend}")
 
@@ -948,7 +974,7 @@ def add_create_args(
     parser.add_argument("--init-net", default=value("init_net", d.init_net))
     parser.add_argument("--backend", default=value("backend", d.backend),
                         choices=["pytorch", "child-ranking", "policy-ranking",
-                                 "replay-jsonl"])
+                                 "replay-jsonl", "lc0-jsonl"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -1052,6 +1078,14 @@ def add_create_args(
     parser.add_argument("--replay-child-targets", default=value("replay_child_targets", d.replay_child_targets))
     parser.add_argument("--replay-child-summary", default=value("replay_child_summary", d.replay_child_summary))
     parser.add_argument("--replay-child-min-groups", type=int, default=value("replay_child_min_groups", d.replay_child_min_groups))
+    parser.add_argument("--lc0-input", default=value("lc0_input", d.lc0_input))
+    parser.add_argument("--lc0-output", default=value("lc0_output", d.lc0_output))
+    parser.add_argument("--lc0-summary", default=value("lc0_summary", d.lc0_summary))
+    parser.add_argument("--lc0-max-records", type=int, default=value("lc0_max_records", d.lc0_max_records))
+    parser.add_argument("--lc0-top-policy", type=int, default=value("lc0_top_policy", d.lc0_top_policy))
+    parser.add_argument("--lc0-min-rows", type=int, default=value("lc0_min_rows", d.lc0_min_rows))
+    parser.add_argument("--lc0-min-played-legal-pct", type=float, default=value("lc0_min_played_legal_pct", d.lc0_min_played_legal_pct))
+    parser.add_argument("--lc0-min-best-legal-pct", type=float, default=value("lc0_min_best_legal_pct", d.lc0_min_best_legal_pct))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

@@ -156,6 +156,15 @@ class CandidateDefaults:
     replay_child_summary: str = "targets/replay-loss-20260528/loss_replay_child_targets.summary.txt"
     replay_child_min_groups: int = 1
 
+    lc0_input: str = "~/code/cpp/chess/assets/lc0/raw/training-run1--20210605-0516.tar"
+    lc0_output: str = "targets/lc0-smoke-20260528/lc0_positions.jsonl"
+    lc0_summary: str = "targets/lc0-smoke-20260528/lc0_positions.summary.txt"
+    lc0_max_records: int = 1000
+    lc0_top_policy: int = 8
+    lc0_min_rows: int = 1
+    lc0_min_played_legal_pct: float = 99.0
+    lc0_min_best_legal_pct: float = 99.0
+
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
     sprt_concurrency: int = 10
