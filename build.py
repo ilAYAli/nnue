@@ -359,6 +359,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "smoke_oracle_hash",
         "smoke_min_ply",
         "smoke_max_per_game",
+        "smoke_sample_mode",
         "smoke_max_positions",
         "smoke_max_gap_cp",
         "smoke_min_oracle_gap_cp",
@@ -1067,6 +1068,7 @@ wc -l "$out" > "$out.wc"
                 "--jobs", str(args.smoke_jobs),
                 "--min-ply", str(args.smoke_min_ply),
                 "--max-per-game", str(args.smoke_max_per_game),
+                "--sample-mode", args.smoke_sample_mode,
                 "--max-positions", str(args.smoke_max_positions),
                 "--max-gap-cp", str(args.smoke_max_gap_cp),
                 "--min-oracle-gap-cp", str(args.smoke_min_oracle_gap_cp),
@@ -1444,6 +1446,7 @@ def add_create_args(
     parser.add_argument("--smoke-oracle-hash", type=int, default=value("smoke_oracle_hash", d.smoke_oracle_hash))
     parser.add_argument("--smoke-min-ply", type=int, default=value("smoke_min_ply", d.smoke_min_ply))
     parser.add_argument("--smoke-max-per-game", type=int, default=value("smoke_max_per_game", d.smoke_max_per_game))
+    parser.add_argument("--smoke-sample-mode", choices=("first", "even"), default=value("smoke_sample_mode", d.smoke_sample_mode))
     parser.add_argument("--smoke-max-positions", type=int, default=value("smoke_max_positions", d.smoke_max_positions))
     parser.add_argument("--smoke-max-gap-cp", type=float, default=value("smoke_max_gap_cp", d.smoke_max_gap_cp))
     parser.add_argument("--smoke-min-oracle-gap-cp", type=float, default=value("smoke_min_oracle_gap_cp", d.smoke_min_oracle_gap_cp))

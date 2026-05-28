@@ -155,6 +155,29 @@ def candidate_outcome(result: str, candidate_is_white: bool) -> str:
     return "unknown"
 
 
+def select_game_cases(
+    eligible: list[PositionCase],
+    max_per_game: int,
+    mode: str,
+) -> list[PositionCase]:
+    if max_per_game <= 0 or len(eligible) <= max_per_game:
+        return eligible
+    if mode == "first":
+        return eligible[:max_per_game]
+    if mode != "even":
+        raise ValueError(f"unknown sample mode: {mode}")
+
+    if max_per_game == 1:
+        return [eligible[len(eligible) // 2]]
+
+    last = len(eligible) - 1
+    indexes = [
+        round(index * last / (max_per_game - 1))
+        for index in range(max_per_game)
+    ]
+    return [eligible[index] for index in indexes]
+
+
 def collect_positions(args: argparse.Namespace) -> list[PositionCase]:
     cases: list[PositionCase] = []
     seen_fens: set[str] = set()
@@ -169,7 +192,8 @@ def collect_positions(args: argparse.Namespace) -> list[PositionCase]:
             result = headers.get("Result", "*")
             candidate_white = headers.get("White", "") == args.candidate_name
             outcome = candidate_outcome(result, candidate_white)
-            per_game = 0
+            eligible: list[PositionCase] = []
+            game_seen_fens: set[str] = set()
             board = game.board()
             node = game
             ply = 0
@@ -183,21 +207,23 @@ def collect_positions(args: argparse.Namespace) -> list[PositionCase]:
                 )
                 if (
                     ply >= args.min_ply
-                    and per_game < args.max_per_game
                     and (not args.only_candidate_losses
                          or outcome == "candidate_loss")
                 ):
                     fen = board.fen()
-                    if not args.unique_fen or fen not in seen_fens:
+                    if (
+                        not args.unique_fen
+                        or (fen not in seen_fens and fen not in game_seen_fens)
+                    ):
                         if args.unique_fen:
-                            seen_fens.add(fen)
+                            game_seen_fens.add(fen)
                         tags = (
                             "source:smoke_pgn",
                             f"outcome:{outcome}",
                             f"logged:{logged_engine}",
                             phase_tag(board),
                         )
-                        cases.append(PositionCase(
+                        eligible.append(PositionCase(
                             case_id=f"smoke-{game_index}-{ply}",
                             fen=fen,
                             logged_move=move.uci(),
@@ -209,12 +235,18 @@ def collect_positions(args: argparse.Namespace) -> list[PositionCase]:
                             source_pgn=str(args.pgn),
                             tags=tags,
                         ))
-                        per_game += 1
-                        if args.max_positions > 0 and len(cases) >= args.max_positions:
-                            return cases
                 board.push(move)
                 node = child
                 ply += 1
+
+            selected = select_game_cases(
+                eligible, args.max_per_game, args.sample_mode)
+            for case in selected:
+                if args.unique_fen:
+                    seen_fens.add(case.fen)
+                cases.append(case)
+                if args.max_positions > 0 and len(cases) >= args.max_positions:
+                    return cases
     return cases
 
 
@@ -405,6 +437,7 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--min-ply", type=int, default=8)
     ap.add_argument("--max-per-game", type=int, default=8)
+    ap.add_argument("--sample-mode", choices=("first", "even"), default="first")
     ap.add_argument("--max-positions", type=int, default=1000)
     ap.add_argument("--max-gap-cp", type=float, default=800.0)
     ap.add_argument("--min-oracle-gap-cp", type=float, default=20.0)
@@ -508,6 +541,7 @@ def main() -> int:
         f"jobs={args.jobs}",
         f"min_ply={args.min_ply}",
         f"max_per_game={args.max_per_game}",
+        f"sample_mode={args.sample_mode}",
         f"max_positions={args.max_positions}",
         f"min_oracle_gap_cp={args.min_oracle_gap_cp}",
         f"elapsed_s={elapsed:.3f}",

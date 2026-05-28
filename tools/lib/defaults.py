@@ -237,6 +237,7 @@ class CandidateDefaults:
     smoke_oracle_hash: int = 128
     smoke_min_ply: int = 8
     smoke_max_per_game: int = 8
+    smoke_sample_mode: str = "first"
     smoke_max_positions: int = 1000
     smoke_max_gap_cp: float = 800.0
     smoke_min_oracle_gap_cp: float = 20.0
