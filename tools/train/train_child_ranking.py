@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import math
 import sys
 from pathlib import Path
 
@@ -242,16 +243,24 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     else:
         raise SystemExit(f"unknown child loss: {args.child_loss}")
 
-    broad_set, broad_collate = load_score_dataset(
-        args.data, limit=args.max_rows, skip=args.skip_rows,
-        in_memory=args.dataset_in_memory)
-    if len(broad_set) == 0:
-        raise SystemExit("no broad rows")
+    use_broad_preserve = args.broad_preserve_weight > 0.0
+    broad_set = None
+    broad_collate = None
+    if use_broad_preserve:
+        broad_set, broad_collate = load_score_dataset(
+            args.data, limit=args.max_rows, skip=args.skip_rows,
+            in_memory=args.dataset_in_memory)
+        if len(broad_set) == 0:
+            raise SystemExit("no broad rows")
 
     print(f"child groups: {len(groups)}", flush=True)
     print(f"child rank pairs: {len(pair_set)}", flush=True)
     print(f"child train rows: {len(rank_set)} loss={args.child_loss}", flush=True)
-    print(f"broad rows: {len(broad_set)}", flush=True)
+    if use_broad_preserve:
+        assert broad_set is not None
+        print(f"broad rows: {len(broad_set)}", flush=True)
+    else:
+        print("broad preservation disabled", flush=True)
 
     if args.init_from_nn:
         model = load_model_from_nn(args.init_from_nn, device=args.device)
@@ -259,12 +268,12 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         model = EnyoNNUE(init=args.init).to(args.device)
     model.export_quantize_forward = args.export_quantize_forward
     anchor_model = None
-    if args.broad_anchor == "reference":
+    if use_broad_preserve and args.broad_anchor == "reference":
         anchor_model = copy.deepcopy(model).eval()
         for param in anchor_model.parameters():
             param.requires_grad_(False)
         print("broad anchor: reference net", flush=True)
-    else:
+    elif use_broad_preserve:
         print("broad anchor: labels", flush=True)
     configure_trainable(model, args.trainable)
     trainable_params = sum(
@@ -277,10 +286,17 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
     rank_loader = DataLoader(
         rank_set, batch_size=args.child_batch_size, shuffle=True,
         collate_fn=rank_collate, **dataloader_kwargs(args))
-    broad_loader = DataLoader(
-        broad_set, batch_size=args.batch_size, shuffle=True,
-        collate_fn=broad_collate, **dataloader_kwargs(args))
     rank_iter = cycle(rank_loader)
+    if use_broad_preserve:
+        broad_loader = DataLoader(
+            broad_set, batch_size=args.batch_size, shuffle=True,
+            collate_fn=broad_collate, **dataloader_kwargs(args))
+        steps_per_epoch = len(broad_loader)
+    else:
+        if args.max_rows > 0:
+            steps_per_epoch = max(1, math.ceil(args.max_rows / args.batch_size))
+        else:
+            steps_per_epoch = max(1, len(rank_loader))
 
     opt = torch.optim.AdamW(
         (p for p in model.parameters() if p.requires_grad),
@@ -294,33 +310,39 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         broad_excess_sum = 0.0
         broad_n = 0
 
-        for broad_batch in broad_loader:
-            broad_batch = move_batch(broad_batch, args.device)
-            w, b, w_off, b_off, stm, y, _wdl, phase_scale, _source_ids = broad_batch
-            if args.target_clamp > 0:
-                y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-
+        for step in range(steps_per_epoch):
             rank_batch = move_batch(next(rank_iter), args.device)
 
             with autocast_context(args):
-                broad_pred = forward_model(w, b, w_off, b_off, stm, phase_scale)
-                if anchor_model is not None:
-                    with torch.no_grad():
-                        broad_target = anchor_model(
-                            w, b, w_off, b_off, stm, phase_scale).float()
-                else:
-                    broad_target = y
-                broad_abs = (broad_pred.float() - broad_target).abs()
-                broad_excess = torch.relu(broad_abs - args.broad_deadzone_cp)
-                broad_loss = F.smooth_l1_loss(
-                    broad_excess, torch.zeros_like(broad_excess),
-                    beta=args.broad_beta, reduction="mean")
-
                 rank_loss, batch_rank_correct, batch_rank_n, batch_rank_gap = (
                     rank_loss_fn(forward_model, rank_batch, args)
                 )
-                loss = (args.ranking_weight * rank_loss
-                        + args.broad_preserve_weight * broad_loss)
+                loss = args.ranking_weight * rank_loss
+
+                if use_broad_preserve:
+                    assert broad_loader is not None
+                    if step == 0:
+                        broad_iter = iter(broad_loader)
+                    broad_batch = move_batch(next(broad_iter), args.device)
+                    (w, b, w_off, b_off, stm, y, _wdl,
+                     phase_scale, _source_ids) = broad_batch
+                    if args.target_clamp > 0:
+                        y = torch.clamp(y, -args.target_clamp, args.target_clamp)
+                    broad_pred = forward_model(
+                        w, b, w_off, b_off, stm, phase_scale)
+                    if anchor_model is not None:
+                        with torch.no_grad():
+                            broad_target = anchor_model(
+                                w, b, w_off, b_off, stm, phase_scale).float()
+                    else:
+                        broad_target = y
+                    broad_abs = (broad_pred.float() - broad_target).abs()
+                    broad_excess = torch.relu(
+                        broad_abs - args.broad_deadzone_cp)
+                    broad_loss = F.smooth_l1_loss(
+                        broad_excess, torch.zeros_like(broad_excess),
+                        beta=args.broad_beta, reduction="mean")
+                    loss = loss + args.broad_preserve_weight * broad_loss
 
             opt.zero_grad()
             loss.backward()
@@ -330,8 +352,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             rank_n += batch_rank_n
             rank_gap_sum += batch_rank_gap
             rank_loss_sum += float(rank_loss.detach()) * batch_rank_n
-            broad_excess_sum += float(broad_excess.detach().sum())
-            broad_n += len(y)
+            if use_broad_preserve:
+                broad_excess_sum += float(broad_excess.detach().sum())
+                broad_n += len(y)
 
         print(
             f"epoch {epoch:4d}"
