@@ -1,20 +1,20 @@
 {
-  "description": "Active Enyo NNUE diagnostic: replicate mate-like sidecar split with a different seed.",
-  "experiment": "policy-ranker-matelike-trainglobal-gatenolowmat-board-seed2",
+  "description": "Policy-ranker diagnostic: keep mate-like learning while enforcing non-mate no-action behavior.",
+  "experiment": "policy-ranker-matelike-preserve-nonmate-board",
   "create": {
-    "name": "policy-ranker-matelike-trainglobal-gatenolowmat-board-h64-d35-lr2e4-e600-s2",
+    "name": "policy-ranker-matelike-preserve-nonmate-board-h64-d35-pw50-lr2e4-e800",
     "backend": "policy-ranking",
     "pack_dir": "runs/imported/latest/pack/train",
     "child_targets": "targets/child-ranking/losslogs_v5_primary80.jsonl",
     "selfplay_depth": 12,
-    "selfplay_seed": 2026052102,
+    "selfplay_seed": 2026052801,
     "skip_plies": 8,
     "score_depth": 16,
     "objective": "huber",
     "huber_beta": 200,
     "target_clamp": 800,
     "lr": 0.0002,
-    "epochs": 600,
+    "epochs": 800,
     "weight_decay": 0.0001,
     "select_metric": "sign",
     "patience": 2,
@@ -33,8 +33,16 @@
     "policy_feature_set": "board",
     "policy_dropout": 0.35,
     "policy_include_tags": "mate_like",
+    "policy_preserve_exclude_tags": "mate_like",
+    "policy_preserve_weight": 0.5,
+    "policy_preserve_margin": 4.0,
+    "policy_preserve_max_groups": 1500,
     "policy_gate_include_tags": "mate_like",
     "policy_gate_exclude_tags": "source:lichess_lowmat_mc12",
+    "policy_broad_gate_exclude_tags": "mate_like",
+    "policy_broad_gate_min_groups": 1000,
+    "policy_broad_gate_max_bad": 0,
+    "policy_broad_gate_max_overrides": 200,
     "policy_breakdown_tags": "source:losslogs_v5,source:gamebalanced_v3,source:lichess_lowmat_mc12,sample:forcing,sample:conversion,sample:queen_rook_endgame,sample:queen_endgame,sample:rook_endgame,sample:pawn_race,sample:broad_other,sample:quiet_broad,phase:endgame,phase:late,phase:midgame",
     "policy_val_fraction": 0.25,
     "policy_target_temperature_cp": 80,
@@ -60,12 +68,12 @@
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "required_before_sprt": [
-      "pt-vs-nn child ranking gate",
-      "exported engine child ranking gate",
-      "broad-preserve stability",
-      "replay/failure-suite",
-      "200-300 game smoke"
+    "required_before_search_integration": [
+      "mate-like policy gate passes",
+      "non-mate broad gate has zero bad overrides at export threshold",
+      "export parity gate passes",
+      "C++ policyrank diagnostic shows no opening override on startpos",
+      "256-game same-binary smoke if engine integration is attempted"
     ]
   }
 }

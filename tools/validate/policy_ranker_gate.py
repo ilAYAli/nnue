@@ -202,7 +202,8 @@ def best_summary(summaries: list[dict[str, float]]) -> dict[str, float]:
 
 def summary_passes(summary: dict[str, float], *,
                    min_top1: int = -1, max_bad: int = -1,
-                   min_good: int = -1, min_overrides: int = -1) -> bool:
+                   min_good: int = -1, min_overrides: int = -1,
+                   max_overrides: int = -1) -> bool:
     if min_top1 >= 0 and summary["top1"] < min_top1:
         return False
     if max_bad >= 0 and summary["bad"] > max_bad:
@@ -210,6 +211,8 @@ def summary_passes(summary: dict[str, float], *,
     if min_good >= 0 and summary["good"] < min_good:
         return False
     if min_overrides >= 0 and summary["overrides"] < min_overrides:
+        return False
+    if max_overrides >= 0 and summary["overrides"] > max_overrides:
         return False
     return True
 
@@ -232,6 +235,7 @@ def main() -> None:
     ap.add_argument("--split-val-fraction", type=float, default=0.0)
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)
     ap.add_argument("--fail-if-bad-above", type=int, default=-1)
+    ap.add_argument("--fail-if-overrides-above", type=int, default=-1)
     ap.add_argument("--fail-if-val-top1-below", type=int, default=-1)
     ap.add_argument("--fail-if-val-bad-above", type=int, default=-1)
     ap.add_argument("--fail-if-val-good-below", type=int, default=-1)
@@ -255,7 +259,8 @@ def main() -> None:
             if not summary_passes(
                     all_summary,
                     min_top1=args.fail_if_top1_below,
-                    max_bad=args.fail_if_bad_above):
+                    max_bad=args.fail_if_bad_above,
+                    max_overrides=args.fail_if_overrides_above):
                 continue
             if summary_passes(
                     val_summary,
@@ -270,7 +275,8 @@ def main() -> None:
         failed = not summary_passes(
             best,
             min_top1=args.fail_if_top1_below,
-            max_bad=args.fail_if_bad_above)
+            max_bad=args.fail_if_bad_above,
+            max_overrides=args.fail_if_overrides_above)
     if failed:
         raise SystemExit(1)
 

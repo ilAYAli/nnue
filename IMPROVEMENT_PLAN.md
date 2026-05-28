@@ -233,6 +233,12 @@ Latest child-ranking result:
   changing `go`. On `startpos`, the current artifact already fires
   (`g1f3 -> e2e4`), so it is not deployment-safe. Do not integrate it into
   search until broad no-action calibration passes.
+- Broad no-action diagnostic on the same exported checkpoint confirmed the
+  problem. On non-`mate_like` groups, threshold `4` produced thousands of
+  overrides and many bad ones; even much higher thresholds still had bad broad
+  overrides. The next run must include non-mate preserve/no-action rows during
+  training and must fail automatically if the deployed threshold has broad bad
+  overrides.
 
 Rejected lanes:
 
@@ -302,10 +308,12 @@ Move the child-ranking signal out of the scalar eval net:
    with the PyTorch checkpoint.
 5. Done: add Enyo-side artifact loading and board-feature parity tests.
 6. Done: add a disabled-by-default `policyrank` root diagnostic.
-7. Next: build a broad no-action gate from normal/opening/middlegame positions.
-   The current artifact must be treated as unsafe because it overrides
-   `startpos`.
-8. Require broad game-safety before considering any default-enabled integration.
+7. Done: add `build.py` support for policy preserve/no-action training rows and
+   a broad gate at the deployed export threshold.
+8. Next: train a `mate_like` sidecar with non-`mate_like` preserve rows active
+   from epoch 0. The run must pass both the split-aware mate-like gate and a
+   broad no-action gate before export is considered useful.
+9. Require broad game-safety before considering any default-enabled integration.
 
 Interpretation:
 
@@ -326,12 +334,13 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `policy-ranker-matelike-mix-board-h64-d35-lr2e4-e600`
+- candidate name:
+  `policy-ranker-matelike-preserve-nonmate-board-h64-d35-pw50-lr2e4-e800`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
 - self-play depth: `12`
-- self-play seed: `2026052101`
+- self-play seed: `2026052801`
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: separate move-ranking sidecar, not scalar eval fine-tuning
@@ -343,10 +352,22 @@ Current `build.json` intent:
   - gate is deliberately split-aware: require a single zero-bad threshold that
     also produces at least 10 held-out good overrides and 10 held-out
     overrides.
+- preserve rows:
+  - all non-`mate_like` groups, sampled to `1500` groups for the first run.
+  - preserve loss keeps the base/static selected move above policy alternatives
+    by `4` policy-score units.
+- broad deployment gate:
+  - evaluates all non-`mate_like` target groups at export threshold `4`.
+  - requires `0` bad overrides and no more than `200` total broad overrides.
 - main knobs:
   - `policy_hidden`
   - `policy_feature_set`
   - `policy_dropout`
+  - `policy_preserve_weight`
+  - `policy_preserve_margin`
+  - `policy_preserve_max_groups`
+  - `policy_broad_gate_max_bad`
+  - `policy_broad_gate_max_overrides`
   - `policy_val_fraction`
   - `policy_target_temperature_cp`
   - `policy_thresholds`
@@ -357,11 +378,11 @@ Current `build.json` intent:
 
 Current hypothesis:
 
-- Board geometry is necessary but not sufficient. On broad groups, the universal
-  sidecar still produced unsafe held-out overrides. The next test is whether a
-  motif-restricted sidecar can be safe for `mate_like` positions. If that also
-  fails, pause simple sidecar MLP work and move to either stronger policy data
-  construction or a different representation.
+- The sidecar can learn `mate_like` corrections, but without an explicit
+  no-action loss it fires on normal positions. The next test is whether
+  non-mate preserve rows can keep broad action near zero while retaining useful
+  mate-like overrides. If this fails cleanly, pause simple sidecar MLP work and
+  move to stronger policy data construction or a different representation.
 
 Rules:
 

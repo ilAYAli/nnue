@@ -350,6 +350,11 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--dropout", str(args.policy_dropout),
                     "--include-tags", args.policy_include_tags,
                     "--exclude-tags", args.policy_exclude_tags,
+                    "--preserve-include-tags", args.policy_preserve_include_tags,
+                    "--preserve-exclude-tags", args.policy_preserve_exclude_tags,
+                    "--preserve-weight", str(args.policy_preserve_weight),
+                    "--preserve-margin", str(args.policy_preserve_margin),
+                    "--preserve-max-groups", str(args.policy_preserve_max_groups),
                     "--epochs", str(args.epochs),
                     "--lr", str(args.lr),
                     "--weight-decay", str(args.weight_decay),
@@ -385,6 +390,32 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--bad-tolerance-cp", str(args.policy_bad_tolerance_cp),
                 ],
             },
+        ])
+        if (args.policy_broad_gate_include_tags
+                or args.policy_broad_gate_exclude_tags):
+            steps.append({
+                "name": "validate_policy_ranker_broad",
+                "command": [
+                    python, tool("validate/policy_ranker_gate.py"),
+                    "--targets", *policy_target_paths,
+                    "--model", f"{candidate_dir}/model.pt",
+                    "--base-net", str(expand_path(args.init_net)),
+                    "--device", args.device,
+                    "--feature-set", args.policy_feature_set,
+                    "--include-tags", args.policy_broad_gate_include_tags,
+                    "--exclude-tags", args.policy_broad_gate_exclude_tags,
+                    "--breakdown-tags", args.policy_breakdown_tags,
+                    "--min-groups", str(args.policy_broad_gate_min_groups),
+                    "--thresholds", str(args.policy_export_threshold),
+                    "--split-seed", str(args.selfplay_seed),
+                    "--split-val-fraction", "0",
+                    "--fail-if-bad-above", str(args.policy_broad_gate_max_bad),
+                    "--fail-if-overrides-above",
+                    str(args.policy_broad_gate_max_overrides),
+                    "--bad-tolerance-cp", str(args.policy_bad_tolerance_cp),
+                ],
+            })
+        steps.extend([
             {
                 "name": "export_policy_ranker",
                 "command": [
@@ -582,8 +613,18 @@ def add_create_args(
     parser.add_argument("--policy-dropout", type=float, default=value("policy_dropout", d.policy_dropout))
     parser.add_argument("--policy-include-tags", default=value("policy_include_tags", d.policy_include_tags))
     parser.add_argument("--policy-exclude-tags", default=value("policy_exclude_tags", d.policy_exclude_tags))
+    parser.add_argument("--policy-preserve-include-tags", default=value("policy_preserve_include_tags", d.policy_preserve_include_tags))
+    parser.add_argument("--policy-preserve-exclude-tags", default=value("policy_preserve_exclude_tags", d.policy_preserve_exclude_tags))
+    parser.add_argument("--policy-preserve-weight", type=float, default=value("policy_preserve_weight", d.policy_preserve_weight))
+    parser.add_argument("--policy-preserve-margin", type=float, default=value("policy_preserve_margin", d.policy_preserve_margin))
+    parser.add_argument("--policy-preserve-max-groups", type=int, default=value("policy_preserve_max_groups", d.policy_preserve_max_groups))
     parser.add_argument("--policy-gate-include-tags", default=value("policy_gate_include_tags", d.policy_gate_include_tags))
     parser.add_argument("--policy-gate-exclude-tags", default=value("policy_gate_exclude_tags", d.policy_gate_exclude_tags))
+    parser.add_argument("--policy-broad-gate-include-tags", default=value("policy_broad_gate_include_tags", d.policy_broad_gate_include_tags))
+    parser.add_argument("--policy-broad-gate-exclude-tags", default=value("policy_broad_gate_exclude_tags", d.policy_broad_gate_exclude_tags))
+    parser.add_argument("--policy-broad-gate-min-groups", type=int, default=value("policy_broad_gate_min_groups", d.policy_broad_gate_min_groups))
+    parser.add_argument("--policy-broad-gate-max-bad", type=int, default=value("policy_broad_gate_max_bad", d.policy_broad_gate_max_bad))
+    parser.add_argument("--policy-broad-gate-max-overrides", type=int, default=value("policy_broad_gate_max_overrides", d.policy_broad_gate_max_overrides))
     parser.add_argument("--policy-breakdown-tags", default=value("policy_breakdown_tags", d.policy_breakdown_tags))
     parser.add_argument("--policy-val-fraction", type=float, default=value("policy_val_fraction", d.policy_val_fraction))
     parser.add_argument("--policy-target-temperature-cp", type=int, default=value("policy_target_temperature_cp", d.policy_target_temperature_cp))
