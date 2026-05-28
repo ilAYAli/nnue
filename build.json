@@ -1,13 +1,13 @@
 {
-  "description": "Train the next child-ranking candidate on the latest root-complete replay-loss corpus, LC0-oracle rows, and the failed-smoke preserve rows.",
-  "experiment": "child-ranking-mixed-replaylatest2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+  "description": "Train the next child-ranking candidate on the r2 root-complete replay-loss corpus, LC0-oracle rows, and the failed-smoke preserve rows.",
+  "experiment": "child-ranking-mixed-replaylatest-r2-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
   "create": {
-    "name": "child-ranking-mixed-replaylatest2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
+    "name": "child-ranking-mixed-replaylatest-r2-2854-lc0oracle1000-smoker1-listwise-qfwd-refpreserve20-dz5-lr5e5-e360",
     "backend": "child-ranking",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "init_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
     "pack_dir": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/pack/train",
-    "child_targets": "targets/mixed-replaylatest2854-lc0oracle1000-smoker1-20260528/mixed_child_targets.jsonl",
+    "child_targets": "targets/mixed-replaylatest-r2-2854-lc0oracle1000-smoker1-20260528/mixed_child_targets.jsonl",
     "epochs": 360,
     "lr": 0.00005,
     "batch_size": 8192,
@@ -36,24 +36,24 @@
     "child_static_gate_max_sign_drop_pct": 1.0,
     "child_static_gate_max_near_zero_sign_drop_pct": 2.0,
     "min_groups": 4045,
-    "min_pairs": 16000,
+    "min_pairs": 16090,
     "child_model_gate_min_top1": 1460,
     "child_engine_gate_min_top1": 1444,
-    "child_search_gate_targets": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r1.jsonl",
+    "child_search_gate_targets": "targets/replay-loss-20260528-latest/loss_replay_child_targets_rootaug_r2_latestcandidate.jsonl",
     "child_search_gate_reference_net": "~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn",
     "child_search_gate_nodes": 20000,
     "child_search_gate_depth": 0,
     "child_search_gate_jobs": 8,
     "child_search_gate_min_groups": 2854,
-    "child_search_gate_min_top1": 1900,
+    "child_search_gate_min_top1": 1873,
     "child_search_gate_max_missing": 0,
-    "child_search_gate_max_reference_better": 258,
+    "child_search_gate_max_reference_better": 283,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "expected_signal": [
       "the mixed model and engine gates must clear the new 4045-group corpus",
-      "the replay search gate must keep missing_selected=0 and stay at least as good as the current r1 candidate on the latest root-complete loss replay set",
+      "the replay search gate must keep missing_selected=0 and improve over the previous r2-complete candidate on the latest loss replay set",
       "the static broad gate must remain within +5cp MAE, <=1pp sign drop, and <=2pp near-zero sign drop before any smoke run is considered"
     ]
   }
