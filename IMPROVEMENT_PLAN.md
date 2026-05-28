@@ -224,8 +224,12 @@ Latest child-ranking result:
   the hard pass/fail rule; global all-row safety is a later deployment gate.
   Rerunning the same checkpoint with `policy_gate_max_bad=-1` passed. The
   policy-sidecar lane has now replicated useful held-out action on two splits.
-  Do not keep tuning the offline model shape until an engine-side integration
-  design exists.
+  Exported `policy_ranker.json` parity also passed: `215` valid groups,
+  `1695` scores, max score drift `0.00024414`, and `0` argmax mismatches.
+  Enyo branch `feature/policy-ranker-diagnostic` now has an artifact loader and
+  C++ board-feature construction with Python-generated parity fixtures. Do not
+  keep tuning the offline model shape until an engine-side root diagnostic
+  exists.
 
 Rejected lanes:
 
@@ -269,11 +273,11 @@ Primary lane:
   objective.
 - New candidates must use `./build.py create`; no manual training pipelines.
 - Policy-sidecar diagnostics are now promising only for a narrow `mate_like`
-  non-lowmat slice. The next useful work is an engine-side design for a gated
-  move-ordering or tie-break signal that cannot corrupt scalar eval. The bridge
-  step is exported-policy parity first, then C++ inference/root-only gating.
-  Do not run SPRT until the sidecar is integrated and an engine gate shows
-  actual search move changes on the same held-out target style.
+  non-lowmat slice. Exported-policy parity and C++ feature parity are done. The
+  next useful work is a disabled-by-default engine diagnostic for root-only
+  gated move ordering/tie-breaking that cannot corrupt scalar eval. Do not run
+  SPRT until an engine gate shows actual search move changes on the same
+  held-out target style.
 
 Secondary lanes:
 
@@ -291,9 +295,12 @@ Move the child-ranking signal out of the scalar eval net:
 2. Train a separate move-ranking/correction model on the same child groups.
 3. Use it only as a gated move-order/tie-break signal in validation, not as an
    eval replacement.
-4. Export the trained sidecar to `policy_ranker.json` and require parity with
-   the PyTorch checkpoint.
-5. Require broad game-safety before considering engine integration.
+4. Done: export the trained sidecar to `policy_ranker.json` and require parity
+   with the PyTorch checkpoint.
+5. Done: add Enyo-side artifact loading and board-feature parity tests.
+6. Next: add a disabled-by-default root diagnostic that logs or gates candidate
+   policy overrides without changing normal play.
+7. Require broad game-safety before considering any default-enabled integration.
 
 Interpretation:
 
