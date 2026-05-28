@@ -169,6 +169,15 @@ Latest child-ranking result:
   good overrides and selected top1 `204/773`, below the required `220/773`.
   This closes the compact policy feature set. It can memorize corrections, but
   does not generalize.
+- `policy-ranker-full773-board-h128-d15-lr2e4-e3000`: added parent and child
+  board planes. The full-corpus gate passed: threshold `32` selected `245/773`
+  versus base `201/773`, with `48` overrides, `47` good, and `0` bad. A
+  train/validation split audit showed this was still mostly memorization:
+  train had `46` good zero-bad overrides at threshold `32`, while validation
+  had only `1` good zero-bad override and no top1 lift. The policy gate is now
+  being made split-aware so a full-corpus pass cannot hide train-only action.
+  Next policy runs must show same-threshold held-out overrides, not just full
+  target-set improvement.
 
 Rejected lanes:
 
@@ -249,7 +258,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `policy-ranker-full773-board-h128-d15-lr2e4-e3000`
+- candidate name: `policy-ranker-lossv5-v3x6-lowmat-board-h64-d25-lr3e4-e120`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
@@ -259,12 +268,12 @@ Current `build.json` intent:
 - score depth: `16`
 - objective: separate move-ranking sidecar, not scalar eval fine-tuning
 - current ladder target:
-  - `targets/child-ranking/losslogs_v5_full773.jsonl`
-  - normalized from the full losslogs-v5 target builder output.
-  - 773 valid groups, 11987 scored moves; three source rows with fewer than
-    two scored moves were dropped.
-  - gate is deliberately strict: require a zero-bad threshold with selected
-    top1 at least `220/773`, above the base `201/773`.
+  - `targets/child-ranking/losslogs_v5_full773.jsonl`.
+  - plus the generated v3/low-material policy mix from
+    `nnue_native_hidden/runs/policy-mix-v3x6-lowmat5k-20260527`.
+  - gate is deliberately stricter than the previous full-corpus gate: require
+    a single zero-bad threshold that also produces at least 100 held-out good
+    overrides and 100 held-out overrides.
 - main knobs:
   - `policy_hidden`
   - `policy_feature_set`
@@ -279,12 +288,12 @@ Current `build.json` intent:
 
 Current hypothesis:
 
-- The compact sidecar did not see enough board geometry. It used reference
-  child eval, move squares, move flags, and material counts, but not the actual
-  parent/child piece placement. The next run adds parent and child 12x64
-  board planes from the parent side-to-move perspective. If validation still
-  stays flat, the sidecar needs a much larger real-game corpus or engine-level
-  integration should be paused.
+- Board geometry is necessary but not sufficient. On 773 groups, it mostly
+  memorized train rows. The next test is whether the same board-aware sidecar
+  can produce held-out safe action when trained on a much broader real-game /
+  low-material policy corpus. If held-out action remains flat, pause simple
+  sidecar MLP work and move to either a larger policy corpus with better
+  feature batching or a different representation.
 
 Rules:
 

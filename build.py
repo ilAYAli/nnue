@@ -365,8 +365,14 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--feature-set", args.policy_feature_set,
                     "--min-groups", str(args.min_groups),
                     "--thresholds", args.policy_thresholds,
+                    "--split-seed", str(args.selfplay_seed),
+                    "--split-val-fraction", str(args.policy_val_fraction),
                     "--fail-if-top1-below", str(args.policy_gate_min_top1),
                     "--fail-if-bad-above", str(args.policy_gate_max_bad),
+                    "--fail-if-val-top1-below", str(args.policy_gate_min_val_top1),
+                    "--fail-if-val-bad-above", str(args.policy_gate_max_val_bad),
+                    "--fail-if-val-good-below", str(args.policy_gate_min_val_good),
+                    "--fail-if-val-overrides-below", str(args.policy_gate_min_val_overrides),
                 ],
             },
         ])
@@ -544,6 +550,10 @@ def add_create_args(
     parser.add_argument("--policy-thresholds", default=value("policy_thresholds", d.policy_thresholds))
     parser.add_argument("--policy-gate-min-top1", type=int, default=value("policy_gate_min_top1", d.policy_gate_min_top1))
     parser.add_argument("--policy-gate-max-bad", type=int, default=value("policy_gate_max_bad", d.policy_gate_max_bad))
+    parser.add_argument("--policy-gate-min-val-top1", type=int, default=value("policy_gate_min_val_top1", d.policy_gate_min_val_top1))
+    parser.add_argument("--policy-gate-max-val-bad", type=int, default=value("policy_gate_max_val_bad", d.policy_gate_max_val_bad))
+    parser.add_argument("--policy-gate-min-val-good", type=int, default=value("policy_gate_min_val_good", d.policy_gate_min_val_good))
+    parser.add_argument("--policy-gate-min-val-overrides", type=int, default=value("policy_gate_min_val_overrides", d.policy_gate_min_val_overrides))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

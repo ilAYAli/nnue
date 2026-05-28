@@ -19,17 +19,8 @@ from lib.policy_ranker import (
     load_policy_source_groups,
     normalize_features,
     score_group,
+    split_policy_groups,
 )
-
-
-def split_groups(groups: list[PolicyGroup], seed: int,
-                 val_fraction: float) -> tuple[list[PolicyGroup], list[PolicyGroup]]:
-    shuffled = list(groups)
-    random.Random(seed).shuffle(shuffled)
-    val_n = int(round(len(shuffled) * val_fraction))
-    if val_fraction > 0.0:
-        val_n = max(1, min(len(shuffled) - 1, val_n))
-    return shuffled[val_n:], shuffled[:val_n]
 
 
 def group_loss(model: PolicyRanker, group: PolicyGroup,
@@ -90,7 +81,8 @@ def main() -> None:
     builder = PolicyFeatureBuilder(
         args.base_net, device=args.device, feature_set=args.feature_set)
     groups = [builder.build_group(group) for group in raw_groups]
-    train_groups, val_groups = split_groups(groups, args.seed, args.val_fraction)
+    train_groups, val_groups = split_policy_groups(
+        groups, args.seed, args.val_fraction)
     if not train_groups:
         raise SystemExit("no train groups")
 
@@ -148,6 +140,9 @@ def main() -> None:
                     "dropout": args.dropout,
                     "feature_set": args.feature_set,
                     "seed": args.seed,
+                    "val_fraction": args.val_fraction,
+                    "train_group_ids": [group.group_id for group in train_groups],
+                    "val_group_ids": [group.group_id for group in val_groups],
                     "targets": list(args.targets),
                     "base_net": args.base_net,
                 }

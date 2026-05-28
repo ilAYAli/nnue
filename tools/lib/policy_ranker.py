@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import random
 
 import chess
 import torch
@@ -45,6 +46,17 @@ def load_policy_source_groups(paths: list[str | Path], *,
         raise SystemExit(
             f"valid_groups={len(groups)} below min_groups={min_groups}")
     return groups
+
+
+def split_policy_groups(groups: list[PolicyGroup], seed: int,
+                        val_fraction: float
+                        ) -> tuple[list[PolicyGroup], list[PolicyGroup]]:
+    shuffled = list(groups)
+    random.Random(seed).shuffle(shuffled)
+    val_n = int(round(len(shuffled) * val_fraction))
+    if val_fraction > 0.0:
+        val_n = max(1, min(len(shuffled) - 1, val_n))
+    return shuffled[val_n:], shuffled[:val_n]
 
 
 class PolicyRanker(nn.Module):

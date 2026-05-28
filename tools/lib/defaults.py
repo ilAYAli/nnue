@@ -107,6 +107,10 @@ class CandidateDefaults:
     policy_thresholds: str = "0,1,2,4,8"
     policy_gate_min_top1: int = 1
     policy_gate_max_bad: int = -1
+    policy_gate_min_val_top1: int = -1
+    policy_gate_max_val_bad: int = -1
+    policy_gate_min_val_good: int = -1
+    policy_gate_min_val_overrides: int = -1
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

@@ -42,7 +42,8 @@ def child_fen(fen: str, move_uci: str) -> str:
 
 def _move_score(row: dict, group_id: str) -> float:
     if "score_cp" not in row:
-        raise ValueError(f"{group_id}: move {row.get('move')} missing score_cp")
+        move = row.get("move") or row.get("uci")
+        raise ValueError(f"{group_id}: move {move} missing score_cp")
     return float(row["score_cp"])
 
 
@@ -62,9 +63,7 @@ def _best_move(raw: dict, moves: list[ChildMoveTarget], group_id: str) -> str:
 def parse_group(raw: dict, line_no: int) -> ChildRankGroup:
     group_id = str(raw.get("id") or raw.get("group_id") or f"line:{line_no}")
     fen = str(raw["fen"])
-    if "max_gap_cp" not in raw:
-        raise ValueError(f"{group_id}: missing max_gap_cp")
-    max_gap_cp = float(raw["max_gap_cp"])
+    max_gap_cp = float(raw.get("max_gap_cp", 800.0))
     if max_gap_cp <= 0:
         raise ValueError(f"{group_id}: max_gap_cp must be positive")
 
@@ -72,17 +71,19 @@ def parse_group(raw: dict, line_no: int) -> ChildRankGroup:
     seen: set[str] = set()
     moves: list[ChildMoveTarget] = []
     for move_raw in raw.get("moves", []):
-        move_uci = str(move_raw["move"])
+        move_uci = str(move_raw.get("move") or move_raw["uci"])
         if move_uci in seen:
             raise ValueError(f"{group_id}: duplicate move {move_uci}")
         seen.add(move_uci)
         move = chess.Move.from_uci(move_uci)
         if move not in board.legal_moves:
             raise ValueError(f"{group_id}: illegal move {move_uci}")
+        flags = set(move_raw.get("flags", []))
         moves.append(ChildMoveTarget(
             move=move_uci,
             score_cp=_move_score(move_raw, group_id),
-            role=str(move_raw.get("role", "neighbor")),
+            role=str(move_raw.get(
+                "role", "best" if "best" in flags else "neighbor")),
         ))
 
     if len(moves) < 2:
