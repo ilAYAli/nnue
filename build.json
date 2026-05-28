@@ -1,15 +1,15 @@
 {
-  "description": "Augment the completed r17 corpus with r17b root-selected moves before judging search gates.",
-  "experiment": "mixed-fast4-r17b-rootaugment-r17b-r15b-20260529",
+  "description": "Augment the completed r17/r17b corpus with r14 root-selected moves before judging r14 as keeper.",
+  "experiment": "mixed-fast4-r17c-rootaugment-r14-r15b-berserk-20260529",
   "create": {
-    "name": "mixed-fast4-r17b-rootaugment-r17b-r15b-20260529",
+    "name": "mixed-fast4-r17c-rootaugment-r14-r15b-berserk-20260529",
     "backend": "augment-child-targets",
     "engine": "~/code/cpp/chess/assets/engines/enyo_43abd4b",
     "score_engine": "~/local/bin/stockfish",
-    "child_augment_input": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17baseline.jsonl",
-    "child_augment_output": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17b.jsonl",
-    "child_augment_summary": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17b.summary.txt",
-    "child_augment_search_nets": "r17b=runs/child-ranking-fast4-r17b-r15binit-rootaug-listwise-qfwd-refpreserve20-dz5-lr5e6-e240/train/child-ranking-fast4-r17b-r15binit-rootaug-listwise-qfwd-refpreserve20-dz5-lr5e6-e240/model.nn,r15b=runs/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/train/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/model.nn",
+    "child_augment_input": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17b.jsonl",
+    "child_augment_output": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17c.jsonl",
+    "child_augment_summary": "targets/mixed-fast4-r17-r15b-smokelosswide395-20260528/mixed_child_targets_rootaug_r17c.summary.txt",
+    "child_augment_search_nets": "r14=runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn,r15b=runs/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/train/child-ranking-fast4-r15b-r14init-listwise-qfwd-refpreserve20-dz5-lr1e5-e240/model.nn,berserk=~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn",
     "child_augment_search_nodes": 20000,
     "child_augment_search_depth": 0,
     "child_augment_jobs": 8,
@@ -23,15 +23,13 @@
   },
   "validation": {
     "baseline": [
-      "r17b model gate: 2343/5842, two below r15b baseline",
-      "r17b engine-eval gate: 2343/5842, above r15b baseline",
-      "r17b broad static: MAE improves by 6.9cp with no sign collapse",
-      "r17b search gate before augmentation: 445 missing selected moves"
+      "r14 is the best game-tested net so far: 1000-game smoke -0.3 +/- 15.7 vs Berserk",
+      "r15b 256-game smoke was -5.4 +/- 29.9; r17b completed search gate was worse than r15b",
+      "r14 has 259 missing selected moves on the r17b-completed corpus before this augmentation"
     ],
     "pass_intent": [
-      "make r17b-vs-r15b search coverage complete before judging the candidate",
-      "rerun the search gate only after missing_selected is zero",
-      "do not smoke unless the completed search gate beats r15b"
+      "make r14, r15b, and Berserk selected-move coverage complete on the current corpus",
+      "rerun completed search gates with missing_selected=0 before choosing the next training init"
     ]
   }
 }
