@@ -106,6 +106,13 @@ Latest child-ranking result:
   primary80 `66/80`, and `.pt == .nn` on primary80. The two trained-set misses
   had margins only around `-2cp` and `-1cp`, so the next check should push
   margin, not change target source.
+- `child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-t15-lr1e4-e800`:
+  passed the sharper margin check. Export-quantized `.pt` and exported `.nn`
+  both reached `64/64`; corrected engine gate also reached `64/64` with worst
+  margin `+28cp`. Broad drift stayed controlled (`broad_excess` about `51cp`).
+  Cross-checks: old focused set `32/34`, full primary80 `68/80`. This proves
+  export-aware child ranking can fully learn the filtered 64-group set; the
+  next useful test is scale, not another 64-set margin tweak.
 
 Rejected lanes:
 
@@ -159,23 +166,24 @@ Secondary lanes:
 
 ## Next Concrete Experiment
 
-Run a longer, sharper export-aware preserve check on the same filtered
-64-group set:
+Scale the export-aware listwise child-ranking run to the full primary80 set:
 
-1. Use `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`.
+1. Use `targets/child-ranking/losslogs_v5_primary80.jsonl`.
 2. Set `child_loss=listwise`, `broad_preserve_weight=0.005`, and
    `export_quantize_forward=true`.
 3. Run `800` epochs at `lr=1e-4`.
-4. Set `rank_temperature_cp=15` to push the near-zero remaining margins.
+4. Keep `rank_temperature_cp=15`.
 5. Require export-quantized `.pt`, `.nn`, and corrected engine gates at least
-   `63/64`.
+   `70/80`.
 
 Interpretation:
 
-- If the longer/sharper run reaches `63/64` or better while keeping
-  `broad_excess <= 80cp`, scale to the next high-signal target set.
-- If it remains at `62/64`, treat the two repeated misses as hard rows and
-  scale anyway only after excluding low-gap/noisy rows from the larger set.
+- The previous 64-group net already cross-checks at `68/80`. A primary80 run
+  must beat that without losing export parity.
+- If primary80 reaches at least `70/80` while keeping `broad_excess <= 80cp`,
+  run broader non-training validation before considering a game smoke.
+- If it fails below `70/80`, inspect misses by gap. Do not chase gap-1 to
+  gap-8 rows as primary failures.
 
 ## Candidate Workflow
 
@@ -187,7 +195,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `child-ranking-lossv5-primary64-g30-listwise-qfwd-preserve005-t15-lr1e4-e800`
+- candidate name: `child-ranking-lossv5-primary80-listwise-qfwd-preserve005-t15-lr1e4-e800`
 - backend: `child-ranking`
 - target format: child-move groups with stored capped gaps
 - broad-preserve data: existing packed broad data via `pack_dir`
@@ -196,10 +204,11 @@ Current `build.json` intent:
 - skipped opening plies: `8`
 - score depth: `16`
 - objective: export-aware listwise ranking loss plus weak broad deadzone
-  preservation for the high-signal primary 64-group diagnostic
-- current ladder target: `targets/child-ranking/losslogs_v5_primary64_g30.jsonl`
-  - 64 groups, 642 positive-gap training pairs, selected from loss logs.
-  - category balance: forcing `56`, queen/rook endgame `3`, conversion `5`.
+  preservation for the primary80 scale diagnostic
+- current ladder target: `targets/child-ranking/losslogs_v5_primary80.jsonl`
+  - 80 groups, 844 positive-gap training pairs, selected from loss logs.
+  - includes the filtered 64 high-signal groups plus 16 low-gap/noisy rows that
+    should not dominate interpretation.
 - main knobs:
   - `ranking_weight`
   - `broad_preserve_weight`
