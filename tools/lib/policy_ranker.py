@@ -48,13 +48,17 @@ def load_policy_source_groups(paths: list[str | Path], *,
 
 
 class PolicyRanker(nn.Module):
-    def __init__(self, input_dim: int, hidden: int = 128) -> None:
+    def __init__(self, input_dim: int, hidden: int = 128,
+                 dropout: float = 0.0) -> None:
         super().__init__()
+        drop = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden),
             nn.ReLU(),
+            drop,
             nn.Linear(hidden, hidden),
             nn.ReLU(),
+            drop,
             nn.Linear(hidden, 1),
         )
 
@@ -109,8 +113,33 @@ def _material_features(board: chess.Board) -> list[float]:
     return features
 
 
+def _oriented_square(square: chess.Square, view: chess.Color,
+                     king_square: chess.Square | None) -> chess.Square:
+    out = square
+    king = king_square
+    if view == chess.BLACK:
+        out ^= 56
+        if king is not None:
+            king ^= 56
+    if king is not None and (king & 0x4):
+        out ^= 7
+    return out
+
+
+def _board_planes(board: chess.Board, view: chess.Color,
+                  king_square: chess.Square | None) -> list[float]:
+    features = [0.0] * (12 * 64)
+    for square, piece in board.piece_map().items():
+        rel_color = 0 if piece.color == view else 1
+        plane = rel_color * 6 + (piece.piece_type - 1)
+        oriented = _oriented_square(square, view, king_square)
+        features[plane * 64 + oriented] = 1.0
+    return features
+
+
 def move_features(board: chess.Board, move: chess.Move, base_score: float,
-                  base_best: float, base_rank: int, move_count: int) -> list[float]:
+                  base_best: float, base_rank: int, move_count: int,
+                  feature_set: str = "compact") -> list[float]:
     moving = board.piece_at(move.from_square)
     captured = board.piece_at(move.to_square)
     if board.is_en_passant(move):
@@ -143,12 +172,23 @@ def move_features(board: chess.Board, move: chess.Move, base_score: float,
     promo_index = 0 if move.promotion is None else move.promotion
     features.extend(_one_hot(promo_index, 7))
     features.extend(_material_features(board))
+    if feature_set == "board":
+        view = board.turn
+        king_square = board.king(view)
+        child = board.copy(stack=False)
+        child.push(move)
+        features.extend(_board_planes(board, view, king_square))
+        features.extend(_board_planes(child, view, king_square))
+    elif feature_set != "compact":
+        raise ValueError(f"unknown policy feature set: {feature_set}")
     return features
 
 
 class PolicyFeatureBuilder:
-    def __init__(self, base_net: str | Path, device: str = "cpu") -> None:
+    def __init__(self, base_net: str | Path, device: str = "cpu",
+                 feature_set: str = "compact") -> None:
         self.device = device
+        self.feature_set = feature_set
         self.base_model = load_model_from_nn(base_net, device=device)
         self.base_model.eval()
 
@@ -174,7 +214,7 @@ class PolicyFeatureBuilder:
             move = chess.Move.from_uci(target.move)
             rows.append(move_features(
                 board, move, base_scores[target.move], base_best,
-                base_rank[target.move], len(group.moves)))
+                base_rank[target.move], len(group.moves), self.feature_set))
             oracle_scores.append(target.score_cp)
             gaps.append(target_gap_cp(group, target))
             moves.append(target.move)

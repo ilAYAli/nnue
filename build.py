@@ -342,6 +342,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--base-net", str(expand_path(args.init_net)),
                     "--out", f"{candidate_dir}/model.pt",
                     "--hidden", str(args.policy_hidden),
+                    "--feature-set", args.policy_feature_set,
+                    "--dropout", str(args.policy_dropout),
                     "--epochs", str(args.epochs),
                     "--lr", str(args.lr),
                     "--weight-decay", str(args.weight_decay),
@@ -360,6 +362,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--model", f"{candidate_dir}/model.pt",
                     "--base-net", str(expand_path(args.init_net)),
                     "--device", args.device,
+                    "--feature-set", args.policy_feature_set,
                     "--min-groups", str(args.min_groups),
                     "--thresholds", args.policy_thresholds,
                     "--fail-if-top1-below", str(args.policy_gate_min_top1),
@@ -533,6 +536,9 @@ def add_create_args(
     parser.add_argument("--child-engine-gate-min-top1", type=int, default=value("child_engine_gate_min_top1", d.child_engine_gate_min_top1))
     parser.add_argument("--policy-targets", default=value("policy_targets", d.policy_targets))
     parser.add_argument("--policy-hidden", type=int, default=value("policy_hidden", d.policy_hidden))
+    parser.add_argument("--policy-feature-set", default=value("policy_feature_set", d.policy_feature_set),
+                        choices=["compact", "board"])
+    parser.add_argument("--policy-dropout", type=float, default=value("policy_dropout", d.policy_dropout))
     parser.add_argument("--policy-val-fraction", type=float, default=value("policy_val_fraction", d.policy_val_fraction))
     parser.add_argument("--policy-target-temperature-cp", type=int, default=value("policy_target_temperature_cp", d.policy_target_temperature_cp))
     parser.add_argument("--policy-thresholds", default=value("policy_thresholds", d.policy_thresholds))

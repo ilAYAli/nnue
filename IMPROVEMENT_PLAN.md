@@ -161,6 +161,14 @@ Latest child-ranking result:
   (`2` and `1` zero-bad overrides respectively). This makes the small-rung
   policy models diagnostic only; the next run must train on the full loss-log
   corpus.
+- `policy-ranker-full773-h64-lr2e4-e3000`: trained directly on the full
+  773-group losslogs corpus. Policy-only reached `428/773`, but validation
+  stayed flat around `29-38/193` while train rose to about `400/580`. The final
+  gate failed: threshold `32` improved to `237/773` but had `7` bad overrides;
+  the only zero-bad threshold with action was threshold `96`, with just `3`
+  good overrides and selected top1 `204/773`, below the required `220/773`.
+  This closes the compact policy feature set. It can memorize corrections, but
+  does not generalize.
 
 Rejected lanes:
 
@@ -241,7 +249,7 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `policy-ranker-full773-h64-lr2e4-e3000`
+- candidate name: `policy-ranker-full773-board-h128-d15-lr2e4-e3000`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
@@ -259,6 +267,8 @@ Current `build.json` intent:
     top1 at least `220/773`, above the base `201/773`.
 - main knobs:
   - `policy_hidden`
+  - `policy_feature_set`
+  - `policy_dropout`
   - `policy_val_fraction`
   - `policy_target_temperature_cp`
   - `policy_thresholds`
@@ -266,6 +276,15 @@ Current `build.json` intent:
   - `policy_gate_max_bad`
   - `rank_temperature_cp`
   - `min_groups`
+
+Current hypothesis:
+
+- The compact sidecar did not see enough board geometry. It used reference
+  child eval, move squares, move flags, and material counts, but not the actual
+  parent/child piece placement. The next run adds parent and child 12x64
+  board planes from the parent side-to-move perspective. If validation still
+  stays flat, the sidecar needs a much larger real-game corpus or engine-level
+  integration should be paused.
 
 Rules:
 

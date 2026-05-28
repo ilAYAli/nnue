@@ -23,10 +23,11 @@ def load_ranker(path: str, device: str):
     model = PolicyRanker(
         input_dim=int(checkpoint["input_dim"]),
         hidden=int(checkpoint["hidden"]),
+        dropout=float(checkpoint.get("dropout", 0.0)),
     ).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()
-    return model, checkpoint["mean"].to(device), checkpoint["std"].to(device)
+    return model, checkpoint
 
 
 def parse_thresholds(raw: str) -> list[float]:
@@ -35,10 +36,16 @@ def parse_thresholds(raw: str) -> list[float]:
 
 @torch.no_grad()
 def evaluate(args: argparse.Namespace) -> list[dict[str, float]]:
+    model, checkpoint = load_ranker(args.model, args.device)
+    feature_set = args.feature_set
+    if feature_set == "auto":
+        feature_set = str(checkpoint.get("feature_set", "compact"))
     raw_groups = load_policy_source_groups(args.targets, min_groups=args.min_groups)
-    builder = PolicyFeatureBuilder(args.base_net, device=args.device)
+    builder = PolicyFeatureBuilder(
+        args.base_net, device=args.device, feature_set=feature_set)
     groups = [builder.build_group(group) for group in raw_groups]
-    model, mean, std = load_ranker(args.model, args.device)
+    mean = checkpoint["mean"].to(args.device)
+    std = checkpoint["std"].to(args.device)
 
     rows = []
     for group in groups:
@@ -129,6 +136,8 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--base-net", required=True)
     ap.add_argument("--device", default="cpu")
+    ap.add_argument("--feature-set", choices=["auto", "compact", "board"],
+                    default="auto")
     ap.add_argument("--min-groups", type=int, default=1)
     ap.add_argument("--thresholds", default="0,1,2,4,8")
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)

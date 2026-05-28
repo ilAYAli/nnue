@@ -73,6 +73,8 @@ def main() -> None:
     ap.add_argument("--base-net", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--hidden", type=int, default=128)
+    ap.add_argument("--feature-set", choices=["compact", "board"], default="compact")
+    ap.add_argument("--dropout", type=float, default=0.0)
     ap.add_argument("--epochs", type=int, default=1000)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--weight-decay", type=float, default=1e-4)
@@ -85,7 +87,8 @@ def main() -> None:
     args = ap.parse_args()
 
     raw_groups = load_policy_source_groups(args.targets)
-    builder = PolicyFeatureBuilder(args.base_net, device=args.device)
+    builder = PolicyFeatureBuilder(
+        args.base_net, device=args.device, feature_set=args.feature_set)
     groups = [builder.build_group(group) for group in raw_groups]
     train_groups, val_groups = split_groups(groups, args.seed, args.val_fraction)
     if not train_groups:
@@ -93,15 +96,17 @@ def main() -> None:
 
     mean, std = normalize_features(train_groups)
     input_dim = int(mean.numel())
-    model = PolicyRanker(input_dim=input_dim, hidden=args.hidden).to(args.device)
-    opt = torch.optim.AdamW(
-        model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-
     print(
         f"policy groups: train={len(train_groups)} val={len(val_groups)} "
-        f"input_dim={input_dim} hidden={args.hidden}",
+        f"input_dim={input_dim} hidden={args.hidden} "
+        f"feature_set={args.feature_set} dropout={args.dropout}",
         flush=True,
     )
+
+    model = PolicyRanker(
+        input_dim=input_dim, hidden=args.hidden, dropout=args.dropout).to(args.device)
+    opt = torch.optim.AdamW(
+        model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     best_state = None
     best_key = (-1, float("-inf"))
@@ -140,6 +145,8 @@ def main() -> None:
                     "std": std,
                     "input_dim": input_dim,
                     "hidden": args.hidden,
+                    "dropout": args.dropout,
+                    "feature_set": args.feature_set,
                     "seed": args.seed,
                     "targets": list(args.targets),
                     "base_net": args.base_net,
