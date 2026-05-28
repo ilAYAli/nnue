@@ -752,7 +752,8 @@ if [[ "$include_history_sensitive" == "1" ]]; then
 fi
 cmd+=(--max-moves-per-position "$max_moves" --min-score-gap "$min_score_gap" -)
 
-find "$logs" -name '*.log' | sort | "${{cmd[@]}}" > "$out" 2> "$err"
+find "$logs" -name '*.log' ! -iname '*conflicted*copy*.log' |
+  sort | "${{cmd[@]}}" > "$out" 2> "$err"
 test -s "$out"
 wc -l "$out" > "$out.wc"
 """
