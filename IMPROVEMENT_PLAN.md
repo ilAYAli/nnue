@@ -239,6 +239,14 @@ Latest child-ranking result:
   overrides. The next run must include non-mate preserve/no-action rows during
   training and must fail automatically if the deployed threshold has broad bad
   overrides.
+- `policy-ranker-matelike-preserve-nonmate-board-h64-d35-pw50-lr2e4-e800`
+  failed the broad no-action gate. The mate-like split gate still passed:
+  validation threshold `4` gave `17` overrides, `16` good, `0` bad. But the
+  broad gate at threshold `4` had `1231` overrides, `407` good, `489` bad, and
+  worst harm `-800cp`. Threshold calibration alone did not solve it: even
+  threshold `256` still had broad bad overrides. This proves the previous
+  preserve sample was not enough and the sidecar confidence is not safety
+  calibrated.
 
 Rejected lanes:
 
@@ -335,7 +343,7 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `policy-ranker-matelike-preserve-nonmate-board-h64-d35-pw50-lr2e4-e800`
+  `policy-ranker-matelike-preserve-all-nonmate-board-h64-d35-pw100-m8-t40-lr2e4-e400`
 - backend: `policy-ranking`
 - target format: child-move groups with stored capped gaps
 - base net: current reference `.nn`; scalar eval is unchanged
@@ -353,11 +361,11 @@ Current `build.json` intent:
     also produces at least 10 held-out good overrides and 10 held-out
     overrides.
 - preserve rows:
-  - all non-`mate_like` groups, sampled to `1500` groups for the first run.
+  - all non-`mate_like` groups, with no subsampling in the next run.
   - preserve loss keeps the base/static selected move above policy alternatives
-    by `4` policy-score units.
+    by `8` policy-score units.
 - broad deployment gate:
-  - evaluates all non-`mate_like` target groups at export threshold `4`.
+  - evaluates all non-`mate_like` target groups at export threshold `40`.
   - requires `0` bad overrides and no more than `200` total broad overrides.
 - main knobs:
   - `policy_hidden`
