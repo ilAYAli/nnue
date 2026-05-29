@@ -12,6 +12,16 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `child-ranking-desc74-targetonly-r14-lr1e5-e480` is rejected as a weak
+  capability result. With broad preservation disabled, the direct descendant
+  subset moved from r14 `.nn 34/74`, engine `34/74` to `.pt/.nn 40/74`,
+  engine `41/74`. The same net scored `2473/6212` on the full r21 mixed
+  engine gate, so the signal is real and export-visible, but far below the
+  `55/74` capability bar. Broad static is not the blocker in this diagnostic:
+  MAE improved versus r14 (`82.100` versus `121.808`) while near-zero sign
+  dropped by about `3.62pp`. Run exactly one stronger target-only capability
+  check. If it cannot reach the `55/74` bar, stop treating these
+  search-descendant rows as scalar child-ranking targets.
 - `child-ranking-fast4-r21-r14init-searchdescx5-listwise-qfwd-refpreserve30-dz5-lr1e6-e240`
   is rejected at the model gate. The mixed corpus had `6212` rows: the stable
   fast4 corpus plus the `74` search-descendant groups repeated five times.

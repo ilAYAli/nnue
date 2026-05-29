@@ -1,8 +1,8 @@
 {
-  "description": "Capability check: train only the 74 search-descendant targets from r14 without broad preservation.",
-  "experiment": "child-ranking-desc74-targetonly-r14-lr1e5-e480",
+  "description": "Stronger capability check: train only the 74 search-descendant targets from r14 without broad preservation.",
+  "experiment": "child-ranking-desc74-targetonly-r14-lr5e5-e960",
   "create": {
-    "name": "child-ranking-desc74-targetonly-r14-lr1e5-e480",
+    "name": "child-ranking-desc74-targetonly-r14-lr5e5-e960",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/pack/train",
     "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
@@ -12,8 +12,8 @@
     "child_static_gate_max_mae_regression_cp": 100000.0,
     "child_static_gate_max_sign_drop_pct": 100.0,
     "child_static_gate_max_near_zero_sign_drop_pct": 100.0,
-    "lr": 0.00001,
-    "epochs": 480,
+    "lr": 5e-05,
+    "epochs": 960,
     "batch_size": 8192,
     "child_batch_size": 64,
     "child_loss": "listwise",
@@ -36,7 +36,7 @@
     "torch_compile": true,
     "dataset_in_memory": true,
     "export_quantize_forward": true,
-    "weight_decay": 0.000001,
+    "weight_decay": 1e-06,
     "trainable": "all",
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
@@ -44,12 +44,12 @@
     "baseline": [
       "r14 on the 74 search-descendant groups: model 34/74, engine 34/74",
       "r21 mixed descendant training stayed flat: model 2424/6212 overall and 34/74 on the descendant subset",
-      "r21 broad static was safe, so the mixed failure was not broad-preserve collapse"
+      "desc74 target-only lr1e-5 moved only partially: .pt/.nn 40/74, engine 41/74; full mixed engine gate 2473/6212"
     ],
     "pass_intent": [
-      "prove whether the 74 descendant rows can move through exported .nn and engine eval at all",
+      "try one stronger target-only run to test whether the descendant rows can cross export thresholds cleanly",
       "ignore broad-static quality for this diagnostic only",
-      "if this fails, stop using these rows as scalar child-ranking targets; if it passes, reintroduce preservation with a stronger descendant weight"
+      "if this fails to reach 55/74, stop using these rows as scalar child-ranking targets"
     ]
   }
 }
