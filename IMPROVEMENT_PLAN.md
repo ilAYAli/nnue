@@ -722,23 +722,39 @@ Current hypothesis:
 ### r23 Triage
 
 `child-ranking-fast4-r23-r22init-latestroot-listwise-qfwd-refpreserve30-dz5-lr5e6-e240`
-failed the exported model top1 gate, but it is not a clean rejection yet:
+failed the exported model top1 gate and is rejected after completing the
+root-search target:
 
-- `.pt/.nn` child ranking: `870/2793`, below the `890` gate but with improved
-  aggregate gap (`591292`, versus r22 `596104`);
-- engine eval child ranking: `843/2793`, slightly ahead of r22 `842/2793`, with
-  improved aggregate gap (`590955`);
+- after r23 root-selected augmentation, the completed target has `2793` groups
+  and `9330` rank pairs;
+- r23 `.nn` child ranking: `862/2793`, versus r22 `864/2793`;
+- r23 engine eval child ranking: `835/2793`, tied with r22 `835/2793`, but with
+  improved aggregate gap (`591661` versus r22 `597979`);
 - broad static versus r22 improved MAE by `4.331cp`, with only `+0.13pp` sign
   drop;
-- root search versus r22 skipped `94` groups because r23 selected unscored
-  moves. On the scored subset it was positive (`candidate_better=221`,
-  `reference_better=194`, `sum_diff=+3223cp`), but the missing rows make the
-  result incomplete.
+- completed root search lost to r22: r23 `1830/2793`, r22 `1847/2793`,
+  `candidate_better=244`, `reference_better=261`, `sum_diff=-1851cp`,
+  `missing_selected=0`.
 
-Next step: augment the completed target with r23-selected root moves, require
-`missing_after=0`, then rerun the r23 versus r22 search comparison on the
-completed corpus. Do not weaken the model top1 gate or launch r24 until the
-r23 root-search result is complete.
+Interpretation: stronger continuation from r22 improved scalar aggregate gaps
+but did not improve root search. r23 is not a keeper and should not be smoked.
+
+### r24 Guarded Continuation
+
+The r23-vs-r22 search detail file identified `49` r23 regressions with
+`diff <= -100cp`, including `21` at `<= -300cp`. The next and final scalar
+continuation test is:
+
+- initialize from r22 again;
+- train on the completed r14/Berserk/r22/r23 root-augmented target;
+- add those `49` r23 regressions as `child_preserve_targets`;
+- use `child_preserve_weight=5`, `child_preserve_deadzone_cp=5`;
+- keep broad preservation at `0.3` against the r22 init net;
+- require completed root search versus r22 to have `missing_selected=0`,
+  `sum_diff > 0`, and `top1 >= 1848/2793`.
+
+If this fails, stop the r22/r23 scalar replay-loss continuation lane. The data
+will then be useful for diagnostics, but not as a direct promotion path.
 
 Rules:
 
