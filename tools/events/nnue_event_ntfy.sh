@@ -6,9 +6,12 @@ set -euo pipefail
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
+AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
 EVENTS=${NNUE_NTFY_EVENTS:-done,fail,test}
 AI_EVENTS=${NNUE_AI_STDIN_EVENTS:-done,fail}
+AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS:-done,fail}
 AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
+AI_STDOUT_ENABLE=${NNUE_AI_STDOUT_ENABLE:-1}
 NOTIFAI=${NNUE_NOTIFAI:-$HOME/scripts/notifai.sh}
 NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-${NOTIFAI_TARGET:-codex_1}}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
@@ -90,6 +93,10 @@ PY
 
 body=$(printf '%s\n' "$rendered" | sed '/^__AI_PROMPT__/d')
 ai_prompt=$(printf '%s\n' "$rendered" | sed -n 's/^__AI_PROMPT__//p' | tail -1)
+stdout_body=$(printf '<output>\n%s\n</output>\n' "$body")
+if [ -n "$ai_prompt" ]; then
+    stdout_body=$(printf '%s\n\n<summary>\n%s\n</summary>\n' "$stdout_body" "$ai_prompt")
+fi
 
 publish() {
     local url="$1"
@@ -120,6 +127,16 @@ case "$event_name" in
 esac
 
 publish "$NNUE_URL" "$body" "Enyo NNUE $event_name" "$priority"
+printf '%s event=%s nnue_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+
+if [ "$AI_STDOUT_ENABLE" = "1" ]; then
+    case ",$AI_STDOUT_EVENTS," in
+        *,"$event_name",*)
+            publish "$AI_STDOUT_URL" "$stdout_body" "Enyo NNUE $event_name" "$priority"
+            printf '%s event=%s ai_stdout_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+            ;;
+    esac
+fi
 
 publish_ai() {
     local prompt="$1"
@@ -139,7 +156,10 @@ publish_ai() {
 
 if [ "$AI_ENABLE" = "1" ] && [ -n "$ai_prompt" ]; then
     case ",$AI_EVENTS," in
-        *,"$event_name",*) publish_ai "$ai_prompt" "Enyo NNUE $event_name" "$priority" ;;
+        *,"$event_name",*)
+            publish_ai "$ai_prompt" "Enyo NNUE $event_name" "$priority"
+            printf '%s event=%s ai_stdin_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+            ;;
     esac
 fi
 
