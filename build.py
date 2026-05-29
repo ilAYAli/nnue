@@ -192,6 +192,46 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "weight_decay",
         "trainable",
     }
+    bullet = {
+        "bullet_source_jsonl",
+        "bullet_data",
+        "bullet_manifest",
+        "bullet_loader",
+        "bullet_limit",
+        "bullet_max_abs_cp",
+        "bullet_enyo_runtime_target",
+        "bullet_sfbinpack_buffer_mb",
+        "bullet_sfbinpack_min_ply",
+        "bullet_sfbinpack_max_abs_cp",
+        "bullet_sfbinpack_quiet_only",
+        "bullet_mode",
+        "bullet_accelerator",
+        "bullet_cuda_path",
+        "bullet_cuda_arch",
+        "bullet_hidden",
+        "bullet_l2",
+        "bullet_batch_size",
+        "bullet_batches",
+        "bullet_superbatches",
+        "bullet_threads",
+        "bullet_wdl",
+        "bullet_lr",
+        "bullet_final_lr",
+        "bullet_enyo_l0_std",
+        "bullet_enyo_l1_std",
+        "bullet_enyo_l1_export_scale",
+        "bullet_enyo_input_factorizer",
+        "bullet_enyo_input_buckets",
+        "bullet_enyo_runtime_input_buckets",
+        "bullet_eval_scale",
+        "bullet_save_rate",
+        "bullet_init_weights",
+        "bullet_trainable",
+        "bullet_weight_decay",
+        "bullet_export_init_only",
+        "bullet_static_data",
+        "bullet_static_rows",
+    }
     child = data | {
         "init_net",
         "child_targets",
@@ -446,6 +486,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "set-child-base-move": set_child_base,
         "search-descendant-child-targets": search_descendant,
         "mix-jsonl": mix,
+        "bullet": bullet,
     }
     return common | backend_keys.get(args.backend, set())
 
@@ -576,6 +617,119 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--out-nn", f"{candidate_dir}/model.nn",
             ],
         })
+    elif args.backend == "bullet":
+        if args.bullet_loader == "direct":
+            if args.bullet_data:
+                bullet_data = str(expand_path(args.bullet_data))
+            else:
+                if not args.bullet_source_jsonl:
+                    raise SystemExit(
+                        "backend=bullet direct loader requires bullet_source_jsonl "
+                        "or bullet_data"
+                    )
+                bullet_text = "{assets}/bullet.txt"
+                bullet_data = "{assets}/bullet.data"
+                steps.extend([
+                    {
+                        "name": "bullet_text",
+                        "command": [
+                            python, tool("bullet/jsonl_to_bullet_text.py"),
+                            "--input", str(expand_path(args.bullet_source_jsonl)),
+                            "--output", bullet_text,
+                            "--limit", str(args.bullet_limit),
+                            "--max-abs-cp", str(args.bullet_max_abs_cp),
+                            *(
+                                ["--enyo-runtime-target"]
+                                if args.bullet_enyo_runtime_target else []
+                            ),
+                        ],
+                    },
+                    {
+                        "name": "bullet_format",
+                        "command": [
+                            python, tool("bullet/bullet.py"), "format",
+                            "--input", bullet_text,
+                            "--output", bullet_data,
+                            "--bullet-manifest",
+                            str(expand_path(args.bullet_manifest)),
+                            "--validate",
+                        ],
+                    },
+                ])
+        else:
+            if not args.bullet_data:
+                raise SystemExit(
+                    "backend=bullet sfbinpack loader requires bullet_data"
+                )
+            bullet_data = args.bullet_data
+
+        steps.append({
+            "name": "bullet_train",
+            "command": [
+                python, tool("bullet/bullet.py"), "train",
+                "--data", str(expand_user(bullet_data)),
+                "--loader", args.bullet_loader,
+                "--sfbinpack-buffer-mb",
+                str(args.bullet_sfbinpack_buffer_mb),
+                "--sfbinpack-min-ply", str(args.bullet_sfbinpack_min_ply),
+                "--sfbinpack-max-abs-cp",
+                str(args.bullet_sfbinpack_max_abs_cp),
+                (
+                    "--sfbinpack-quiet-only"
+                    if args.bullet_sfbinpack_quiet_only
+                    else "--no-sfbinpack-quiet-only"
+                ),
+                "--out-dir", f"{candidate_dir}/checkpoints",
+                "--net-id", name,
+                "--cargo-target-dir", "{run}/cargo-target",
+                "--mode", args.bullet_mode,
+                "--accelerator", args.bullet_accelerator,
+                "--cuda-path", args.bullet_cuda_path,
+                "--cuda-arch", args.bullet_cuda_arch,
+                "--hidden", str(args.bullet_hidden),
+                "--l2", str(args.bullet_l2),
+                "--batch-size", str(args.bullet_batch_size),
+                "--batches", str(args.bullet_batches),
+                "--superbatches", str(args.bullet_superbatches),
+                "--threads", str(args.bullet_threads),
+                "--wdl", str(args.bullet_wdl),
+                "--lr", str(args.bullet_lr),
+                "--final-lr", str(args.bullet_final_lr),
+                "--enyo-l0-std", str(args.bullet_enyo_l0_std),
+                "--enyo-l1-std", str(args.bullet_enyo_l1_std),
+                "--enyo-l1-export-scale",
+                str(args.bullet_enyo_l1_export_scale),
+                (
+                    "--enyo-input-factorizer"
+                    if args.bullet_enyo_input_factorizer
+                    else "--no-enyo-input-factorizer"
+                ),
+                "--enyo-input-buckets", str(args.bullet_enyo_input_buckets),
+                "--enyo-runtime-input-buckets",
+                str(args.bullet_enyo_runtime_input_buckets),
+                "--eval-scale", str(args.bullet_eval_scale),
+                "--save-rate", str(args.bullet_save_rate),
+                *(
+                    ["--init-weights", str(expand_path(args.bullet_init_weights))]
+                    if args.bullet_init_weights else []
+                ),
+                "--trainable", args.bullet_trainable,
+                "--weight-decay", str(args.bullet_weight_decay),
+                *(["--export-init-only"] if args.bullet_export_init_only else []),
+            ],
+        })
+        if args.bullet_static_data:
+            steps.append({
+                "name": "validate_bullet_static",
+                "command": [
+                    python, tool("validate/eval_dataset.py"),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--data", str(expand_path(args.bullet_static_data)),
+                    "--rows", str(args.bullet_static_rows),
+                    "--buckets",
+                    "--sources",
+                ],
+            })
     elif args.backend == "child-ranking":
         if not args.child_targets:
             raise SystemExit("backend=child-ranking requires child_targets")
@@ -1395,6 +1549,7 @@ def add_create_args(
     parser.add_argument("--init-net", default=value("init_net", d.init_net))
     parser.add_argument("--backend", default=value("backend", d.backend),
                         choices=["pytorch", "child-ranking", "policy-ranking",
+                                 "bullet",
                                  "replay-jsonl", "lc0-jsonl",
                                  "lc0-oracle-jsonl",
                                  "smoke-pgn-child-targets",
@@ -1425,6 +1580,55 @@ def add_create_args(
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "float-head", "output"])
+    parser.add_argument("--bullet-source-jsonl", default=value("bullet_source_jsonl", d.bullet_source_jsonl))
+    parser.add_argument("--bullet-data", default=value("bullet_data", d.bullet_data))
+    parser.add_argument("--bullet-manifest", default=value("bullet_manifest", d.bullet_manifest))
+    parser.add_argument("--bullet-loader", default=value("bullet_loader", d.bullet_loader),
+                        choices=["direct", "sfbinpack"])
+    parser.add_argument("--bullet-limit", type=int, default=value("bullet_limit", d.bullet_limit))
+    parser.add_argument("--bullet-max-abs-cp", type=int, default=value("bullet_max_abs_cp", d.bullet_max_abs_cp))
+    parser.add_argument("--bullet-enyo-runtime-target", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_enyo_runtime_target", d.bullet_enyo_runtime_target))
+    parser.add_argument("--bullet-sfbinpack-buffer-mb", type=int, default=value("bullet_sfbinpack_buffer_mb", d.bullet_sfbinpack_buffer_mb))
+    parser.add_argument("--bullet-sfbinpack-min-ply", type=int, default=value("bullet_sfbinpack_min_ply", d.bullet_sfbinpack_min_ply))
+    parser.add_argument("--bullet-sfbinpack-max-abs-cp", type=int, default=value("bullet_sfbinpack_max_abs_cp", d.bullet_sfbinpack_max_abs_cp))
+    parser.add_argument("--bullet-sfbinpack-quiet-only", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_sfbinpack_quiet_only", d.bullet_sfbinpack_quiet_only))
+    parser.add_argument("--bullet-mode", default=value("bullet_mode", d.bullet_mode),
+                        choices=["reckless", "enyo"])
+    parser.add_argument("--bullet-accelerator", default=value("bullet_accelerator", d.bullet_accelerator),
+                        choices=["cuda", "rocm"])
+    parser.add_argument("--bullet-cuda-path", default=value("bullet_cuda_path", d.bullet_cuda_path))
+    parser.add_argument("--bullet-cuda-arch", default=value("bullet_cuda_arch", d.bullet_cuda_arch))
+    parser.add_argument("--bullet-hidden", type=int, default=value("bullet_hidden", d.bullet_hidden))
+    parser.add_argument("--bullet-l2", type=int, default=value("bullet_l2", d.bullet_l2))
+    parser.add_argument("--bullet-batch-size", type=int, default=value("bullet_batch_size", d.bullet_batch_size))
+    parser.add_argument("--bullet-batches", type=int, default=value("bullet_batches", d.bullet_batches))
+    parser.add_argument("--bullet-superbatches", type=int, default=value("bullet_superbatches", d.bullet_superbatches))
+    parser.add_argument("--bullet-threads", type=int, default=value("bullet_threads", d.bullet_threads))
+    parser.add_argument("--bullet-wdl", type=float, default=value("bullet_wdl", d.bullet_wdl))
+    parser.add_argument("--bullet-lr", type=float, default=value("bullet_lr", d.bullet_lr))
+    parser.add_argument("--bullet-final-lr", type=float, default=value("bullet_final_lr", d.bullet_final_lr))
+    parser.add_argument("--bullet-enyo-l0-std", type=float, default=value("bullet_enyo_l0_std", d.bullet_enyo_l0_std))
+    parser.add_argument("--bullet-enyo-l1-std", type=float, default=value("bullet_enyo_l1_std", d.bullet_enyo_l1_std))
+    parser.add_argument("--bullet-enyo-l1-export-scale", type=float, default=value("bullet_enyo_l1_export_scale", d.bullet_enyo_l1_export_scale))
+    parser.add_argument("--bullet-enyo-input-factorizer", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_enyo_input_factorizer", d.bullet_enyo_input_factorizer))
+    parser.add_argument("--bullet-enyo-input-buckets", type=int, default=value("bullet_enyo_input_buckets", d.bullet_enyo_input_buckets),
+                        choices=[1, 2, 4, 8, 16, 32])
+    parser.add_argument("--bullet-enyo-runtime-input-buckets", type=int,
+                        default=value("bullet_enyo_runtime_input_buckets", d.bullet_enyo_runtime_input_buckets),
+                        choices=[1, 2, 4, 8, 16, 32])
+    parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
+    parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
+    parser.add_argument("--bullet-init-weights", default=value("bullet_init_weights", d.bullet_init_weights))
+    parser.add_argument("--bullet-trainable", default=value("bullet_trainable", d.bullet_trainable),
+                        choices=["all", "input", "float-head", "output"])
+    parser.add_argument("--bullet-weight-decay", type=float, default=value("bullet_weight_decay", d.bullet_weight_decay))
+    parser.add_argument("--bullet-export-init-only", action="store_true",
+                        default=value("bullet_export_init_only", d.bullet_export_init_only))
+    parser.add_argument("--bullet-static-data", default=value("bullet_static_data", d.bullet_static_data))
+    parser.add_argument("--bullet-static-rows", type=int, default=value("bullet_static_rows", d.bullet_static_rows))
     parser.add_argument("--child-targets", default=value("child_targets", d.child_targets))
     parser.add_argument("--child-broad-rows", type=int, default=value("child_broad_rows", d.child_broad_rows))
     parser.add_argument("--child-static-gate-rows", type=int, default=value("child_static_gate_rows", d.child_static_gate_rows))
