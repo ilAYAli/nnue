@@ -12,6 +12,14 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-mix533-compact-nolc0-selectdeploy-h64-t2-lr2e4-e1200` is rejected.
+  Deploy-gate checkpoint selection worked, but it selected a no-op checkpoint:
+  threshold `2` had `0` overrides, `0` good, `0` bad, and stayed at the base
+  validation score `59/133`. Lower thresholds had useful action but unsafe
+  bad overrides. This closes the broad compact sidecar setup as a near-term
+  lane. The only sidecar variant with repeated held-out signal was the narrow
+  `mate_like` board-feature lane; rerun that once with deploy-gate checkpoint
+  selection and broad non-mate no-action gating.
 - `policy-mix533-compact-nolc0-h64-nh2-bb2-t2-lr2e4-e1200` is rejected by
   the deploy gate. Removing LC0 helped but did not make the sidecar safe:
   validation base was `59/133`, raw policy was `66/133`, and threshold `2`
@@ -585,26 +593,23 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Rerun the compact no-LC0 sidecar policy-ranker diagnostic with deploy-gate
-checkpoint selection:
+Rerun the narrow mate-like sidecar with deploy-gate checkpoint selection:
 
 1. Keep scalar NNUE eval unchanged.
-2. Use the r14 net as the frozen base feature/eval source.
-3. Mix the `74` search-descendant groups with the `459` r14 smoke-loss rows.
-   Exclude LC0-oracle rows because they were the bad validation source in the
-   compact mixed run.
-4. Use compact policy features, smaller hidden width, dropout, and stronger
-   no-harm/base-best preservation terms.
-5. Gate on a `25%` validation split and require zero bad overrides at the
-   selected deploy threshold.
+2. Use the Berserk reference net from `enyo/net/berserk-d43206fe90e4.nn` as the
+   frozen base feature/eval source.
+3. Train on `mate_like` rows only, excluding the unsafe
+   `source:lichess_lowmat_mc12` slice from the hard validation gate.
+4. Use all non-`mate_like` rows as no-action preservation rows.
+5. Require held-out mate-like action with zero bad overrides and broad
+   non-mate zero bad overrides at the deployed threshold.
 
 Interpretation:
 
-- If held-out validation improves top1 and produces useful good overrides with
-  bounded bad overrides, the sidecar deserves an engine-integration diagnostic.
-- If the no-LC0 sidecar still cannot find a useful zero-bad checkpoint, the
-  current sidecar setup is only useful for narrow motifs and should not be
-  treated as a near-term Elo lane.
+- If this passes, the next step is engine-side policy integration as a
+  diagnostic only, not an automatic strength candidate.
+- If this fails, pause simple sidecar MLP work. It has useful narrow signal but
+  not a safe deployable action policy.
 
 ## Candidate Workflow
 
