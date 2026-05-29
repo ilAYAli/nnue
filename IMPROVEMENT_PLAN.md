@@ -8,10 +8,28 @@ kind of Stockfish-labeled Enyo self-play.
 
 ## Current State
 
-No trained Enyo net is currently a keeper.
+`r14` is the current Enyo-owned keeper baseline, but it is not a production
+replacement for Berserk yet. Keep Berserk as the strength reference until an
+Enyo-owned candidate passes clean game evidence.
 
 Latest result:
 
+- `policy-rootbase-r14-full2793-board-h128-selectgate-r2-20260529` is
+  rejected. The raw policy model learned signal on the full r14 root-base
+  replay-loss target (`base top1=1831/2793`, raw policy `2008/2793`), but the
+  deployable override policy is unsafe. Threshold `8` gave `37` good overrides
+  and `66` bad; threshold `16` gave `3` good and `12` bad. The first zero-bad
+  threshold with improvement (`24`) produced only `1` good override, so it is
+  effectively inert. This closes the full-target board-feature policy sidecar
+  as a promotion path.
+- Current run:
+  `policy-rootbase-r14-missgap50-preserve-correct-h64-20260529`. It tests a
+  narrower hypothesis: train only on clear r14 root-search mistakes
+  (`base_miss_gap50`, `285` rows) while using r14-correct rows (`1831` rows)
+  as preserve guards. Pass criteria are deliberately small but strict: zero
+  bad held-out overrides on the full replay-loss target, at least `5` good
+  held-out overrides, and a non-inert selected threshold. If this fails, close
+  the current policy-sidecar shape for r14 root-base replay-loss repair.
 - `policy-matelike-preserve-nonmate-selectdeploy-board-h64-t24-lr2e4-e400`
   is rejected. Deploy-gate checkpoint selection worked and selected a safe
   but effectively inert policy. At the deploy threshold `24`, the validation
@@ -557,6 +575,9 @@ Primary lane:
 - Use LC0 as a source of diverse positions and plausible candidate moves only
   after oracle rescoring. Do not train scalar eval directly from LC0 policy
   logits.
+- Keep LC0 out of the main Enyo-owned release lane unless an LC0-assisted
+  candidate beats the Enyo-only counterpart in game testing. So far LC0 helped
+  tooling and target coverage, but did not produce Elo.
 - Use replay JSONL as the preferred source for Enyo loss data because it stores
   scored legal moves and provenance in one format. CSV-era target files are
   legacy only.
@@ -778,6 +799,38 @@ Interpretation: the guarded r24 run improved some static/engine aggregate
 numbers but failed the completed root-search gate. The r22/r23/r24 scalar
 replay-loss continuation lane is closed as a direct promotion path. Do not
 launch r25 by only adjusting LR, preserve weight, or child-ranking thresholds.
+
+### r14 Root-Base Policy Triage
+
+`policy-rootbase-r14-full2793-board-h128-selectgate-r2-20260529` is rejected:
+
+- base r14 root-selected policy on the completed replay-loss target:
+  `1831/2793`, summed gap `67179cp`;
+- raw sidecar policy: `2008/2793`, summed gap `60977cp`;
+- deploy threshold `8`: `121` overrides, `37` good, `66` bad,
+  summed gap worsened to `72472cp`;
+- deploy threshold `16`: `16` overrides, `3` good, `12` bad;
+- deploy threshold `24`: `1` override, `1` good, `0` bad.
+
+Interpretation: the sidecar can fit the full target distribution, but it does
+not learn a safe deployable confidence boundary. Useful action rates are
+unsafe; safe thresholds are inert. Do not smoke or export this policy.
+
+Current diagnostic:
+
+- branch: `feature/rootbase-policy-mistake-filter`;
+- run: `policy-rootbase-r14-missgap50-preserve-correct-h64-20260529`;
+- target: same replay-loss root-base corpus, tagged by r14 root-search outcome;
+- train rows: `base_miss_gap50` (`285` clear r14 root-search mistakes);
+- preserve rows: `base_correct` (`1831` r14-correct rows);
+- smaller model: board features, hidden `64`, dropout `0.4`;
+- gate: full replay-loss target, zero bad held-out overrides, at least `5`
+  good held-out overrides.
+
+If this diagnostic fails, close the current policy-ranker architecture for
+r14 root-base repair. The next useful direction is not another threshold/LR
+tweak; it is either different features or an engine-side/search-coupled
+mechanism.
 
 Next useful work: inspect the completed root-search regressions as a separate
 diagnostic set. The repeated pattern is mate-like/middlegame/endgame root
