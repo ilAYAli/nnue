@@ -719,6 +719,27 @@ Current hypothesis:
   refreshed replay-derived corpus and only add supplemental rows that survive
   root-search validation.
 
+### r23 Triage
+
+`child-ranking-fast4-r23-r22init-latestroot-listwise-qfwd-refpreserve30-dz5-lr5e6-e240`
+failed the exported model top1 gate, but it is not a clean rejection yet:
+
+- `.pt/.nn` child ranking: `870/2793`, below the `890` gate but with improved
+  aggregate gap (`591292`, versus r22 `596104`);
+- engine eval child ranking: `843/2793`, slightly ahead of r22 `842/2793`, with
+  improved aggregate gap (`590955`);
+- broad static versus r22 improved MAE by `4.331cp`, with only `+0.13pp` sign
+  drop;
+- root search versus r22 skipped `94` groups because r23 selected unscored
+  moves. On the scored subset it was positive (`candidate_better=221`,
+  `reference_better=194`, `sum_diff=+3223cp`), but the missing rows make the
+  result incomplete.
+
+Next step: augment the completed target with r23-selected root moves, require
+`missing_after=0`, then rerun the r23 versus r22 search comparison on the
+completed corpus. Do not weaken the model top1 gate or launch r24 until the
+r23 root-search result is complete.
+
 Rules:
 
 - Commit `build.json` changes so the current intended run is reviewable.
