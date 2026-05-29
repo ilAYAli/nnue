@@ -601,23 +601,41 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Refresh the replay-loss child corpus from the latest synced loss logs:
+The latest replay-loss refresh and root augmentation are complete:
 
-1. Use `backend=replay-jsonl`.
-2. Source logs from `~/code/cpp/chess/lichess/logs/loss` after syncing from
-   localhost.
-3. Use the current reference engine as the candidate and omit A/B reference
-   mode.
-4. Emit dense scored legal-move groups with `top_root_moves=4`,
-   `max_moves_per_position=16`, checks, captures, and promotions enabled.
-5. Keep `include_history_sensitive=false` for normal NNUE targets.
+- `replay-loss-latest-fast4-20260529` produced `3550` replay rows and `2793`
+  child groups with `history_sensitive=0`.
+- Root augmentation for r14 and Berserk added `401` scored selected moves
+  across `366` groups.
+- The completed target has `missing_after=0`.
+- Augmented r14 baselines:
+  - `.nn` child ranking: `868/2793`;
+  - engine eval child ranking: `841/2793`;
+  - root search: `1838/2793`, `missing_selected=0`.
+- Berserk root-search baseline on the same target is `1832/2793`,
+  `missing_selected=0`.
+
+Current run: train a conservative r14-initialized child-ranking candidate on
+the completed target:
+
+1. Use `backend=child-ranking`.
+2. Initialize from r14.
+3. Use `listwise` child-ranking loss with export-quantized forward enabled.
+4. Use reference-deadzone broad preservation from epoch 0:
+   `broad_preserve_weight=0.3`, `broad_deadzone_cp=5`.
+5. Gate against augmented r14 baselines:
+   `.nn >= 900/2793`, engine eval `>= 870/2793`, root search
+   `>= 1839/2793`, `missing_selected=0`, and reference-better `<= 300`.
 
 Interpretation:
 
-- If extraction/validation fails, fix replay/log filtering before training.
-- If it passes, build the next child-ranking mix from this refreshed replay
-  corpus plus only proven useful supplemental rows. Do not rerun the simple
-  policy sidecar without a new data or representation hypothesis.
+- If model/engine top1 stays flat, this refreshed replay-loss target is not
+  enough to move r14 through exported scalar eval.
+- If root search fails only due to new `missing_selected`, augment those moves
+  and rerun before judging strength.
+- If all gates pass, run a short smoke versus r14 before any Berserk claim.
+- Do not rerun the simple policy sidecar without a new data or representation
+  hypothesis.
 
 ## Candidate Workflow
 
@@ -630,24 +648,23 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `replay-loss-latest-fast4-20260529`
-- backend: `replay-jsonl`
-- source: latest synced Enyo Lichess loss logs
-- engine: current reference as candidate, no A/B reference mode
-- oracle: fixed `200000` nodes
-- move set: root PV top 4 plus checks, captures, promotions, capped at 16 moves
-  per position
-- output: replay JSONL plus converted child-ranking JSONL
+  `child-ranking-fast4-r22-r14init-latestroot-listwise-qfwd-refpreserve30-dz5-lr2e6-e240`
+- backend: `child-ranking`
+- init net: r14
+- child targets:
+  `targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk.jsonl`
+- broad preserve: reference-deadzone, not label fitting
 - hard gates:
-  - replay JSONL validates cleanly;
-  - no dirty candidate binary;
-  - no history-sensitive rows in normal NNUE targets;
-  - at least `2500` replay rows and child groups.
+  - exported `.nn` model gate beats augmented r14 baseline;
+  - engine eval gate beats augmented r14 baseline;
+  - broad static gate stays within the r14 regression caps;
+  - root-search gate does not lose to r14 or introduce missing selected moves.
 - main knobs:
-  - `replay_top_root_moves`
-  - `replay_max_moves_per_position`
-  - `replay_oracle_nodes`
-  - `replay_child_min_groups`
+  - `lr`
+  - `ranking_weight`
+  - `broad_preserve_weight`
+  - `broad_deadzone_cp`
+  - model/engine/search gate thresholds
 
 Current hypothesis:
 
