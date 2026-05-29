@@ -1,27 +1,47 @@
 {
-  "description": "Stamp completed replay-loss child targets with r14 root-search selected moves as policy base_move.",
-  "experiment": "replay-loss-fast4-r14-rootbase-20260529",
+  "description": "Train a policy-sidecar diagnostic that treats r14 root-search selection as the base move.",
+  "experiment": "policy-rootbase-r14-full2793-board-h128-t8-20260529",
   "create": {
-    "name": "replay-loss-fast4-r14-rootbase-20260529",
-    "backend": "set-child-base-move",
-    "child_base_input": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24.jsonl",
-    "child_base_output": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24_base_r14.jsonl",
-    "child_base_summary": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24_base_r14.summary.txt",
-    "child_base_origin": "root_search:r14",
-    "child_base_min_groups": 2793,
-    "child_base_keep_missing": false,
+    "name": "policy-rootbase-r14-full2793-board-h128-t8-20260529",
+    "backend": "policy-ranking",
+    "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
+    "policy_targets": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24_base_r14.jsonl",
+    "policy_hidden": 128,
+    "policy_feature_set": "board",
+    "policy_dropout": 0.15,
+    "policy_base_best_preserve_weight": 3.0,
+    "policy_no_harm_weight": 3.0,
+    "policy_no_harm_gap_cp": 10,
+    "policy_bad_tolerance_cp": 10,
+    "policy_val_fraction": 0.25,
+    "policy_thresholds": "4,8,12,16,24,32,48",
+    "policy_export_threshold": 8,
+    "policy_gate_min_top1": -1,
+    "policy_gate_max_bad": 0,
+    "policy_gate_min_val_top1": -1,
+    "policy_gate_max_val_bad": 0,
+    "policy_gate_min_val_good": 10,
+    "policy_gate_min_val_overrides": 10,
+    "policy_target_temperature_cp": 80,
+    "rank_temperature_cp": 1,
+    "lr": 0.00002,
+    "epochs": 1200,
+    "weight_decay": 0.000001,
+    "min_groups": 2793,
+    "device": "cpu",
+    "selfplay_seed": 2026052901,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "baseline": [
       "r14 is the current keeper baseline",
-      "r22/r23/r24 scalar child-ranking continuation is closed as a direct promotion path",
-      "policy diagnostics need base_move to mean the root-search selected move, not static child-eval best"
+      "target file has base_move=root_search:r14 on all 2793 groups",
+      "this does not change scalar eval or export a replacement .nn"
     ],
     "pass_intent": [
-      "produce a complete policy target with base_move=root_search:r14 for every group",
-      "use the output as the next policy-ranking target through build.py",
-      "do not launch another scalar child-ranking continuation from this target"
+      "held-out validation must have zero bad overrides at a shared threshold",
+      "held-out validation must have at least 10 good overrides",
+      "if this fails, do not tune scalar child-ranking; inspect whether policy features lack the root-search signal"
     ]
   }
 }
