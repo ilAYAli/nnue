@@ -69,6 +69,38 @@ def no_harm_loss(model: PolicyRanker, group: PolicyGroup,
 
 
 @torch.no_grad()
+def threshold_summary(model: PolicyRanker, groups: list[PolicyGroup],
+                      mean: torch.Tensor, std: torch.Tensor,
+                      args: argparse.Namespace
+                      ) -> tuple[int, float, int, int, int]:
+    top1 = 0
+    sum_gap = 0.0
+    good = 0
+    bad = 0
+    overrides = 0
+    for group in groups:
+        scores = score_group(model, group, mean, std, args.device)
+        policy_idx = int(torch.argmax(scores).item())
+        base_idx = group.base_idx
+        selected_idx = base_idx
+        confidence = float(scores[policy_idx] - scores[base_idx])
+        if policy_idx != base_idx and confidence >= args.select_threshold:
+            selected_idx = policy_idx
+            overrides += 1
+
+        base_gap = float(group.gaps[base_idx])
+        selected_gap = float(group.gaps[selected_idx])
+        diff = base_gap - selected_gap
+        if diff > args.select_bad_tolerance_cp:
+            good += 1
+        elif diff < -args.select_bad_tolerance_cp:
+            bad += 1
+        top1 += int(selected_idx == group.best_idx)
+        sum_gap += selected_gap
+    return top1, sum_gap, good, bad, overrides
+
+
+@torch.no_grad()
 def summarize(label: str, model: PolicyRanker, groups: list[PolicyGroup],
               mean: torch.Tensor, std: torch.Tensor,
               device: str) -> tuple[int, float]:
@@ -125,6 +157,8 @@ def main() -> None:
     ap.add_argument("--base-best-preserve-weight", type=float, default=0.0)
     ap.add_argument("--no-harm-weight", type=float, default=0.0)
     ap.add_argument("--no-harm-gap-cp", type=float, default=10.0)
+    ap.add_argument("--select-threshold", type=float, default=-1.0)
+    ap.add_argument("--select-bad-tolerance-cp", type=float, default=0.0)
     ap.add_argument("--val-fraction", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--device", default="cpu")
@@ -217,11 +251,31 @@ def main() -> None:
             val_preserve = summarize_preserve(
                 f"epoch {epoch:4d} preserve_val", model, val_preserve_groups,
                 mean, std, args)
-            key = (
-                val_top1 if val_groups else train_top1,
-                -(val_gap if val_groups else train_gap),
-                -val_preserve,
-            )
+            if args.select_threshold >= 0.0:
+                select_groups = val_groups if val_groups else train_groups
+                select_top1, select_gap, select_good, select_bad, select_overrides = (
+                    threshold_summary(model, select_groups, mean, std, args))
+                print(
+                    f"epoch {epoch:4d} select threshold={args.select_threshold:g} "
+                    f"top1={select_top1}/{len(select_groups)} "
+                    f"sum_gap={select_gap:.0f} good={select_good} "
+                    f"bad={select_bad} overrides={select_overrides}",
+                    flush=True,
+                )
+                key = (
+                    -select_bad,
+                    select_top1,
+                    select_good,
+                    -select_gap,
+                    -select_overrides,
+                    -val_preserve,
+                )
+            else:
+                key = (
+                    val_top1 if val_groups else train_top1,
+                    -(val_gap if val_groups else train_gap),
+                    -val_preserve,
+                )
             print(
                 f"epoch {epoch:4d} loss={loss_sum / max(1, loss_count):.6f}",
                 flush=True,
@@ -259,6 +313,8 @@ def main() -> None:
                     "base_best_preserve_weight": args.base_best_preserve_weight,
                     "no_harm_weight": args.no_harm_weight,
                     "no_harm_gap_cp": args.no_harm_gap_cp,
+                    "select_threshold": args.select_threshold,
+                    "select_bad_tolerance_cp": args.select_bad_tolerance_cp,
                 }
 
     if best_state is None:

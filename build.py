@@ -723,6 +723,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     str(args.policy_base_best_preserve_weight),
                     "--no-harm-weight", str(args.policy_no_harm_weight),
                     "--no-harm-gap-cp", str(args.policy_no_harm_gap_cp),
+                    "--select-threshold", str(args.policy_export_threshold),
+                    "--select-bad-tolerance-cp", str(args.policy_bad_tolerance_cp),
                     "--epochs", str(args.epochs),
                     "--lr", str(args.lr),
                     "--weight-decay", str(args.weight_decay),
