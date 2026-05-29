@@ -12,6 +12,14 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `child-ranking-desc74-targetonly-r14-lr5e5-e960` proves the
+  search-descendant rows are learnable through export and engine eval, but is
+  not a candidate. It reached `.pt/.nn 61/74`, engine `61/74`, sum gap `732cp`,
+  and worst engine margin `-37cp` on the `74` descendant groups. Broad static
+  collapsed badly (`MAE 157.262` versus r14 `121.808`, sign `58.54%` versus
+  `91.60%`). The next run must reintroduce reference broad preservation and
+  test whether a useful fraction of the descendant gain can survive normal
+  broad gates.
 - `child-ranking-desc74-targetonly-r14-lr1e5-e480` is rejected as a weak
   capability result. With broad preservation disabled, the direct descendant
   subset moved from r14 `.nn 34/74`, engine `34/74` to `.pt/.nn 40/74`,

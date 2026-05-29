@@ -1,24 +1,24 @@
 {
-  "description": "Stronger capability check: train only the 74 search-descendant targets from r14 without broad preservation.",
-  "experiment": "child-ranking-desc74-targetonly-r14-lr5e5-e960",
+  "description": "Train the 74 search-descendant targets from r14 with reference broad preservation enabled.",
+  "experiment": "child-ranking-desc74-refpreserve100-r14-lr2e5-e960",
   "create": {
-    "name": "child-ranking-desc74-targetonly-r14-lr5e5-e960",
+    "name": "child-ranking-desc74-refpreserve100-r14-lr2e5-e960",
     "backend": "child-ranking",
     "pack_dir": "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/pack/train",
     "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
     "child_targets": "targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl",
     "child_broad_rows": 100000,
     "child_static_gate_rows": 100000,
-    "child_static_gate_max_mae_regression_cp": 100000.0,
-    "child_static_gate_max_sign_drop_pct": 100.0,
-    "child_static_gate_max_near_zero_sign_drop_pct": 100.0,
-    "lr": 5e-05,
+    "child_static_gate_max_mae_regression_cp": 5.0,
+    "child_static_gate_max_sign_drop_pct": 1.0,
+    "child_static_gate_max_near_zero_sign_drop_pct": 2.0,
+    "lr": 0.00002,
     "epochs": 960,
     "batch_size": 8192,
     "child_batch_size": 64,
     "child_loss": "listwise",
     "ranking_weight": 1.0,
-    "broad_preserve_weight": 0.0,
+    "broad_preserve_weight": 1.0,
     "broad_anchor": "reference",
     "broad_deadzone_cp": 5,
     "broad_beta": 100,
@@ -26,8 +26,8 @@
     "rank_temperature_cp": 35,
     "min_groups": 74,
     "min_pairs": 83,
-    "child_model_gate_min_top1": 55,
-    "child_engine_gate_min_top1": 55,
+    "child_model_gate_min_top1": 50,
+    "child_engine_gate_min_top1": 50,
     "child_engine_jobs": 4,
     "device": "cuda",
     "workers": 4,
@@ -36,20 +36,20 @@
     "torch_compile": true,
     "dataset_in_memory": true,
     "export_quantize_forward": true,
-    "weight_decay": 1e-06,
+    "weight_decay": 0.000001,
     "trainable": "all",
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "baseline": [
       "r14 on the 74 search-descendant groups: model 34/74, engine 34/74",
-      "r21 mixed descendant training stayed flat: model 2424/6212 overall and 34/74 on the descendant subset",
-      "desc74 target-only lr1e-5 moved only partially: .pt/.nn 40/74, engine 41/74; full mixed engine gate 2473/6212"
+      "target-only lr1e-5 moved weakly: .pt/.nn 40/74, engine 41/74",
+      "target-only lr5e-5 proved capability: .pt/.nn 61/74, engine 61/74, but broad static collapsed to MAE 157.262 and sign 58.54%"
     ],
     "pass_intent": [
-      "try one stronger target-only run to test whether the descendant rows can cross export thresholds cleanly",
-      "ignore broad-static quality for this diagnostic only",
-      "if this fails to reach 55/74, stop using these rows as scalar child-ranking targets"
+      "retain a useful part of the descendant gain while keeping broad static behavior within normal caps",
+      "require exported model and engine to reach at least 50/74 on the descendant set",
+      "if this fails by staying flat, raise target pressure; if it fails by broad collapse, lower target pressure or widen the deadzone"
     ]
   }
 }
