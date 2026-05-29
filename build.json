@@ -1,40 +1,35 @@
 {
-  "description": "Refresh dense replay-loss child targets from latest synced loss logs after closing the simple policy-sidecar lane.",
-  "experiment": "replay-loss-latest-fast4-20260529",
+  "description": "Augment the latest fast replay-loss child targets with root-search-selected moves from r14 and Berserk before training.",
+  "experiment": "replay-loss-latest-fast4-rootaug-r14-berserk-20260529",
   "create": {
-    "name": "replay-loss-latest-fast4-20260529",
-    "backend": "replay-jsonl",
-    "replay_logs": "$HOME/code/cpp/chess/lichess/logs/loss",
-    "replay_candidate": "$HOME/code/cpp/chess/assets/engines/reference",
-    "replay_reference": "",
-    "replay_oracle_nodes": 200000,
-    "replay_jobs": 8,
-    "replay_move": 8,
-    "replay_top_root_moves": 4,
-    "replay_include_checks": true,
-    "replay_include_captures": true,
-    "replay_include_promotions": true,
-    "replay_include_history_sensitive": false,
-    "replay_max_moves_per_position": 16,
-    "replay_min_score_gap": 0,
-    "replay_output": "targets/replay-loss-latest-fast4-20260529/loss_replay.jsonl",
-    "replay_stderr": "targets/replay-loss-latest-fast4-20260529/loss_replay.stderr",
-    "replay_min_rows": 2500,
-    "replay_child_targets": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets.jsonl",
-    "replay_child_summary": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets.summary.txt",
-    "replay_child_min_groups": 2500,
+    "name": "replay-loss-latest-fast4-rootaug-r14-berserk-20260529",
+    "backend": "augment-child-targets",
+    "engine": "$HOME/code/cpp/chess/assets/engines/reference",
+    "child_augment_input": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets.jsonl",
+    "child_augment_output": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk.jsonl",
+    "child_augment_summary": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk.summary.txt",
+    "child_augment_search_nets": "r14=runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn,berserk=$HOME/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn",
+    "child_augment_search_nodes": 20000,
+    "child_augment_search_depth": 0,
+    "child_augment_jobs": 8,
+    "child_augment_min_groups": 2793,
+    "child_augment_max_missing_after": 0,
+    "child_augment_oracle_nodes": 200000,
+    "child_augment_oracle_depth": 0,
+    "child_augment_oracle_threads": 1,
+    "child_augment_oracle_hash": 128,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "baseline": [
-      "simple policy sidecar MLPs learned narrow corrections but did not produce safe useful held-out action",
-      "mate-like preserved sidecar failed at deploy threshold 24 with 0 validation overrides",
-      "threshold 16 was still too low-action with only 3 validation good overrides"
+      "latest fast replay-loss extraction produced 2793 child groups and 12445 scored moves",
+      "r14 static baseline on that corpus is .nn 883/2793 and engine 858/2793",
+      "root-search gate still has missing_selected=254 for r14 and 242 for Berserk"
     ],
     "pass_intent": [
-      "regenerate scored child-move groups from latest synced Enyo loss logs",
-      "keep history-sensitive replay rows excluded from normal NNUE targets",
-      "use this refreshed corpus as input to the next child-ranking training run"
+      "score root-search-selected moves before launching another child-ranking train",
+      "make the next training and search gates complete for r14 and Berserk",
+      "require missing_after=0 so later gate numbers are not contaminated by unscored selected moves"
     ]
   }
 }
