@@ -637,6 +637,24 @@ Interpretation:
 - Do not rerun the simple policy sidecar without a new data or representation
   hypothesis.
 
+### r22 Result
+
+`child-ranking-fast4-r22-r14init-latestroot-listwise-qfwd-refpreserve30-dz5-lr2e6-e240`
+is rejected at the model gate, but it is not a collapse:
+
+- `.pt/.nn` child ranking: `875/2793`, versus r14 `868/2793`;
+- engine eval child ranking: `846/2793`, versus r14 `841/2793`;
+- broad static stayed safe and improved MAE (`117.182` versus r14 `121.808`),
+  with only `+0.08pp` sign drop;
+- root search was `1839/2793`, versus r14 `1838/2793`, but
+  `missing_selected=97`.
+
+Interpretation: the conservative r22 run moved in the right direction, but not
+far enough to pass the exported model/engine gates. The root-search result is
+also incomplete because r22 selected `97` unscored moves. The next step is not
+to weaken the gate; augment those selected moves first, then run a stronger r23
+train on the completed corpus.
+
 ## Candidate Workflow
 
 Normal candidate creation:
@@ -648,23 +666,20 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `child-ranking-fast4-r22-r14init-latestroot-listwise-qfwd-refpreserve30-dz5-lr2e6-e240`
-- backend: `child-ranking`
-- init net: r14
-- child targets:
+  `replay-loss-latest-fast4-rootaug-r14-berserk-r22-20260529`
+- backend: `augment-child-targets`
+- input:
   `targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk.jsonl`
-- broad preserve: reference-deadzone, not label fitting
+- output:
+  `targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22.jsonl`
+- search nets: r14, Berserk, and r22
 - hard gates:
-  - exported `.nn` model gate beats augmented r14 baseline;
-  - engine eval gate beats augmented r14 baseline;
-  - broad static gate stays within the r14 regression caps;
-  - root-search gate does not lose to r14 or introduce missing selected moves.
+  - target file still has `2793` groups;
+  - `missing_after=0`.
 - main knobs:
-  - `lr`
-  - `ranking_weight`
-  - `broad_preserve_weight`
-  - `broad_deadzone_cp`
-  - model/engine/search gate thresholds
+  - `child_augment_search_nets`
+  - `child_augment_search_nodes`
+  - `child_augment_oracle_nodes`
 
 Current hypothesis:
 
