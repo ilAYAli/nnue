@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -104,43 +104,59 @@ def cmd_failure_suite(args: argparse.Namespace) -> int:
 
 
 def cmd_sprt(args: argparse.Namespace) -> int:
-    script = tools_root() / "validate" / "run_net_sprt_pwa.sh"
-    run_dir = event_run_dir(args.run, expand_path(args.net).parent)
-    env = os.environ.copy()
-    env.update({
-        "NET": str(expand_path(args.net)),
-        "GAMES": str(args.games),
-        "CONCURRENCY": str(args.concurrency),
-        "THREADS": str(args.threads),
-        "HASH": str(args.hash),
-        "TC": args.tc,
-        "ELO0": str(args.elo0),
-        "ELO1": str(args.elo1),
-        "RESTART": args.restart,
-    })
-    if args.tag:
-        env["TAG"] = args.tag
-    if args.run:
-        env["RUN"] = str(expand_path(args.run))
-    if args.engine:
-        env["ENGINE"] = str(expand_path(args.engine))
-    if args.reference_net:
-        env["INIT"] = str(expand_path(args.reference_net))
-    if args.sprt:
-        env["SPRT"] = str(expand_path(args.sprt))
-    if args.book:
-        env["BOOK"] = str(expand_path(args.book))
-    if args.log_dir:
-        env["LOG_DIR"] = str(expand_path(args.log_dir))
-    if args.ntfy_url:
-        env["NTFY_URL"] = args.ntfy_url
-    command = [str(script)]
+    home = Path.home()
+    net = expand_path(args.net)
+    tag = args.tag or net.parent.name
+    run_dir = event_run_dir(args.run, net.parent.parent)
+    engine = expand_path(args.engine) if args.engine else home / "code/cpp/chess/assets/engines/reference"
+    reference_net = (
+        expand_path(args.reference_net)
+        if args.reference_net
+        else home / "code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn"
+    )
+    sprt = expand_path(args.sprt) if args.sprt else home / "code/cpp/chess/sprt/sprt"
+    book = expand_path(args.book) if args.book else home / "code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd"
+    log_dir = (
+        expand_path(args.log_dir)
+        if args.log_dir
+        else run_dir / tag / f"sprt_confirm_{time.strftime('%Y%m%d_%H%M%S')}"
+    )
+
+    command = [
+        str(sprt),
+        "--candidate", str(engine),
+        "--reference", str(engine),
+        "--candidate-uci", f"Hash={args.hash}",
+        "--candidate-uci", f"nnue_file={net}",
+        "--reference-uci", f"Hash={args.hash}",
+        "--reference-uci", f"nnue_file={reference_net}",
+        "--book", str(book),
+        "--log-dir", str(log_dir),
+        "--name", f"{tag}_vs_refnet",
+    ]
+    if args.games != 2000:
+        command += ["--games", str(args.games)]
+    if args.concurrency != 6:
+        command += ["--concurrency", str(args.concurrency)]
+    if args.threads != 4:
+        command += ["--threads", str(args.threads)]
+    if args.tc != "10+0.1":
+        command += ["--tc", args.tc]
+    if args.elo0 not in {0, 0.0}:
+        command += ["--elo0", str(args.elo0)]
+    if args.elo1 not in {10, 10.0}:
+        command += ["--elo1", str(args.elo1)]
+    if args.restart != "on":
+        command += ["--restart", args.restart]
+    if args.ntfy_url and args.ntfy_url != "https://ntfy.wahlman.no/sprt":
+        command += ["--ntfy-url", args.ntfy_url]
+
     emit_event(
         run_dir, "phase_start", stage="validate_sprt", status="running",
         command=command, hook_command=args.event_command or "",
         extra={"tag": args.tag or "", "games": args.games, "tc": args.tc},
     )
-    rc = run(command, env=env)
+    rc = run(command)
     emit_event(
         run_dir, "done" if rc == 0 else "fail",
         stage="validate_sprt", status="ok" if rc == 0 else "failed",
