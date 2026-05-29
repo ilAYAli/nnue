@@ -229,7 +229,10 @@ def main() -> None:
             if key > best_key:
                 best_key = key
                 best_state = {
-                    "model": model.state_dict(),
+                    "model": {
+                        name: value.detach().cpu().clone()
+                        for name, value in model.state_dict().items()
+                    },
                     "mean": mean,
                     "std": std,
                     "input_dim": input_dim,
