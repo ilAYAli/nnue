@@ -1,35 +1,27 @@
 {
-  "description": "Augment the completed replay-loss corpus with r24 root-search selected moves before judging r24.",
-  "experiment": "replay-loss-latest-fast4-rootaug-r14-berserk-r22-r23-r24-20260529",
+  "description": "Stamp completed replay-loss child targets with r14 root-search selected moves as policy base_move.",
+  "experiment": "replay-loss-fast4-r14-rootbase-20260529",
   "create": {
-    "name": "replay-loss-latest-fast4-rootaug-r14-berserk-r22-r23-r24-20260529",
-    "backend": "augment-child-targets",
-    "engine": "$HOME/code/cpp/chess/assets/engines/reference",
-    "child_augment_input": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23.jsonl",
-    "child_augment_output": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24.jsonl",
-    "child_augment_summary": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24.summary.txt",
-    "child_augment_search_nets": "r24=runs/child-ranking-fast4-r24-r22init-r23regress49-listwise-qfwd-refpreserve30-childpreserve5-dz5-lr3e6-e240/train/child-ranking-fast4-r24-r22init-r23regress49-listwise-qfwd-refpreserve30-childpreserve5-dz5-lr3e6-e240/model.nn",
-    "child_augment_search_nodes": 20000,
-    "child_augment_search_depth": 0,
-    "child_augment_jobs": 8,
-    "child_augment_min_groups": 2793,
-    "child_augment_max_missing_after": 0,
-    "child_augment_oracle_nodes": 200000,
-    "child_augment_oracle_depth": 0,
+    "name": "replay-loss-fast4-r14-rootbase-20260529",
+    "backend": "set-child-base-move",
+    "child_base_input": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24.jsonl",
+    "child_base_output": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24_base_r14.jsonl",
+    "child_base_summary": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24_base_r14.summary.txt",
+    "child_base_origin": "root_search:r14",
+    "child_base_min_groups": 2793,
+    "child_base_keep_missing": false,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "baseline": [
-      "r24 failed model top1 at 863/2793 versus threshold 865",
-      "r24 engine eval is 836/2793 with sum_gap 596024",
-      "r24 broad static versus r22 improved MAE by 2.198cp with 0.02pp sign drop",
-      "r24 root-search comparison versus r22 skipped 77 groups because r24 selected unscored moves",
-      "on the scored subset r24 was candidate_better=226 reference_better=214 sum_diff=+663cp"
+      "r14 is the current keeper baseline",
+      "r22/r23/r24 scalar child-ranking continuation is closed as a direct promotion path",
+      "policy diagnostics need base_move to mean the root-search selected move, not static child-eval best"
     ],
     "pass_intent": [
-      "complete the r24 target before judging root-search strength",
-      "require missing_after=0 after scoring all r24-selected root moves",
-      "rerun r24 versus r22 search comparison on the completed corpus before choosing the next train"
+      "produce a complete policy target with base_move=root_search:r14 for every group",
+      "use the output as the next policy-ranking target through build.py",
+      "do not launch another scalar child-ranking continuation from this target"
     ]
   }
 }
