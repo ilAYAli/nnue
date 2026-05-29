@@ -823,6 +823,19 @@ signal without touching scalar eval. If the policy cannot safely improve this
 focused set, the next useful work is engine/search instrumentation or a real
 representation change, not more child-ranking LR/preserve sweeps.
 
+`policy-rootbase-r14-full2793-board-h128-t8-20260529` failed the policy gate.
+Training produced validation action at threshold `8`, but it was unsafe
+(`epoch 1199`: `good=40`, `bad=90`, `overrides=159`). The saved checkpoint was
+the only zero-bad checkpoint, which had zero overrides, so the final validation
+failed with `good=0`, `bad=0`, `overrides=0` at every configured threshold.
+
+Tooling correction: policy checkpoint selection now evaluates the same
+threshold list and zero-bad/min-good/min-override constraints as the validation
+gate, and export can use the selected checkpoint threshold automatically. Rerun
+the policy diagnostic once with this corrected selector. If it still cannot
+find a zero-bad useful threshold, close this policy-sidecar shape for the
+full replay-loss root-base target.
+
 Rules:
 
 - Commit `build.json` changes so the current intended run is reviewable.
