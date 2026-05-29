@@ -12,6 +12,16 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-desc74-board-h128-t0-val25-r14-lr2e4-e2000` passed the held-out
+  sidecar diagnostic. The validation split improved from base `5/18`,
+  `1107cp` summed gap to policy `12/18`, `258cp` summed gap, with `8` good
+  overrides, `0` bad overrides, and export parity. The signal is therefore not
+  pure memorization inside this small search-descendant family. However, this
+  sidecar does not transfer directly to a mixed `1533`-row corpus without
+  retraining: threshold `0` produced `79` good and `169` bad validation
+  overrides; threshold `4` produced only `7` good and `5` bad. The next run
+  trains directly on the moderate mixed corpus with no-harm and base-best
+  preservation in the policy loss.
 - `policy-desc74-board-h128-t0-r14-lr2e4-e2000` passed as an in-sample
   capability proof. On the `74` search-descendant groups, r14/base was
   `34/74` with `3285cp` summed gap. The sidecar reached `74/74`, `0cp` summed
@@ -541,22 +551,22 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Run a held-out sidecar policy-ranker diagnostic on the same `74`
-search-descendant groups:
+Train a moderate sidecar policy-ranker corpus:
 
-1. Do not change scalar NNUE eval.
-2. Initialize policy features from the r14 net.
-3. Use board-level policy features and train only the sidecar ranker.
-4. Use `25%` validation split.
-5. Gate at threshold `0`.
+1. Keep scalar NNUE eval unchanged.
+2. Use the r14 net as the frozen base feature/eval source.
+3. Mix the `74` search-descendant groups, the `459` r14 smoke-loss rows, and
+   `1000` LC0-oracle rows.
+4. Use board-level policy features with dropout plus no-harm/base-best
+   preservation terms.
+5. Gate on a `25%` validation split with bounded bad overrides.
 
 Interpretation:
 
-- If held-out validation passes with no bad overrides, expand the sidecar
-  corpus; the signal is not just memorized.
-- If held-out validation fails, the sidecar result is only an overfit
-  diagnostic and the next useful work is broader real-game data or
-  search-policy debugging.
+- If held-out validation improves top1 and produces useful good overrides with
+  bounded bad overrides, the sidecar deserves an engine-integration diagnostic.
+- If it fails, the sidecar is only useful for narrow motifs and should not be
+  treated as a near-term Elo lane.
 
 ## Candidate Workflow
 

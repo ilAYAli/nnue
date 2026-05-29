@@ -1,44 +1,45 @@
 {
-  "description": "Train a held-out sidecar policy-ranker diagnostic on the 74 search-descendant targets without changing scalar NNUE eval.",
-  "experiment": "policy-desc74-board-h128-t0-val25-r14-lr2e4-e2000",
+  "description": "Train a moderate sidecar policy-ranker corpus with descendant, smoke-loss, and LC0-oracle rows.",
+  "experiment": "policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800",
   "create": {
-    "name": "policy-desc74-board-h128-t0-val25-r14-lr2e4-e2000",
+    "name": "policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800",
     "backend": "policy-ranking",
     "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "policy_targets": "targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl",
+    "policy_targets": "targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl,targets/smoke1000-r5-loss-even-20260528/smoke_child_targets_rootaug_r14.jsonl,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl",
     "policy_hidden": 128,
     "policy_feature_set": "board",
-    "policy_dropout": 0.0,
+    "policy_dropout": 0.15,
     "policy_val_fraction": 0.25,
-    "policy_target_temperature_cp": 35,
-    "policy_thresholds": "0",
-    "policy_export_threshold": 0,
-    "policy_gate_min_top1": 55,
+    "policy_target_temperature_cp": 80,
+    "policy_thresholds": "0,2,4,6,8,12,16",
+    "policy_export_threshold": 4,
+    "policy_gate_min_top1": 800,
     "policy_gate_max_bad": -1,
-    "policy_gate_min_val_top1": 12,
-    "policy_gate_max_val_bad": 0,
-    "policy_gate_min_val_good": 3,
+    "policy_gate_min_val_top1": 220,
+    "policy_gate_max_val_bad": 25,
+    "policy_gate_min_val_good": 30,
     "policy_bad_tolerance_cp": 10,
-    "lr": 0.0002,
-    "epochs": 2000,
+    "policy_base_best_preserve_weight": 1.0,
+    "policy_no_harm_weight": 1.0,
+    "policy_no_harm_gap_cp": 10,
+    "policy_preserve_margin": 8,
+    "lr": 0.0001,
+    "epochs": 800,
     "rank_temperature_cp": 1,
-    "min_groups": 74,
+    "min_groups": 1500,
     "device": "cpu",
     "weight_decay": 0.000001,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "baseline": [
-      "r14 scalar child eval on the 74 search-descendant groups: 34/74",
-      "preserved scalar child-ranking lr2e-5: .pt/.nn 35/74",
-      "preserved scalar child-ranking lr5e-5: .pt/.nn 36/74",
-      "target-only scalar child-ranking lr5e-5: .pt/.nn and engine 61/74, but broad static collapsed",
-      "in-sample policy sidecar reached 74/74 with 40 good overrides and 0 bad"
+      "desc74 held-out policy sidecar: val 5/18 -> 12/18, 8 good overrides, 0 bad",
+      "desc74 sidecar applied to the mixed 1533 corpus without retraining was harmful: val threshold 0 had 79 good and 169 bad overrides; threshold 4 had 7 good and 5 bad"
     ],
     "pass_intent": [
-      "test whether the non-scalar sidecar generalizes beyond the rows it trains on",
-      "require held-out selected policy top1 at threshold 0 to reach at least 12/18",
-      "require at least 3 held-out good overrides and 0 held-out bad overrides"
+      "test whether the sidecar signal survives on a moderate mixed corpus",
+      "require held-out top1 above the mixed-corpus base baseline",
+      "require useful held-out good overrides while bounding bad overrides"
     ]
   }
 }
