@@ -12,6 +12,12 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `child-ranking-desc74-refpreserve100-r14-lr2e5-e960` is rejected at the
+  model gate. It reached only `.pt/.nn 35/74` on the `74`
+  search-descendant groups, versus r14 baseline `34/74`. This is not an
+  export mismatch; `.pt` and `.nn` agree. The preserve term is suppressing the
+  descendant signal too much at this target pressure. The next run keeps the
+  same target file and reference preservation but raises LR to `5e-5`.
 - `child-ranking-desc74-targetonly-r14-lr5e5-e960` proves the
   search-descendant rows are learnable through export and engine eval, but is
   not a candidate. It reached `.pt/.nn 61/74`, engine `61/74`, sum gap `732cp`,
@@ -521,26 +527,23 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Build a search-descendant diagnostic before more training:
+Run one higher-pressure preserved descendant check:
 
-1. Use the focused `29` r18-vs-r14 smoke-worse rows.
-2. For each row, record r14 and candidate root selected moves and principal
-   variation descendants at the same fixed-node search setting.
-3. Oracle-score the descendant positions/moves in parent POV, using the same
-   oracle settings as the current child targets.
-4. Identify where r14's selected root move becomes correct: immediate child,
-   first PV descendant, later PV descendant, or only full search.
-5. Only train a new candidate if the diagnostic yields concrete descendant
-   child-ranking groups. If it does not, stop this eval-training loop and treat
-   the remaining issue as search-policy rather than NNUE scalar training.
+1. Keep the `74` scored search-descendant child groups unchanged.
+2. Initialize from r14.
+3. Keep reference broad preservation enabled (`weight=1.0`, `deadzone=5cp`).
+4. Raise LR from `2e-5` to `5e-5`.
+5. Accept only if exported `.nn` and engine child gate both reach at least
+   `50/74` and broad static stays inside the normal caps.
 
-Pass condition for the diagnostic:
+Interpretation:
 
-- r14-search-good rows must become explainable by scored descendant targets for
-  most of the `29` rows;
-- no ordinary training run is launched unless the new target file has complete
-  scored selected moves and `missing_selected=0` under both r14 and the current
-  candidate.
+- If it stays flat again, reference preservation is still blocking this target
+  family and another preserved weight tweak is not justified.
+- If it reaches the descendant gate but broad collapses, target-only capability
+  is confirmed but the scalar eval path still lacks a clean preserved
+  correction space.
+- If it passes both, run the focused root-search gate before any game smoke.
 
 ## Candidate Workflow
 
