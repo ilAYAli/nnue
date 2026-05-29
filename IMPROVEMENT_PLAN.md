@@ -12,6 +12,14 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-matelike-preserve-nonmate-selectdeploy-board-h64-t24-lr2e4-e400`
+  is rejected. Deploy-gate checkpoint selection worked and selected a safe
+  but effectively inert policy. At the deploy threshold `24`, the validation
+  split stayed at base `19/54` with `0` overrides, `0` good, and `0` bad.
+  Lowering to threshold `16` produced only `3` held-out good overrides with
+  `0` bad, still below the useful-action bar. This closes the simple sidecar
+  MLP lane for now: it can learn narrow `mate_like` signal, but not a safe
+  deployable action policy at useful validation rate.
 - `policy-mix533-compact-nolc0-selectdeploy-h64-t2-lr2e4-e1200` is rejected.
   Deploy-gate checkpoint selection worked, but it selected a no-op checkpoint:
   threshold `2` had `0` overrides, `0` good, `0` bad, and stayed at the base
@@ -593,23 +601,23 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Rerun the narrow mate-like sidecar with deploy-gate checkpoint selection:
+Refresh the replay-loss child corpus from the latest synced loss logs:
 
-1. Keep scalar NNUE eval unchanged.
-2. Use the Berserk reference net from `enyo/net/berserk-d43206fe90e4.nn` as the
-   frozen base feature/eval source.
-3. Train on `mate_like` rows only, excluding the unsafe
-   `source:lichess_lowmat_mc12` slice from the hard validation gate.
-4. Use all non-`mate_like` rows as no-action preservation rows.
-5. Require held-out mate-like action with zero bad overrides and broad
-   non-mate zero bad overrides at the deployed threshold.
+1. Use `backend=replay-jsonl`.
+2. Source logs from `~/code/cpp/chess/lichess/logs/loss` after syncing from
+   localhost.
+3. Use the current reference engine as the candidate and omit A/B reference
+   mode.
+4. Emit dense scored legal-move groups with `top_root_moves=4`,
+   `max_moves_per_position=16`, checks, captures, and promotions enabled.
+5. Keep `include_history_sensitive=false` for normal NNUE targets.
 
 Interpretation:
 
-- If this passes, the next step is engine-side policy integration as a
-  diagnostic only, not an automatic strength candidate.
-- If this fails, pause simple sidecar MLP work. It has useful narrow signal but
-  not a safe deployable action policy.
+- If extraction/validation fails, fix replay/log filtering before training.
+- If it passes, build the next child-ranking mix from this refreshed replay
+  corpus plus only proven useful supplemental rows. Do not rerun the simple
+  policy sidecar without a new data or representation hypothesis.
 
 ## Candidate Workflow
 
@@ -622,45 +630,31 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `child-ranking-mixed-replayloss2677-lc0oracle1000-smoker1x5-listwise-qfwd-refpreserve20-dz5-lr5e5-e360`
-- backend: `child-ranking`
-- target format: child-move groups with stored capped gaps
-- base net: current reference `.nn`
-- objective: listwise child ranking with quantized-forward export behavior
-- broad preserve: reference-anchor deadzone (`weight=0.20`, `deadzone=5cp`)
-- current target mix:
-  - replay-loss dense rows;
-  - LC0-oracle rows;
-  - failed-smoke root-search rows weighted x5.
+  `replay-loss-latest-fast4-20260529`
+- backend: `replay-jsonl`
+- source: latest synced Enyo Lichess loss logs
+- engine: current reference as candidate, no A/B reference mode
+- oracle: fixed `200000` nodes
+- move set: root PV top 4 plus checks, captures, promotions, capped at 16 moves
+  per position
+- output: replay JSONL plus converted child-ranking JSONL
 - hard gates:
-  - model/engine child gates above reference baseline;
-  - broad static gate;
-  - root-search gate on failed-smoke rows before any game smoke.
+  - replay JSONL validates cleanly;
+  - no dirty candidate binary;
+  - no history-sensitive rows in normal NNUE targets;
+  - at least `2500` replay rows and child groups.
 - main knobs:
-  - `policy_hidden`
-  - `policy_feature_set`
-  - `policy_dropout`
-  - `policy_preserve_weight`
-  - `policy_preserve_margin`
-  - `policy_preserve_max_groups`
-  - `policy_preserve_val_fraction`
-  - `policy_broad_gate_max_bad`
-  - `policy_broad_gate_max_overrides`
-  - `policy_val_fraction`
-  - `policy_target_temperature_cp`
-  - `policy_thresholds`
-  - `policy_gate_min_top1`
-  - `policy_gate_max_bad`
-  - `rank_temperature_cp`
-  - `min_groups`
+  - `replay_top_root_moves`
+  - `replay_max_moves_per_position`
+  - `replay_oracle_nodes`
+  - `replay_child_min_groups`
 
 Current hypothesis:
 
-- The sidecar can learn `mate_like` corrections, but without an explicit
-  no-action loss it fires on normal positions. The next test is whether
-  non-mate preserve rows can keep broad action near zero while retaining useful
-  mate-like overrides. If this fails cleanly, pause simple sidecar MLP work and
-  move to stronger policy data construction or a different representation.
+- The simple sidecar can learn `mate_like` corrections, but cannot produce a
+  safe useful held-out action rate. The next child-ranking attempt should use a
+  refreshed replay-derived corpus and only add supplemental rows that survive
+  root-search validation.
 
 Rules:
 
