@@ -12,6 +12,15 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-mix533-compact-nolc0-h64-nh2-bb2-t2-lr2e4-e1200` is rejected by
+  the deploy gate. Removing LC0 helped but did not make the sidecar safe:
+  validation base was `59/133`, raw policy was `66/133`, and threshold `2`
+  reached `65/133` with `6` good overrides but `2` bad, including a `-686cp`
+  harm. This exposed another process issue: the trainer selected checkpoints
+  by raw validation top1/sum-gap, while deployment rejects on thresholded
+  good/bad overrides. Checkpoint selection now uses the deploy threshold and
+  bad-tolerance criterion. Rerun the no-LC0 diagnostic once with the fixed
+  selector before closing the sidecar lane.
 - `policy-mix1533-compact-h64-nh2-bb2-t4-lr2e4-e1200` is rejected. Compact
   features did not solve the mixed sidecar problem: validation base was
   `210/383`, raw policy was `206/383`, and deploy threshold `4` had only `1`
@@ -576,7 +585,8 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Train a compact no-LC0 sidecar policy-ranker diagnostic:
+Rerun the compact no-LC0 sidecar policy-ranker diagnostic with deploy-gate
+checkpoint selection:
 
 1. Keep scalar NNUE eval unchanged.
 2. Use the r14 net as the frozen base feature/eval source.
@@ -592,8 +602,9 @@ Interpretation:
 
 - If held-out validation improves top1 and produces useful good overrides with
   bounded bad overrides, the sidecar deserves an engine-integration diagnostic.
-- If the no-LC0 sidecar also fails, the current sidecar setup is only useful
-  for narrow motifs and should not be treated as a near-term Elo lane.
+- If the no-LC0 sidecar still cannot find a useful zero-bad checkpoint, the
+  current sidecar setup is only useful for narrow motifs and should not be
+  treated as a near-term Elo lane.
 
 ## Candidate Workflow
 

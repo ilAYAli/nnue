@@ -1,8 +1,8 @@
 {
-  "description": "Train a compact sidecar policy-ranker corpus with descendant and smoke-loss rows, excluding LC0-oracle rows.",
-  "experiment": "policy-mix533-compact-nolc0-h64-nh2-bb2-t2-lr2e4-e1200",
+  "description": "Rerun the compact no-LC0 policy-ranker corpus with deploy-gate checkpoint selection.",
+  "experiment": "policy-mix533-compact-nolc0-selectdeploy-h64-t2-lr2e4-e1200",
   "create": {
-    "name": "policy-mix533-compact-nolc0-h64-nh2-bb2-t2-lr2e4-e1200",
+    "name": "policy-mix533-compact-nolc0-selectdeploy-h64-t2-lr2e4-e1200",
     "backend": "policy-ranking",
     "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
     "policy_targets": "targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl,targets/smoke1000-r5-loss-even-20260528/smoke_child_targets_rootaug_r14.jsonl",
@@ -37,10 +37,11 @@
       "desc74 sidecar applied to the mixed 1533 corpus without retraining was harmful: val threshold 0 had 79 good and 169 bad overrides; threshold 4 had 7 good and 5 bad",
       "first mixed sidecar run was confounded by a checkpoint-selection bug and saved the final epoch instead of the selected best epoch",
       "r2 after the checkpoint fix still failed: val raw policy 203/383 versus base 210/383; threshold 4 had 3 good and 4 bad validation overrides",
-      "compact mixed run failed because LC0-oracle validation was harmful: val threshold 4 had 0 good and 6 bad LC0 overrides, while the no-LC0 slice was clean at threshold 2"
+      "compact mixed run failed because LC0-oracle validation was harmful: val threshold 4 had 0 good and 6 bad LC0 overrides, while the no-LC0 slice was clean at threshold 2",
+      "first no-LC0 compact run improved raw validation top1 but failed the deploy gate with 6 good and 2 bad validation overrides at threshold 2; checkpoint selection has now been aligned with the deploy gate"
     ],
     "pass_intent": [
-      "test whether excluding LC0-oracle rows leaves a transferable real-game sidecar signal",
+      "test whether deploy-gate checkpoint selection can find a zero-bad no-LC0 sidecar checkpoint",
       "require held-out top1 above the no-LC0 base baseline",
       "require useful held-out good overrides with zero bad overrides"
     ]
