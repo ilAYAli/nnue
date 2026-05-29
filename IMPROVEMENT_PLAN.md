@@ -655,6 +655,33 @@ also incomplete because r22 selected `97` unscored moves. The next step is not
 to weaken the gate; augment those selected moves first, then run a stronger r23
 train on the completed corpus.
 
+### r22 Root Augmentation
+
+`replay-loss-latest-fast4-rootaug-r14-berserk-r22-20260529` completed cleanly:
+
+- added `97` r22-selected moves;
+- `groups_augmented=97`;
+- `best_overrides=11`;
+- `missing_after=0`;
+- output target:
+  `targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22.jsonl`.
+
+Completed r22-augmented target baselines:
+
+- groups: `2793`;
+- scored moves: `12186`;
+- rank pairs: `9236`;
+- r14 `.nn`: `864/2793`;
+- r14 engine eval: `837/2793`;
+- r22 `.nn`: `871/2793`;
+- r22 engine eval: `842/2793`;
+- r22 root search: `1850/2793`, `missing_selected=0`;
+- r14 root search on the same file: `1834/2793`, `missing_selected=0`.
+
+The r22 root-search baseline is better by top1, but the aggregate comparison
+against r14 is still negative (`sum_diff=-3577cp`). This is not a promotion
+signal. It is enough to justify one stronger r23 continuation from r22.
+
 ## Candidate Workflow
 
 Normal candidate creation:
@@ -666,20 +693,24 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `replay-loss-latest-fast4-rootaug-r14-berserk-r22-20260529`
-- backend: `augment-child-targets`
-- input:
-  `targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk.jsonl`
-- output:
+  `child-ranking-fast4-r23-r22init-latestroot-listwise-qfwd-refpreserve30-dz5-lr5e6-e240`
+- backend: `child-ranking`
+- init net: r22
+- child targets:
   `targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22.jsonl`
-- search nets: r14, Berserk, and r22
+- broad preserve: reference-deadzone against r22
 - hard gates:
-  - target file still has `2793` groups;
-  - `missing_after=0`.
+  - exported `.nn` model gate beats r22 baseline: `>= 890/2793`;
+  - engine eval gate beats r22 baseline: `>= 860/2793`;
+  - broad static gate stays within r22 regression caps;
+  - root-search gate beats r22 baseline: `>= 1851/2793`;
+  - `missing_selected=0`;
+  - `reference_better <= 300` against r22.
 - main knobs:
-  - `child_augment_search_nets`
-  - `child_augment_search_nodes`
-  - `child_augment_oracle_nodes`
+  - `lr=5e-6`
+  - `ranking_weight=1.0`
+  - `broad_preserve_weight=0.3`
+  - `broad_deadzone_cp=5`
 
 Current hypothesis:
 
