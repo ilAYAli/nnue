@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import json
 import os
 import queue
 import statistics
@@ -261,6 +262,60 @@ def compare(candidate: list[dict], reference: list[dict]) -> dict[str, float]:
     }
 
 
+def write_details(
+    path: Path,
+    groups: list[ChildRankGroup],
+    candidate: list[dict],
+    reference: list[dict] | None,
+) -> None:
+    by_group = {group.group_id: group for group in groups}
+    reference_by_id = (
+        {str(result["group_id"]): result for result in reference}
+        if reference is not None else {}
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for cand in candidate:
+            group = by_group[str(cand["group_id"])]
+            ref = reference_by_id.get(str(cand["group_id"]))
+            diff = None
+            relation = "no_reference"
+            if ref is not None:
+                if cand["selected_gap"] is None or ref["selected_gap"] is None:
+                    relation = "missing"
+                else:
+                    diff = float(ref["selected_gap"]) - float(cand["selected_gap"])
+                    if diff > 0:
+                        relation = "candidate_better"
+                    elif diff < 0:
+                        relation = "reference_better"
+                    else:
+                        relation = "equal"
+            row = {
+                "schema": "enyo.child_rank_search_gate.v1",
+                "group_id": group.group_id,
+                "fen": group.fen,
+                "tags": list(group.tags),
+                "best_move": group.best_move,
+                "candidate": {
+                    "selected": cand["selected"],
+                    "correct": cand["correct"],
+                    "missing": cand["missing"],
+                    "gap_cp": cand["selected_gap"],
+                },
+                "relation": relation,
+                "diff_cp": diff,
+            }
+            if ref is not None:
+                row["reference"] = {
+                    "selected": ref["selected"],
+                    "correct": ref["correct"],
+                    "missing": ref["missing"],
+                    "gap_cp": ref["selected_gap"],
+                }
+            handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--targets", required=True, type=Path)
@@ -276,6 +331,7 @@ def main() -> None:
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)
     ap.add_argument("--fail-if-missing-above", type=int, default=-1)
     ap.add_argument("--fail-if-reference-better-above", type=int, default=-1)
+    ap.add_argument("--out-jsonl", type=Path)
     args = ap.parse_args()
 
     if args.nodes <= 0 and args.depth <= 0:
@@ -293,6 +349,11 @@ def main() -> None:
             max(1, args.jobs), args.nodes, args.depth)
         summarize("reference", reference)
         compare_summary = compare(candidate, reference)
+    else:
+        reference = None
+
+    if args.out_jsonl:
+        write_details(args.out_jsonl, groups, candidate, reference)
 
     failed = False
     if (
