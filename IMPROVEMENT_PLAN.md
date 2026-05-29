@@ -784,6 +784,26 @@ diagnostic set. The repeated pattern is mate-like/middlegame/endgame root
 search behavior where small static child ranking gains are not preserving
 r22's search-selected zero-gap moves.
 
+### r24 Regression Diagnostic
+
+Generated:
+
+- `runs/r24-root-regression-diagnostic-20260529.md`
+- focus target:
+  `targets/replay-loss-latest-fast4-20260529/r24_reference_better_ge100_focus57.jsonl`
+
+The `57` rows where r22 beats r24 by at least `100cp` remain meaningfully worse
+for r24 at higher node budgets:
+
+- `20k`: r24 `0/57`, r22 `35/57`, `sum_diff=-22978cp`;
+- `50k`: r24 `19/57`, r22 `29/57`, `sum_diff=-10721cp`;
+- `100k`: r24 `23/57`, r22 `35/57`, `sum_diff=-8419cp`.
+
+This is not just a missing-move or shallow-gate artifact. More nodes reduce the
+damage, but the candidate still loses the focused root-search comparison. The
+next intervention needs to be root-search-aware or architectural; do not keep
+training scalar child-ranking against the same replay-loss target family.
+
 Rules:
 
 - Commit `build.json` changes so the current intended run is reviewable.
