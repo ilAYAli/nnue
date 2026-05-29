@@ -12,6 +12,18 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `child-ranking-fast4-r21-r14init-searchdescx5-listwise-qfwd-refpreserve30-dz5-lr1e6-e240`
+  is rejected at the model gate. The mixed corpus had `6212` rows: the stable
+  fast4 corpus plus the `74` search-descendant groups repeated five times.
+  Baseline r14 was model `2422/6212`, engine `2398/6212`; r21 reached only
+  `.pt/.nn 2424/6212` and failed the `2450` gate. On the direct
+  search-descendant subset, r21 stayed exactly flat at `.pt/.nn 34/74` and
+  engine `34/74`, matching r14. Broad static was safe and improved versus r14
+  (`MAE 118.486` versus `121.808`, sign `91.58%` versus `91.60%`), so this is
+  not broad-preserve collapse. The immediate next run is a target-only
+  capability check on the `74` descendant groups. If that cannot move exported
+  model and engine eval, these rows are not useful scalar child-ranking targets
+  for the current architecture/objective.
 - `child-ranking-fast4-r20-r14init-smokeguard29-listwise-qfwd-refpreserve30-childguard5-dz5-lr1e6-e240`
   is rejected. It trained on the base `5842` mixed corpus and used the `29`
   r18-vs-r14 smoke-worse rows only as a child-level reference-preserve guard
