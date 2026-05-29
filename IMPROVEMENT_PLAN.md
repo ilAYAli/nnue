@@ -759,20 +759,30 @@ will then be useful for diagnostics, but not as a direct promotion path.
 ### r24 Triage
 
 `child-ranking-fast4-r24-r22init-r23regress49-listwise-qfwd-refpreserve30-childpreserve5-dz5-lr3e6-e240`
-failed the early exported model gate by a small amount:
+failed the early exported model gate and is rejected after completing the
+root-search target:
 
 - `.pt/.nn` child ranking: `863/2793`, below the `865` gate;
 - engine eval child ranking: `836/2793`, with `sum_gap=596024`;
 - broad static versus r22 improved MAE by `2.198cp`, with only `+0.02pp` sign
   drop;
-- root search versus r22 had `missing_selected=77`;
-- on the scored subset, r24 was positive: `candidate_better=226`,
-  `reference_better=214`, `sum_diff=+663cp`.
+- after r24 root-selected augmentation, the completed target has `2793` groups
+  and `12357` scored child moves;
+- completed root search lost to r22: r24 `1836/2793`, r22 `1846/2793`,
+  `candidate_better=240`, `reference_better=271`, `sum_diff=-6546cp`,
+  `missing_selected=0`;
+- r24 has `57` reference-better rows at `<= -100cp`, `26` at `<= -300cp`, and
+  `9` capped `-800cp` losses.
 
-Interpretation: r24 cannot be judged yet. The model gate was too early for this
-specific run because the root-search subset was positive but incomplete. Next
-step is to augment the target with r24-selected moves, require
-`missing_after=0`, and rerun the completed r24-vs-r22 search comparison.
+Interpretation: the guarded r24 run improved some static/engine aggregate
+numbers but failed the completed root-search gate. The r22/r23/r24 scalar
+replay-loss continuation lane is closed as a direct promotion path. Do not
+launch r25 by only adjusting LR, preserve weight, or child-ranking thresholds.
+
+Next useful work: inspect the completed root-search regressions as a separate
+diagnostic set. The repeated pattern is mate-like/middlegame/endgame root
+search behavior where small static child ranking gains are not preserving
+r22's search-selected zero-gap moves.
 
 Rules:
 
