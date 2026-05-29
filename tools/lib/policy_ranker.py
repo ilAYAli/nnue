@@ -290,6 +290,13 @@ def export_policy_ranker_checkpoint(model_path: str | Path,
                                     out_path: str | Path,
                                     threshold: float) -> None:
     checkpoint = torch.load(model_path, map_location="cpu")
+    if threshold < 0.0:
+        selected = checkpoint.get("selected_threshold")
+        if selected is None:
+            raise ValueError(
+                "auto policy threshold requested, but checkpoint has no "
+                "selected_threshold")
+        threshold = float(selected)
     state = checkpoint["model"]
     payload = {
         "format": "enyo-policy-ranker-v1",

@@ -31,7 +31,11 @@ def load_ranker(path: str, device: str):
     return model, checkpoint
 
 
-def parse_thresholds(raw: str) -> list[float]:
+def parse_thresholds(raw: str, checkpoint: dict | None = None) -> list[float]:
+    if raw.strip().lower() == "auto":
+        if checkpoint is None or checkpoint.get("selected_threshold") is None:
+            raise ValueError("threshold=auto requires checkpoint selected_threshold")
+        return [float(checkpoint["selected_threshold"])]
     return [float(item) for item in raw.split(",") if item.strip()]
 
 
@@ -160,7 +164,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, list[dict[str, float]]]:
     groups = [builder.build_group(group) for group in raw_groups]
     mean = checkpoint["mean"].to(args.device)
     std = checkpoint["std"].to(args.device)
-    thresholds = parse_thresholds(args.thresholds)
+    thresholds = parse_thresholds(args.thresholds, checkpoint)
     breakdown_tags = parse_tags(args.breakdown_tags)
 
     all_rows = build_rows(model, groups, mean, std, args.device)

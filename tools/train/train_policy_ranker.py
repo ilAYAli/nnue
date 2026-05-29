@@ -68,11 +68,20 @@ def no_harm_loss(model: PolicyRanker, group: PolicyGroup,
     return torch.relu(logits[mask] - base + args.preserve_margin).mean()
 
 
+def parse_thresholds(raw: str, fallback: float) -> list[float]:
+    values = [float(item) for item in raw.split(",") if item.strip()]
+    if values:
+        return values
+    if fallback >= 0.0:
+        return [fallback]
+    return []
+
+
 @torch.no_grad()
 def threshold_summary(model: PolicyRanker, groups: list[PolicyGroup],
                       mean: torch.Tensor, std: torch.Tensor,
-                      args: argparse.Namespace
-                      ) -> tuple[int, float, int, int, int]:
+                      args: argparse.Namespace, threshold: float
+                      ) -> dict[str, float]:
     top1 = 0
     sum_gap = 0.0
     good = 0
@@ -84,7 +93,7 @@ def threshold_summary(model: PolicyRanker, groups: list[PolicyGroup],
         base_idx = group.base_idx
         selected_idx = base_idx
         confidence = float(scores[policy_idx] - scores[base_idx])
-        if policy_idx != base_idx and confidence >= args.select_threshold:
+        if policy_idx != base_idx and confidence >= threshold:
             selected_idx = policy_idx
             overrides += 1
 
@@ -97,7 +106,39 @@ def threshold_summary(model: PolicyRanker, groups: list[PolicyGroup],
             bad += 1
         top1 += int(selected_idx == group.best_idx)
         sum_gap += selected_gap
-    return top1, sum_gap, good, bad, overrides
+    return {
+        "threshold": threshold,
+        "top1": float(top1),
+        "sum_gap": sum_gap,
+        "good": float(good),
+        "bad": float(bad),
+        "overrides": float(overrides),
+    }
+
+
+def select_passes(summary: dict[str, float],
+                  args: argparse.Namespace) -> bool:
+    if args.select_max_bad >= 0 and summary["bad"] > args.select_max_bad:
+        return False
+    if args.select_min_good >= 0 and summary["good"] < args.select_min_good:
+        return False
+    if (args.select_min_overrides >= 0
+            and summary["overrides"] < args.select_min_overrides):
+        return False
+    return True
+
+
+def select_key(summary: dict[str, float], val_preserve: float,
+               args: argparse.Namespace) -> tuple:
+    return (
+        1 if select_passes(summary, args) else 0,
+        -summary["bad"],
+        summary["good"],
+        summary["top1"],
+        -summary["sum_gap"],
+        -summary["overrides"],
+        -val_preserve,
+    )
 
 
 @torch.no_grad()
@@ -158,6 +199,10 @@ def main() -> None:
     ap.add_argument("--no-harm-weight", type=float, default=0.0)
     ap.add_argument("--no-harm-gap-cp", type=float, default=10.0)
     ap.add_argument("--select-threshold", type=float, default=-1.0)
+    ap.add_argument("--select-thresholds", default="")
+    ap.add_argument("--select-max-bad", type=int, default=-1)
+    ap.add_argument("--select-min-good", type=int, default=-1)
+    ap.add_argument("--select-min-overrides", type=int, default=-1)
     ap.add_argument("--select-bad-tolerance-cp", type=float, default=0.0)
     ap.add_argument("--val-fraction", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=1)
@@ -210,6 +255,8 @@ def main() -> None:
         input_dim=input_dim, hidden=args.hidden, dropout=args.dropout).to(args.device)
     opt = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    select_thresholds = parse_thresholds(
+        args.select_thresholds, args.select_threshold)
 
     best_state = None
     best_key = (-1, float("-inf"))
@@ -251,25 +298,28 @@ def main() -> None:
             val_preserve = summarize_preserve(
                 f"epoch {epoch:4d} preserve_val", model, val_preserve_groups,
                 mean, std, args)
-            if args.select_threshold >= 0.0:
+            selected_threshold_summary = None
+            if select_thresholds:
                 select_groups = val_groups if val_groups else train_groups
-                select_top1, select_gap, select_good, select_bad, select_overrides = (
-                    threshold_summary(model, select_groups, mean, std, args))
-                print(
-                    f"epoch {epoch:4d} select threshold={args.select_threshold:g} "
-                    f"top1={select_top1}/{len(select_groups)} "
-                    f"sum_gap={select_gap:.0f} good={select_good} "
-                    f"bad={select_bad} overrides={select_overrides}",
-                    flush=True,
-                )
-                key = (
-                    -select_bad,
-                    select_top1,
-                    select_good,
-                    -select_gap,
-                    -select_overrides,
-                    -val_preserve,
-                )
+                summaries = [
+                    threshold_summary(
+                        model, select_groups, mean, std, args, threshold)
+                    for threshold in select_thresholds
+                ]
+                selected_threshold_summary = max(
+                    summaries, key=lambda item: select_key(item, val_preserve, args))
+                for summary in summaries:
+                    print(
+                        f"epoch {epoch:4d} select "
+                        f"threshold={summary['threshold']:g} "
+                        f"top1={int(summary['top1'])}/{len(select_groups)} "
+                        f"sum_gap={summary['sum_gap']:.0f} "
+                        f"good={int(summary['good'])} "
+                        f"bad={int(summary['bad'])} "
+                        f"overrides={int(summary['overrides'])}",
+                        flush=True,
+                    )
+                key = select_key(selected_threshold_summary, val_preserve, args)
             else:
                 key = (
                     val_top1 if val_groups else train_top1,
@@ -314,6 +364,19 @@ def main() -> None:
                     "no_harm_weight": args.no_harm_weight,
                     "no_harm_gap_cp": args.no_harm_gap_cp,
                     "select_threshold": args.select_threshold,
+                    "select_thresholds": select_thresholds,
+                    "selected_threshold": (
+                        None if selected_threshold_summary is None
+                        else selected_threshold_summary["threshold"]),
+                    "selected_good": (
+                        None if selected_threshold_summary is None
+                        else selected_threshold_summary["good"]),
+                    "selected_bad": (
+                        None if selected_threshold_summary is None
+                        else selected_threshold_summary["bad"]),
+                    "selected_overrides": (
+                        None if selected_threshold_summary is None
+                        else selected_threshold_summary["overrides"]),
                     "select_bad_tolerance_cp": args.select_bad_tolerance_cp,
                 }
 
