@@ -22,14 +22,14 @@ Latest result:
   threshold with improvement (`24`) produced only `1` good override, so it is
   effectively inert. This closes the full-target board-feature policy sidecar
   as a promotion path.
-- Current run:
-  `policy-rootbase-r14-missgap50-preserve-correct-h64-20260529`. It tests a
-  narrower hypothesis: train only on clear r14 root-search mistakes
-  (`base_miss_gap50`, `285` rows) while using r14-correct rows (`1831` rows)
-  as preserve guards. Pass criteria are deliberately small but strict: zero
-  bad held-out overrides on the full replay-loss target, at least `5` good
-  held-out overrides, and a non-inert selected threshold. If this fails, close
-  the current policy-sidecar shape for r14 root-base replay-loss repair.
+- `policy-rootbase-r14-missgap50-preserve-correct-h64-20260529` is rejected.
+  It tested a narrower hypothesis: train only on clear r14 root-search
+  mistakes (`base_miss_gap50`, `285` rows) while using r14-correct rows
+  (`1831` rows) as preserve guards. It still failed the deploy gate. On the
+  full replay-loss target, threshold `8` had `125` good overrides but `339`
+  bad; threshold `48` had only `9` overrides and still `4` bad; zero-bad
+  thresholds were inert. This closes the current policy-sidecar architecture
+  for r14 root-base replay-loss repair.
 - `policy-matelike-preserve-nonmate-selectdeploy-board-h64-t24-lr2e4-e400`
   is rejected. Deploy-gate checkpoint selection worked and selected a safe
   but effectively inert policy. At the deploy threshold `24`, the validation
@@ -816,7 +816,7 @@ Interpretation: the sidecar can fit the full target distribution, but it does
 not learn a safe deployable confidence boundary. Useful action rates are
 unsafe; safe thresholds are inert. Do not smoke or export this policy.
 
-Current diagnostic:
+Mistake-filter diagnostic:
 
 - branch: `feature/rootbase-policy-mistake-filter`;
 - run: `policy-rootbase-r14-missgap50-preserve-correct-h64-20260529`;
@@ -824,13 +824,19 @@ Current diagnostic:
 - train rows: `base_miss_gap50` (`285` clear r14 root-search mistakes);
 - preserve rows: `base_correct` (`1831` r14-correct rows);
 - smaller model: board features, hidden `64`, dropout `0.4`;
-- gate: full replay-loss target, zero bad held-out overrides, at least `5`
-  good held-out overrides.
+- final raw policy was worse than base on the full target (`1585/2793` versus
+  r14 `1831/2793`);
+- threshold `8`: `612` overrides, `125` good, `339` bad;
+- threshold `24`: `104` overrides, `19` good, `61` bad;
+- threshold `48`: `9` overrides, `0` good, `4` bad;
+- threshold `128+`: zero bad but no action.
 
-If this diagnostic fails, close the current policy-ranker architecture for
-r14 root-base repair. The next useful direction is not another threshold/LR
-tweak; it is either different features or an engine-side/search-coupled
-mechanism.
+Interpretation: filtering to clear r14 mistakes and adding r14-correct preserve
+guards did not create a safe confidence boundary. The current policy-ranker
+architecture is closed for r14 root-base repair. The next useful direction is
+not another threshold/LR tweak; it is either different features or an
+engine-side/search-coupled mechanism. In parallel, validate whether r14 itself
+is strong enough to become the Enyo-owned baseline candidate.
 
 Next useful work: inspect the completed root-search regressions as a separate
 diagnostic set. The repeated pattern is mate-like/middlegame/endgame root
