@@ -231,6 +231,7 @@ class PolicyFeatureBuilder:
         ranked = sorted(base_scores, key=base_scores.get, reverse=True)
         base_rank = {move: idx for idx, move in enumerate(ranked)}
         base_best = base_scores[ranked[0]]
+        base_move = group.base_move or ranked[0]
 
         rows: list[list[float]] = []
         oracle_scores: list[float] = []
@@ -248,7 +249,7 @@ class PolicyFeatureBuilder:
             moves.append(target.move)
             if target.move == group.best_move:
                 best_idx = idx
-            if target.move == ranked[0]:
+            if target.move == base_move:
                 base_idx = idx
 
         if best_idx < 0 or base_idx < 0:

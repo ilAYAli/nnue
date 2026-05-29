@@ -394,6 +394,14 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "engine",
         "score_engine",
     }
+    set_child_base = {
+        "child_base_input",
+        "child_base_output",
+        "child_base_summary",
+        "child_base_origin",
+        "child_base_min_groups",
+        "child_base_keep_missing",
+    }
     search_descendant = {
         "search_descendant_input",
         "search_descendant_output",
@@ -435,6 +443,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "lc0-oracle-jsonl": lc0,
         "smoke-pgn-child-targets": smoke,
         "augment-child-targets": augment_child,
+        "set-child-base-move": set_child_base,
         "search-descendant-child-targets": search_descendant,
         "mix-jsonl": mix,
     }
@@ -1168,6 +1177,26 @@ wc -l "$out" > "$out.wc"
                 str(args.child_augment_max_missing_after),
             ],
         })
+    elif args.backend == "set-child-base-move":
+        if not args.child_base_input:
+            raise SystemExit(
+                "backend=set-child-base-move requires child_base_input")
+        if not args.child_base_origin:
+            raise SystemExit(
+                "backend=set-child-base-move requires child_base_origin")
+        steps.append({
+            "name": "set_child_base_move",
+            "command": [
+                python, tool("validate/set_child_base_move.py"),
+                "--input", str(expand_user(args.child_base_input)),
+                "--out", str(expand_user(args.child_base_output)),
+                "--summary", str(expand_user(args.child_base_summary)),
+                "--base-origin", args.child_base_origin,
+                "--min-groups", str(args.child_base_min_groups),
+                "--keep-missing" if args.child_base_keep_missing
+                else "--no-keep-missing",
+            ],
+        })
     elif args.backend == "search-descendant-child-targets":
         if not args.search_descendant_input:
             raise SystemExit(
@@ -1362,7 +1391,8 @@ def add_create_args(
                                  "replay-jsonl", "lc0-jsonl",
                                  "lc0-oracle-jsonl",
                                  "smoke-pgn-child-targets",
-                                 "augment-child-targets", "mix-jsonl"])
+                                 "augment-child-targets",
+                                 "set-child-base-move", "mix-jsonl"])
     parser.add_argument("--objective", default=value("objective", d.objective),
                         choices=["mse", "huber", "mpe25"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
@@ -1439,6 +1469,13 @@ def add_create_args(
     parser.add_argument("--child-augment-oracle-depth", type=int, default=value("child_augment_oracle_depth", d.child_augment_oracle_depth))
     parser.add_argument("--child-augment-oracle-threads", type=int, default=value("child_augment_oracle_threads", d.child_augment_oracle_threads))
     parser.add_argument("--child-augment-oracle-hash", type=int, default=value("child_augment_oracle_hash", d.child_augment_oracle_hash))
+    parser.add_argument("--child-base-input", default=value("child_base_input", d.child_base_input))
+    parser.add_argument("--child-base-output", default=value("child_base_output", d.child_base_output))
+    parser.add_argument("--child-base-summary", default=value("child_base_summary", d.child_base_summary))
+    parser.add_argument("--child-base-origin", default=value("child_base_origin", d.child_base_origin))
+    parser.add_argument("--child-base-min-groups", type=int, default=value("child_base_min_groups", d.child_base_min_groups))
+    parser.add_argument("--child-base-keep-missing", action=argparse.BooleanOptionalAction,
+                        default=value("child_base_keep_missing", d.child_base_keep_missing))
     parser.add_argument("--search-descendant-input", default=value("search_descendant_input", d.search_descendant_input))
     parser.add_argument("--search-descendant-output", default=value("search_descendant_output", d.search_descendant_output))
     parser.add_argument("--search-descendant-summary", default=value("search_descendant_summary", d.search_descendant_summary))

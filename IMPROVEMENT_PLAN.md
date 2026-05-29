@@ -804,6 +804,25 @@ damage, but the candidate still loses the focused root-search comparison. The
 next intervention needs to be root-search-aware or architectural; do not keep
 training scalar child-ranking against the same replay-loss target family.
 
+### Root-Search-Aware Policy Diagnostic
+
+The next diagnostic is a policy-sidecar test, not another scalar `.nn` repair:
+
+- stamp child targets with an explicit `base_move` from root-search provenance
+  such as `root_search:r22`;
+- train/gate the policy ranker against that base move so "override" means
+  "change the move root search selected", not "change the static child-eval
+  best";
+- first use the r24 focused regression set and/or the completed r22/r23/r24
+  target, with `base_move=root_search:r22`;
+- require zero bad overrides on held-out rows before considering any engine
+  integration or smoke.
+
+This tests whether the r22 root-search choices contain a separable policy
+signal without touching scalar eval. If the policy cannot safely improve this
+focused set, the next useful work is engine/search instrumentation or a real
+representation change, not more child-ranking LR/preserve sweeps.
+
 Rules:
 
 - Commit `build.json` changes so the current intended run is reviewable.

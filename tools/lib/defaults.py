@@ -132,6 +132,12 @@ class CandidateDefaults:
     child_augment_oracle_depth: int = 0
     child_augment_oracle_threads: int = 1
     child_augment_oracle_hash: int = 128
+    child_base_input: str = ""
+    child_base_output: str = "targets/child-ranking/base_move.jsonl"
+    child_base_summary: str = "targets/child-ranking/base_move.summary.txt"
+    child_base_origin: str = ""
+    child_base_min_groups: int = 1
+    child_base_keep_missing: bool = False
     search_descendant_input: str = ""
     search_descendant_output: str = "targets/search-descendant/child_targets.jsonl"
     search_descendant_summary: str = "targets/search-descendant/summary.txt"

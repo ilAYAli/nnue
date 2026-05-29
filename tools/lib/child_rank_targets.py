@@ -23,6 +23,7 @@ class ChildRankGroup:
     max_gap_cp: float
     moves: tuple[ChildMoveTarget, ...]
     best_move: str
+    base_move: str = ""
     tags: tuple[str, ...] = ()
 
     @property
@@ -94,6 +95,9 @@ def parse_group(raw: dict, line_no: int) -> ChildRankGroup:
     best_move = _best_move(raw, moves, group_id)
     if best_move not in seen:
         raise ValueError(f"{group_id}: best move {best_move} is not scored")
+    base_move = str(raw.get("base_move", ""))
+    if base_move and base_move not in seen:
+        raise ValueError(f"{group_id}: base move {base_move} is not scored")
 
     return ChildRankGroup(
         group_id=group_id,
@@ -101,6 +105,7 @@ def parse_group(raw: dict, line_no: int) -> ChildRankGroup:
         max_gap_cp=max_gap_cp,
         moves=tuple(moves),
         best_move=best_move,
+        base_move=base_move,
         tags=tuple(str(tag) for tag in raw.get("tags", [])),
     )
 
