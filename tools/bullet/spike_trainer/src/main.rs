@@ -44,25 +44,32 @@ fn dataset_paths(dataset: &str) -> Vec<String> {
         .collect()
 }
 
-fn sfbinpack_filter(entry: &TrainingDataEntry) -> bool {
+fn make_sfbinpack_filter() -> impl Fn(&TrainingDataEntry) -> bool + Clone {
     let min_ply = env_parse("ENYO_BULLET_SFBINPACK_MIN_PLY", 16u16);
     let max_abs_cp = env_parse("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", 10000u32);
     let quiet_only = env_parse("ENYO_BULLET_SFBINPACK_QUIET_ONLY", 1usize) != 0;
-
-    if entry.ply < min_ply {
-        return false;
+    move |entry: &TrainingDataEntry| {
+        if entry.ply < min_ply {
+            return false;
+        }
+        if i32::from(entry.score).unsigned_abs() > max_abs_cp {
+            return false;
+        }
+        // Check move quietness before is_checked: the quiet test is a cheap
+        // bitboard index while is_checked runs full attack generation.  Non-quiet
+        // positions are rejected regardless of check status, so we skip the
+        // expensive call for them.
+        if quiet_only
+            && (entry.mv.mtype() != MoveType::Normal
+                || entry.pos.piece_at(entry.mv.to()).piece_type() != PieceType::None)
+        {
+            return false;
+        }
+        if entry.pos.is_checked(entry.pos.side_to_move()) {
+            return false;
+        }
+        true
     }
-    if i32::from(entry.score).unsigned_abs() > max_abs_cp {
-        return false;
-    }
-    if entry.pos.is_checked(entry.pos.side_to_move()) {
-        return false;
-    }
-    if quiet_only {
-        return entry.mv.mtype() == MoveType::Normal
-            && entry.pos.piece_at(entry.mv.to()).piece_type() == PieceType::None;
-    }
-    true
 }
 
 fn enyo_affine<'a>(
@@ -419,7 +426,7 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
                 &path_refs,
                 buffer_mb,
                 threads,
-                sfbinpack_filter,
+                make_sfbinpack_filter(),
             );
             trainer.run(&schedule, &settings, &dataloader);
         }
@@ -615,7 +622,7 @@ fn main() {
                 &path_refs,
                 buffer_mb,
                 threads,
-                sfbinpack_filter,
+                make_sfbinpack_filter(),
             );
             trainer.run(&schedule, &settings, &dataloader);
         }
