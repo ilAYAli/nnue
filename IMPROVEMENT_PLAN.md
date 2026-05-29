@@ -12,6 +12,15 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800` is not a clean rejection.
+  It trained strongly on the mixed `1533` corpus but failed validation:
+  deploy threshold `4` had all `852/1533`, validation `211/383`, `10` good
+  validation overrides, and `8` bad. During inspection, the policy trainer had
+  a checkpoint bug: it stored `model.state_dict()` by reference, so the
+  selected best checkpoint kept mutating and the saved file was the final
+  epoch, not the selected epoch. This is fixed in
+  `fix: preserve best policy ranker checkpoint`; rerun the same mixed config
+  as `-r2` before interpreting the result.
 - `policy-desc74-board-h128-t0-val25-r14-lr2e4-e2000` passed the held-out
   sidecar diagnostic. The validation split improved from base `5/18`,
   `1107cp` summed gap to policy `12/18`, `258cp` summed gap, with `8` good

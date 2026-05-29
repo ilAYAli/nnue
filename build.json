@@ -1,8 +1,8 @@
 {
   "description": "Train a moderate sidecar policy-ranker corpus with descendant, smoke-loss, and LC0-oracle rows.",
-  "experiment": "policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800",
+  "experiment": "policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800-r2",
   "create": {
-    "name": "policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800",
+    "name": "policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800-r2",
     "backend": "policy-ranking",
     "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
     "policy_targets": "targets/search-descendant-r20-smokeworse29-20260529/search_descendant_child_targets.jsonl,targets/smoke1000-r5-loss-even-20260528/smoke_child_targets_rootaug_r14.jsonl,targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl",
@@ -34,7 +34,8 @@
   "validation": {
     "baseline": [
       "desc74 held-out policy sidecar: val 5/18 -> 12/18, 8 good overrides, 0 bad",
-      "desc74 sidecar applied to the mixed 1533 corpus without retraining was harmful: val threshold 0 had 79 good and 169 bad overrides; threshold 4 had 7 good and 5 bad"
+      "desc74 sidecar applied to the mixed 1533 corpus without retraining was harmful: val threshold 0 had 79 good and 169 bad overrides; threshold 4 had 7 good and 5 bad",
+      "first mixed sidecar run was confounded by a checkpoint-selection bug and saved the final epoch instead of the selected best epoch"
     ],
     "pass_intent": [
       "test whether the sidecar signal survives on a moderate mixed corpus",
