@@ -12,6 +12,14 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-mix1533-compact-h64-nh2-bb2-t4-lr2e4-e1200` is rejected. Compact
+  features did not solve the mixed sidecar problem: validation base was
+  `210/383`, raw policy was `206/383`, and deploy threshold `4` had only `1`
+  good validation override with `6` bad. The failure is source-specific:
+  LC0-oracle validation produced `0` good and `6` bad overrides at threshold
+  `4`, while search-descendant was clean and smoke-loss was clean at threshold
+  `2`. The next diagnostic removes LC0-oracle rows and tests only the
+  real-game/search-descendant sidecar signal.
 - `policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800-r2` is a clean rejection
   after fixing checkpoint selection. The saved best checkpoint still failed to
   generalize: base validation was `210/383`, raw policy validation was
@@ -568,22 +576,24 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Train a compact sidecar policy-ranker diagnostic on the moderate corpus:
+Train a compact no-LC0 sidecar policy-ranker diagnostic:
 
 1. Keep scalar NNUE eval unchanged.
 2. Use the r14 net as the frozen base feature/eval source.
-3. Mix the `74` search-descendant groups, the `459` r14 smoke-loss rows, and
-   `1000` LC0-oracle rows.
+3. Mix the `74` search-descendant groups with the `459` r14 smoke-loss rows.
+   Exclude LC0-oracle rows because they were the bad validation source in the
+   compact mixed run.
 4. Use compact policy features, smaller hidden width, dropout, and stronger
    no-harm/base-best preservation terms.
-5. Gate on a `25%` validation split with bounded bad overrides.
+5. Gate on a `25%` validation split and require zero bad overrides at the
+   selected deploy threshold.
 
 Interpretation:
 
 - If held-out validation improves top1 and produces useful good overrides with
   bounded bad overrides, the sidecar deserves an engine-integration diagnostic.
-- If compact features also fail, the current sidecar setup is only useful for
-  narrow motifs and should not be treated as a near-term Elo lane.
+- If the no-LC0 sidecar also fails, the current sidecar setup is only useful
+  for narrow motifs and should not be treated as a near-term Elo lane.
 
 ## Candidate Workflow
 
