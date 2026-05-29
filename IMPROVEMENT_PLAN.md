@@ -12,6 +12,12 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `child-ranking-desc74-refpreserve100-r14-lr5e5-e960` is rejected at the
+  model gate. Raising LR from `2e-5` to `5e-5` under the same
+  reference-preserve objective moved only from `.pt/.nn 35/74` to `.pt/.nn
+  36/74`. This closes the preserved scalar child-ranking variant for these
+  `74` search-descendant rows. Target-only scalar training can learn them, but
+  preserved scalar training cannot move them enough to be useful.
 - `child-ranking-desc74-refpreserve100-r14-lr2e5-e960` is rejected at the
   model gate. It reached only `.pt/.nn 35/74` on the `74`
   search-descendant groups, versus r14 baseline `34/74`. This is not an
@@ -527,23 +533,20 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Run one higher-pressure preserved descendant check:
+Run a sidecar policy-ranker diagnostic on the same `74` search-descendant
+groups:
 
-1. Keep the `74` scored search-descendant child groups unchanged.
-2. Initialize from r14.
-3. Keep reference broad preservation enabled (`weight=1.0`, `deadzone=5cp`).
-4. Raise LR from `2e-5` to `5e-5`.
-5. Accept only if exported `.nn` and engine child gate both reach at least
-   `50/74` and broad static stays inside the normal caps.
+1. Do not change scalar NNUE eval.
+2. Initialize policy features from the r14 net.
+3. Use board-level policy features and train only the sidecar ranker.
+4. Gate at threshold `0` and require selected policy top1 at least `55/74`.
 
 Interpretation:
 
-- If it stays flat again, reference preservation is still blocking this target
-  family and another preserved weight tweak is not justified.
-- If it reaches the descendant gate but broad collapses, target-only capability
-  is confirmed but the scalar eval path still lacks a clean preserved
-  correction space.
-- If it passes both, run the focused root-search gate before any game smoke.
+- If the policy sidecar passes, the signal is available outside scalar eval and
+  the next work is engine integration or a larger sidecar corpus.
+- If it fails, stop using these descendant rows as a direct training target and
+  return to broader real-game data or search-policy debugging.
 
 ## Candidate Workflow
 
