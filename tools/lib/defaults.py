@@ -111,8 +111,8 @@ class CandidateDefaults:
     bullet_enyo_l1_std: float = 1.0
     bullet_enyo_l1_export_scale: float = 1.0
     bullet_enyo_input_factorizer: bool = False
-    bullet_enyo_input_buckets: int = 32
-    bullet_enyo_runtime_input_buckets: int = 32
+    bullet_enyo_input_buckets: int = 16
+    bullet_enyo_runtime_input_buckets: int = 16
     bullet_eval_scale: float = 400.0
     bullet_save_rate: int = 1
     bullet_init_weights: str = ""

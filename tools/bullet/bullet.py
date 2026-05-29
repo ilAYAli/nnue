@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 
-ENYO_DEFAULT_INPUT_BUCKETS = 32
+ENYO_DEFAULT_INPUT_BUCKETS = 16
 ENYO_SUPPORTED_INPUT_BUCKETS = (1, 2, 4, 8, 16, 32)
 ENYO_PIECE_TYPES = 12
 ENYO_SQUARES = 64
@@ -91,7 +91,7 @@ def enyo_parent_bucket(
             "cannot export fewer runtime buckets than trained buckets: "
             f"train={input_buckets} runtime={runtime_input_buckets}"
         )
-    if runtime_input_buckets == ENYO_DEFAULT_INPUT_BUCKETS:
+    if runtime_input_buckets == 32:
         legacy_bucket = ENYO_LEGACY_BUCKET_FOR_32[target_bucket]
         return legacy_bucket * input_buckets // 16
     return target_bucket * input_buckets // runtime_input_buckets
