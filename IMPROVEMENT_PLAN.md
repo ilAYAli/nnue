@@ -12,6 +12,14 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-desc74-board-h128-t0-r14-lr2e4-e2000` passed as an in-sample
+  capability proof. On the `74` search-descendant groups, r14/base was
+  `34/74` with `3285cp` summed gap. The sidecar reached `74/74`, `0cp` summed
+  gap, with `40` good overrides, `0` bad overrides, and export parity
+  (`max_abs_diff=0.00000095`, `argmax_mismatches=0`). This proves the
+  descendant signal is learnable outside scalar eval. It does not prove
+  generalization because the gate had no held-out split. The next run uses the
+  same sidecar setup with `25%` validation.
 - `child-ranking-desc74-refpreserve100-r14-lr5e5-e960` is rejected at the
   model gate. Raising LR from `2e-5` to `5e-5` under the same
   reference-preserve objective moved only from `.pt/.nn 35/74` to `.pt/.nn
@@ -533,20 +541,22 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Run a sidecar policy-ranker diagnostic on the same `74` search-descendant
-groups:
+Run a held-out sidecar policy-ranker diagnostic on the same `74`
+search-descendant groups:
 
 1. Do not change scalar NNUE eval.
 2. Initialize policy features from the r14 net.
 3. Use board-level policy features and train only the sidecar ranker.
-4. Gate at threshold `0` and require selected policy top1 at least `55/74`.
+4. Use `25%` validation split.
+5. Gate at threshold `0`.
 
 Interpretation:
 
-- If the policy sidecar passes, the signal is available outside scalar eval and
-  the next work is engine integration or a larger sidecar corpus.
-- If it fails, stop using these descendant rows as a direct training target and
-  return to broader real-game data or search-policy debugging.
+- If held-out validation passes with no bad overrides, expand the sidecar
+  corpus; the signal is not just memorized.
+- If held-out validation fails, the sidecar result is only an overfit
+  diagnostic and the next useful work is broader real-game data or
+  search-policy debugging.
 
 ## Candidate Workflow
 
