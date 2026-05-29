@@ -12,6 +12,14 @@ No trained Enyo net is currently a keeper.
 
 Latest result:
 
+- `policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800-r2` is a clean rejection
+  after fixing checkpoint selection. The saved best checkpoint still failed to
+  generalize: base validation was `210/383`, raw policy validation was
+  `203/383`, and deploy threshold `4` had validation `210/383` with only `3`
+  good overrides and `4` bad. The board-feature sidecar overfits this
+  moderate corpus. The next diagnostic keeps the same corpus but switches to
+  compact features, smaller hidden width, and stronger no-harm/base-best
+  preservation.
 - `policy-mix1533-board-h128-nh1-bb1-t4-lr1e4-e800` is not a clean rejection.
   It trained strongly on the mixed `1533` corpus but failed validation:
   deploy threshold `4` had all `852/1533`, validation `211/383`, `10` good
@@ -560,22 +568,22 @@ reference preservation cannot reliably preserve this behavior.
 
 ## Next Concrete Experiment
 
-Train a moderate sidecar policy-ranker corpus:
+Train a compact sidecar policy-ranker diagnostic on the moderate corpus:
 
 1. Keep scalar NNUE eval unchanged.
 2. Use the r14 net as the frozen base feature/eval source.
 3. Mix the `74` search-descendant groups, the `459` r14 smoke-loss rows, and
    `1000` LC0-oracle rows.
-4. Use board-level policy features with dropout plus no-harm/base-best
-   preservation terms.
+4. Use compact policy features, smaller hidden width, dropout, and stronger
+   no-harm/base-best preservation terms.
 5. Gate on a `25%` validation split with bounded bad overrides.
 
 Interpretation:
 
 - If held-out validation improves top1 and produces useful good overrides with
   bounded bad overrides, the sidecar deserves an engine-integration diagnostic.
-- If it fails, the sidecar is only useful for narrow motifs and should not be
-  treated as a near-term Elo lane.
+- If compact features also fail, the current sidecar setup is only useful for
+  narrow motifs and should not be treated as a near-term Elo lane.
 
 ## Candidate Workflow
 
