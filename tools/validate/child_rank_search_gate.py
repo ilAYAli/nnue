@@ -331,6 +331,7 @@ def main() -> None:
     ap.add_argument("--fail-if-top1-below", type=int, default=-1)
     ap.add_argument("--fail-if-missing-above", type=int, default=-1)
     ap.add_argument("--fail-if-reference-better-above", type=int, default=-1)
+    ap.add_argument("--fail-if-sum-diff-below", type=float, default=None)
     ap.add_argument("--out-jsonl", type=Path)
     args = ap.parse_args()
 
@@ -370,6 +371,12 @@ def main() -> None:
         compare_summary is not None
         and args.fail_if_reference_better_above >= 0
         and compare_summary["reference_better"] > args.fail_if_reference_better_above
+    ):
+        failed = True
+    if (
+        compare_summary is not None
+        and args.fail_if_sum_diff_below is not None
+        and compare_summary["sum_diff"] < args.fail_if_sum_diff_below
     ):
         failed = True
     if failed:

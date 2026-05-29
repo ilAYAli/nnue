@@ -241,6 +241,7 @@ def recorded_create_arg_keys(args: argparse.Namespace) -> set[str]:
         "child_search_gate_min_top1",
         "child_search_gate_max_missing",
         "child_search_gate_max_reference_better",
+        "child_search_gate_min_sum_diff",
     }
     policy = {
         "init_net",
@@ -689,6 +690,8 @@ def create_config(args: argparse.Namespace) -> dict:
                     str(args.child_search_gate_max_missing),
                     "--fail-if-reference-better-above",
                     str(args.child_search_gate_max_reference_better),
+                    "--fail-if-sum-diff-below",
+                    str(args.child_search_gate_min_sum_diff),
                 ],
             })
     elif args.backend == "policy-ranking":
@@ -1422,6 +1425,7 @@ def add_create_args(
     parser.add_argument("--child-search-gate-min-top1", type=int, default=value("child_search_gate_min_top1", d.child_search_gate_min_top1))
     parser.add_argument("--child-search-gate-max-missing", type=int, default=value("child_search_gate_max_missing", d.child_search_gate_max_missing))
     parser.add_argument("--child-search-gate-max-reference-better", type=int, default=value("child_search_gate_max_reference_better", d.child_search_gate_max_reference_better))
+    parser.add_argument("--child-search-gate-min-sum-diff", type=float, default=value("child_search_gate_min_sum_diff", d.child_search_gate_min_sum_diff))
     parser.add_argument("--child-augment-input", default=value("child_augment_input", d.child_augment_input))
     parser.add_argument("--child-augment-output", default=value("child_augment_output", d.child_augment_output))
     parser.add_argument("--child-augment-summary", default=value("child_augment_summary", d.child_augment_summary))

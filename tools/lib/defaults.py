@@ -118,6 +118,7 @@ class CandidateDefaults:
     child_search_gate_min_top1: int = -1
     child_search_gate_max_missing: int = 0
     child_search_gate_max_reference_better: int = -1
+    child_search_gate_min_sum_diff: float = -1.0e18
     child_augment_input: str = ""
     child_augment_output: str = "targets/child-ranking/augmented.jsonl"
     child_augment_summary: str = "targets/child-ranking/augmented.summary.txt"
