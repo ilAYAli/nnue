@@ -1,18 +1,24 @@
 {
-  "description": "Rerun the r14 root-base policy diagnostic with gate-aligned checkpoint selection.",
-  "experiment": "policy-rootbase-r14-full2793-board-h128-selectgate-r2-20260529",
+  "description": "Train a smaller policy sidecar only on clear r14 root-search mistakes, with r14-correct rows as preserve guards.",
+  "experiment": "policy-rootbase-r14-missgap50-preserve-correct-h64-20260529",
   "create": {
-    "name": "policy-rootbase-r14-full2793-board-h128-selectgate-r2-20260529",
+    "name": "policy-rootbase-r14-missgap50-preserve-correct-h64-20260529",
     "backend": "policy-ranking",
     "init_net": "runs/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/train/child-ranking-fast4-r14-rank2-listwise-qfwd-refpreserve20-dz5-lr5e5-e360/model.nn",
-    "policy_targets": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24_base_r14.jsonl",
-    "policy_hidden": 128,
+    "policy_targets": "targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets_rootaug_r14_berserk_r22_r23_r24_base_r14_tagged.jsonl",
+    "policy_hidden": 64,
     "policy_feature_set": "board",
-    "policy_dropout": 0.15,
-    "policy_base_best_preserve_weight": 3.0,
-    "policy_no_harm_weight": 3.0,
+    "policy_dropout": 0.4,
+    "policy_include_tags": "base_miss_gap50",
+    "policy_preserve_include_tags": "base_correct",
+    "policy_preserve_weight": 6.0,
+    "policy_preserve_margin": 8.0,
+    "policy_preserve_max_groups": 600,
+    "policy_base_best_preserve_weight": 0.0,
+    "policy_no_harm_weight": 6.0,
     "policy_no_harm_gap_cp": 10,
     "policy_bad_tolerance_cp": 10,
+    "policy_gate_include_tags": "source:replay_loss",
     "policy_val_fraction": 0.25,
     "policy_thresholds": "8,16,24,32,48,64,96,128,192",
     "policy_export_threshold": -1,
@@ -20,26 +26,26 @@
     "policy_gate_max_bad": 0,
     "policy_gate_min_val_top1": -1,
     "policy_gate_max_val_bad": 0,
-    "policy_gate_min_val_good": 10,
-    "policy_gate_min_val_overrides": 10,
-    "policy_target_temperature_cp": 80,
+    "policy_gate_min_val_good": 5,
+    "policy_gate_min_val_overrides": 5,
+    "policy_target_temperature_cp": 50,
     "rank_temperature_cp": 1,
-    "lr": 0.00002,
-    "epochs": 600,
-    "weight_decay": 0.000001,
-    "min_groups": 2793,
+    "lr": 0.00001,
+    "epochs": 800,
+    "weight_decay": 0.00001,
+    "min_groups": 285,
     "device": "cpu",
-    "selfplay_seed": 2026052901,
+    "selfplay_seed": 2026052902,
     "event_command": "$HOME/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
     "baseline": [
-      "previous r14 root-base policy run failed because useful overrides were unsafe and the only zero-bad checkpoint was inert",
-      "policy checkpoint selection now uses the same threshold list and zero-bad/min-good constraints as the gate"
+      "full-target r14 root-base policy run overfit: raw policy improved all top1 but held-out deploy overrides were unsafe",
+      "the tagged corpus has 285 r14 root-search mistakes with oracle gap >=50cp and 1831 r14-correct preserve rows"
     ],
     "pass_intent": [
-      "find a selected checkpoint and threshold with zero bad held-out overrides and at least 10 good held-out overrides",
-      "if this fails, close this policy-sidecar shape for the full replay-loss root-base target"
+      "find a selected checkpoint and threshold with zero bad held-out overrides on the full replay-loss target and at least 5 good held-out overrides",
+      "if this fails, close this policy-sidecar shape for r14 root-base replay-loss repair"
     ]
   }
 }
