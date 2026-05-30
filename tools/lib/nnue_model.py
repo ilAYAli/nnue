@@ -12,10 +12,12 @@ from . import enyo_nnue as nn2
 
 
 class EnyoNNUE(nn_pt.Module):
-    def __init__(self, init: str = "kaiming"):
+    def __init__(self, init: str = "kaiming",
+                 input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS):
         super().__init__()
+        self.input_buckets = input_buckets
         self.embed = nn_pt.EmbeddingBag(
-            nn2.N_FEATURES, nn2.N_HIDDEN, mode="sum")
+            nn2.feature_count(input_buckets), nn2.N_HIDDEN, mode="sum")
         self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
         self.l1_weight = nn_pt.Parameter(torch.zeros(nn2.N_L2, nn2.N_L1))
         self.l1_bias = nn_pt.Parameter(torch.zeros(nn2.N_L2))
@@ -72,7 +74,7 @@ class EnyoNNUE(nn_pt.Module):
 
 def load_model_from_nn(path: str | Path, device: str = "cpu") -> EnyoNNUE:
     net = nn2.load_net(path)
-    model = EnyoNNUE(init="kaiming")
+    model = EnyoNNUE(init="kaiming", input_buckets=net.input_buckets)
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
         model.input_bias.copy_(torch.from_numpy(net.input_biases.astype(np.float32)))
@@ -126,5 +128,6 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         l2_biases=m.l2.bias.detach().numpy().astype(np.float32),
         output_weights=m.output.weight.detach().numpy().reshape(-1).astype(np.float32),
         output_bias=float(m.output.bias.detach().numpy().item()),
+        input_buckets=m.input_buckets,
     )
     nn2.write_net(net, path)

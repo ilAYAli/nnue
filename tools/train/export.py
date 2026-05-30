@@ -17,8 +17,11 @@ def main() -> None:
     ap.add_argument("--out", required=True, help="Output Berserk-format .nn")
     args = ap.parse_args()
 
-    model = EnyoNNUE()
-    model.load_state_dict(torch.load(args.state, map_location="cpu"))
+    state = torch.load(args.state, map_location="cpu")
+    input_features = int(state["embed.weight"].shape[0])
+    input_buckets = input_features // (12 * 64)
+    model = EnyoNNUE(input_buckets=input_buckets)
+    model.load_state_dict(state)
     export_model(model, args.out)
     print(f"wrote {args.out}")
 
