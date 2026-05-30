@@ -135,101 +135,111 @@ def create_config(args: argparse.Namespace) -> dict:
     steps: list[dict] = []
 
     if args.backend == "pytorch":
-        steps = [
-            {
-                "name": "posgen_selfplay",
-                "command": [
-                    tool("posgen/posgen.py"), "selfplay",
-                    "--runner", str(expand_path(args.runner)),
-                    "--engine", str(expand_path(args.engine)),
-                    "--nnue-file", str(expand_path(args.nnue_file)),
-                    "--book", str(expand_path(args.book)),
-                    "--output", "{posgen}/selfplay.pgn",
-                    "--games", str(args.selfplay_games),
-                    "--shard-games", str(args.selfplay_shard_games),
-                    "--concurrency", str(args.selfplay_concurrency),
-                    "--threads", str(args.selfplay_threads),
-                    "--depth", str(args.selfplay_depth),
-                    "--srand", str(args.selfplay_seed),
-                    "--restart", "off",
-                    "--engine-option", f"Hash={args.selfplay_hash}",
-                ],
-            },
-            {
-                "name": "posgen_extract",
-                "command": [
-                    tool("posgen/posgen.py"), "extract",
-                    "{posgen}/selfplay.pgn",
-                    "--output", "{posgen}/positions.jsonl",
-                    "--stats", "{posgen}/extract_stats.json",
-                    "--skip-plies", str(args.skip_plies),
-                    "--min-depth", str(args.selfplay_depth),
-                    "--max-abs-cp", str(args.source_max_abs_cp),
-                ],
-            },
-            {
-                "name": "posgen_sample",
-                "command": [
-                    tool("posgen/posgen.py"), "sample",
-                    "--input", "{posgen}/positions.jsonl",
-                    "--output", "{posgen}/source.jsonl",
-                    "--preset", args.sample_preset,
-                    "--unique-fen",
-                    "--seed", str(args.selfplay_seed),
-                ],
-            },
-        ]
+        if args.train_data:
+            train_data = str(expand_path(args.train_data))
+        else:
+            train_data = "{pack}/train"
+            steps = [
+                {
+                    "name": "posgen_selfplay",
+                    "command": [
+                        tool("posgen/posgen.py"), "selfplay",
+                        "--runner", str(expand_path(args.runner)),
+                        "--engine", str(expand_path(args.engine)),
+                        "--nnue-file", str(expand_path(args.nnue_file)),
+                        "--book", str(expand_path(args.book)),
+                        "--output", "{posgen}/selfplay.pgn",
+                        "--games", str(args.selfplay_games),
+                        "--shard-games", str(args.selfplay_shard_games),
+                        "--concurrency", str(args.selfplay_concurrency),
+                        "--threads", str(args.selfplay_threads),
+                        "--depth", str(args.selfplay_depth),
+                        "--srand", str(args.selfplay_seed),
+                        "--restart", "off",
+                        "--engine-option", f"Hash={args.selfplay_hash}",
+                    ],
+                },
+                {
+                    "name": "posgen_extract",
+                    "command": [
+                        tool("posgen/posgen.py"), "extract",
+                        "{posgen}/selfplay.pgn",
+                        "--output", "{posgen}/positions.jsonl",
+                        "--stats", "{posgen}/extract_stats.json",
+                        "--skip-plies", str(args.skip_plies),
+                        "--min-depth", str(args.selfplay_depth),
+                        "--max-abs-cp", str(args.source_max_abs_cp),
+                    ],
+                },
+                {
+                    "name": "posgen_sample",
+                    "command": [
+                        tool("posgen/posgen.py"), "sample",
+                        "--input", "{posgen}/positions.jsonl",
+                        "--output", "{posgen}/source.jsonl",
+                        "--preset", args.sample_preset,
+                        "--unique-fen",
+                        "--seed", str(args.selfplay_seed),
+                    ],
+                },
+            ]
 
-        for shard in range(args.score_shards):
-            steps.append({
-                "name": f"score_{shard:02d}",
-                "parallel_group": "score",
-                "command": [
-                    tool("score/score.py"), "uci",
-                    "--input", "{posgen}/source.jsonl",
-                    "--output", f"{{score}}/shards/label.{shard}.jsonl",
-                    "--engine", str(expand_path(args.score_engine)),
-                    "--depth", str(args.score_depth),
-                    "--threads", str(args.score_threads),
-                    "--hash", str(args.score_hash),
-                    "--shard-count", str(args.score_shards),
-                    "--shard-index", str(shard),
-                    "--max-abs-cp", str(args.score_max_abs_cp),
-                    "--progress", str(args.score_progress),
-                ],
-            })
+            for shard in range(args.score_shards):
+                steps.append({
+                    "name": f"score_{shard:02d}",
+                    "parallel_group": "score",
+                    "command": [
+                        tool("score/score.py"), "uci",
+                        "--input", "{posgen}/source.jsonl",
+                        "--output", f"{{score}}/shards/label.{shard}.jsonl",
+                        "--engine", str(expand_path(args.score_engine)),
+                        "--depth", str(args.score_depth),
+                        "--threads", str(args.score_threads),
+                        "--hash", str(args.score_hash),
+                        "--shard-count", str(args.score_shards),
+                        "--shard-index", str(shard),
+                        "--max-abs-cp", str(args.score_max_abs_cp),
+                        "--progress", str(args.score_progress),
+                    ],
+                })
 
-        steps.extend([
-            {
-                "name": "score_merge",
-                "command": [
-                    "bash", "-lc",
-                    "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
-                    "merge-score", "{score}",
-                ],
-            },
-            {
-                "name": "pack",
-                "command": [
-                    tool("pack/pack.py"), "build",
-                    "--input", "{score}/labeled.jsonl",
-                    "--out-dir", "{pack}/train",
-                    "--rows-file", "{score}/labeled.wc",
-                    "--max-features", str(args.max_features),
-                    "--progress", str(args.pack_progress),
-                    "--python", python,
-                ],
-            },
-            {
+            steps.extend([
+                {
+                    "name": "score_merge",
+                    "command": [
+                        "bash", "-lc",
+                        "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
+                        "merge-score", "{score}",
+                    ],
+                },
+                {
+                    "name": "pack",
+                    "command": [
+                        tool("pack/pack.py"), "build",
+                        "--input", "{score}/labeled.jsonl",
+                        "--out-dir", train_data,
+                        "--rows-file", "{score}/labeled.wc",
+                        "--max-features", str(args.max_features),
+                        "--progress", str(args.pack_progress),
+                        "--python", python,
+                    ],
+                },
+            ])
+
+        steps.append({
                 "name": "train",
                 "command": [
                     tool("train/train.py"), "run",
-                    "--data", "{pack}/train",
+                    "--data", train_data,
                     "--init-from-nn", str(expand_path(args.init_net)),
                     "--objective", args.objective,
                     "--huber-beta", str(args.huber_beta),
                     "--select-metric", args.select_metric,
                     "--wdl-lambda", str(args.wdl_lambda),
+                    "--sign-temperature-cp", str(args.sign_temperature_cp),
+                    "--sign-deadzone-cp", str(args.sign_deadzone_cp),
+                    "--sign-loss-weight", str(args.sign_loss_weight),
+                    "--score-loss-weight", str(args.score_loss_weight),
                     "--epochs", str(args.epochs),
                     "--batch-size", str(args.batch_size),
                     "--lr", str(args.lr),
@@ -242,14 +252,15 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--torch-compile" if args.torch_compile else "--no-torch-compile",
                     "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
                     "--patience", str(args.patience),
+                    "--max-rows", str(args.train_max_rows),
+                    "--skip-rows", str(args.train_skip_rows),
                     "--val-rows", str(args.val_rows),
                     "--trainable", args.trainable,
                     "--python", python,
                     "--out", f"{candidate_dir}/model.pt",
                     "--out-nn", f"{candidate_dir}/model.nn",
                 ],
-            },
-        ])
+        })
     elif args.backend == "bullet":
         if args.bullet_loader == "direct":
             if args.bullet_data:
@@ -512,10 +523,15 @@ def add_create_args(
 
     parser.add_argument("--init-net", default=value("init_net", d.init_net))
     parser.add_argument("--objective", default=value("objective", d.objective),
-                        choices=["mse", "huber", "mpe25"])
+                        choices=["mse", "huber", "mpe25", "sign-bce",
+                                 "sign-huber"])
     parser.add_argument("--target-clamp", type=int, default=value("target_clamp", d.target_clamp))
     parser.add_argument("--huber-beta", type=int, default=value("huber_beta", d.huber_beta))
     parser.add_argument("--wdl-lambda", type=float, default=value("wdl_lambda", d.wdl_lambda))
+    parser.add_argument("--sign-temperature-cp", type=float, default=value("sign_temperature_cp", d.sign_temperature_cp))
+    parser.add_argument("--sign-deadzone-cp", type=float, default=value("sign_deadzone_cp", d.sign_deadzone_cp))
+    parser.add_argument("--sign-loss-weight", type=float, default=value("sign_loss_weight", d.sign_loss_weight))
+    parser.add_argument("--score-loss-weight", type=float, default=value("score_loss_weight", d.score_loss_weight))
     parser.add_argument("--lr", type=float, default=value("lr", d.lr))
     parser.add_argument("--epochs", type=int, default=value("epochs", d.epochs))
     parser.add_argument("--batch-size", type=int, default=value("batch_size", d.batch_size))
@@ -534,6 +550,12 @@ def add_create_args(
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "float-head", "output"])
+    parser.add_argument("--train-data", default=value("train_data", d.train_data),
+                        help="Existing packed dataset to train from; skips posgen/score/pack.")
+    parser.add_argument("--train-max-rows", type=int,
+                        default=value("train_max_rows", d.train_max_rows))
+    parser.add_argument("--train-skip-rows", type=int,
+                        default=value("train_skip_rows", d.train_skip_rows))
 
     parser.add_argument("--bullet-source-jsonl", default=value("bullet_source_jsonl", d.bullet_source_jsonl))
     parser.add_argument("--bullet-data", default=value("bullet_data", d.bullet_data))

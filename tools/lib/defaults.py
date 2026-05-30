@@ -65,6 +65,10 @@ class CandidateDefaults:
     target_clamp: int = 800
     huber_beta: int = 200
     wdl_lambda: float = 0.75
+    sign_temperature_cp: float = 100.0
+    sign_deadzone_cp: float = 0.0
+    sign_loss_weight: float = 1.0
+    score_loss_weight: float = 1.0
     lr: float = 7e-7
     epochs: int = 8
     batch_size: int = 8192
@@ -80,6 +84,9 @@ class CandidateDefaults:
     weight_decay: float = 1e-6
     trainable: str = "all"
     backend: str = "pytorch"
+    train_data: str = ""
+    train_max_rows: int = 0
+    train_skip_rows: int = 0
 
     bullet_source_jsonl: str = "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
     bullet_data: str = ""

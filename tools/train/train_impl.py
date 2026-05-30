@@ -73,6 +73,8 @@ def source_value_tensor(source_ids: torch.Tensor, default: float,
 def score_loss(pred: torch.Tensor, target: torch.Tensor,
                wdl: torch.Tensor, source_ids: torch.Tensor,
                args: argparse.Namespace) -> torch.Tensor:
+    weights = torch.ones_like(target, dtype=torch.float32)
+    sign_huber_terms: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None = None
     if args.objective == "mpe25":
         pred_p = torch.sigmoid(pred * MPE_SCALE)
         target_p = torch.sigmoid(target * MPE_SCALE)
@@ -80,6 +82,29 @@ def score_loss(pred: torch.Tensor, target: torch.Tensor,
             source_ids, args.wdl_lambda, args.source_wdl_lambdas)
         target_p = lambdas * target_p + (1.0 - lambdas) * wdl
         losses = (pred_p - target_p).abs() ** MPE_EXPONENT
+    elif args.objective == "sign-bce":
+        logits = pred / args.sign_temperature_cp
+        targets = (target > 0).to(dtype=torch.float32)
+        valid = target.abs() > args.sign_deadzone_cp
+        losses = F.binary_cross_entropy_with_logits(
+            logits, targets, reduction="none")
+        weights = weights * valid.to(dtype=torch.float32)
+    elif args.objective == "sign-huber":
+        logits = pred / args.sign_temperature_cp
+        targets = (target > 0).to(dtype=torch.float32)
+        # For sign-huber, the deadzone suppresses only the sign term. The
+        # Huber term remains active so near-zero rows still preserve scale.
+        valid = target.abs() > args.sign_deadzone_cp
+        sign_losses = F.binary_cross_entropy_with_logits(
+            logits, targets, reduction="none")
+        huber_losses = F.smooth_l1_loss(
+            pred, target, beta=args.huber_beta, reduction="none")
+        sign_huber_terms = (
+            sign_losses,
+            valid.to(dtype=torch.float32),
+            huber_losses / args.huber_beta,
+        )
+        losses = None
     elif args.objective == "huber":
         losses = F.smooth_l1_loss(
             pred, target, beta=args.huber_beta, reduction="none")
@@ -89,10 +114,20 @@ def score_loss(pred: torch.Tensor, target: torch.Tensor,
         raise ValueError(f"unknown objective: {args.objective}")
 
     if args.source_loss_weights:
-        weights = source_value_tensor(
+        weights = weights * source_value_tensor(
             source_ids, 1.0, args.source_loss_weights)
-        return (losses * weights).sum() / weights.sum().clamp_min(1.0)
-    return losses.mean()
+    if sign_huber_terms is not None:
+        sign_losses, sign_mask, score_losses = sign_huber_terms
+        sign_weights = weights * sign_mask
+        sign_loss = (
+            (sign_losses * sign_weights).sum()
+            / sign_weights.sum().clamp_min(1.0))
+        score_loss_value = (
+            (score_losses * weights).sum()
+            / weights.sum().clamp_min(1.0))
+        return (args.sign_loss_weight * sign_loss
+                + args.score_loss_weight * score_loss_value)
+    return (losses * weights).sum() / weights.sum().clamp_min(1.0)
 
 
 def selection_value(metrics: dict[str, float], args: argparse.Namespace) -> float:
@@ -136,6 +171,10 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
                  ) -> dict[str, float]:
     model.eval()
     loss_sum = 0.0
+    sign_huber_sign_sum = 0.0
+    sign_huber_sign_weight = 0.0
+    sign_huber_score_sum = 0.0
+    sign_huber_score_weight = 0.0
     mae_sum = 0.0
     mse_sum = 0.0
     sign_sum = 0
@@ -150,11 +189,33 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
         with autocast_context(args):
             pred = model(w, b, w_off, b_off, stm, phase_scale)
-            loss = score_loss(pred.float(), y, wdl, source_ids, args)
+            if args.objective == "sign-huber":
+                weights = torch.ones_like(y, dtype=torch.float32)
+                if args.source_loss_weights:
+                    weights = weights * source_value_tensor(
+                        source_ids, 1.0, args.source_loss_weights)
+                logits = pred.float() / args.sign_temperature_cp
+                targets = (y > 0).to(dtype=torch.float32)
+                valid = (y.abs() > args.sign_deadzone_cp).to(
+                    dtype=torch.float32)
+                sign_losses = F.binary_cross_entropy_with_logits(
+                    logits, targets, reduction="none")
+                score_losses = F.smooth_l1_loss(
+                    pred.float(), y, beta=args.huber_beta,
+                    reduction="none") / args.huber_beta
+                sign_weights = weights * valid
+                sign_huber_sign_sum += float(
+                    (sign_losses * sign_weights).sum())
+                sign_huber_sign_weight += float(sign_weights.sum())
+                sign_huber_score_sum += float(
+                    (score_losses * weights).sum())
+                sign_huber_score_weight += float(weights.sum())
+            else:
+                loss = score_loss(pred.float(), y, wdl, source_ids, args)
+                loss_sum += float(loss) * len(y)
         err = pred - y
         sign_mask = y != 0
         batch_n = len(y)
-        loss_sum += float(loss) * batch_n
         mae_sum += float(err.abs().sum())
         mse_sum += float((err * err).sum())
         sign_sum += int(((pred[sign_mask] > 0) == (y[sign_mask] > 0)).sum())
@@ -162,8 +223,17 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
         n += batch_n
     model.train()
     denom = max(1, n)
+    if args.objective == "sign-huber":
+        loss_value = (
+            args.sign_loss_weight
+            * sign_huber_sign_sum / max(1.0, sign_huber_sign_weight)
+            + args.score_loss_weight
+            * sign_huber_score_sum / max(1.0, sign_huber_score_weight)
+        )
+    else:
+        loss_value = loss_sum / denom
     return {
-        "loss": loss_sum / denom,
+        "loss": loss_value,
         "mse": mse_sum / denom,
         "mae": mae_sum / denom,
         "sign": sign_sum / max(1, sign_n),
@@ -255,7 +325,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                 pred = forward_model(w, b, w_off, b_off, stm, phase_scale)
                 loss = score_loss(pred.float(), y, wdl, source_ids, args)
 
-            opt.zero_grad()
+            opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
 
@@ -286,8 +356,9 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
             else:
                 bad += 1
             if args.patience > 0:
+                display = best_display * 100 if args.select_metric == "sign" else best_display
                 line += (f" best_{args.select_metric}="
-                         f"{best_display:.6f} bad={bad}")
+                         f"{display:.6f} bad={bad}")
         print(line, flush=True)
 
         if args.patience > 0 and val_metrics is not None and bad >= args.patience:
@@ -296,6 +367,7 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     if best_state is not None:
         model.load_state_dict(best_state)
+    model.zero_grad(set_to_none=True)
     return model
 
 
@@ -310,7 +382,8 @@ def main() -> None:
     ap.add_argument("--init", default="kaiming",
                     choices=["kaiming", "berserk-ish"])
     ap.add_argument("--objective", default="mpe25",
-                    choices=["mse", "huber", "mpe25"])
+                    choices=["mse", "huber", "mpe25", "sign-bce",
+                             "sign-huber"])
     ap.add_argument("--huber-beta", type=float, default=200.0,
                     help="SmoothL1/Huber transition in centipawns.")
     ap.add_argument("--select-metric", default="loss",
@@ -318,6 +391,16 @@ def main() -> None:
                     help="Validation metric used to keep the best checkpoint. "
                          "sign is maximized; the others are minimized.")
     ap.add_argument("--wdl-lambda", type=float, default=0.75)
+    ap.add_argument("--sign-temperature-cp", type=float, default=100.0,
+                    help="CP scale used to convert predictions into logits "
+                         "for sign-bce.")
+    ap.add_argument("--sign-deadzone-cp", type=float, default=0.0,
+                    help="Ignore sign-bce rows with abs(target) at or below "
+                         "this CP value. For sign-huber this suppresses only "
+                         "the sign component; the Huber component remains "
+                         "active.")
+    ap.add_argument("--sign-loss-weight", type=float, default=1.0)
+    ap.add_argument("--score-loss-weight", type=float, default=1.0)
     ap.add_argument("--source-wdl-lambda", action="append", default=[],
                     metavar="SOURCE_ID=VALUE",
                     help="Override MPE WDL lambda for one packed source id. "
@@ -350,6 +433,15 @@ def main() -> None:
                          "L2+output floats. 'output' trains only the final "
                          "linear layer.")
     args = ap.parse_args()
+    if args.objective == "sign-huber":
+        if args.wdl_lambda != 1.0:
+            raise SystemExit(
+                "objective=sign-huber requires --wdl-lambda 1.0; "
+                "WDL mixing is only implemented for objective=mpe25")
+        if args.source_wdl_lambda:
+            raise SystemExit(
+                "objective=sign-huber cannot use --source-wdl-lambda; "
+                "WDL mixing is only implemented for objective=mpe25")
     source_map = load_source_map(args.data)
     args.source_wdl_lambdas = parse_source_values(
         args.source_wdl_lambda, value_name="source-wdl-lambda",

@@ -41,6 +41,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--huber-beta", str(args.huber_beta),
         "--select-metric", args.select_metric,
         "--wdl-lambda", str(args.wdl_lambda),
+        "--sign-temperature-cp", str(args.sign_temperature_cp),
+        "--sign-deadzone-cp", str(args.sign_deadzone_cp),
+        "--sign-loss-weight", str(args.sign_loss_weight),
+        "--score-loss-weight", str(args.score_loss_weight),
         "--epochs", str(args.epochs),
         "--batch-size", str(args.batch_size),
         "--lr", str(args.lr),
@@ -106,11 +110,16 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--init", default="kaiming",
                        choices=["kaiming", "berserk-ish"])
     train.add_argument("--objective", default="mpe25",
-                       choices=["mse", "huber", "mpe25"])
+                       choices=["mse", "huber", "mpe25", "sign-bce",
+                                "sign-huber"])
     train.add_argument("--huber-beta", type=float, default=200.0)
     train.add_argument("--select-metric", default="loss",
                        choices=["loss", "mse", "mae", "sign"])
     train.add_argument("--wdl-lambda", type=float, default=0.75)
+    train.add_argument("--sign-temperature-cp", type=float, default=100.0)
+    train.add_argument("--sign-deadzone-cp", type=float, default=0.0)
+    train.add_argument("--sign-loss-weight", type=float, default=1.0)
+    train.add_argument("--score-loss-weight", type=float, default=1.0)
     train.add_argument("--source-wdl-lambda", action="append", default=[])
     train.add_argument("--source-loss-weight", action="append", default=[])
     train.add_argument("--epochs", type=int, default=80)
