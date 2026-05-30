@@ -454,7 +454,7 @@ fn main() {
     let enyo_input_factoriser = env_parse("ENYO_BULLET_ENYO_INPUT_FACTORISER", 0usize) != 0;
     let enyo_input_buckets = env_parse("ENYO_BULLET_ENYO_INPUT_BUCKETS", 32usize);
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
-    let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 1usize);
+    let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
     let weight_decay = env_parse("ENYO_BULLET_WEIGHT_DECAY", 0.0f32);
 

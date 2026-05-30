@@ -454,7 +454,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enyo runtime king buckets to export into the .nn file.",
     )
     train.add_argument("--eval-scale", type=float, default=400.0)
-    train.add_argument("--save-rate", type=int, default=1)
+    train.add_argument("--save-rate", type=int, default=64)
     train.add_argument("--init-weights", default="")
     train.add_argument(
         "--trainable",
