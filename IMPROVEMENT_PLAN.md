@@ -38,9 +38,33 @@ No trained Enyo net is currently a keeper.
 - Local engine validation passed: full `build/test`, focused
   `network_model.*:network_audit.*`, and a Python-generated 32-bucket zero net
   loaded through Enyo and returned `evalnet 0 cp` on `startpos`.
-- Next validation must run on pwa from clean `main`: create the init-only
-  32-bucket Bullet export, run a tiny engine-static check, and measure search
-  NPS before training.
+- pwa clean-main preflight later passed; see the 32-bucket training update below.
+
+
+2026-05-30 32-bucket training update:
+
+- pwa clean-main preflight passed after the runtime/export work:
+  - init-only 32-bucket Bullet export produced a `50368836` byte `.nn`.
+  - Enyo `4322021` loaded the file through `evalnet` and engine-static eval ran.
+  - startpos node-search NPS was about `0.3%` slower than the 16-bucket zero net,
+    inside the `3-5%` guard.
+- First real 32-bucket scratch run:
+  `native-kb32-d12-20m-scratch-max800-scale300-wdl25-sb4096-20260530`.
+  - trained from the known Enyo d12 20M Bullet data, wdl25, scale300,
+    no input factorizer.
+  - Bullet phase completed 4096 superbatches in `12m20s`, around
+    `1.4-1.5M` positions/sec.
+  - Python/static validation on 100k rows: `mae=121.38`, `sign=81.68%`,
+    `0-50cp sign=67.21%`.
+  - Engine-static validation on 1000 rows: `mae=108.69`, `sign=83.00%`,
+    `0-50cp sign=66.89%`.
+  - The first smoke accidentally used the old `43abd4b` reference binary, which
+    cannot be trusted for 32-bucket nets; discard that smoke.
+  - Corrected smoke with Enyo `4322021` still scored `0` through 34 games
+    against Berserk and was stopped.
+- Conclusion: 32 input buckets are runtime-viable but this first scratch data
+  recipe is not a keeper. Static metrics again failed to predict game strength.
+  Do not launch another kb32 training run until the game/static gap is isolated.
 
 Rejected lanes:
 
@@ -57,6 +81,9 @@ Rejected lanes:
 - old-pool instability/disagreement blends: diagnostically useful, but not
   enough for SPRT promotion.
 - folded 8-king-bucket shortcut: clearly negative as a drop-in net.
+- 32 input-bucket scratch on the known Enyo d12 20M recipe: runtime/NPS passed,
+  static looked plausible, but corrected game smoke scored `0/34` versus
+  Berserk and was stopped.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
 Conclusion:
@@ -121,39 +148,27 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run the 32 input king-bucket runtime preflight before any more training.
+Do not launch another training run yet.
 
-Preflight steps:
+The next experiment is a corrected game/static gap diagnostic:
 
-1. From clean `main`, run the current dry-run `build.json` and inspect the
-   generated steps.
-2. Create an init-only 32-bucket Bullet export.
-3. Load the exported `.nn` through Enyo `evalnet`.
-4. Run a tiny engine-static validation through `eval_jsonl_engine.py`.
-5. Measure search NPS versus the 16-bucket runtime on the same binary and
-   settings.
+1. Using the same kb32-capable Enyo `4322021` binary, run a short Berserk smoke
+   for the previous 16-bucket d12 20M scratch net from the same source recipe.
+2. Compare that result with the rejected 32-bucket run to determine whether the
+   failure is architecture-specific or simply the known native scratch gap.
+3. Inspect failed smoke PGNs for gross eval-scale/runtime symptoms before
+   adding more data or changing loss.
+4. Only after that, choose between:
+   - stronger/deeper teacher data for the native scratch lane;
+   - a representation change that directly targets near-zero move-choice;
+   - an explicitly external-data lane with provenance if Enyo-only data remains
+     too weak.
 
-Pass criteria:
+Pass criteria for continuing a lane:
 
-- 16-bucket behavior remains loadable and audit-clean.
-- 32-bucket `.nn` size is accepted by Enyo.
-- Engine-side eval runs without Python-only assumptions.
-- NPS loss is no worse than about `3-5%`, or the move-choice evidence required
-  before training is raised accordingly.
-
-Anti-confounding rule:
-
-- Do not change architecture and data source in the same first candidate.
-- Reuse the best-understood training source for the first architecture test:
-  the current signed-balanced d12 self-play plus Stockfish-d16 label recipe
-  expressed through `build.py`.
-- Because this moves the recipe through the new `build.py` pipeline, run the
-  pack/static/roundtrip sanity checks before training starts.
-
-Fallback:
-
-- learned material/phase head input.
-- Do not use another folded/drop-in shortcut as evidence.
+- a smoke must score at least non-catastrophically against Berserk;
+- engine-static sign must improve in the `0-50cp` bucket;
+- no SPRT should run on a net that cannot draw or score in the early smoke.
 
 ## Candidate Workflow
 
@@ -165,13 +180,13 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `native-kb32-runtime-preflight-pending-20260530`
-- selected branch: 32 input king-bucket runtime preflight
-- backend: Bullet
+- candidate name: `native-static-game-gap-diagnostic-pending-20260530`
+- selected branch: no training; static/game-strength diagnostic
+- backend: Bullet placeholder only
 - input buckets: `32`
 - runtime input buckets: `32`
-- mode: init-only export
-- training source: none until loader/runtime/NPS preflight passes
+- mode: dry-run placeholder
+- training source: none until the corrected baseline comparison is recorded
 
 Rules:
 

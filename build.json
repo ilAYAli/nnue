@@ -1,24 +1,24 @@
 {
-  "description": "Safe placeholder for the next intended native-net direction. The near-zero source-weight lane is closed; do not rerun it. The next work is the 32 input king-bucket runtime preflight, and this config is intentionally dry-run until loader/runtime/NPS checks exist.",
-  "experiment": "native-kb32-runtime-preflight",
+  "description": "Safe placeholder after the first 32-bucket scratch training run. Runtime preflight passed, but the first kb32 d12 20M scratch net was game-rejected; do not launch more training until the static/game-strength gap is diagnosed.",
+  "experiment": "native-static-game-gap-diagnostic",
   "create": {
-    "name": "native-kb32-runtime-preflight-pending-20260530",
+    "name": "native-static-game-gap-diagnostic-pending-20260530",
     "dry_run": true,
     "backend": "bullet",
     "bullet_mode": "enyo",
     "bullet_loader": "direct",
-    "bullet_source_jsonl": "",
-    "bullet_data": "runs/imported/latest_20m/bullet.data",
+    "bullet_data": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-enyo-d12-20m-max800-scale300-wdl25-sb4096-kb16-20260529/assets/bullet.data",
     "bullet_enyo_input_buckets": 32,
     "bullet_enyo_runtime_input_buckets": 32,
     "bullet_hidden": 1024,
     "bullet_l2": 16,
-    "bullet_export_init_only": true,
-    "bullet_static_data": "",
-    "engine_static_jsonl": "",
+    "bullet_export_init_only": false,
+    "bullet_static_data": "/home/petter/code/cpp/chess/nnue/runs/imported/latest_20m/pack/train",
+    "engine_static_jsonl": "/home/petter/code/cpp/chess/nnue/runs/imported/latest_20m/score/labeled.jsonl",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "pass_hint": "Do not train from this config. First implement and verify 32-bucket runtime support: 16-bucket parity unchanged, 32-bucket .nn size accepted, tiny engine-static validation works, and NPS loss is measured."
+    "last_result": "native-kb32-d12-20m-scratch-max800-scale300-wdl25-sb4096-20260530: static looked plausible, corrected game smoke scored 0 through 34 games against Berserk and was stopped.",
+    "next_gate": "Run corrected baseline game/static comparisons with the same kb32-capable Enyo binary before any more training. Determine whether the failure is architecture-specific or the known native scratch/static-vs-game gap."
   }
 }
