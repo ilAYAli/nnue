@@ -183,6 +183,7 @@ def create_config(args: argparse.Namespace) -> dict:
         for shard in range(args.score_shards):
             steps.append({
                 "name": f"score_{shard:02d}",
+                "parallel_group": "score",
                 "command": [
                     tool("score/score.py"), "uci",
                     "--input", "{posgen}/source.jsonl",

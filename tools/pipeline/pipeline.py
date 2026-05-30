@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import subprocess
 import sys
@@ -167,6 +168,25 @@ def completion_extra(run_dir: Path) -> dict[str, Any]:
     }
 
 
+def _group_steps(steps: list[dict]) -> list[list[dict]]:
+    """Split steps into sequential batches.
+
+    Consecutive steps sharing the same non-empty ``parallel_group`` value form
+    one batch and will be launched concurrently.  All other steps form a
+    singleton batch and run sequentially.
+    """
+    batches: list[list[dict]] = []
+    for key, group_iter in itertools.groupby(
+        steps, key=lambda s: s.get("parallel_group") or "" if isinstance(s, dict) else ""
+    ):
+        group = list(group_iter)
+        if key and len(group) > 1:
+            batches.append(group)
+        else:
+            batches.extend([s] for s in group)
+    return batches
+
+
 def cmd_launch(args: argparse.Namespace) -> int:
     config_path = expand_path(args.config)
     config = load_config(config_path)
@@ -203,11 +223,13 @@ def cmd_launch(args: argparse.Namespace) -> int:
     variables.update({str(k): str(v) for k, v in config.get("vars", {}).items()})
 
     log_path = run_dir / "runs.log"
-    current_proc: subprocess.Popen[str] | None = None
+    # Mutable list so the signal handler always sees the current running procs.
+    active_procs: list[subprocess.Popen[str]] = []
 
     def handle_signal(signum: int, _frame: object) -> None:
-        if current_proc and current_proc.poll() is None:
-            current_proc.terminate()
+        for p in active_procs:
+            if p.poll() is None:
+                p.terminate()
         emit_event(
             run_dir,
             "fail",
@@ -232,76 +254,202 @@ def cmd_launch(args: argparse.Namespace) -> int:
         extra={"config": str(config_path)},
     )
 
+    batches = _group_steps(steps)
+
     with log_path.open("a", encoding="utf-8") as log:
-        for step in steps:
-            if not isinstance(step, dict):
-                raise SystemExit("each step must be an object")
-            name = str(step.get("name", "step"))
-            command = step.get("command")
-            if not isinstance(command, list) or not all(isinstance(x, str) for x in command):
-                raise SystemExit(f"step {name}: command must be a string list")
-            formatted = format_command(command, variables)
-            marker = run_dir / f"{name}.done"
-            if marker.exists() and not args.force:
-                print(f"skip {name}: {marker} exists", flush=True)
+        for batch in batches:
+            if len(batch) == 1:
+                step = batch[0]
+                if not isinstance(step, dict):
+                    raise SystemExit("each step must be an object")
+                name = str(step.get("name", "step"))
+                command = step.get("command")
+                if not isinstance(command, list) or not all(isinstance(x, str) for x in command):
+                    raise SystemExit(f"step {name}: command must be a string list")
+                formatted = format_command(command, variables)
+                marker = run_dir / f"{name}.done"
+                if marker.exists() and not args.force:
+                    print(f"skip {name}: {marker} exists", flush=True)
+                    emit_event(
+                        run_dir,
+                        "phase_skip",
+                        stage=name,
+                        status="done marker exists",
+                        log=log_path,
+                        command=formatted,
+                        hook_command=hook_command,
+                    )
+                    continue
+                print(f"start {name}: {' '.join(formatted)}", flush=True)
+                log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} start {name}: {' '.join(formatted)}\n")
+                log.flush()
                 emit_event(
                     run_dir,
-                    "phase_skip",
+                    "phase_start",
                     stage=name,
-                    status="done marker exists",
+                    status="running",
                     log=log_path,
                     command=formatted,
                     hook_command=hook_command,
                 )
-                continue
-            print(f"start {name}: {' '.join(formatted)}", flush=True)
-            log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} start {name}: {' '.join(formatted)}\n")
-            log.flush()
-            emit_event(
-                run_dir,
-                "phase_start",
-                stage=name,
-                status="running",
-                log=log_path,
-                command=formatted,
-                hook_command=hook_command,
-            )
-            current_proc = subprocess.Popen(
-                formatted,
-                cwd=variables["repo"],
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
-            rc = current_proc.wait()
-            current_proc = None
-            log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} done {name} rc={rc}\n")
-            log.flush()
-            if rc != 0:
-                print(f"failed {name}: rc={rc}; log={log_path}", flush=True)
+                proc = subprocess.Popen(
+                    formatted,
+                    cwd=variables["repo"],
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+                active_procs.append(proc)
+                rc = proc.wait()
+                active_procs.remove(proc)
+                log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} done {name} rc={rc}\n")
+                log.flush()
+                if rc != 0:
+                    print(f"failed {name}: rc={rc}; log={log_path}", flush=True)
+                    emit_event(
+                        run_dir,
+                        "fail",
+                        stage=name,
+                        status="failed",
+                        rc=rc,
+                        log=log_path,
+                        command=formatted,
+                        hook_command=hook_command,
+                    )
+                    return rc
+                marker.write_text("rc=0\n", encoding="utf-8")
+                print(f"done {name}", flush=True)
                 emit_event(
                     run_dir,
-                    "fail",
+                    "phase_done",
                     stage=name,
-                    status="failed",
+                    status="ok",
                     rc=rc,
                     log=log_path,
                     command=formatted,
                     hook_command=hook_command,
                 )
-                return rc
-            marker.write_text(f"rc=0\n", encoding="utf-8")
-            print(f"done {name}", flush=True)
-            emit_event(
-                run_dir,
-                "phase_done",
-                stage=name,
-                status="ok",
-                rc=rc,
-                log=log_path,
-                command=formatted,
-                hook_command=hook_command,
-            )
+            else:
+                # Parallel batch: launch all steps concurrently, wait for all.
+                group_name = batch[0].get("parallel_group", "parallel")
+                pending: list[tuple[str, list[str], Path, subprocess.Popen[str]]] = []
+                skipped_all = True
+
+                for step in batch:
+                    if not isinstance(step, dict):
+                        raise SystemExit("each step must be an object")
+                    name = str(step.get("name", "step"))
+                    command = step.get("command")
+                    if not isinstance(command, list) or not all(
+                        isinstance(x, str) for x in command
+                    ):
+                        raise SystemExit(f"step {name}: command must be a string list")
+                    formatted = format_command(command, variables)
+                    marker = run_dir / f"{name}.done"
+                    if marker.exists() and not args.force:
+                        print(f"skip {name}: {marker} exists", flush=True)
+                        emit_event(
+                            run_dir,
+                            "phase_skip",
+                            stage=name,
+                            status="done marker exists",
+                            log=log_path,
+                            command=formatted,
+                            hook_command=hook_command,
+                        )
+                        continue
+                    skipped_all = False
+                    print(f"start {name}: {' '.join(formatted)}", flush=True)
+                    log.write(
+                        f"{time.strftime('%Y-%m-%dT%H:%M:%S')} start {name}:"
+                        f" {' '.join(formatted)}\n"
+                    )
+                    log.flush()
+                    emit_event(
+                        run_dir,
+                        "phase_start",
+                        stage=name,
+                        status="running",
+                        log=log_path,
+                        command=formatted,
+                        hook_command=hook_command,
+                    )
+                    proc = subprocess.Popen(
+                        formatted,
+                        cwd=variables["repo"],
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                    )
+                    active_procs.append(proc)
+                    pending.append((name, formatted, marker, proc))
+
+                if skipped_all:
+                    continue
+
+                # Poll until all procs in the batch finish.
+                failed_rc: int | None = None
+                remaining = list(pending)
+                while remaining:
+                    still_running = []
+                    for name, formatted, marker, proc in remaining:
+                        rc = proc.poll()
+                        if rc is None:
+                            still_running.append((name, formatted, marker, proc))
+                            continue
+                        active_procs.remove(proc)
+                        log.write(
+                            f"{time.strftime('%Y-%m-%dT%H:%M:%S')} done {name} rc={rc}\n"
+                        )
+                        log.flush()
+                        if rc != 0:
+                            print(f"failed {name}: rc={rc}; log={log_path}", flush=True)
+                            emit_event(
+                                run_dir,
+                                "fail",
+                                stage=name,
+                                status="failed",
+                                rc=rc,
+                                log=log_path,
+                                command=formatted,
+                                hook_command=hook_command,
+                            )
+                            if failed_rc is None:
+                                failed_rc = rc
+                                # Terminate all siblings in this batch, not just
+                                # the ones already visited in this poll pass.
+                                for _, _, _, sibling in pending:
+                                    if sibling.poll() is None:
+                                        sibling.terminate()
+                        else:
+                            marker.write_text("rc=0\n", encoding="utf-8")
+                            print(f"done {name}", flush=True)
+                            emit_event(
+                                run_dir,
+                                "phase_done",
+                                stage=name,
+                                status="ok",
+                                rc=rc,
+                                log=log_path,
+                                command=formatted,
+                                hook_command=hook_command,
+                            )
+                    remaining = still_running
+                    if remaining:
+                        time.sleep(0.05)
+
+                if failed_rc is not None:
+                    emit_event(
+                        run_dir,
+                        "fail",
+                        stage=group_name,
+                        status="failed",
+                        rc=failed_rc,
+                        log=log_path,
+                        hook_command=hook_command,
+                    )
+                    return failed_rc
+
     extra = completion_extra(run_dir)
     print(f"run complete: {run_dir}", flush=True)
     if extra.get("candidate_net"):
