@@ -151,8 +151,13 @@ def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
 
 
 def train(args) -> EnyoNNUE:
-    broad_set, broad_collate = load_score_dataset(
-        args.data, limit=args.max_rows, skip=args.skip_rows)
+    use_broad = args.broad_weight > 0.0
+    if use_broad:
+        broad_set, broad_collate = load_score_dataset(
+            args.data, limit=args.max_rows, skip=args.skip_rows)
+    else:
+        broad_set = None
+        broad_collate = None
     pair_set = HardPairDataset.from_jsonl(
         args.pairs,
         min_target_margin=args.min_target_margin,
@@ -160,7 +165,10 @@ def train(args) -> EnyoNNUE:
     if len(pair_set) == 0:
         raise SystemExit("no hard pairs after filtering")
 
-    print(f"broad rows: {len(broad_set)}", flush=True)
+    if use_broad:
+        print(f"broad rows: {len(broad_set)}", flush=True)
+    else:
+        print("broad rows: skipped", flush=True)
     print(f"hard pairs: {len(pair_set)}", flush=True)
 
     if args.init_from_nn:
@@ -168,10 +176,12 @@ def train(args) -> EnyoNNUE:
     else:
         model = EnyoNNUE(init=args.init).to(args.device)
 
-    broad_loader = DataLoader(
-        broad_set, batch_size=args.batch_size, shuffle=True,
-        collate_fn=broad_collate, num_workers=args.workers,
-        pin_memory=args.device.startswith("cuda"))
+    broad_loader = None
+    if use_broad:
+        broad_loader = DataLoader(
+            broad_set, batch_size=args.batch_size, shuffle=True,
+            collate_fn=broad_collate, num_workers=args.workers,
+            pin_memory=args.device.startswith("cuda"))
     pair_loader = DataLoader(
         pair_set, batch_size=args.pair_batch_size, shuffle=True,
         collate_fn=collate_pairs, num_workers=0,
@@ -187,14 +197,27 @@ def train(args) -> EnyoNNUE:
         pair_mae_sum = 0.0
         pair_correct = 0
         pair_n = 0
-        for broad_batch in broad_loader:
-            broad_batch = to_device(broad_batch, args.device)
-            w, b, w_off, b_off, stm, y, _wdl, phase_scale, _source_ids = broad_batch
-            if args.target_clamp > 0:
-                y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-            pred = model(w, b, w_off, b_off, stm, phase_scale)
-            broad_loss = F.smooth_l1_loss(
-                pred, y, beta=args.huber_beta, reduction="mean")
+        steps = (
+            len(broad_loader) if use_broad
+            else args.steps_per_epoch if args.steps_per_epoch > 0
+            else max(1, len(pair_loader))
+        )
+        broad_iter = iter(broad_loader) if use_broad else None
+        for _step in range(steps):
+            broad_loss = torch.zeros((), device=args.device)
+            if use_broad:
+                assert broad_iter is not None
+                broad_batch = to_device(next(broad_iter), args.device)
+                w, b, w_off, b_off, stm, y, _wdl, phase_scale, _source_ids = broad_batch
+                if args.target_clamp > 0:
+                    y = torch.clamp(y, -args.target_clamp, args.target_clamp)
+                pred = model(w, b, w_off, b_off, stm, phase_scale)
+                broad_loss = F.smooth_l1_loss(
+                    pred, y, beta=args.huber_beta, reduction="mean")
+
+                broad_err = (pred.detach() - y).abs()
+                broad_mae_sum += float(broad_err.sum())
+                broad_n += len(y)
 
             pair_batch = to_device(next(pair_iter), args.device)
             (pw, pb, pwo, pbo, pstm, pphase,
@@ -212,14 +235,11 @@ def train(args) -> EnyoNNUE:
             else:
                 pair_loss = pair_losses.mean()
 
-            loss = broad_loss + args.pair_weight * pair_loss
+            loss = args.broad_weight * broad_loss + args.pair_weight * pair_loss
             opt.zero_grad()
             loss.backward()
             opt.step()
 
-            broad_err = (pred.detach() - y).abs()
-            broad_mae_sum += float(broad_err.sum())
-            broad_n += len(y)
             pair_err = (pred_margin.detach() - target_margin).abs()
             pair_mae_sum += float(pair_err.sum())
             pair_correct += int((pred_margin.detach() > 0).sum())
@@ -257,6 +277,9 @@ def main() -> None:
     ap.add_argument("--huber-beta", type=float, default=200.0)
     ap.add_argument("--pair-beta", type=float, default=100.0)
     ap.add_argument("--pair-weight", type=float, default=1.0)
+    ap.add_argument("--broad-weight", type=float, default=1.0)
+    ap.add_argument("--steps-per-epoch", type=int, default=0,
+                    help="Target-only steps per epoch when --broad-weight=0.")
     ap.add_argument("--target-clamp", type=float, default=1600.0)
     ap.add_argument("--max-target-margin", type=float, default=800.0)
     ap.add_argument("--min-target-margin", type=float, default=1.0)
