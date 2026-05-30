@@ -396,6 +396,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--jsonl", str(expand_path(args.engine_static_jsonl)),
                 "--rows", str(args.engine_static_rows),
                 "--buckets",
+                "--sources",
             ],
         })
 
