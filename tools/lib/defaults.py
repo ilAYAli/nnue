@@ -100,7 +100,7 @@ class CandidateDefaults:
     bullet_l2: int = 16
     bullet_batch_size: int = 4096
     bullet_batches: int = 64
-    bullet_superbatches: int = 8
+    bullet_superbatches: int = 2048
     bullet_threads: int = 4
     bullet_wdl: float = 0.75
     bullet_lr: float = 1e-3

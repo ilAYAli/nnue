@@ -443,7 +443,7 @@ fn main() {
     let l2_size = env_parse("ENYO_BULLET_L2", 16usize);
     let batch_size = env_parse("ENYO_BULLET_BATCH_SIZE", 2048usize);
     let batches_per_superbatch = env_parse("ENYO_BULLET_BATCHES", 64usize);
-    let end_superbatch = env_parse("ENYO_BULLET_SUPERBATCHES", 2usize);
+    let end_superbatch = env_parse("ENYO_BULLET_SUPERBATCHES", 2048usize);
     let threads = env_parse("ENYO_BULLET_THREADS", 4usize);
     let wdl_proportion = env_parse("ENYO_BULLET_WDL", 0.75f32);
     let initial_lr = env_parse("ENYO_BULLET_LR", 0.001f32);

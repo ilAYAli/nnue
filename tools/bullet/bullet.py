@@ -425,7 +425,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--l2", type=int, default=16)
     train.add_argument("--batch-size", type=int, default=2048)
     train.add_argument("--batches", type=int, default=64)
-    train.add_argument("--superbatches", type=int, default=2)
+    train.add_argument("--superbatches", type=int, default=2048)
     train.add_argument("--threads", type=int, default=4)
     train.add_argument("--wdl", type=float, default=0.75)
     train.add_argument("--lr", type=float, default=1e-3)
