@@ -18,7 +18,7 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "last_result": "LC0/Berserk-oracle pairwise scalar probes: target-only training reached 89.4% pair correctness, but broad behavior collapsed; preserved scalar blends plateaued near 70-76% and drifted broad MAE.",
-    "next_gate": "Build fixed cases with tools/validate/build_fixed_move_gate.py and evaluate candidates with tools/validate/validate.py move-gate before any separable policy/ranking or architecture proof."
+    "last_result": "Loss-log sidecar with guard negatives has a clean offline threshold: t18 catches 101/622 held-out mistake pairs with 0 harmful and 1 neutral guard override out of 596; LC0 remains rejected for this gate.",
+    "next_gate": "Engine policy/tie-break preflight: disabled parity, NPS, model-load behavior, and Python-vs-engine parity on fixed mistake/guard gates before any enabled smoke."
   }
 }

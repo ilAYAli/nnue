@@ -126,6 +126,40 @@ No trained Enyo net is currently a keeper.
   another scalar pairwise-plus-broad blend unless the representation changes or
   the pairwise signal is moved to a separate policy/ranking path.
 
+2026-05-31 separable move-policy proof:
+
+- Added a fixed move-choice gate builder and engine-side move-gate validator.
+  Same-net Berserk sanity on the 80-case smoke gate passed with identical
+  baseline/candidate scores (`57/80`, no regressions).
+- Added a tiny sidecar move-policy proof that scores `best` versus `played`
+  moves without touching the scalar `.nn` eval path.
+- Mixed LC0+loss-log cases are not useful enough:
+  - compact features overfit train at `100%` but held out only `348/498`
+    (`69.9%`);
+  - board features overfit train at `100%` but held out `344/498` (`69.1%`).
+- Source split isolated the issue:
+  - LC0-only board sidecar held out `153/248` (`61.7%`);
+  - loss-log-only board sidecar held out `211/250` (`84.4%`) on the capped
+    1000-case set;
+  - full loss-log gate (`2487` cases) held out `508/622` (`81.7%`) and seed
+    checks landed at `81.0%`, `83.8%`, and `83.8%`.
+- Added a no-override guard builder/evaluator using replay rows where Enyo's
+  current move is within `10cp` of oracle.
+- Training with one guard-negative pair per guard row produced the first clean
+  offline sidecar threshold:
+  - held-out mistake gate at threshold `18`: `101/622` selected, all correct;
+  - held-out guard gate at threshold `18`: `0` harmful overrides and `1`
+    neutral override out of `596` guards;
+  - threshold `16` has more action (`158/622`) but still has `2/596` harmful
+    guard overrides;
+  - x2 guard negatives were worse and still had harmful guard overrides at high
+    thresholds.
+- Conclusion: LC0 is currently a poor source for this sidecar gate. The
+  Enyo loss-log replay rows carry a real move-choice signal, and the sidecar can
+  be calibrated to a clean offline threshold. This is still not a replacement
+  `.nn`; the next step is a no-op/runtime preflight for an engine policy
+  tie-break path, followed by real-game action-rate and SPRT gates.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did
@@ -150,6 +184,9 @@ Rejected lanes:
 - LC0/Berserk-oracle pairwise supervision through the scalar eval path:
   target-only training can learn the pairs, but broad preservation either blocks
   the movement or collapses when removed.
+- LC0/Berserk-oracle sidecar policy on the current fixed gate: held-out
+  accuracy is only about `62%`, and mixing it with loss-log rows drags the
+  useful loss-log signal down to about `69%`.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
 Conclusion:
@@ -177,7 +214,9 @@ Priority order:
      row format and stored with provenance under `runs/` or `assets/`.
    - LC0 V6 import and oracle child-target generation now work as a data-source
      path. The current result says not to push LC0 pairwise signal through the
-     scalar eval head without a separability change.
+     scalar eval head without a separability change. The first sidecar proof
+     also says to exclude LC0 from the current move-policy gate until its labels
+     are audited or regenerated with a better oracle setup.
 
 2. Targeted move-choice data.
    - Expand the fixed failure-suite and disagreement/PV-instability samplers.
@@ -186,6 +225,8 @@ Priority order:
      positive.
    - Longer-term goal: optimize search decision quality, not only scalar
      evaluation accuracy.
+   - Current positive source: Enyo loss-log replay rows. Current rejected source
+     for this gate: LC0/Berserk-oracle rows.
    - Search-aware signals to track before training from them:
      - top-move agreement.
      - top-3 move overlap.
@@ -213,20 +254,20 @@ Priority order:
 Do not launch another native self-play Bullet training run or scalar pairwise
 blend yet.
 
-The next experiment must add separability before training time is spent:
+The next experiment is an engine policy/tie-break preflight:
 
-1. Keep LC0 tooling as a source of move-choice supervision, not as a scalar
-   eval blend by default.
-2. Build a small fixed engine-side move-choice gate with
-   `tools/validate/build_fixed_move_gate.py` and run it with
-   `tools/validate/validate.py move-gate` before the next training run.
-3. Try the next LC0-derived signal only through a separate policy/ranking path
-   or a runtime-checked architecture branch with a no-op parity/NPS preflight.
-4. Treat target-only pair learning as a capability proof only. A keeper
-   candidate must preserve broad engine-static behavior and then pass an early
-   game smoke.
-5. If a separable move-choice path cannot improve the fixed gate without broad
-   collapse, stop this lane before a full candidate run.
+1. Do not train another mixed LC0+loss policy run until LC0 label quality is
+   audited.
+2. Design the smallest Enyo runtime hook for a disabled-by-default sidecar
+   policy/tie-breaker.
+3. Preflight requirements before enabling any move changes:
+   - same binary/net behavior with policy disabled;
+   - NPS impact measured with policy disabled and enabled;
+   - policy model load failure is non-fatal unless explicitly required;
+   - replay of the fixed mistake and guard gates reports the same threshold
+     decisions as Python.
+4. Only after those pass, run a tiny enabled smoke with threshold `18` and
+   measure action rate, harmful overrides, and SPRT direction.
 
 Pass criteria for continuing a lane:
 
@@ -245,10 +286,10 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name: `separable-move-choice-preflight-20260531`
-- selected branch: no training; LC0 pairwise scalar lane is closed
+- selected branch: no NNUE scalar training; LC0 pairwise scalar lane is closed
 - backend: dry-run placeholder only
 - training source: none until the next separable policy/ranking or architecture
-  preflight has an explicit engine-side move-choice gate
+  runtime preflight has policy-disabled parity and policy-enabled gate parity
 
 Rules:
 
