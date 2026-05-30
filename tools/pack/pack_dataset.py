@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -37,6 +38,23 @@ def read_rows_file(path: Path) -> int:
     return rows
 
 
+def shrink_memmap(path: Path, *, dtype: Any, shape: tuple[int, ...],
+                  rows: int, chunk_rows: int = 100000) -> None:
+    if shape[0] == rows:
+        return
+    tmp = path.with_name(path.name + ".shrink")
+    src = np.load(path, mmap_mode="r")
+    dst = np.lib.format.open_memmap(
+        tmp, mode="w+", dtype=dtype, shape=(rows, *shape[1:]))
+    for start in range(0, rows, chunk_rows):
+        end = min(rows, start + chunk_rows)
+        dst[start:end] = src[start:end]
+    dst.flush()
+    del src
+    del dst
+    tmp.replace(path)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True, help="Source self-play JSONL.")
@@ -60,9 +78,11 @@ def main() -> None:
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
+    rows_file_used = False
     if args.rows > 0:
         rows = args.rows
     elif args.rows_file:
+        rows_file_used = True
         rows = read_rows_file(Path(args.rows_file).expanduser())
     else:
         rows = count_rows(src, skip=args.skip, limit=args.limit)
@@ -132,7 +152,29 @@ def main() -> None:
                 print(f"packed {written}/{rows}", flush=True)
             if args.limit > 0 and written >= args.limit:
                 break
-    if written != rows:
+    for array in (
+            w_features, b_features, counts, stms, scores, wdls,
+            phase_scales, source_ids):
+        array.flush()
+
+    if written < rows and rows_file_used:
+        shrink_memmap(out / "white_features.npy", dtype=np.uint16,
+                      shape=shape, rows=written)
+        shrink_memmap(out / "black_features.npy", dtype=np.uint16,
+                      shape=shape, rows=written)
+        shrink_memmap(out / "counts.npy", dtype=np.uint8, shape=(rows,),
+                      rows=written)
+        shrink_memmap(out / "stm.npy", dtype=np.uint8, shape=(rows,),
+                      rows=written)
+        shrink_memmap(out / "score.npy", dtype=np.float32, shape=(rows,),
+                      rows=written)
+        shrink_memmap(out / "wdl.npy", dtype=np.float32, shape=(rows,),
+                      rows=written)
+        shrink_memmap(out / "phase_scale.npy", dtype=np.float32,
+                      shape=(rows,), rows=written)
+        shrink_memmap(out / "source_id.npy", dtype=np.uint16, shape=(rows,),
+                      rows=written)
+    elif written != rows:
         raise ValueError(f"packed {written} rows, expected {rows}")
 
     meta = {
