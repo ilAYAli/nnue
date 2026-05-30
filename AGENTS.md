@@ -164,7 +164,27 @@ git diff --name-only origin/main..HEAD
 ## Shared Long-Run Rules
 
 - Run long NNUE jobs in tmux.
-- Notifications should report task, ETA, and project state. Avoid phase spam.
+- Notifications should report conclusions, task, ETA, and project state.
+- The `nnue` topic is for user-facing conclusions, not phase spam. The hook
+  subscribes to `done,fail,test` by default, but suppresses generic `done` and
+  `fail` messages unless the event is marked user-worthy, improved,
+  promotion-candidate, or critical.
+- Always wake the agent for long-running phase completions and failures by
+  sending `phase_done,done,fail` to `AI_stdin`. This is agent control traffic,
+  not user-facing status.
+- Do not rely on inherited tmux environment. Long-run launches should set the
+  event split explicitly:
+
+```sh
+NNUE_NTFY_EVENTS=done,fail,test \
+NNUE_AI_STDIN_EVENTS=phase_done,done,fail \
+NNUE_AI_STDOUT_EVENTS=done,fail \
+./build.py create -c build.json \
+  --event-command /home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh
+```
+
+- `AI_stdout` should receive concise structured status/conclusion output when
+  a long run completes.
 - Remove temporary tmux windows when the job is done.
 - Do not leave nested shells in tmux panes.
 - Do not start a new training run without an explicit instruction and a written

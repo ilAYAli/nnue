@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# NNUE event hook. It publishes only completion/failure by default to avoid
-# phase spam. Set NNUE_NTFY_EVENTS=phase_done,done,fail for verbose runs.
+# NNUE event hook. Agent wakeups are controlled through NNUE_AI_STDIN_EVENTS.
+# The user-facing nnue topic should only receive explicit good-news/conclusion
+# events, not generic phase/run completion or ordinary experiment-failure spam.
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
 EVENTS=${NNUE_NTFY_EVENTS:-done,fail,test}
-AI_EVENTS=${NNUE_AI_STDIN_EVENTS:-done,fail}
+AI_EVENTS=${NNUE_AI_STDIN_EVENTS:-phase_done,done,fail}
 AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS:-done,fail}
+USER_GENERIC=${NNUE_USER_NOTIFY_GENERIC:-0}
 AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 AI_STDOUT_ENABLE=${NNUE_AI_STDOUT_ENABLE:-1}
 NOTIFAI=${NNUE_NOTIFAI:-$HOME/scripts/notifai.sh}
@@ -26,6 +28,23 @@ event_name=$(NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
 import json
 import os
 print(json.loads(os.environ["NNUE_EVENT_PAYLOAD"]).get("event", "event"))
+PY
+)
+
+user_worthy=$(NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
+import json
+import os
+
+event = json.loads(os.environ["NNUE_EVENT_PAYLOAD"])
+name = str(event.get("event", ""))
+if name == "test":
+    print("1")
+elif any(event.get(key) for key in (
+        "user_notify", "good_news", "promotion_candidate", "improved",
+        "critical", "critical_failure")):
+    print("1")
+else:
+    print("0")
 PY
 )
 
@@ -46,6 +65,9 @@ if [ "$AI_ENABLE" = "1" ]; then
     case ",$AI_EVENTS," in
         *,"$event_name",*) send_ai_stdin=1 ;;
     esac
+fi
+if [ "$USER_GENERIC" != "1" ] && [ "$user_worthy" != "1" ]; then
+    send_nnue=0
 fi
 
 if [ "$send_nnue" = "0" ] && [ "$send_ai_stdout" = "0" ] && [ "$send_ai_stdin" = "0" ]; then
@@ -159,6 +181,7 @@ publish_ai() {
     local prompt="$1"
     local title="$2"
     local priority="$3"
+    local rc=0
 
     if [ "$DRY_RUN" = "1" ]; then
         printf '%s\n' "$prompt"
@@ -166,9 +189,32 @@ publish_ai() {
     fi
 
     if [ -x "$NOTIFAI" ]; then
-        "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1 || true
+        if "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1; then
+            printf '%s event=%s notifai_ok target=%s\n' \
+                "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" \
+                "$NOTIFAI_TARGET" >>"$LOG"
+        else
+            rc=$?
+            printf '%s event=%s notifai_failed rc=%s target=%s\n' \
+                "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" \
+                "$NOTIFAI_TARGET" >>"$LOG"
+        fi
+    else
+        printf '%s event=%s notifai_missing path=%s target=%s\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI" \
+            "$NOTIFAI_TARGET" >>"$LOG"
     fi
-    publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"
+
+    if publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"; then
+        printf '%s event=%s ai_stdin_ntfy_ok\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+    else
+        rc=$?
+        printf '%s event=%s ai_stdin_ntfy_failed rc=%s\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" \
+            >>"$LOG"
+        return "$rc"
+    fi
 }
 
 if [ "$send_ai_stdin" = "1" ] && [ -n "$ai_prompt" ]; then
