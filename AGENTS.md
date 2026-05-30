@@ -125,6 +125,26 @@ git rev-list --count origin/main..HEAD
 - If a branch is hundreds of commits ahead of `main`, it is contaminated. Do
   not merge it; create a clean branch from `origin/main` and cherry-pick or
   reapply only the intended commits.
+- Research branches are never merge branches. A branch used for experiments,
+  failed candidates, generated targets, run configs, or exploratory tooling must
+  be treated as scratch/history only.
+- Mergeable feature branches must be born clean from `origin/main` and contain
+  only the requested feature/fix plus its tests/docs. If useful code was first
+  developed on a research branch, extract it into a fresh branch from
+  `origin/main`; do not rebase the whole research branch and do not make it
+  `main`.
+- Keep durable tooling separate from experiments. Tool capability changes,
+  experiment configs, and generated run data belong in separate commits or
+  branches unless the user explicitly asks otherwise.
+- Before any merge, run a contamination check:
+
+```sh
+git rev-list --count origin/main..HEAD
+git diff --stat origin/main..HEAD
+git diff --name-only origin/main..HEAD
+```
+
+  Stop if the count or file list contains unrelated experiment churn.
 - Rebase feature branches onto `origin/main`; merge to `main` with `--ff-only`.
 - Stage only files that belong to the requested change.
 - Squash local fixup churn before merge.
