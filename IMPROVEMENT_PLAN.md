@@ -10,6 +10,25 @@ kind of Stockfish-labeled Enyo self-play.
 
 No trained Enyo net is currently a keeper.
 
+2026-05-30 replacement-net attempt:
+
+- Current clean goal: produce an Enyo-owned native net that can replace Berserk,
+  or reject the current native Bullet recipe quickly with a trustworthy game
+  gate.
+- The only near-Berserk historical net is the r14 child-ranking/rank path; keep
+  it as a comparison point, but it is not the clean Enyo-owned scratch target.
+- The next committed run is
+  `native-bullet-test80-100m-d12init-lr5e7-sb4096-kb16-20260530`.
+  - It continues the best native d12 Bullet checkpoint on the existing 100M
+    test80 Bullet data.
+  - It uses conservative LR (`5e-7 -> 1e-7`) to avoid the static/game collapse
+    seen in the previous `lr3e-6` d16-init 100M run.
+  - It keeps the deployable 16-input-bucket Enyo architecture.
+  - It must be checked through Enyo `main` (`4322021` or newer), not the old
+    asset reference binary.
+- Success requires a non-catastrophic short SPRT versus Berserk after
+  engine-static validation. Static MAE/sign remains informational only.
+
 2026-05-30 validation update:
 
 - Added `validate.py engine-static`, which evaluates scored JSONL rows through
