@@ -30,13 +30,28 @@ PY
 )
 
 mkdir -p "$(dirname "$LOG")"
+send_nnue=0
+send_ai_stdout=0
+send_ai_stdin=0
+
 case ",$EVENTS," in
-    *,"$event_name",*) ;;
-    *)
-        printf '%s event=%s skipped\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-        exit 0
-        ;;
+    *,"$event_name",*) send_nnue=1 ;;
 esac
+if [ "$AI_STDOUT_ENABLE" = "1" ]; then
+    case ",$AI_STDOUT_EVENTS," in
+        *,"$event_name",*) send_ai_stdout=1 ;;
+    esac
+fi
+if [ "$AI_ENABLE" = "1" ]; then
+    case ",$AI_EVENTS," in
+        *,"$event_name",*) send_ai_stdin=1 ;;
+    esac
+fi
+
+if [ "$send_nnue" = "0" ] && [ "$send_ai_stdout" = "0" ] && [ "$send_ai_stdin" = "0" ]; then
+    printf '%s event=%s skipped\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+    exit 0
+fi
 
 source "$HOME/.ntfy" 2>/dev/null || true
 
@@ -76,6 +91,8 @@ if event_name == "fail":
     lines.append("  • Next: inspect log and fix the failed phase")
 elif event_name == "done":
     lines.append("  • Next: inspect result and choose the next gate")
+elif event_name == "phase_done":
+    lines.append("  • Next: inspect result and continue the next task")
 else:
     lines.append("  • Next: no action unless this was unexpected")
 
@@ -83,6 +100,8 @@ if event_name == "fail":
     prompt = f"NNUE phase failed: run={name} stage={stage or 'n/a'} status={status or 'failed'} log={log}. Inspect the log and fix the failed phase."
 elif event_name == "done":
     prompt = f"NNUE run complete: run={name} status={status or 'ok'} log={log}. Inspect the result and start the next task."
+elif event_name == "phase_done":
+    prompt = f"NNUE phase complete: run={name} stage={stage or 'n/a'} status={status or 'ok'} log={log}. Inspect the result and continue the next task."
 else:
     prompt = ""
 
@@ -126,16 +145,14 @@ case "$event_name" in
     done) priority=4 ;;
 esac
 
-publish "$NNUE_URL" "$body" "Enyo NNUE $event_name" "$priority"
-printf '%s event=%s nnue_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+if [ "$send_nnue" = "1" ]; then
+    publish "$NNUE_URL" "$body" "Enyo NNUE $event_name" "$priority"
+    printf '%s event=%s nnue_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+fi
 
-if [ "$AI_STDOUT_ENABLE" = "1" ]; then
-    case ",$AI_STDOUT_EVENTS," in
-        *,"$event_name",*)
-            publish "$AI_STDOUT_URL" "$stdout_body" "Enyo NNUE $event_name" "$priority"
-            printf '%s event=%s ai_stdout_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-            ;;
-    esac
+if [ "$send_ai_stdout" = "1" ]; then
+    publish "$AI_STDOUT_URL" "$stdout_body" "Enyo NNUE $event_name" "$priority"
+    printf '%s event=%s ai_stdout_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
 fi
 
 publish_ai() {
@@ -154,13 +171,9 @@ publish_ai() {
     publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"
 }
 
-if [ "$AI_ENABLE" = "1" ] && [ -n "$ai_prompt" ]; then
-    case ",$AI_EVENTS," in
-        *,"$event_name",*)
-            publish_ai "$ai_prompt" "Enyo NNUE $event_name" "$priority"
-            printf '%s event=%s ai_stdin_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-            ;;
-    esac
+if [ "$send_ai_stdin" = "1" ] && [ -n "$ai_prompt" ]; then
+    publish_ai "$ai_prompt" "Enyo NNUE $event_name" "$priority"
+    printf '%s event=%s ai_stdin_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
 fi
 
 printf '%s event=%s sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
