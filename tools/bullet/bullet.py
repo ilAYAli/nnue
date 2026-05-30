@@ -168,6 +168,26 @@ def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
     subprocess.run(command, check=True, cwd=repo_root(), env=env)
 
 
+def validate_init_weights(path: str) -> Path:
+    resolved = expand_path(path)
+    if resolved.name == "raw.bin":
+        raise SystemExit(
+            "--init-weights must point to Bullet optimiser_state/weights.bin, "
+            "not raw.bin"
+        )
+    if resolved.name != "weights.bin":
+        raise SystemExit(
+            "--init-weights must point to Bullet optimiser_state/weights.bin"
+        )
+    if resolved.parent.name != "optimiser_state":
+        raise SystemExit(
+            "--init-weights must point to Bullet optimiser_state/weights.bin"
+        )
+    if not resolved.exists():
+        raise SystemExit(f"--init-weights file not found: {resolved}")
+    return resolved
+
+
 def usable_cuda_path(path: Path) -> bool:
     return (
         (path / "include" / "cuda.h").exists()
@@ -380,7 +400,8 @@ def cmd_train(args: argparse.Namespace) -> int:
         "ENYO_BULLET_WEIGHT_DECAY": str(args.weight_decay),
     })
     if args.init_weights:
-        env["ENYO_BULLET_INIT_WEIGHTS"] = str(expand_path(args.init_weights))
+        env["ENYO_BULLET_INIT_WEIGHTS"] = str(
+            validate_init_weights(args.init_weights))
     if args.cuda_path:
         env["CUDA_PATH"] = str(expand_path(args.cuda_path))
     elif args.accelerator == "cuda":

@@ -2,7 +2,7 @@
   "description": "Active Enyo NNUE improvement-run config. This run tests whether the native d12 Bullet net can recover engine-side near-zero sign by output-head calibration only.",
   "experiment": "native-d12-output-head-sign-probe",
   "create": {
-    "name": "native-bullet-d12head-signprobe-latest20m-lr1e4-sb512-kb16-20260530",
+    "name": "native-bullet-d12head-signprobe-r2-latest20m-lr1e4-sb512-kb16-20260530",
     "backend": "bullet",
     "bullet_loader": "direct",
     "bullet_source_jsonl": "runs/imported/latest_20m/score/labeled.jsonl",
@@ -27,7 +27,7 @@
     "bullet_enyo_runtime_input_buckets": 16,
     "bullet_eval_scale": 300.0,
     "bullet_save_rate": 64,
-    "bullet_init_weights": "runs/native-bullet-enyo-d12-20m-factorizer-max800-scale300-wdl25-sb4096-kb16-20260529/train/native-bullet-enyo-d12-20m-factorizer-max800-scale300-wdl25-sb4096-kb16-20260529/checkpoints/native-bullet-enyo-d12-20m-factorizer-max800-scale300-wdl25-sb4096-kb16-20260529-4096/raw.bin",
+    "bullet_init_weights": "runs/native-bullet-enyo-d12-20m-factorizer-max800-scale300-wdl25-sb4096-kb16-20260529/train/native-bullet-enyo-d12-20m-factorizer-max800-scale300-wdl25-sb4096-kb16-20260529/checkpoints/native-bullet-enyo-d12-20m-factorizer-max800-scale300-wdl25-sb4096-kb16-20260529-4096/optimiser_state/weights.bin",
     "bullet_trainable": "output",
     "bullet_weight_decay": 0.0,
     "bullet_static_data": "runs/imported/latest_20m/pack/train",
