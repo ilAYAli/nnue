@@ -131,119 +131,233 @@ def create_config(args: argparse.Namespace) -> dict:
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"
-    steps = [
-        {
-            "name": "posgen_selfplay",
-            "command": [
-                tool("posgen/posgen.py"), "selfplay",
-                "--runner", str(expand_path(args.runner)),
-                "--engine", str(expand_path(args.engine)),
-                "--nnue-file", str(expand_path(args.nnue_file)),
-                "--book", str(expand_path(args.book)),
-                "--output", "{posgen}/selfplay.pgn",
-                "--games", str(args.selfplay_games),
-                "--shard-games", str(args.selfplay_shard_games),
-                "--concurrency", str(args.selfplay_concurrency),
-                "--threads", str(args.selfplay_threads),
-                "--depth", str(args.selfplay_depth),
-                "--srand", str(args.selfplay_seed),
-                "--restart", "off",
-                "--engine-option", f"Hash={args.selfplay_hash}",
-            ],
-        },
-        {
-            "name": "posgen_extract",
-            "command": [
-                tool("posgen/posgen.py"), "extract",
-                "{posgen}/selfplay.pgn",
-                "--output", "{posgen}/positions.jsonl",
-                "--stats", "{posgen}/extract_stats.json",
-                "--skip-plies", str(args.skip_plies),
-                "--min-depth", str(args.selfplay_depth),
-                "--max-abs-cp", str(args.source_max_abs_cp),
-            ],
-        },
-        {
-            "name": "posgen_sample",
-            "command": [
-                tool("posgen/posgen.py"), "sample",
-                "--input", "{posgen}/positions.jsonl",
-                "--output", "{posgen}/source.jsonl",
-                "--preset", args.sample_preset,
-                "--unique-fen",
-                "--seed", str(args.selfplay_seed),
-            ],
-        },
-    ]
+    python = str(expand_user(args.python))
+    steps: list[dict] = []
 
-    for shard in range(args.score_shards):
+    if args.backend == "pytorch":
+        steps = [
+            {
+                "name": "posgen_selfplay",
+                "command": [
+                    tool("posgen/posgen.py"), "selfplay",
+                    "--runner", str(expand_path(args.runner)),
+                    "--engine", str(expand_path(args.engine)),
+                    "--nnue-file", str(expand_path(args.nnue_file)),
+                    "--book", str(expand_path(args.book)),
+                    "--output", "{posgen}/selfplay.pgn",
+                    "--games", str(args.selfplay_games),
+                    "--shard-games", str(args.selfplay_shard_games),
+                    "--concurrency", str(args.selfplay_concurrency),
+                    "--threads", str(args.selfplay_threads),
+                    "--depth", str(args.selfplay_depth),
+                    "--srand", str(args.selfplay_seed),
+                    "--restart", "off",
+                    "--engine-option", f"Hash={args.selfplay_hash}",
+                ],
+            },
+            {
+                "name": "posgen_extract",
+                "command": [
+                    tool("posgen/posgen.py"), "extract",
+                    "{posgen}/selfplay.pgn",
+                    "--output", "{posgen}/positions.jsonl",
+                    "--stats", "{posgen}/extract_stats.json",
+                    "--skip-plies", str(args.skip_plies),
+                    "--min-depth", str(args.selfplay_depth),
+                    "--max-abs-cp", str(args.source_max_abs_cp),
+                ],
+            },
+            {
+                "name": "posgen_sample",
+                "command": [
+                    tool("posgen/posgen.py"), "sample",
+                    "--input", "{posgen}/positions.jsonl",
+                    "--output", "{posgen}/source.jsonl",
+                    "--preset", args.sample_preset,
+                    "--unique-fen",
+                    "--seed", str(args.selfplay_seed),
+                ],
+            },
+        ]
+
+        for shard in range(args.score_shards):
+            steps.append({
+                "name": f"score_{shard:02d}",
+                "command": [
+                    tool("score/score.py"), "uci",
+                    "--input", "{posgen}/source.jsonl",
+                    "--output", f"{{score}}/shards/label.{shard}.jsonl",
+                    "--engine", str(expand_path(args.score_engine)),
+                    "--depth", str(args.score_depth),
+                    "--threads", str(args.score_threads),
+                    "--hash", str(args.score_hash),
+                    "--shard-count", str(args.score_shards),
+                    "--shard-index", str(shard),
+                    "--max-abs-cp", str(args.score_max_abs_cp),
+                    "--progress", str(args.score_progress),
+                ],
+            })
+
+        steps.extend([
+            {
+                "name": "score_merge",
+                "command": [
+                    "bash", "-lc",
+                    "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
+                    "merge-score", "{score}",
+                ],
+            },
+            {
+                "name": "pack",
+                "command": [
+                    tool("pack/pack.py"), "build",
+                    "--input", "{score}/labeled.jsonl",
+                    "--out-dir", "{pack}/train",
+                    "--max-features", str(args.max_features),
+                    "--progress", str(args.pack_progress),
+                    "--python", python,
+                ],
+            },
+            {
+                "name": "train",
+                "command": [
+                    tool("train/train.py"), "run",
+                    "--data", "{pack}/train",
+                    "--init-from-nn", str(expand_path(args.init_net)),
+                    "--objective", args.objective,
+                    "--huber-beta", str(args.huber_beta),
+                    "--select-metric", args.select_metric,
+                    "--wdl-lambda", str(args.wdl_lambda),
+                    "--epochs", str(args.epochs),
+                    "--batch-size", str(args.batch_size),
+                    "--lr", str(args.lr),
+                    "--weight-decay", str(args.weight_decay),
+                    "--target-clamp", str(args.target_clamp),
+                    "--device", args.device,
+                    "--workers", str(args.workers),
+                    "--prefetch-factor", str(args.prefetch_factor),
+                    "--amp", args.amp,
+                    "--torch-compile" if args.torch_compile else "--no-torch-compile",
+                    "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
+                    "--patience", str(args.patience),
+                    "--val-rows", str(args.val_rows),
+                    "--trainable", args.trainable,
+                    "--python", python,
+                    "--out", f"{candidate_dir}/model.pt",
+                    "--out-nn", f"{candidate_dir}/model.nn",
+                ],
+            },
+        ])
+    elif args.backend == "bullet":
+        if args.bullet_loader == "direct":
+            if args.bullet_data:
+                bullet_data = str(expand_user(args.bullet_data))
+            else:
+                if not args.bullet_source_jsonl:
+                    raise SystemExit(
+                        "backend=bullet direct loader requires bullet_source_jsonl or bullet_data"
+                    )
+                bullet_text = "{assets}/bullet.txt"
+                bullet_data = "{assets}/bullet.data"
+                steps.extend([
+                    {
+                        "name": "bullet_text",
+                        "command": [
+                            python, tool("bullet/jsonl_to_bullet_text.py"),
+                            "--input", str(expand_path(args.bullet_source_jsonl)),
+                            "--output", bullet_text,
+                            "--limit", str(args.bullet_limit),
+                            "--max-abs-cp", str(args.bullet_max_abs_cp),
+                            *(
+                                ["--enyo-runtime-target"]
+                                if args.bullet_enyo_runtime_target else []
+                            ),
+                        ],
+                    },
+                    {
+                        "name": "bullet_format",
+                        "command": [
+                            python, tool("bullet/bullet.py"), "format",
+                            "--input", bullet_text,
+                            "--output", bullet_data,
+                            "--bullet-manifest", str(expand_path(args.bullet_manifest)),
+                            "--validate",
+                        ],
+                    },
+                ])
+        elif args.bullet_loader == "sfbinpack":
+            if not args.bullet_data:
+                raise SystemExit("backend=bullet sfbinpack loader requires bullet_data")
+            bullet_data = str(expand_user(args.bullet_data))
+        else:
+            raise SystemExit(f"unsupported bullet_loader={args.bullet_loader}")
+
         steps.append({
-            "name": f"score_{shard:02d}",
+            "name": "bullet_train",
             "command": [
-                tool("score/score.py"), "uci",
-                "--input", "{posgen}/source.jsonl",
-                "--output", f"{{score}}/shards/label.{shard}.jsonl",
-                "--engine", str(expand_path(args.score_engine)),
-                "--depth", str(args.score_depth),
-                "--threads", str(args.score_threads),
-                "--hash", str(args.score_hash),
-                "--shard-count", str(args.score_shards),
-                "--shard-index", str(shard),
-                "--max-abs-cp", str(args.score_max_abs_cp),
-                "--progress", str(args.score_progress),
+                python, tool("bullet/bullet.py"), "train",
+                "--data", bullet_data,
+                "--loader", args.bullet_loader,
+                "--sfbinpack-buffer-mb", str(args.bullet_sfbinpack_buffer_mb),
+                "--sfbinpack-min-ply", str(args.bullet_sfbinpack_min_ply),
+                "--sfbinpack-max-abs-cp", str(args.bullet_sfbinpack_max_abs_cp),
+                (
+                    "--sfbinpack-quiet-only"
+                    if args.bullet_sfbinpack_quiet_only
+                    else "--no-sfbinpack-quiet-only"
+                ),
+                "--out-dir", f"{candidate_dir}/checkpoints",
+                "--net-id", name,
+                "--cargo-target-dir", "{run}/cargo-target",
+                "--mode", args.bullet_mode,
+                "--accelerator", args.bullet_accelerator,
+                "--cuda-path", args.bullet_cuda_path,
+                "--cuda-arch", args.bullet_cuda_arch,
+                "--hidden", str(args.bullet_hidden),
+                "--l2", str(args.bullet_l2),
+                "--batch-size", str(args.bullet_batch_size),
+                "--batches", str(args.bullet_batches),
+                "--superbatches", str(args.bullet_superbatches),
+                "--threads", str(args.bullet_threads),
+                "--wdl", str(args.bullet_wdl),
+                "--lr", str(args.bullet_lr),
+                "--final-lr", str(args.bullet_final_lr),
+                "--enyo-l0-std", str(args.bullet_enyo_l0_std),
+                "--enyo-l1-std", str(args.bullet_enyo_l1_std),
+                "--enyo-l1-export-scale", str(args.bullet_enyo_l1_export_scale),
+                (
+                    "--enyo-input-factorizer"
+                    if args.bullet_enyo_input_factorizer
+                    else "--no-enyo-input-factorizer"
+                ),
+                "--enyo-input-buckets", str(args.bullet_enyo_input_buckets),
+                "--enyo-runtime-input-buckets",
+                str(args.bullet_enyo_runtime_input_buckets),
+                "--eval-scale", str(args.bullet_eval_scale),
+                "--save-rate", str(args.bullet_save_rate),
+                *(
+                    ["--init-weights", str(expand_path(args.bullet_init_weights))]
+                    if args.bullet_init_weights else []
+                ),
+                "--trainable", args.bullet_trainable,
+                "--weight-decay", str(args.bullet_weight_decay),
+                *(["--export-init-only"] if args.bullet_export_init_only else []),
             ],
         })
-
-    steps.extend([
-        {
-            "name": "score_merge",
-            "command": [
-                "bash", "-lc",
-                "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
-                "merge-score", "{score}",
-            ],
-        },
-        {
-            "name": "pack",
-            "command": [
-                tool("pack/pack.py"), "build",
-                "--input", "{score}/labeled.jsonl",
-                "--out-dir", "{pack}/train",
-                "--max-features", str(args.max_features),
-                "--progress", str(args.pack_progress),
-                "--python", str(expand_user(args.python)),
-            ],
-        },
-        {
-            "name": "train",
-            "command": [
-                tool("train/train.py"), "run",
-                "--data", "{pack}/train",
-                "--init-from-nn", str(expand_path(args.init_net)),
-                "--objective", args.objective,
-                "--huber-beta", str(args.huber_beta),
-                "--select-metric", args.select_metric,
-                "--wdl-lambda", str(args.wdl_lambda),
-                "--epochs", str(args.epochs),
-                "--batch-size", str(args.batch_size),
-                "--lr", str(args.lr),
-                "--weight-decay", str(args.weight_decay),
-                "--target-clamp", str(args.target_clamp),
-                "--device", args.device,
-                "--workers", str(args.workers),
-                "--prefetch-factor", str(args.prefetch_factor),
-                "--amp", args.amp,
-                "--torch-compile" if args.torch_compile else "--no-torch-compile",
-                "--dataset-in-memory" if args.dataset_in_memory else "--no-dataset-in-memory",
-                "--patience", str(args.patience),
-                "--val-rows", str(args.val_rows),
-                "--trainable", args.trainable,
-                "--python", str(expand_user(args.python)),
-                "--out", f"{candidate_dir}/model.pt",
-                "--out-nn", f"{candidate_dir}/model.nn",
-            ],
-        },
-    ])
+        if args.bullet_static_data:
+            steps.append({
+                "name": "validate_bullet_static",
+                "command": [
+                    python, tool("validate/eval_dataset.py"),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--data", str(expand_path(args.bullet_static_data)),
+                    "--rows", str(args.bullet_static_rows),
+                    "--buckets",
+                    "--sources",
+                ],
+            })
+    else:
+        raise SystemExit(f"unsupported backend={args.backend}")
 
     config = {
         "name": name,
@@ -330,6 +444,8 @@ def add_create_args(
     parser.add_argument("--book", default=value("book", d.book))
     parser.add_argument("--runner", default=value("runner", d.runner))
     parser.add_argument("--python", default=value("python", d.python))
+    parser.add_argument("--backend", default=value("backend", d.backend),
+                        choices=["pytorch", "bullet"])
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
     parser.add_argument("--selfplay-shard-games", type=int, default=value("selfplay_shard_games", d.selfplay_shard_games))
@@ -378,6 +494,57 @@ def add_create_args(
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "float-head", "output"])
+
+    parser.add_argument("--bullet-source-jsonl", default=value("bullet_source_jsonl", d.bullet_source_jsonl))
+    parser.add_argument("--bullet-data", default=value("bullet_data", d.bullet_data))
+    parser.add_argument("--bullet-manifest", default=value("bullet_manifest", d.bullet_manifest))
+    parser.add_argument("--bullet-loader", default=value("bullet_loader", d.bullet_loader),
+                        choices=["direct", "sfbinpack"])
+    parser.add_argument("--bullet-limit", type=int, default=value("bullet_limit", d.bullet_limit))
+    parser.add_argument("--bullet-max-abs-cp", type=int, default=value("bullet_max_abs_cp", d.bullet_max_abs_cp))
+    parser.add_argument("--bullet-enyo-runtime-target", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_enyo_runtime_target", d.bullet_enyo_runtime_target))
+    parser.add_argument("--bullet-sfbinpack-buffer-mb", type=int, default=value("bullet_sfbinpack_buffer_mb", d.bullet_sfbinpack_buffer_mb))
+    parser.add_argument("--bullet-sfbinpack-min-ply", type=int, default=value("bullet_sfbinpack_min_ply", d.bullet_sfbinpack_min_ply))
+    parser.add_argument("--bullet-sfbinpack-max-abs-cp", type=int, default=value("bullet_sfbinpack_max_abs_cp", d.bullet_sfbinpack_max_abs_cp))
+    parser.add_argument("--bullet-sfbinpack-quiet-only", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_sfbinpack_quiet_only", d.bullet_sfbinpack_quiet_only))
+    parser.add_argument("--bullet-mode", default=value("bullet_mode", d.bullet_mode),
+                        choices=["reckless", "enyo"])
+    parser.add_argument("--bullet-accelerator", default=value("bullet_accelerator", d.bullet_accelerator),
+                        choices=["cuda", "rocm"])
+    parser.add_argument("--bullet-cuda-path", default=value("bullet_cuda_path", d.bullet_cuda_path))
+    parser.add_argument("--bullet-cuda-arch", default=value("bullet_cuda_arch", d.bullet_cuda_arch))
+    parser.add_argument("--bullet-hidden", type=int, default=value("bullet_hidden", d.bullet_hidden))
+    parser.add_argument("--bullet-l2", type=int, default=value("bullet_l2", d.bullet_l2))
+    parser.add_argument("--bullet-batch-size", type=int, default=value("bullet_batch_size", d.bullet_batch_size))
+    parser.add_argument("--bullet-batches", type=int, default=value("bullet_batches", d.bullet_batches))
+    parser.add_argument("--bullet-superbatches", type=int, default=value("bullet_superbatches", d.bullet_superbatches))
+    parser.add_argument("--bullet-threads", type=int, default=value("bullet_threads", d.bullet_threads))
+    parser.add_argument("--bullet-wdl", type=float, default=value("bullet_wdl", d.bullet_wdl))
+    parser.add_argument("--bullet-lr", type=float, default=value("bullet_lr", d.bullet_lr))
+    parser.add_argument("--bullet-final-lr", type=float, default=value("bullet_final_lr", d.bullet_final_lr))
+    parser.add_argument("--bullet-enyo-l0-std", type=float, default=value("bullet_enyo_l0_std", d.bullet_enyo_l0_std))
+    parser.add_argument("--bullet-enyo-l1-std", type=float, default=value("bullet_enyo_l1_std", d.bullet_enyo_l1_std))
+    parser.add_argument("--bullet-enyo-l1-export-scale", type=float, default=value("bullet_enyo_l1_export_scale", d.bullet_enyo_l1_export_scale))
+    parser.add_argument("--bullet-enyo-input-factorizer", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_enyo_input_factorizer", d.bullet_enyo_input_factorizer))
+    parser.add_argument("--bullet-enyo-input-buckets", type=int,
+                        default=value("bullet_enyo_input_buckets", d.bullet_enyo_input_buckets),
+                        choices=[1, 2, 4, 8, 16, 32])
+    parser.add_argument("--bullet-enyo-runtime-input-buckets", type=int,
+                        default=value("bullet_enyo_runtime_input_buckets", d.bullet_enyo_runtime_input_buckets),
+                        choices=[1, 2, 4, 8, 16, 32])
+    parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
+    parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
+    parser.add_argument("--bullet-init-weights", default=value("bullet_init_weights", d.bullet_init_weights))
+    parser.add_argument("--bullet-trainable", default=value("bullet_trainable", d.bullet_trainable),
+                        choices=["all", "input", "float-head", "output"])
+    parser.add_argument("--bullet-weight-decay", type=float, default=value("bullet_weight_decay", d.bullet_weight_decay))
+    parser.add_argument("--bullet-export-init-only", action="store_true",
+                        default=value("bullet_export_init_only", d.bullet_export_init_only))
+    parser.add_argument("--bullet-static-data", default=value("bullet_static_data", d.bullet_static_data))
+    parser.add_argument("--bullet-static-rows", type=int, default=value("bullet_static_rows", d.bullet_static_rows))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
