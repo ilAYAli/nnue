@@ -19,6 +19,6 @@
   },
   "validation": {
     "last_result": "LC0/Berserk-oracle pairwise scalar probes: target-only training reached 89.4% pair correctness, but broad behavior collapsed; preserved scalar blends plateaued near 70-76% and drifted broad MAE.",
-    "next_gate": "Define a fixed engine-side move-choice gate, then try LC0/failure-suite signal only through a separable policy/ranking path or runtime-checked architecture preflight."
+    "next_gate": "Build fixed cases with tools/validate/build_fixed_move_gate.py and evaluate candidates with tools/validate/validate.py move-gate before any separable policy/ranking or architecture proof."
   }
 }

@@ -138,6 +138,52 @@ def cmd_failure_suite(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_move_gate(args: argparse.Namespace) -> int:
+    script = tools_root() / "validate" / "eval_move_gate.py"
+    run_dir = event_run_dir(args.run, expand_path(args.cases).parent)
+    command = [
+        sys.executable,
+        str(script),
+        "--cases", str(expand_path(args.cases)),
+        "--engine", str(expand_path(args.engine)),
+        "--baseline-net", str(expand_path(args.baseline_net)),
+        "--candidate-net", str(expand_path(args.candidate_net)),
+        "--threads", str(args.threads),
+        "--hash", str(args.hash),
+        "--timeout", str(args.timeout),
+        "--limit", str(args.limit),
+    ]
+    if args.output:
+        command += ["--output", str(expand_path(args.output))]
+    if args.summary_json:
+        command += ["--summary-json", str(expand_path(args.summary_json))]
+    if args.fail_if_candidate_below_baseline:
+        command.append("--fail-if-candidate-below-baseline")
+    if args.fail_if_regressed_above is not None:
+        command += ["--fail-if-regressed-above", str(args.fail_if_regressed_above)]
+    if args.fail_if_fixed_below is not None:
+        command += ["--fail-if-fixed-below", str(args.fail_if_fixed_below)]
+    if args.fail_if_delta_below is not None:
+        command += ["--fail-if-delta-below", str(args.fail_if_delta_below)]
+    if args.fail_if_loss_weighted_delta_below is not None:
+        command += [
+            "--fail-if-loss-weighted-delta-below",
+            str(args.fail_if_loss_weighted_delta_below),
+        ]
+    emit_event(
+        run_dir, "phase_start", stage="validate_move_gate",
+        status="running", command=command,
+        hook_command=args.event_command or "",
+    )
+    rc = run(command)
+    emit_event(
+        run_dir, "phase_done" if rc == 0 else "fail",
+        stage="validate_move_gate", status="ok" if rc == 0 else "failed",
+        rc=rc, command=command, hook_command=args.event_command or "",
+    )
+    return rc
+
+
 def cmd_sprt(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "run_net_sprt_pwa.sh"
     run_dir = event_run_dir(args.run, expand_path(args.net).parent)
@@ -243,6 +289,29 @@ def build_parser() -> argparse.ArgumentParser:
     failure.add_argument("--run")
     failure.add_argument("--event-command")
     failure.set_defaults(func=cmd_failure_suite)
+
+    move_gate = subparsers.add_parser(
+        "move-gate",
+        help="Evaluate a fixed parent-position move-choice gate through evalnet.",
+    )
+    move_gate.add_argument("--cases", required=True)
+    move_gate.add_argument("--engine", required=True)
+    move_gate.add_argument("--baseline-net", required=True)
+    move_gate.add_argument("--candidate-net", required=True)
+    move_gate.add_argument("--threads", type=int, default=1)
+    move_gate.add_argument("--hash", type=int, default=64)
+    move_gate.add_argument("--timeout", type=float, default=10.0)
+    move_gate.add_argument("--limit", type=int, default=0)
+    move_gate.add_argument("--output")
+    move_gate.add_argument("--summary-json")
+    move_gate.add_argument("--fail-if-candidate-below-baseline", action="store_true")
+    move_gate.add_argument("--fail-if-regressed-above", type=int)
+    move_gate.add_argument("--fail-if-fixed-below", type=int)
+    move_gate.add_argument("--fail-if-delta-below", type=float)
+    move_gate.add_argument("--fail-if-loss-weighted-delta-below", type=float)
+    move_gate.add_argument("--run")
+    move_gate.add_argument("--event-command")
+    move_gate.set_defaults(func=cmd_move_gate)
 
     sprt = subparsers.add_parser("sprt", help="Run NNUE candidate SPRT.")
     sprt.add_argument("--net", required=True)

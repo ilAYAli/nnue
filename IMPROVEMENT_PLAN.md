@@ -217,8 +217,9 @@ The next experiment must add separability before training time is spent:
 
 1. Keep LC0 tooling as a source of move-choice supervision, not as a scalar
    eval blend by default.
-2. Define a small fixed engine-side move-choice gate for the LC0 pair rows and
-   failure-suite rows before the next training run.
+2. Build a small fixed engine-side move-choice gate with
+   `tools/validate/build_fixed_move_gate.py` and run it with
+   `tools/validate/validate.py move-gate` before the next training run.
 3. Try the next LC0-derived signal only through a separate policy/ranking path
    or a runtime-checked architecture branch with a no-op parity/NPS preflight.
 4. Treat target-only pair learning as a capability proof only. A keeper

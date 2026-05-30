@@ -10,6 +10,7 @@ one abstraction instead of splitting "gates" and Elo testing.
 ```sh
 tools/validate/validate.py static --help
 tools/validate/validate.py failure-suite --help
+tools/validate/validate.py move-gate --help
 tools/validate/validate.py sprt --help
 ```
 
@@ -29,6 +30,23 @@ tools/validate/validate.py failure-suite \
   --output-dir run/failure-suite \
   --event-command "$HOME/scripts/nnue_event_ntfy.sh" \
   ~/code/cpp/chess/enyo/bugs/*.log
+
+$PYTHON tools/validate/build_fixed_move_gate.py \
+  --child-targets lc0=targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl \
+  --child-targets loss=targets/replay-loss-latest-fast4-20260529/loss_replay_child_targets.jsonl \
+  --output runs/fixed-move-gate/cases.jsonl \
+  --summary runs/fixed-move-gate/summary.txt \
+  --min-gap-cp 30 \
+  --max-per-parent 1 \
+  --max-per-source 200
+
+$PYTHON tools/validate/validate.py move-gate \
+  --cases runs/fixed-move-gate/cases.jsonl \
+  --engine ~/code/cpp/chess/assets/engines/reference \
+  --baseline-net ~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn \
+  --candidate-net run/candidate/model.nn \
+  --fail-if-candidate-below-baseline \
+  --fail-if-regressed-above 0
 
 tools/validate/validate.py sprt \
   --net run/candidate/model.nn \
