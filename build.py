@@ -214,6 +214,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     tool("pack/pack.py"), "build",
                     "--input", "{score}/labeled.jsonl",
                     "--out-dir", "{pack}/train",
+                    "--rows-file", "{score}/labeled.wc",
                     "--max-features", str(args.max_features),
                     "--progress", str(args.pack_progress),
                     "--python", python,

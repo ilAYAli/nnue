@@ -27,6 +27,16 @@ def count_rows(path: Path, *, skip: int, limit: int) -> int:
     return n
 
 
+def read_rows_file(path: Path) -> int:
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        raise ValueError(f"{path}: empty rows file")
+    rows = int(text.split()[0])
+    if rows < 0:
+        raise ValueError(f"{path}: negative row count {rows}")
+    return rows
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True, help="Source self-play JSONL.")
@@ -34,15 +44,28 @@ def main() -> None:
                     help="Output directory containing .npy arrays.")
     ap.add_argument("--skip", type=int, default=0)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--rows", type=int, default=0,
+                    help="Precomputed output row count after skip/limit.")
+    ap.add_argument("--rows-file", default="",
+                    help="File containing a precomputed row count. Accepts wc output.")
     ap.add_argument("--max-features", type=int, default=32)
     ap.add_argument("--progress", type=int, default=250000)
     args = ap.parse_args()
+    if args.rows < 0:
+        raise SystemExit("--rows must be non-negative")
+    if args.rows > 0 and args.rows_file:
+        raise SystemExit("--rows and --rows-file are mutually exclusive")
 
     src = Path(args.input)
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    rows = count_rows(src, skip=args.skip, limit=args.limit)
+    if args.rows > 0:
+        rows = args.rows
+    elif args.rows_file:
+        rows = read_rows_file(Path(args.rows_file).expanduser())
+    else:
+        rows = count_rows(src, skip=args.skip, limit=args.limit)
     print(f"packing rows={rows} from {src}", flush=True)
     print(f"out={out}", flush=True)
 
@@ -82,6 +105,9 @@ def main() -> None:
             if len(w) > args.max_features:
                 raise ValueError(
                     f"row {i}: {len(w)} features > max {args.max_features}")
+            if written >= rows:
+                raise ValueError(
+                    f"row count exceeded precomputed rows={rows} at input row {i}")
 
             n = len(w)
             max_seen = max(max_seen, n)
@@ -106,6 +132,8 @@ def main() -> None:
                 print(f"packed {written}/{rows}", flush=True)
             if args.limit > 0 and written >= args.limit:
                 break
+    if written != rows:
+        raise ValueError(f"packed {written} rows, expected {rows}")
 
     meta = {
         "source": str(src),

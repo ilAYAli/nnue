@@ -43,6 +43,10 @@ def cmd_build(args: argparse.Namespace) -> int:
         "--max-features", str(args.max_features),
         "--progress", str(args.progress),
     ]
+    if args.rows > 0:
+        command.extend(["--rows", str(args.rows)])
+    if args.rows_file:
+        command.extend(["--rows-file", str(expand_path(args.rows_file))])
     return run(command)
 
 
@@ -69,6 +73,8 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--out-dir", required=True)
     build.add_argument("--skip", type=int, default=0)
     build.add_argument("--limit", type=int, default=0)
+    build.add_argument("--rows", type=int, default=0)
+    build.add_argument("--rows-file", default="")
     build.add_argument("--max-features", type=int, default=32)
     build.add_argument("--progress", type=int, default=250000)
     build.add_argument("--python", default=sys.executable)
