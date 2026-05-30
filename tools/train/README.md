@@ -14,7 +14,7 @@ Example:
 ```sh
 tools/train/train.py run \
   --data run/packed \
-  --init-from-nn ~/code/cpp/chess/enyo/nnue/berserk-d43206fe90e4.nn \
+  --init-from-nn ~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn \
   --objective huber \
   --target-clamp 800 \
   --lr 7e-7 \
@@ -22,4 +22,3 @@ tools/train/train.py run \
   --out run/candidate/model.pt \
   --out-nn run/candidate/model.nn
 ```
-
