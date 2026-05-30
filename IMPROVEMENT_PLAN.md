@@ -159,6 +159,8 @@ No trained Enyo net is currently a keeper.
   be calibrated to a clean offline threshold. This is still not a replacement
   `.nn`; the next step is a no-op/runtime preflight for an engine policy
   tie-break path, followed by real-game action-rate and SPRT gates.
+- Exported sidecar JSON was verified against the same held-out sets and matched
+  Python-side decisions at thresholds `16`, `18`, `20`, and `32`.
 
 Rejected lanes:
 
