@@ -10,6 +10,25 @@ kind of Stockfish-labeled Enyo self-play.
 
 No trained Enyo net is currently a keeper.
 
+2026-05-30 validation update:
+
+- Added `validate.py engine-static`, which evaluates scored JSONL rows through
+  Enyo's exported-net runtime path (`evalnet`) instead of the Python `.nn`
+  loader.
+- Python-only static metrics are no longer authoritative for promotion
+  decisions. They can still catch obvious failures, but exported candidates
+  must be checked through the engine path.
+- On the first 1000 rows of `runs/imported/latest_20m/score/labeled.jsonl`:
+  - Berserk: `mae=133.8`, `sign=92.0%`, `0-50cp sign=81.9%`.
+  - native d12 20m: `mae=92.4`, `sign=86.9%`, `0-50cp sign=74.7%`.
+  - native d16 fine-tune 20m: `mae=96.5`, `sign=86.6%`,
+    `0-50cp sign=75.8%`.
+- This explains why lower MAE did not translate to game strength: the native
+  nets are less reliable in near-zero sign/ranking decisions, which dominate
+  practical move choice and game outcomes.
+- Promotion candidates now need engine-side static/sign checks plus early game
+  smokes. Static MAE alone is a rejection filter only.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did
