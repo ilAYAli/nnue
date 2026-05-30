@@ -386,6 +386,19 @@ def create_config(args: argparse.Namespace) -> dict:
     else:
         raise SystemExit(f"unsupported backend={args.backend}")
 
+    if args.engine_static_jsonl:
+        steps.append({
+            "name": "validate_engine_static",
+            "command": [
+                python, tool("validate/eval_jsonl_engine.py"),
+                "--engine", str(expand_path(args.engine_static_engine)),
+                "--net", f"{candidate_dir}/model.nn",
+                "--jsonl", str(expand_path(args.engine_static_jsonl)),
+                "--rows", str(args.engine_static_rows),
+                "--buckets",
+            ],
+        })
+
     config = {
         "name": name,
         "run": str(run_dir),
@@ -572,6 +585,9 @@ def add_create_args(
                         default=value("bullet_export_init_only", d.bullet_export_init_only))
     parser.add_argument("--bullet-static-data", default=value("bullet_static_data", d.bullet_static_data))
     parser.add_argument("--bullet-static-rows", type=int, default=value("bullet_static_rows", d.bullet_static_rows))
+    parser.add_argument("--engine-static-jsonl", default=value("engine_static_jsonl", d.engine_static_jsonl))
+    parser.add_argument("--engine-static-rows", type=int, default=value("engine_static_rows", d.engine_static_rows))
+    parser.add_argument("--engine-static-engine", default=value("engine_static_engine", d.engine_static_engine))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:

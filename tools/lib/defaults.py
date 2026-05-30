@@ -119,6 +119,9 @@ class CandidateDefaults:
     bullet_export_init_only: bool = False
     bullet_static_data: str = "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/pack/train"
     bullet_static_rows: int = 100000
+    engine_static_jsonl: str = ""
+    engine_static_rows: int = 1000
+    engine_static_engine: str = "~/code/cpp/chess/assets/engines/reference"
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
