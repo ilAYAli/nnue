@@ -69,6 +69,41 @@ def cmd_static(args: argparse.Namespace) -> int:
     return rc
 
 
+def cmd_engine_static(args: argparse.Namespace) -> int:
+    script = tools_root() / "validate" / "eval_jsonl_engine.py"
+    run_dir = event_run_dir(args.run, expand_path(args.jsonl).parent)
+    command = [
+        sys.executable,
+        str(script),
+        "--engine", str(expand_path(args.engine)),
+        "--net", str(expand_path(args.net)),
+        "--jsonl", str(expand_path(args.jsonl)),
+        "--rows", str(args.rows),
+        "--skip", str(args.skip),
+        "--score-field", args.score_field,
+        "--threads", str(args.threads),
+        "--hash", str(args.hash),
+        "--timeout", str(args.timeout),
+        "--progress", str(args.progress),
+    ]
+    if args.buckets:
+        command.append("--buckets")
+    if args.sources:
+        command.append("--sources")
+    emit_event(
+        run_dir, "phase_start", stage="validate_engine_static",
+        status="running", command=command,
+        hook_command=args.event_command or "",
+    )
+    rc = run(command)
+    emit_event(
+        run_dir, "phase_done" if rc == 0 else "fail",
+        stage="validate_engine_static", status="ok" if rc == 0 else "failed",
+        rc=rc, command=command, hook_command=args.event_command or "",
+    )
+    return rc
+
+
 def cmd_failure_suite(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "replay_failure_suite.py"
     run_dir = event_run_dir(args.run, args.output_dir)
@@ -167,6 +202,26 @@ def build_parser() -> argparse.ArgumentParser:
     static.add_argument("--run")
     static.add_argument("--event-command")
     static.set_defaults(func=cmd_static)
+
+    engine_static = subparsers.add_parser(
+        "engine-static",
+        help="Evaluate scored JSONL metrics through Enyo evalnet.",
+    )
+    engine_static.add_argument("--engine", required=True)
+    engine_static.add_argument("--net", required=True)
+    engine_static.add_argument("--jsonl", required=True)
+    engine_static.add_argument("--rows", type=int, default=1000)
+    engine_static.add_argument("--skip", type=int, default=0)
+    engine_static.add_argument("--score-field", default="score")
+    engine_static.add_argument("--threads", type=int, default=1)
+    engine_static.add_argument("--hash", type=int, default=128)
+    engine_static.add_argument("--timeout", type=float, default=10.0)
+    engine_static.add_argument("--progress", type=int, default=1000)
+    engine_static.add_argument("--buckets", action="store_true")
+    engine_static.add_argument("--sources", action="store_true")
+    engine_static.add_argument("--run")
+    engine_static.add_argument("--event-command")
+    engine_static.set_defaults(func=cmd_engine_static)
 
     failure = subparsers.add_parser(
         "failure-suite",
