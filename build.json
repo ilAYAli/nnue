@@ -1,8 +1,8 @@
 {
-  "description": "Safe placeholder after the first 32-bucket scratch training run. Runtime preflight passed, but the first kb32 d12 20M scratch net was game-rejected; do not launch more training until the static/game-strength gap is diagnosed.",
-  "experiment": "native-static-game-gap-diagnostic",
+  "description": "Safe placeholder for LC0 minimal import preflight. No NNUE training should run from this config; first validate LC0 V6 decoding, move legality, provenance, and oracle child-target generation.",
+  "experiment": "lc0-minimal-import-preflight",
   "create": {
-    "name": "native-static-game-gap-diagnostic-pending-20260530",
+    "name": "lc0-minimal-import-preflight-20260530",
     "dry_run": true,
     "backend": "bullet",
     "bullet_mode": "enyo",
@@ -18,7 +18,7 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "last_result": "native-kb32-d12-20m-scratch-max800-scale300-wdl25-sb4096-20260530: static looked plausible, corrected game smoke scored 0 through 34 games against Berserk and was stopped.",
-    "next_gate": "Run corrected baseline game/static comparisons with the same kb32-capable Enyo binary before any more training. Determine whether the failure is architecture-specific or the known native scratch/static-vs-game gap."
+    "last_result": "native-bullet-test80-100m-d12init-lr5e7-sb4096-kb16-20260530 trained in 8m50s but was game-rejected: Berserk smoke stopped at 0-52-2 through 54 games.",
+    "next_gate": "Use tools/posgen/lc0_to_jsonl.py and tools/validate/lc0_oracle_child_targets.py to generate a documented LC0-derived target sample before any further native training."
   }
 }

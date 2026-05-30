@@ -66,6 +66,36 @@ No trained Enyo net is currently a keeper.
   recipe is not a keeper. Static metrics again failed to predict game strength.
   Do not launch another kb32 training run until the game/static gap is isolated.
 
+2026-05-30 native 100M continuation update:
+
+- Tested `native-bullet-test80-100m-d12init-lr5e7-sb4096-kb16-20260530`.
+  - Continued the best native d12 Bullet checkpoint on the existing 100M
+    test80 Bullet data with conservative LR (`5e-7 -> 1e-7`).
+  - Bullet training completed 4096 superbatches in `8m50s`, around
+    `2.0M` positions/sec.
+  - Python/static validation on 100k rows: `mae=139.51`, `sign=80.86%`,
+    `0-50cp sign=67.03%`.
+  - Engine-static validation on 1000 rows: `mae=133.48`, `sign=84.27%`,
+    `0-50cp sign=73.04%`.
+  - Short Berserk smoke was stopped after 54 games at `0-52-2`,
+    about `-690 Elo`, `LOS 0.0%`.
+- Conclusion: the current same-architecture Enyo/self-play Bullet recipe is
+  rejected. Do not spend more runs on LR/superbatch variants of this source
+  without new signal.
+
+2026-05-30 LC0 import preflight:
+
+- Added minimal LC0 V6 tooling on a clean feature branch, without importing the
+  old contaminated research branch.
+- Sample decode from `training-run1--20210605-0516`:
+  - `1000/1000` rows decoded.
+  - played and best moves were `100%` legal.
+  - top-policy moves were `7509/8000` legal (`93.86%`).
+- Policy-logit child conversion smoke wrote `200` groups.
+- Oracle-scored child conversion smoke wrote `20` groups through Enyo as the
+  UCI scorer. This validates the format path only; keeper data still needs a
+  chosen oracle and documented scoring settings.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did
@@ -84,6 +114,9 @@ Rejected lanes:
 - 32 input-bucket scratch on the known Enyo d12 20M recipe: runtime/NPS passed,
   static looked plausible, but corrected game smoke scored `0/34` versus
   Berserk and was stopped.
+- conservative 16-bucket 100M continuation from native d12 init: trained fast,
+  but engine-static near-zero sign remained weak and Berserk smoke scored
+  `0-52-2` through 54 games before stopping.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
 Conclusion:
@@ -93,29 +126,15 @@ Conclusion:
   low.
 - Static MAE/sign is now only a rejection filter.
 - Novel Enyo self-play alone was not enough.
-- Do not launch another same-architecture Stockfish-d16-labeled Enyo self-play
-  candidate unless a move-choice/failure-suite gate gives a concrete reason.
+- Do not launch another same-architecture Stockfish-labeled Enyo/self-play
+  candidate unless a move-choice/failure-suite or external-data gate gives a
+  concrete reason.
 
 ## Current Strategy
 
 Priority order:
 
-1. Architecture/features.
-   - This is the primary lane.
-   - Current first branch: 32 input king buckets.
-   - This changes sparse feature indexing and `.nn` input row count, so the
-     runtime/export preflight is mandatory before training.
-   - Verify feature extraction, export/load, and roundtrip before training.
-   - Benchmark NPS before training; pause and optimize first if NPS drops more
-     than about `3-5%`.
-   - If NPS loss is above that threshold, require much stronger pre-SPRT
-     evidence before spending games.
-   - Train the changed architecture properly. Do not treat folded/drop-in
-     conversions as evidence.
-   - Do not widen the net until at least one small feature/bucket experiment
-     has failed cleanly.
-
-2. Stronger or different teacher data.
+1. Stronger or different teacher data.
    - Treat Stockfish d16 as the bulk baseline, not the ceiling.
    - Test d18/d20 only on high-value slices first: disagreement,
      PV-instability, failure-suite, and high-loss move-choice rows.
@@ -123,8 +142,10 @@ Priority order:
      move-choice gates, not just MAE.
    - External/prepared datasets are acceptable if converted once into the Enyo
      row format and stored with provenance under `runs/` or `assets/`.
+   - Current branch: minimal LC0 V6 import and oracle child-target generation.
+     This is a data-source preflight, not a training result yet.
 
-3. Targeted move-choice data.
+2. Targeted move-choice data.
    - Expand the fixed failure-suite and disagreement/PV-instability samplers.
    - Train at most one isolated candidate from this signal at a time.
    - Tail regressions can veto a candidate even when aggregate sum diff is
@@ -138,6 +159,13 @@ Priority order:
      - disagreement/PV-instability weighting.
      - tactical surprise or large child-eval swing weighting.
 
+3. Architecture/features.
+   - 32 input king buckets are runtime-viable but not yet useful with the old
+     data recipe.
+   - Do not widen or add buckets again until the data/source problem has a
+     positive gate, or a small representation probe proves unique movement on
+     hard rows without game collapse.
+
 4. Tooling.
    - Tooling work is justified only when it directly supports the lanes above.
    - New candidates must use `./build.py create`.
@@ -148,21 +176,21 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Do not launch another training run yet.
+Do not launch another native self-play Bullet training run yet.
 
-The next experiment is a corrected game/static gap diagnostic:
+The next experiment is an external-data preflight:
 
-1. Using the same kb32-capable Enyo `4322021` binary, run a short Berserk smoke
-   for the previous 16-bucket d12 20M scratch net from the same source recipe.
-2. Compare that result with the rejected 32-bucket run to determine whether the
-   failure is architecture-specific or simply the known native scratch gap.
-3. Inspect failed smoke PGNs for gross eval-scale/runtime symptoms before
-   adding more data or changing loss.
-4. Only after that, choose between:
-   - stronger/deeper teacher data for the native scratch lane;
-   - a representation change that directly targets near-zero move-choice;
-   - an explicitly external-data lane with provenance if Enyo-only data remains
-     too weak.
+1. Keep the minimal LC0 import tooling isolated and reviewable.
+2. Generate a larger LC0 sample JSONL and record legality/source summaries.
+3. Score a small LC0 policy-selected child-target set with one documented
+   oracle configuration.
+4. Train only a small capability proof after the target set passes:
+   - legal move coverage is high enough;
+   - target rows have explicit provenance and ODbL license tags;
+   - oracle settings are fixed and written to the target JSONL;
+   - engine-static and a tiny move-choice gate are defined before training.
+5. If LC0-derived targets cannot improve move-choice gates without collapse,
+   stop this lane before a full candidate run.
 
 Pass criteria for continuing a lane:
 
@@ -180,13 +208,11 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `native-static-game-gap-diagnostic-pending-20260530`
-- selected branch: no training; static/game-strength diagnostic
-- backend: Bullet placeholder only
-- input buckets: `32`
-- runtime input buckets: `32`
-- mode: dry-run placeholder
-- training source: none until the corrected baseline comparison is recorded
+- candidate name: `lc0-minimal-import-preflight-20260530`
+- selected branch: no training; LC0 conversion/tooling preflight
+- backend: dry-run placeholder only
+- training source: none until LC0 JSONL and oracle child-target summaries are
+  recorded and reviewed
 
 Rules:
 
