@@ -156,7 +156,7 @@ def collate_packed(batch):
         w_padded[mask],
         b_padded[mask],
         offsets,
-        offsets.clone(),
+        offsets,
         torch.as_tensor(np.asarray(stms), dtype=torch.long),
         torch.as_tensor(np.asarray(scores), dtype=torch.float32),
         torch.as_tensor(np.asarray(wdls), dtype=torch.float32),
