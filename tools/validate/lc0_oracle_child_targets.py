@@ -25,7 +25,8 @@ def mate_to_cp(mate: int) -> int:
 
 
 class UciEngine:
-    def __init__(self, command: str, *, threads: int, hash_mb: int) -> None:
+    def __init__(self, command: str, *, threads: int, hash_mb: int,
+                 options: list[tuple[str, str]]) -> None:
         self.proc = subprocess.Popen(
             shlex.split(command),
             stdin=subprocess.PIPE,
@@ -38,6 +39,8 @@ class UciEngine:
         self.wait_for("uciok")
         self.setoption("Threads", str(threads))
         self.setoption("Hash", str(hash_mb))
+        for name, value in options:
+            self.setoption(name, value)
         self.send("isready")
         self.wait_for("readyok")
 
@@ -249,7 +252,10 @@ def convert_row(row: dict, engine: UciEngine, args: argparse.Namespace,
 
 def convert_chunk(indexed_rows: list[tuple[int, dict]],
                   args: argparse.Namespace) -> list[tuple[int, dict | None, Counter[str]]]:
-    engine = UciEngine(args.engine, threads=args.threads, hash_mb=args.hash)
+    engine = UciEngine(
+        args.engine, threads=args.threads, hash_mb=args.hash,
+        options=args.engine_options,
+    )
     out: list[tuple[int, dict | None, Counter[str]]] = []
     try:
         for index, row in indexed_rows:
@@ -278,6 +284,19 @@ def preselect_row(row: dict, args: argparse.Namespace) -> bool:
     return passes_policy_filters(row, moves, args, counters)
 
 
+def parse_engine_options(raw_options: list[str]) -> list[tuple[str, str]]:
+    options: list[tuple[str, str]] = []
+    for raw in raw_options:
+        if "=" not in raw:
+            raise SystemExit(f"--engine-option requires NAME=VALUE, got {raw!r}")
+        name, value = raw.split("=", 1)
+        name = name.strip()
+        if not name:
+            raise SystemExit(f"--engine-option requires non-empty NAME: {raw!r}")
+        options.append((name, value))
+    return options
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Score LC0 policy candidate moves with a UCI oracle.")
@@ -289,6 +308,9 @@ def main() -> int:
     ap.add_argument("--depth", type=int, default=12)
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--hash", type=int, default=128)
+    ap.add_argument("--engine-option", action="append", default=[],
+                    metavar="NAME=VALUE",
+                    help="extra UCI option for the oracle engine; repeatable")
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--min-groups", type=int, default=1)
     ap.add_argument("--max-groups", type=int, default=0)
@@ -308,6 +330,7 @@ def main() -> int:
         raise SystemExit("either --nodes or --depth must be positive")
     if args.max_moves_per_position < 2:
         raise SystemExit("--max-moves-per-position must be at least 2")
+    args.engine_options = parse_engine_options(args.engine_option)
 
     start = time.monotonic()
     selected: list[tuple[int, dict]] = []
@@ -382,6 +405,8 @@ def main() -> int:
         f"jobs={args.jobs}",
         f"threads={args.threads}",
         f"hash={args.hash}",
+        "engine_options=" + ",".join(
+            f"{name}={value}" for name, value in args.engine_options),
         f"max_moves_per_position={args.max_moves_per_position}",
         f"max_gap_cp={args.max_gap_cp}",
         f"min_oracle_gap_cp={args.min_oracle_gap_cp}",
