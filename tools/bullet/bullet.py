@@ -330,6 +330,7 @@ def cmd_convert(args: argparse.Namespace) -> int:
         "--output", str(output_path),
         "--buffer-mb", str(args.buffer_mb),
         "--threads", str(args.threads),
+        "--limit", str(args.limit),
         "--min-ply", str(args.min_ply),
         "--max-abs-cp", str(args.max_abs_cp),
         "--quiet-only", "1" if args.quiet_only else "0",
@@ -504,6 +505,8 @@ def build_parser() -> argparse.ArgumentParser:
     convert.add_argument("--cargo-target-dir", required=True)
     convert.add_argument("--buffer-mb", type=int, default=1024)
     convert.add_argument("--threads", type=int, default=4)
+    convert.add_argument("--limit", type=int, default=0,
+                         help="Maximum filtered rows to write; 0 means unlimited.")
     convert.add_argument("--min-ply", type=int, default=16)
     convert.add_argument("--max-abs-cp", type=int, default=10000)
     convert.add_argument("--quiet-only", action=argparse.BooleanOptionalAction, default=True)

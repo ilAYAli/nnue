@@ -58,7 +58,8 @@ fn write_chunk(writer: &mut BufWriter<File>, chunk: &[ChessBoard]) -> std::io::R
 fn usage() -> ! {
     eprintln!(
         "usage: convert_sfbinpack --data PATH[;PATH...] --output PATH \
-         [--buffer-mb N] [--threads N] [--min-ply N] [--max-abs-cp N] [--quiet-only 0|1]"
+         [--buffer-mb N] [--threads N] [--limit N] [--min-ply N] \
+         [--max-abs-cp N] [--quiet-only 0|1]"
     );
     process::exit(2);
 }
@@ -68,6 +69,7 @@ fn main() {
     let mut output = String::new();
     let mut buffer_mb = 1024_usize;
     let mut threads = 4_usize;
+    let mut limit = 0_u64;
     let mut filter = Filter {
         min_ply: 16,
         max_abs_cp: 10000,
@@ -82,6 +84,7 @@ fn main() {
             "--output"     => output = value(),
             "--buffer-mb"  => buffer_mb  = value().parse().unwrap_or_else(|_| usage()),
             "--threads"    => threads    = value().parse().unwrap_or_else(|_| usage()),
+            "--limit"      => limit      = value().parse().unwrap_or_else(|_| usage()),
             "--min-ply"    => filter.min_ply    = value().parse().unwrap_or_else(|_| usage()),
             "--max-abs-cp" => filter.max_abs_cp = value().parse().unwrap_or_else(|_| usage()),
             "--quiet-only" => filter.quiet_only = value() != "0",
@@ -116,6 +119,16 @@ fn main() {
     let mut written: u64 = 0;
 
     loader.map_chunks(0, |chunk: &[ChessBoard]| {
+        let remaining = if limit == 0 {
+            chunk.len()
+        } else {
+            limit.saturating_sub(written).min(chunk.len() as u64) as usize
+        };
+        if remaining == 0 {
+            return true;
+        }
+
+        let chunk = &chunk[..remaining];
         write_chunk(&mut writer, chunk).unwrap_or_else(|e| {
             eprintln!("error: write failed: {e}");
             process::exit(1);
@@ -129,7 +142,7 @@ fn main() {
                 written as f32 / secs.max(0.001) / 1e6
             );
         }
-        false
+        limit != 0 && written >= limit
     });
 
     let secs = start.elapsed().as_secs_f32();

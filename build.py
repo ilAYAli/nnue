@@ -300,6 +300,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--cargo-target-dir", "{run}/cargo-target",
                     "--buffer-mb", str(args.bullet_sfbinpack_buffer_mb),
                     "--threads", str(args.bullet_threads),
+                    "--limit", str(args.bullet_limit),
                     "--min-ply", str(args.bullet_sfbinpack_min_ply),
                     "--max-abs-cp", str(args.bullet_sfbinpack_max_abs_cp),
                     (
