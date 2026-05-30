@@ -96,6 +96,36 @@ No trained Enyo net is currently a keeper.
   UCI scorer. This validates the format path only; keeper data still needs a
   chosen oracle and documented scoring settings.
 
+2026-05-31 LC0 pairwise scalar probes:
+
+- Converted `1000` LC0/Berserk-oracle child groups into `2951` pair rows.
+- Broad-preserved full pairwise run
+  `pairwise-lc0oracle1k-native-d12init-w5-lr2e5-e80-20260530` was rejected:
+  final pair correctness was only `64.9%`, with exported engine-static
+  `mae=112.63`, `sign=82.15%`, and `0-50cp sign=62.46%`.
+- Full target-only run
+  `pairwise-lc0oracle1k-full-targetonly-lr2e3-e500-20260530` showed the pair
+  signal is learnable when broad preservation is removed:
+  - final pair correctness `89.4%`;
+  - pair MAE `42.70`;
+  - predicted margin `132.21` versus target margin `159.91`.
+- The same target-only net collapsed broad behavior:
+  - Python/static 100k: `mae=184.90`, `sign=65.45%`,
+    `0-50cp sign=52.70%`;
+  - engine-static 1000: `mae=164.30`, `sign=66.63%`,
+    `0-50cp sign=51.19%`.
+- Recovery/preservation attempts were rejected:
+  - `pairwise-lc0oracle1k-recover-pw10-lr1e5-e160-20260530` was stopped at
+    epoch 49 with `broad_mae=164.31`, `pair_correct=76.3%`, and predicted
+    margin `95.17`.
+  - `pairwise-lc0oracle1k-diverse64-preserve-pw50-lr1e5-e200-20260530` was
+    stopped at epoch 18 with broad MAE already drifting from `110.24` to
+    `121.19` while pair correctness stayed around `70-75%`.
+- Conclusion: LC0-derived pairwise supervision is real, but pushing it through
+  the same scalar eval path conflicts with broad preservation. Do not run
+  another scalar pairwise-plus-broad blend unless the representation changes or
+  the pairwise signal is moved to a separate policy/ranking path.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did
@@ -117,6 +147,9 @@ Rejected lanes:
 - conservative 16-bucket 100M continuation from native d12 init: trained fast,
   but engine-static near-zero sign remained weak and Berserk smoke scored
   `0-52-2` through 54 games before stopping.
+- LC0/Berserk-oracle pairwise supervision through the scalar eval path:
+  target-only training can learn the pairs, but broad preservation either blocks
+  the movement or collapses when removed.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
 Conclusion:
@@ -142,8 +175,9 @@ Priority order:
      move-choice gates, not just MAE.
    - External/prepared datasets are acceptable if converted once into the Enyo
      row format and stored with provenance under `runs/` or `assets/`.
-   - Current branch: minimal LC0 V6 import and oracle child-target generation.
-     This is a data-source preflight, not a training result yet.
+   - LC0 V6 import and oracle child-target generation now work as a data-source
+     path. The current result says not to push LC0 pairwise signal through the
+     scalar eval head without a separability change.
 
 2. Targeted move-choice data.
    - Expand the fixed failure-suite and disagreement/PV-instability samplers.
@@ -176,21 +210,22 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Do not launch another native self-play Bullet training run yet.
+Do not launch another native self-play Bullet training run or scalar pairwise
+blend yet.
 
-The next experiment is an external-data preflight:
+The next experiment must add separability before training time is spent:
 
-1. Keep the minimal LC0 import tooling isolated and reviewable.
-2. Generate a larger LC0 sample JSONL and record legality/source summaries.
-3. Score a small LC0 policy-selected child-target set with one documented
-   oracle configuration.
-4. Train only a small capability proof after the target set passes:
-   - legal move coverage is high enough;
-   - target rows have explicit provenance and ODbL license tags;
-   - oracle settings are fixed and written to the target JSONL;
-   - engine-static and a tiny move-choice gate are defined before training.
-5. If LC0-derived targets cannot improve move-choice gates without collapse,
-   stop this lane before a full candidate run.
+1. Keep LC0 tooling as a source of move-choice supervision, not as a scalar
+   eval blend by default.
+2. Define a small fixed engine-side move-choice gate for the LC0 pair rows and
+   failure-suite rows before the next training run.
+3. Try the next LC0-derived signal only through a separate policy/ranking path
+   or a runtime-checked architecture branch with a no-op parity/NPS preflight.
+4. Treat target-only pair learning as a capability proof only. A keeper
+   candidate must preserve broad engine-static behavior and then pass an early
+   game smoke.
+5. If a separable move-choice path cannot improve the fixed gate without broad
+   collapse, stop this lane before a full candidate run.
 
 Pass criteria for continuing a lane:
 
@@ -208,11 +243,11 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `lc0-minimal-import-preflight-20260530`
-- selected branch: no training; LC0 conversion/tooling preflight
+- candidate name: `separable-move-choice-preflight-20260531`
+- selected branch: no training; LC0 pairwise scalar lane is closed
 - backend: dry-run placeholder only
-- training source: none until LC0 JSONL and oracle child-target summaries are
-  recorded and reviewed
+- training source: none until the next separable policy/ranking or architecture
+  preflight has an explicit engine-side move-choice gate
 
 Rules:
 

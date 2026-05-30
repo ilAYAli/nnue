@@ -1,8 +1,8 @@
 {
-  "description": "Safe placeholder for LC0 minimal import preflight. No NNUE training should run from this config; first validate LC0 V6 decoding, move legality, provenance, and oracle child-target generation.",
-  "experiment": "lc0-minimal-import-preflight",
+  "description": "Safe placeholder after LC0 pairwise scalar probes. No NNUE training should run from this config until the next separable policy/ranking or architecture preflight has an explicit engine-side move-choice gate.",
+  "experiment": "separable-move-choice-preflight",
   "create": {
-    "name": "lc0-minimal-import-preflight-20260530",
+    "name": "separable-move-choice-preflight-20260531",
     "dry_run": true,
     "backend": "bullet",
     "bullet_mode": "enyo",
@@ -18,7 +18,7 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "last_result": "native-bullet-test80-100m-d12init-lr5e7-sb4096-kb16-20260530 trained in 8m50s but was game-rejected: Berserk smoke stopped at 0-52-2 through 54 games.",
-    "next_gate": "Use tools/posgen/lc0_to_jsonl.py and tools/validate/lc0_oracle_child_targets.py to generate a documented LC0-derived target sample before any further native training."
+    "last_result": "LC0/Berserk-oracle pairwise scalar probes: target-only training reached 89.4% pair correctness, but broad behavior collapsed; preserved scalar blends plateaued near 70-76% and drifted broad MAE.",
+    "next_gate": "Define a fixed engine-side move-choice gate, then try LC0/failure-suite signal only through a separable policy/ranking path or runtime-checked architecture preflight."
   }
 }
