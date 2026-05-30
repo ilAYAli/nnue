@@ -311,6 +311,32 @@ def cmd_format(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_convert(args: argparse.Namespace) -> int:
+    output_path = expand_path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    target_dir = expand_path(args.cargo_target_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    manifest = repo_root() / "tools" / "bullet" / "spike_trainer" / "Cargo.toml"
+
+    env = os.environ.copy()
+    env["CARGO_TARGET_DIR"] = str(target_dir)
+
+    run([
+        cargo_bin(), "run", "-q", "--release",
+        "--bin", "convert_sfbinpack",
+        "--manifest-path", str(manifest),
+        "--",
+        "--data", expand_data_paths(args.data),
+        "--output", str(output_path),
+        "--buffer-mb", str(args.buffer_mb),
+        "--threads", str(args.threads),
+        "--min-ply", str(args.min_ply),
+        "--max-abs-cp", str(args.max_abs_cp),
+        "--quiet-only", "1" if args.quiet_only else "0",
+    ], env=env)
+    return 0
+
+
 def cmd_train(args: argparse.Namespace) -> int:
     data = expand_data_paths(args.data)
     out_dir = expand_path(args.out_dir)
@@ -468,6 +494,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Load --init-weights, export checkpoint 0, and exit before training.",
     )
     train.set_defaults(func=cmd_train)
+
+    convert = subparsers.add_parser(
+        "convert",
+        help="Convert sfbinpack to BulletFormat .data (run once, train with direct loader).",
+    )
+    convert.add_argument("--data", required=True, help="Source sfbinpack path(s), semicolon-separated.")
+    convert.add_argument("--output", required=True, help="Destination .data file.")
+    convert.add_argument("--cargo-target-dir", required=True)
+    convert.add_argument("--buffer-mb", type=int, default=1024)
+    convert.add_argument("--threads", type=int, default=4)
+    convert.add_argument("--min-ply", type=int, default=16)
+    convert.add_argument("--max-abs-cp", type=int, default=10000)
+    convert.add_argument("--quiet-only", action=argparse.BooleanOptionalAction, default=True)
+    convert.set_defaults(func=cmd_convert)
+
     return parser
 
 

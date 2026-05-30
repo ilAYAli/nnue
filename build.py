@@ -290,16 +290,39 @@ def create_config(args: argparse.Namespace) -> dict:
         elif args.bullet_loader == "sfbinpack":
             if not args.bullet_data:
                 raise SystemExit("backend=bullet sfbinpack loader requires bullet_data")
-            bullet_data = str(expand_user(args.bullet_data))
+            converted_data = "{assets}/bullet.data"
+            steps.append({
+                "name": "bullet_convert",
+                "command": [
+                    python, tool("bullet/bullet.py"), "convert",
+                    "--data", args.bullet_data,
+                    "--output", converted_data,
+                    "--cargo-target-dir", "{run}/cargo-target",
+                    "--buffer-mb", str(args.bullet_sfbinpack_buffer_mb),
+                    "--threads", str(args.bullet_threads),
+                    "--min-ply", str(args.bullet_sfbinpack_min_ply),
+                    "--max-abs-cp", str(args.bullet_sfbinpack_max_abs_cp),
+                    (
+                        "--quiet-only"
+                        if args.bullet_sfbinpack_quiet_only
+                        else "--no-quiet-only"
+                    ),
+                ],
+            })
+            bullet_data = converted_data
+            bullet_loader = "direct"
         else:
             raise SystemExit(f"unsupported bullet_loader={args.bullet_loader}")
+
+        if args.bullet_loader == "direct":
+            bullet_loader = "direct"
 
         steps.append({
             "name": "bullet_train",
             "command": [
                 python, tool("bullet/bullet.py"), "train",
                 "--data", bullet_data,
-                "--loader", args.bullet_loader,
+                "--loader", bullet_loader,
                 "--sfbinpack-buffer-mb", str(args.bullet_sfbinpack_buffer_mb),
                 "--sfbinpack-min-ply", str(args.bullet_sfbinpack_min_ply),
                 "--sfbinpack-max-abs-cp", str(args.bullet_sfbinpack_max_abs_cp),
