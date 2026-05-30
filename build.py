@@ -354,6 +354,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--net", f"{candidate_dir}/model.nn",
                     "--data", str(expand_path(args.bullet_static_data)),
                     "--rows", str(args.bullet_static_rows),
+                    "--device", args.device,
                     "--buckets",
                     "--sources",
                 ],
