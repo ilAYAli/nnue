@@ -29,6 +29,19 @@ No trained Enyo net is currently a keeper.
 - Promotion candidates now need engine-side static/sign checks plus early game
   smokes. Static MAE alone is a rejection filter only.
 
+2026-05-30 32-bucket runtime preflight update:
+
+- Tooling now reads and writes both 16-input-bucket and 32-input-bucket Enyo
+  `.nn` files.
+- Enyo runtime now detects 16/32-bucket `.nn` file sizes, switches the active
+  feature-index table, and accepts 32-bucket nets through `evalnet`.
+- Local engine validation passed: full `build/test`, focused
+  `network_model.*:network_audit.*`, and a Python-generated 32-bucket zero net
+  loaded through Enyo and returned `evalnet 0 cp` on `startpos`.
+- Next validation must run on pwa from clean `main`: create the init-only
+  32-bucket Bullet export, run a tiny engine-static check, and measure search
+  NPS before training.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did
@@ -62,10 +75,9 @@ Priority order:
 
 1. Architecture/features.
    - This is the primary lane.
-   - First branch: learned material/phase head input.
-   - This is deliberately lower risk than king-bucket changes because it should
-     not change sparse feature indexing, accumulator updates, or `.nn` input
-     row count.
+   - Current first branch: 32 input king buckets.
+   - This changes sparse feature indexing and `.nn` input row count, so the
+     runtime/export preflight is mandatory before training.
    - Verify feature extraction, export/load, and roundtrip before training.
    - Benchmark NPS before training; pause and optimize first if NPS drops more
      than about `3-5%`.
@@ -109,18 +121,25 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run exactly one architecture/feature branch first.
+Run the 32 input king-bucket runtime preflight before any more training.
 
-Preferred first branch:
+Preflight steps:
 
-- learned material/phase head input.
+1. From clean `main`, run the current dry-run `build.json` and inspect the
+   generated steps.
+2. Create an init-only 32-bucket Bullet export.
+3. Load the exported `.nn` through Enyo `evalnet`.
+4. Run a tiny engine-static validation through `eval_jsonl_engine.py`.
+5. Measure search NPS versus the 16-bucket runtime on the same binary and
+   settings.
 
-Reason:
+Pass criteria:
 
-- low implementation risk.
-- easy known-FEN activation tests.
-- plausible effect on conversion, defense, and endgame calibration.
-- less invasive than king-bucket refinement or widening the net.
+- 16-bucket behavior remains loadable and audit-clean.
+- 32-bucket `.nn` size is accepted by Enyo.
+- Engine-side eval runs without Python-only assumptions.
+- NPS loss is no worse than about `3-5%`, or the move-choice evidence required
+  before training is raised accordingly.
 
 Anti-confounding rule:
 
@@ -133,7 +152,7 @@ Anti-confounding rule:
 
 Fallback:
 
-- king-bucket refinement with full trainer/engine support, trained properly.
+- learned material/phase head input.
 - Do not use another folded/drop-in shortcut as evidence.
 
 ## Candidate Workflow
@@ -146,14 +165,13 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `arch-material-phase-v1`
-- selected branch: learned material/phase head input
-- self-play depth: `12`
-- self-play seed: `2026052101`
-- skipped opening plies: `8`
-- score depth: `16`
-- objective: Huber, clamp `800`, beta `200`, lr `7e-7`, epochs `8`
-- checkpoint selection: `sign`, patience `2`
+- candidate name: `native-kb32-runtime-preflight-pending-20260530`
+- selected branch: 32 input king-bucket runtime preflight
+- backend: Bullet
+- input buckets: `32`
+- runtime input buckets: `32`
+- mode: init-only export
+- training source: none until loader/runtime/NPS preflight passes
 
 Rules:
 
