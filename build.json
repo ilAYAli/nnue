@@ -1,11 +1,11 @@
 {
-    "description": "Clean Enyo-owned d16 NNUE run: random init, Enyo self-play from default.net, Stockfish oracle labels, Bullet training, and mandatory provenance gate before validation.",
-  "experiment": "native-d16-owned-default-selfplay-sf-d16-v1",
+    "description": "Clean Enyo-owned d16 NNUE lane is blocked until source generation uses a clean Enyo evaluator. default.net and Berserk are borrowed-weight sources and must not generate owned self-play positions.",
+  "experiment": "native-d16-owned-source-blocked-v1",
   "create": {
-    "name": "native-d16-owned-default-selfplay-sf-d16-v1-20260531",
+    "name": "native-d16-owned-source-blocked-v1-20260531",
     "backend": "bullet",
     "engine": "/home/petter/code/cpp/chess/assets/engines/reference",
-    "nnue_file": "/home/petter/code/cpp/chess/enyo/net/default.net",
+    "nnue_file": "",
     "book": "/home/petter/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd",
     "runner": "/home/petter/source/fastchess/fastchess",
     "bullet_generate_source": true,

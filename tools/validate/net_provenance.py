@@ -300,7 +300,7 @@ def classify_position_ref(ref: str) -> set[str]:
     if "berserk" in lower:
         tags.add("berserk")
     if "default.net" in lower:
-        tags.add("enyo-default")
+        tags.add("borrowed-default")
     if "lc0" in lower or "leela" in lower:
         tags.add("lc0")
     if "test80" in lower or "sfbinpack" in lower:
@@ -347,7 +347,9 @@ def classify_source(tags: set[str], *, kind: str) -> str:
         return "enyo-replay"
     if "lc0" in tags:
         return "lc0" if len(tags) == 1 else "mixed"
-    if tags <= {"enyo-selfplay", "enyo-replay", "enyo-default"}:
+    if "borrowed-default" in tags:
+        return "borrowed-default" if len(tags) == 1 else "mixed"
+    if tags <= {"enyo-selfplay", "enyo-replay"}:
         return "enyo-games"
     if tags == {"external-stockfish"}:
         return "external-stockfish"
@@ -449,6 +451,8 @@ def analyze(path: Path) -> Provenance:
         reasons.append("position source includes external Stockfish/test80 rows")
     if "berserk" in position_sources:
         reasons.append("position source uses Berserk net during generation")
+    if "borrowed-default" in position_sources:
+        reasons.append("position source uses default.net during generation")
     if "stockfish" in label_sources:
         reasons.append("label source includes Stockfish oracle rows")
     if "lc0" in position_sources or "lc0" in label_sources:
@@ -461,7 +465,6 @@ def analyze(path: Path) -> Provenance:
     clean_positions = position_sources <= {
         "enyo-selfplay",
         "enyo-replay",
-        "enyo-default",
     }
     clean_labels = label_sources <= {"stockfish", "enyo"}
     clean = (

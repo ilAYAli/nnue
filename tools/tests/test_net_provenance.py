@@ -175,7 +175,7 @@ class NetProvenanceTests(unittest.TestCase):
             self.assertIn("berserk", result.position_sources)
             self.assertFalse(result.clean_enyo_owned)
 
-    def test_allows_default_net_selfplay_source(self) -> None:
+    def test_rejects_default_net_selfplay_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             run = root / "runs" / "default-selfplay"
@@ -201,8 +201,9 @@ class NetProvenanceTests(unittest.TestCase):
 
             result = net_provenance.analyze(net)
 
-            self.assertIn("enyo-default", result.position_sources)
-            self.assertTrue(result.clean_enyo_owned)
+            self.assertIn("borrowed-default", result.position_sources)
+            self.assertFalse(result.clean_enyo_owned)
+            self.assertTrue(any("default.net" in reason for reason in result.reasons))
 
 
 if __name__ == "__main__":

@@ -134,6 +134,29 @@ def templated_path_arg(value: str | Path) -> str:
     return str(expand_path(text))
 
 
+def borrowed_selfplay_nnue_reason(value: str | Path | None) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return "empty nnue_file would use the embedded default evaluator"
+    name = Path(os.path.expandvars(text)).expanduser().name.lower()
+    if name == "default.net":
+        return "default.net is a borrowed-weight source"
+    if "berserk" in name:
+        return "Berserk is a borrowed-weight source"
+    return None
+
+
+def validate_create_args(args: argparse.Namespace) -> None:
+    if not (args.require_clean_enyo_owned and args.bullet_generate_source):
+        return
+    reason = borrowed_selfplay_nnue_reason(args.nnue_file)
+    if reason:
+        raise SystemExit(
+            "clean Enyo-owned source generation requires an explicit clean "
+            f"self-play evaluator; {reason}"
+        )
+
+
 def append_source_generation_steps(
     steps: list[dict],
     args: argparse.Namespace,
@@ -216,6 +239,7 @@ def append_source_generation_steps(
 
 
 def create_config(args: argparse.Namespace) -> dict:
+    validate_create_args(args)
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
     candidate_dir = f"{{train}}/{name}"

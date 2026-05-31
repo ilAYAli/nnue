@@ -50,6 +50,7 @@ class BuildConfigTests(unittest.TestCase):
                     "bullet_static_data": "",
                     "engine_static_rows": 10,
                     "require_clean_enyo_owned": True,
+                    "nnue_file": "/repo/enyo/net/clean-owned-source.nn",
                 }
             }, handle)
             path = handle.name
@@ -73,6 +74,48 @@ class BuildConfigTests(unittest.TestCase):
                 if step["name"] == "validate_engine_static"
             )
             self.assertIn("{score}/labeled.jsonl", engine_static["command"])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_clean_owned_generation_rejects_empty_nnue_file(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "nnue_file": "",
+                    "require_clean_enyo_owned": True,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            with self.assertRaises(SystemExit) as ctx:
+                build.create_config(args)
+            self.assertIn("embedded default evaluator", str(ctx.exception))
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_clean_owned_generation_rejects_default_net(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "nnue_file": "/repo/enyo/net/default.net",
+                    "require_clean_enyo_owned": True,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            with self.assertRaises(SystemExit) as ctx:
+                build.create_config(args)
+            self.assertIn("default.net", str(ctx.exception))
         finally:
             Path(path).unlink(missing_ok=True)
 

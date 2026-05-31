@@ -15,12 +15,22 @@ their init chain back to `berserk-d43206fe90e4.nn`.
 
 Current build intent:
 
-- Build a clean d16 candidate from random init.
-- Generate positions from Enyo self-play/replay only.
+- Build a clean d16 candidate from random init after clean source generation
+  exists.
+- Generate positions from Enyo self-play/replay only. Self-play generated with
+  Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
 - Require `net_provenance.py --require-clean-enyo-owned` before static
   validation or SPRT.
 - First promotion threshold is "not worse than Berserk", not merely "close".
+
+2026-05-31 ownership correction:
+
+- `default.net` is also a borrowed-weight source. It cannot be used to generate
+  clean Enyo-owned self-play positions.
+- The clean self-play lane is blocked until Enyo exposes a clean source
+  evaluator, likely pure HCE/no-NNUE self-play, or another explicitly clean
+  Enyo-owned source net is selected.
 
 2026-05-30 validation update:
 
