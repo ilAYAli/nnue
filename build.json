@@ -5,7 +5,7 @@
     "name": "native-d16-owned-selfplay-sf-d16-v1-20260531",
     "backend": "bullet",
     "engine": "/home/petter/code/cpp/chess/assets/engines/reference",
-    "nnue_file": "/home/petter/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn",
+    "nnue_file": "",
     "book": "/home/petter/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd",
     "runner": "/home/petter/source/fastchess/fastchess",
     "bullet_generate_source": true,

@@ -138,25 +138,28 @@ def append_source_generation_steps(
     steps: list[dict],
     args: argparse.Namespace,
 ) -> None:
+    selfplay_command = [
+        tool("posgen/posgen.py"), "selfplay",
+        "--runner", str(expand_path(args.runner)),
+        "--engine", str(expand_path(args.engine)),
+        "--book", str(expand_path(args.book)),
+        "--output", "{posgen}/selfplay.pgn",
+        "--games", str(args.selfplay_games),
+        "--shard-games", str(args.selfplay_shard_games),
+        "--concurrency", str(args.selfplay_concurrency),
+        "--threads", str(args.selfplay_threads),
+        "--depth", str(args.selfplay_depth),
+        "--srand", str(args.selfplay_seed),
+        "--restart", "off",
+        "--engine-option", f"Hash={args.selfplay_hash}",
+    ]
+    if args.nnue_file:
+        selfplay_command.extend(["--nnue-file", str(expand_path(args.nnue_file))])
+
     steps.extend([
         {
             "name": "posgen_selfplay",
-            "command": [
-                tool("posgen/posgen.py"), "selfplay",
-                "--runner", str(expand_path(args.runner)),
-                "--engine", str(expand_path(args.engine)),
-                "--nnue-file", str(expand_path(args.nnue_file)),
-                "--book", str(expand_path(args.book)),
-                "--output", "{posgen}/selfplay.pgn",
-                "--games", str(args.selfplay_games),
-                "--shard-games", str(args.selfplay_shard_games),
-                "--concurrency", str(args.selfplay_concurrency),
-                "--threads", str(args.selfplay_threads),
-                "--depth", str(args.selfplay_depth),
-                "--srand", str(args.selfplay_seed),
-                "--restart", "off",
-                "--engine-option", f"Hash={args.selfplay_hash}",
-            ],
+            "command": selfplay_command,
         },
         {
             "name": "posgen_extract",
