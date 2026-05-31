@@ -42,6 +42,16 @@ def best_move(row: dict[str, Any], moves: list[dict[str, Any]]) -> dict[str, Any
     return max(moves, key=lambda move: float(move.get("score_cp", 0.0)), default=None)
 
 
+def move_rank(move: dict[str, Any], default: int) -> int:
+    value = move.get("rank", default)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def row_tags(row: dict[str, Any], source_label: str) -> list[str]:
     tags = [str(tag) for tag in row.get("tags", [])]
     if source_label and f"gate_source:{source_label}" not in tags:
@@ -91,7 +101,7 @@ def child_target_cases(
         candidates.append((gap, move))
 
     candidates.sort(
-        key=lambda item: (-item[0], int(item[1].get("rank", 999999)), str(item[1]["move"]))
+        key=lambda item: (-item[0], move_rank(item[1], 999999), str(item[1]["move"]))
     )
     if max_per_parent > 0:
         candidates = candidates[:max_per_parent]
@@ -115,8 +125,8 @@ def child_target_cases(
             "score_pov": str(row.get("score_pov", "parent")),
             "best_score_cp": best_score,
             "played_score_cp": float(move["score_cp"]),
-            "best_rank": int(best.get("rank", 0) or 0),
-            "played_rank": int(move.get("rank", 0) or 0),
+            "best_rank": move_rank(best, 0),
+            "played_rank": move_rank(move, 0),
             "tags": row_tags(row, source_label),
         })
         counters["child_cases"] += 1
