@@ -1,5 +1,5 @@
 {
-    "description": "Clean Enyo-owned d16 NNUE run: random init, Enyo HCE/no-NNUE self-play source positions, Stockfish oracle labels, Bullet training, and mandatory provenance gate before validation.",
+  "description": "Clean Enyo-owned d16 NNUE proof run: random init, Enyo HCE/no-NNUE self-play source positions, Stockfish oracle labels capped to 300k rows for first validation, Bullet training, and mandatory provenance gate before validation.",
   "experiment": "native-d16-owned-hce-selfplay-sf-d16-v1",
   "create": {
     "name": "native-d16-owned-hce-selfplay-sf-d16-v1-20260531",
@@ -52,7 +52,8 @@
     "score_max_abs_cp": 1600,
     "score_progress": 10000,
     "engine_static_engine": "/home/petter/code/cpp/chess/assets/engines/reference",
-    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
+    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
+    "score_limit": 300000
   },
   "validation": {
     "promotion_gate": "Pass clean Enyo-owned provenance, engine-static sanity, 256-game triage versus Berserk, then 1000/2000 games if triage is not clearly negative.",
