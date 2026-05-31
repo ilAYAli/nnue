@@ -13,6 +13,7 @@ AI_EVENTS=${NNUE_AI_STDIN_EVENTS:-phase_done,done,fail}
 AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS:-done,fail}
 USER_GENERIC=${NNUE_USER_NOTIFY_GENERIC:-0}
 AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
+AI_STDIN_NTFY_ENABLE=${NNUE_AI_STDIN_NTFY_ENABLE:-0}
 AI_STDOUT_ENABLE=${NNUE_AI_STDOUT_ENABLE:-1}
 NOTIFAI=${NNUE_NOTIFAI:-$HOME/scripts/notifai.sh}
 NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-${NOTIFAI_TARGET:-codex_1}}
@@ -161,6 +162,16 @@ publish() {
     fi
 }
 
+is_worker_target() {
+    case "$1" in
+        nnue_native|nnue_native:*|nnue_reckless|nnue_reckless:*|\
+        nnue_training|nnue_training:*|nnue_test|nnue_test:*)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
 priority=3
 case "$event_name" in
     fail) priority=5 ;;
@@ -188,7 +199,11 @@ publish_ai() {
         return
     fi
 
-    if [ -x "$NOTIFAI" ]; then
+    if is_worker_target "$NOTIFAI_TARGET"; then
+        printf '%s event=%s notifai_refused_worker target=%s\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" \
+            "$NOTIFAI_TARGET" >>"$LOG"
+    elif [ -x "$NOTIFAI" ]; then
         if "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1; then
             printf '%s event=%s notifai_ok target=%s\n' \
                 "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" \
@@ -205,6 +220,12 @@ publish_ai() {
             "$NOTIFAI_TARGET" >>"$LOG"
     fi
 
+    if [ "$AI_STDIN_NTFY_ENABLE" != "1" ]; then
+        printf '%s event=%s ai_stdin_ntfy_skipped\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+        return 0
+    fi
+
     if publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"; then
         printf '%s event=%s ai_stdin_ntfy_ok\n' \
             "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
@@ -219,7 +240,7 @@ publish_ai() {
 
 if [ "$send_ai_stdin" = "1" ] && [ -n "$ai_prompt" ]; then
     publish_ai "$ai_prompt" "Enyo NNUE $event_name" "$priority"
-    printf '%s event=%s ai_stdin_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+    printf '%s event=%s ai_wakeup_processed\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
 fi
 
 printf '%s event=%s sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
