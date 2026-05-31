@@ -14,7 +14,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 SCORE_RE = re.compile(
@@ -109,6 +109,7 @@ def extract_rows(
     max_abs_cp: int,
     include_mates: bool,
     mate_score_cp: int,
+    row_writer: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     try:
         import chess
@@ -167,25 +168,27 @@ def extract_rows(
                     elif not game_wdl_known or wdl is None:
                         stats["skipped_unknown_result"] += 1
                     else:
-                        rows.append(
-                            {
-                                "fen": board.fen(en_passant="fen"),
-                                "move": board.san(move),
-                                "move_uci": move.uci(),
-                                "score": score["score_cp"],
-                                "wdl": wdl,
-                                "result": result,
-                                "side": "white" if turn == chess.WHITE else "black",
-                                "ply": ply,
-                                "fullmove": board.fullmove_number,
-                                "depth": score["depth"],
-                                "time_s": score["time_s"],
-                                "mate_ply": score["mate_ply"],
-                                "game_id": game_id,
-                                "termination": result_reason(game.headers),
-                                "source": str(pgn_path),
-                            }
-                        )
+                        row = {
+                            "fen": board.fen(en_passant="fen"),
+                            "move": board.san(move),
+                            "move_uci": move.uci(),
+                            "score": score["score_cp"],
+                            "wdl": wdl,
+                            "result": result,
+                            "side": "white" if turn == chess.WHITE else "black",
+                            "ply": ply,
+                            "fullmove": board.fullmove_number,
+                            "depth": score["depth"],
+                            "time_s": score["time_s"],
+                            "mate_ply": score["mate_ply"],
+                            "game_id": game_id,
+                            "termination": result_reason(game.headers),
+                            "source": str(pgn_path),
+                        }
+                        if row_writer is None:
+                            rows.append(row)
+                        else:
+                            row_writer(row)
                         stats["rows"] += 1
 
                 board.push(move)
@@ -197,19 +200,20 @@ def extract_rows(
 def cmd_extract(args: argparse.Namespace) -> int:
     pgn = expand_path(args.pgn)
     output = expand_path(args.output)
-    rows, stats = extract_rows(
-        pgn,
-        skip_plies=args.skip_plies,
-        min_depth=args.min_depth,
-        max_abs_cp=args.max_abs_cp,
-        include_mates=args.include_mates,
-        mate_score_cp=args.mate_score_cp,
-    )
-
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as out:
-        for row in rows:
+        def write_row(row: dict[str, Any]) -> None:
             out.write(json.dumps(row, separators=(",", ":")) + "\n")
+
+        _, stats = extract_rows(
+            pgn,
+            skip_plies=args.skip_plies,
+            min_depth=args.min_depth,
+            max_abs_cp=args.max_abs_cp,
+            include_mates=args.include_mates,
+            mate_score_cp=args.mate_score_cp,
+            row_writer=write_row,
+        )
 
     payload = {"input": str(pgn), "output": str(output), **stats}
     if args.stats:
