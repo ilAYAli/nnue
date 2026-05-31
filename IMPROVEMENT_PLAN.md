@@ -15,14 +15,18 @@ their init chain back to `berserk-d43206fe90e4.nn`.
 
 Current build intent:
 
-- Build a clean d16 candidate from random init after clean source generation
-  exists.
+- Build a clean d16 candidate from random init using the HCE/no-NNUE source
+  run now in progress:
+  `native-d16-owned-hce-selfplay-sf-d16-v1-20260531`.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
 - Require `net_provenance.py --require-clean-enyo-owned` before static
   validation or SPRT.
 - First promotion threshold is "not worse than Berserk", not merely "close".
+- The current run is intentionally capped at `score_limit=300000` for the first
+  proof pass. If this cannot produce a non-catastrophic smoke, do not spend the
+  full 3M-label pass on the same recipe.
 
 2026-05-31 ownership correction:
 
@@ -183,16 +187,17 @@ Current build intent:
 - Exported sidecar JSON was verified against the same held-out sets and matched
   Python-side decisions at thresholds `16`, `18`, `20`, and `32`.
 
-2026-05-31 native d16 owned RC update:
+2026-05-31 d16 RC provenance correction:
 
-- The best Enyo-owned `.nn` candidate is the d16 huber/sign continuation:
+- The d16 huber/sign continuation is no longer considered Enyo-owned:
   `d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531`.
   - Architecture: 16 king/input buckets, 12288 features, hidden width 1024,
     L2 size 16.
   - Confirm run versus Berserk was interrupted at 2000 games by choice, not by
     a hard reject: `-5.4 +/- 12.0 Elo`, `LOS 18.9%`, draw rate `38.0%`.
-  - This is close enough to treat as an RC lane, but not as proven equal or
-    stronger.
+  - The result is useful as a strength reference, but the provenance chain
+    traces through borrowed weights and it must not be promoted as an
+    Enyo-owned net.
 - Loss analysis from the 2000-game confirm found candidate-specific excess
   losses concentrated in late/endgame conversion/search positions:
   - candidate as White: `585W/388D/27L`;
@@ -305,23 +310,17 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Do not launch another native self-play Bullet training run or scalar pairwise
-blend yet.
+The current experiment is a clean ownership proof run:
 
-The next experiment is an RC validation/promotion gate for the current
-Enyo-owned d16 net:
-
-1. Treat `d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531` as
-   `native-d16-owned-rc1`.
-2. Keep the pairwise repair nets as diagnostics only; do not copy or promote
-   them.
-3. Run fixed replay/loss gates and the candidate-excess search gate against
-   the RC net.
-4. If replay gates are clean, run a bounded Berserk confirm. A 2000-game result
-   near the current `-5 Elo` with CI crossing zero is acceptable for an
-   Enyo-owned release candidate, but not proof of superiority.
-5. If this RC is rejected, the next training data must be broader
-   full-game/search-loss data, not another tiny scalar pairwise overfit.
+1. Reuse the completed HCE/no-NNUE self-play and extraction in
+   `native-d16-owned-hce-selfplay-sf-d16-v1-20260531`.
+2. Score a capped first slice with Stockfish d16
+   (`score_limit=300000`, `score_shards=24`).
+3. Train one random-init Bullet d16 candidate from that capped source.
+4. Run provenance, engine-static, and a short Berserk smoke.
+5. If the smoke is catastrophic, reject this source recipe before spending the
+   full 3M-label pass. If it is non-catastrophic, finish or rerun the full 3M
+   scoring/training pass with the same clean source.
 
 Pass criteria for continuing a lane:
 
@@ -339,14 +338,14 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `native-d16-owned-rc1-20260531`
-- selected branch: no new NNUE training; validate and package the existing
-  Enyo-owned d16 huber/sign net as an RC candidate
-- backend: dry-run placeholder only
-- candidate net:
-  `runs/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/train/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/model.nn`
-- rejected follow-up nets: all `pairwise-searchdesc26-*` and
-  `pairwise-root14-misses10-*` repair nets
+- candidate name: `native-d16-owned-hce-selfplay-sf-d16-v1-20260531`
+- selected branch: clean HCE/no-NNUE self-play source plus Stockfish d16 oracle
+  labels
+- backend: Bullet
+- initialization: random, with `require_clean_enyo_owned=true`
+- current cap: `score_limit=300000` for the first proof pass
+- rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`, RC2, and all
+  pairwise repair nets
 
 Rules:
 
