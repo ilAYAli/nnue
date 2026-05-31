@@ -8,7 +8,10 @@ kind of Stockfish-labeled Enyo self-play.
 
 ## Current State
 
-No trained Enyo net is currently a keeper.
+No trained Enyo net is proven stronger than Berserk yet. The current
+near-replacement candidate is the Enyo-owned 16-king-bucket d16 huber/sign net:
+`runs/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/train/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/model.nn`.
+It is not Berserk-derived.
 
 2026-05-30 validation update:
 
@@ -162,6 +165,34 @@ No trained Enyo net is currently a keeper.
 - Exported sidecar JSON was verified against the same held-out sets and matched
   Python-side decisions at thresholds `16`, `18`, `20`, and `32`.
 
+2026-05-31 native d16 owned RC update:
+
+- The best Enyo-owned `.nn` candidate is the d16 huber/sign continuation:
+  `d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531`.
+  - Architecture: 16 king/input buckets, 12288 features, hidden width 1024,
+    L2 size 16.
+  - Confirm run versus Berserk was interrupted at 2000 games by choice, not by
+    a hard reject: `-5.4 +/- 12.0 Elo`, `LOS 18.9%`, draw rate `38.0%`.
+  - This is close enough to treat as an RC lane, but not as proven equal or
+    stronger.
+- Loss analysis from the 2000-game confirm found candidate-specific excess
+  losses concentrated in late/endgame conversion/search positions:
+  - candidate as White: `585W/388D/27L`;
+  - candidate as Black: `19W/373D/608L`;
+  - paired opening set is strongly White-favored for both engines, so this is
+    not a candidate-only black-side collapse.
+- Candidate-specific search gates separated Berserk from the d16 candidate:
+  - root excess gate: Berserk `36/38`, candidate `22/38`;
+  - root miss subset: `14` positions;
+  - search-descendant gate: Berserk `46/46`, candidate `20/46`.
+- Scalar pairwise repair was tested and rejected:
+  - search-descendant target-only repair improved descendant gate only
+    `20/46 -> 24/46` and root gate `0/14 -> 4/14`;
+  - targeted overfit on remaining root misses improved root gate to `6/14` but
+    regressed descendant gate to `22/46`;
+  - conclusion: scalar pairwise pressure can force some local margins, but does
+    not produce stable search repair. Do not promote the pairwise repair nets.
+
 Rejected lanes:
 
 - d16/d18 relabeling of old/self-play pools: static metrics improved, SPRT did
@@ -189,6 +220,9 @@ Rejected lanes:
 - LC0/Berserk-oracle sidecar policy on the current fixed gate: held-out
   accuracy is only about `62%`, and mixing it with loss-log rows drags the
   useful loss-log signal down to about `69%`.
+- scalar pairwise repair of the d16 RC's candidate-specific search misses:
+  local pair metrics moved, but root/search-descendant engine gates did not
+  stabilize and the targeted overfit regressed the broader descendant gate.
 - thread voting/arbitration search experiments: clearly negative in early SPRT.
 
 Conclusion:
@@ -256,20 +290,20 @@ Priority order:
 Do not launch another native self-play Bullet training run or scalar pairwise
 blend yet.
 
-The next experiment is an engine policy/tie-break preflight:
+The next experiment is an RC validation/promotion gate for the current
+Enyo-owned d16 net:
 
-1. Do not train another mixed LC0+loss policy run until LC0 label quality is
-   audited.
-2. Design the smallest Enyo runtime hook for a disabled-by-default sidecar
-   policy/tie-breaker.
-3. Preflight requirements before enabling any move changes:
-   - same binary/net behavior with policy disabled;
-   - NPS impact measured with policy disabled and enabled;
-   - policy model load failure is non-fatal unless explicitly required;
-   - replay of the fixed mistake and guard gates reports the same threshold
-     decisions as Python.
-4. Only after those pass, run a tiny enabled smoke with threshold `18` and
-   measure action rate, harmful overrides, and SPRT direction.
+1. Treat `d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531` as
+   `native-d16-owned-rc1`.
+2. Keep the pairwise repair nets as diagnostics only; do not copy or promote
+   them.
+3. Run fixed replay/loss gates and the candidate-excess search gate against
+   the RC net.
+4. If replay gates are clean, run a bounded Berserk confirm. A 2000-game result
+   near the current `-5 Elo` with CI crossing zero is acceptable for an
+   Enyo-owned release candidate, but not proof of superiority.
+5. If this RC is rejected, the next training data must be broader
+   full-game/search-loss data, not another tiny scalar pairwise overfit.
 
 Pass criteria for continuing a lane:
 
@@ -287,11 +321,14 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `separable-move-choice-preflight-20260531`
-- selected branch: no NNUE scalar training; LC0 pairwise scalar lane is closed
+- candidate name: `native-d16-owned-rc1-20260531`
+- selected branch: no new NNUE training; validate and package the existing
+  Enyo-owned d16 huber/sign net as an RC candidate
 - backend: dry-run placeholder only
-- training source: none until the next separable policy/ranking or architecture
-  runtime preflight has policy-disabled parity and policy-enabled gate parity
+- candidate net:
+  `runs/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/train/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/model.nn`
+- rejected follow-up nets: all `pairwise-searchdesc26-*` and
+  `pairwise-root14-misses10-*` repair nets
 
 Rules:
 

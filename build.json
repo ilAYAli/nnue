@@ -1,15 +1,15 @@
 {
-  "description": "Safe placeholder after LC0 pairwise scalar probes. No NNUE training should run from this config until the next separable policy/ranking or architecture preflight has an explicit engine-side move-choice gate.",
-  "experiment": "separable-move-choice-preflight",
+  "description": "Native d16 Enyo-owned RC lane. No new training runs from this config; validate and package the existing d16 huber/sign net as the current Berserk-replacement candidate.",
+  "experiment": "native-d16-owned-rc1",
   "create": {
-    "name": "separable-move-choice-preflight-20260531",
+    "name": "native-d16-owned-rc1-20260531",
     "dry_run": true,
     "backend": "bullet",
     "bullet_mode": "enyo",
     "bullet_loader": "direct",
     "bullet_data": "/home/petter/code/cpp/chess/nnue/runs/native-bullet-enyo-d12-20m-max800-scale300-wdl25-sb4096-kb16-20260529/assets/bullet.data",
-    "bullet_enyo_input_buckets": 32,
-    "bullet_enyo_runtime_input_buckets": 32,
+    "bullet_enyo_input_buckets": 16,
+    "bullet_enyo_runtime_input_buckets": 16,
     "bullet_hidden": 1024,
     "bullet_l2": 16,
     "bullet_export_init_only": false,
@@ -18,7 +18,8 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "last_result": "Loss-log sidecar with guard negatives has a clean offline threshold: t18 catches 101/622 held-out mistake pairs with 0 harmful and 1 neutral guard override out of 596; LC0 remains rejected for this gate.",
-    "next_gate": "Engine policy/tie-break preflight: disabled parity, NPS, model-load behavior, and Python-vs-engine parity on fixed mistake/guard gates before any enabled smoke."
+    "candidate_net": "/home/petter/code/cpp/chess/nnue/runs/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/train/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/model.nn",
+    "last_result": "The Enyo-owned d16 huber/sign net reached -5.4 +/- 12.0 Elo versus Berserk after 2000 games. Scalar pairwise repair of its search misses is rejected: it improved some root cases but did not stabilize the descendant search gate.",
+    "next_gate": "Validate native-d16-owned-rc1 with fixed replay/loss gates and candidate-excess search gates before any copy/promotion. If clean, run a bounded Berserk confirm as RC validation."
   }
 }
