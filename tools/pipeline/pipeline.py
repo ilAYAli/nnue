@@ -80,6 +80,9 @@ def score_progress(run_dir: Path, config: dict[str, Any] | None) -> tuple[int, i
         create_args = config.get("create_args", {})
         if isinstance(create_args, dict):
             shards = int(create_args.get("score_shards", 0) or 0)
+            limit = int(create_args.get("score_limit", 0) or 0)
+            if limit > 0 and (source_rows <= 0 or limit < source_rows):
+                source_rows = limit
     if shards <= 0:
         shards = max(
             [

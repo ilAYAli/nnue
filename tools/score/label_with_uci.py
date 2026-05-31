@@ -91,6 +91,12 @@ def main() -> None:
     ap.add_argument("--hash", type=int, default=128)
     ap.add_argument("--shard-count", type=int, default=1)
     ap.add_argument("--shard-index", type=int, default=0)
+    ap.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Maximum input rows to consider before sharding; 0 means all rows.",
+    )
     ap.add_argument("--max-abs-cp", type=int, default=1600)
     ap.add_argument("--progress", type=int, default=1000)
     args = ap.parse_args()
@@ -110,6 +116,7 @@ def main() -> None:
         "hash": args.hash,
         "shard_count": args.shard_count,
         "shard_index": args.shard_index,
+        "limit": args.limit,
         "read": 0,
         "selected": 0,
         "written": 0,
@@ -123,6 +130,8 @@ def main() -> None:
     try:
         with Path(args.input).open() as src, out.open("w") as dst:
             for idx, line in enumerate(src):
+                if args.limit > 0 and idx >= args.limit:
+                    break
                 stats["read"] += 1
                 if idx % args.shard_count != args.shard_index:
                     continue

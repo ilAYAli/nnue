@@ -56,6 +56,7 @@ class CandidateDefaults:
     score_shards: int = 24
     score_threads: int = 1
     score_hash: int = 128
+    score_limit: int = 0
     score_max_abs_cp: int = 1600
     score_progress: int = 10000
 

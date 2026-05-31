@@ -228,6 +228,7 @@ def append_source_generation_steps(
                 "--hash", str(args.score_hash),
                 "--shard-count", str(args.score_shards),
                 "--shard-index", str(shard),
+                "--limit", str(args.score_limit),
                 "--max-abs-cp", str(args.score_max_abs_cp),
                 "--progress", str(args.score_progress),
             ],
@@ -311,6 +312,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--hash", str(args.score_hash),
                     "--shard-count", str(args.score_shards),
                     "--shard-index", str(shard),
+                    "--limit", str(args.score_limit),
                     "--max-abs-cp", str(args.score_max_abs_cp),
                     "--progress", str(args.score_progress),
                 ],
@@ -639,6 +641,7 @@ def add_create_args(
     parser.add_argument("--score-shards", type=int, default=value("score_shards", d.score_shards))
     parser.add_argument("--score-threads", type=int, default=value("score_threads", d.score_threads))
     parser.add_argument("--score-hash", type=int, default=value("score_hash", d.score_hash))
+    parser.add_argument("--score-limit", type=int, default=value("score_limit", d.score_limit))
     parser.add_argument("--score-max-abs-cp", type=int, default=value("score_max_abs_cp", d.score_max_abs_cp))
     parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
 
