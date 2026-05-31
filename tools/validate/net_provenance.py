@@ -184,12 +184,23 @@ def extract_selfplay_net_refs(text: str) -> list[str]:
             "fastchess",
         )):
             continue
+
+        if re.search(r"(?:^|\s)--engine-option\s+use_nnue=false(?:\s|$)", line, re.I) \
+                or re.search(r"(?:^|\s)option\.use_nnue=false(?:\s|$)", line, re.I):
+            refs.append("enyo-hce")
+            continue
+
+        found_nnue = False
         match = re.search(r"(?:^|\s)--nnue-file\s+(?P<path>\S+)", line)
         if match:
             refs.append(normalize_log_path(match.group("path")))
+            found_nnue = True
         match = re.search(r"(?:^|\s)option\.nnue_file=(?P<path>\S+)", line)
         if match:
             refs.append(normalize_log_path(match.group("path")))
+            found_nnue = True
+        if not found_nnue:
+            refs.append("default.net")
     return refs
 
 
@@ -301,6 +312,8 @@ def classify_position_ref(ref: str) -> set[str]:
         tags.add("berserk")
     if "default.net" in lower:
         tags.add("borrowed-default")
+    if "enyo-hce" in lower:
+        tags.add("enyo-hce")
     if "lc0" in lower or "leela" in lower:
         tags.add("lc0")
     if "test80" in lower or "sfbinpack" in lower:
@@ -343,13 +356,15 @@ def classify_source(tags: set[str], *, kind: str) -> str:
         return "mixed"
     if tags == {"enyo-selfplay"}:
         return "enyo-selfplay"
+    if tags == {"enyo-hce"}:
+        return "enyo-hce"
     if tags == {"enyo-replay"}:
         return "enyo-replay"
     if "lc0" in tags:
         return "lc0" if len(tags) == 1 else "mixed"
     if "borrowed-default" in tags:
         return "borrowed-default" if len(tags) == 1 else "mixed"
-    if tags <= {"enyo-selfplay", "enyo-replay"}:
+    if tags <= {"enyo-selfplay", "enyo-replay", "enyo-hce"}:
         return "enyo-games"
     if tags == {"external-stockfish"}:
         return "external-stockfish"
@@ -465,6 +480,7 @@ def analyze(path: Path) -> Provenance:
     clean_positions = position_sources <= {
         "enyo-selfplay",
         "enyo-replay",
+        "enyo-hce",
     }
     clean_labels = label_sources <= {"stockfish", "enyo"}
     clean = (

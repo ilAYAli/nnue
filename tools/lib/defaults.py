@@ -44,6 +44,7 @@ class CandidateDefaults:
     selfplay_concurrency: int = 12
     selfplay_threads: int = 1
     selfplay_hash: int = 128
+    selfplay_use_nnue: bool = True
     selfplay_depth: int = 8
     selfplay_seed: int = 2026051501
 

@@ -119,6 +119,35 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_clean_owned_generation_can_use_hce_selfplay(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "nnue_file": "",
+                    "selfplay_use_nnue": False,
+                    "require_clean_enyo_owned": True,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            selfplay = next(
+                step for step in config["steps"]
+                if step["name"] == "posgen_selfplay"
+            )
+            self.assertNotIn("--nnue-file", selfplay["command"])
+            self.assertIn("use_nnue=false", selfplay["command"])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_empty_nnue_file_is_not_passed_to_selfplay(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

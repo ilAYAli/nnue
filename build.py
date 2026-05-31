@@ -149,6 +149,8 @@ def borrowed_selfplay_nnue_reason(value: str | Path | None) -> str | None:
 def validate_create_args(args: argparse.Namespace) -> None:
     if not (args.require_clean_enyo_owned and args.bullet_generate_source):
         return
+    if not args.selfplay_use_nnue:
+        return
     reason = borrowed_selfplay_nnue_reason(args.nnue_file)
     if reason:
         raise SystemExit(
@@ -176,6 +178,8 @@ def append_source_generation_steps(
         "--restart", "off",
         "--engine-option", f"Hash={args.selfplay_hash}",
     ]
+    if not args.selfplay_use_nnue:
+        selfplay_command.extend(["--engine-option", "use_nnue=false"])
     if args.nnue_file:
         selfplay_command.extend(["--nnue-file", str(expand_path(args.nnue_file))])
 
@@ -620,6 +624,8 @@ def add_create_args(
     parser.add_argument("--selfplay-concurrency", type=int, default=value("selfplay_concurrency", d.selfplay_concurrency))
     parser.add_argument("--selfplay-threads", type=int, default=value("selfplay_threads", d.selfplay_threads))
     parser.add_argument("--selfplay-hash", type=int, default=value("selfplay_hash", d.selfplay_hash))
+    parser.add_argument("--selfplay-use-nnue", action=argparse.BooleanOptionalAction,
+                        default=value("selfplay_use_nnue", d.selfplay_use_nnue))
     parser.add_argument("--selfplay-depth", type=int, default=value("selfplay_depth", d.selfplay_depth))
     parser.add_argument("--selfplay-seed", type=int, default=value("selfplay_seed", d.selfplay_seed))
 

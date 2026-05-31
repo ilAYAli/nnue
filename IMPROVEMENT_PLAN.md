@@ -28,9 +28,8 @@ Current build intent:
 
 - `default.net` is also a borrowed-weight source. It cannot be used to generate
   clean Enyo-owned self-play positions.
-- The clean self-play lane is blocked until Enyo exposes a clean source
-  evaluator, likely pure HCE/no-NNUE self-play, or another explicitly clean
-  Enyo-owned source net is selected.
+- Enyo `cebcd78` exposes `use_nnue=false`, so the next clean source run should
+  generate positions with HCE/no-NNUE self-play and no `nnue_file`.
 
 2026-05-30 validation update:
 

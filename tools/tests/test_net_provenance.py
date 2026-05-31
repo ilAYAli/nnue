@@ -175,6 +175,63 @@ class NetProvenanceTests(unittest.TestCase):
             self.assertIn("berserk", result.position_sources)
             self.assertFalse(result.clean_enyo_owned)
 
+    def test_allows_hce_selfplay_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs" / "hce-selfplay"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "posgen.py selfplay --output /runs/posgen/selfplay.pgn "
+                "--engine-option use_nnue=false\n"
+                "data=/runs/posgen/source.jsonl\n",
+                encoding="utf-8",
+            )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertIn("enyo-hce", result.position_sources)
+            self.assertTrue(result.clean_enyo_owned)
+
+    def test_rejects_implicit_default_selfplay_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs" / "implicit-default"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "posgen.py selfplay --output /runs/posgen/selfplay.pgn\n"
+                "data=/runs/posgen/source.jsonl\n",
+                encoding="utf-8",
+            )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertIn("borrowed-default", result.position_sources)
+            self.assertFalse(result.clean_enyo_owned)
+
     def test_rejects_default_net_selfplay_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
