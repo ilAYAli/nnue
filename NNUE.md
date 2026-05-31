@@ -1,5 +1,31 @@
 # Enyo NNUE
 
+```sh
+• Current native Enyo NNUE:
+
+  features:      12,288
+  hidden width:  1,024
+  L1 input:      2 * 1024 = 2,048
+  L2:            16
+  L3/output:     scalar
+
+  So the big accumulator matrix is:
+
+  12,288 features * 1,024 hidden = 12,582,912 int16 weights
+
+  Plus:
+
+  1,024 input biases
+  2,048 * 16 int8 l1 weights
+  16 l1 biases
+  16 l2 weights
+  1 l2 bias
+  1 output weight
+  1 output bias
+
+  current .nn size: 25,203,012 bytes.
+```
+
 `README.md` describes the current candidate creation workflow and command-line
 entry points.
 
@@ -7,226 +33,6 @@ This file explains what those steps mean for the NNUE itself: weights, hidden
 neurons, king buckets, packed tensors, accumulator updates, export, validation,
 and SPRT.
 
-## Vocabulary
-
-The concrete values below are the current Enyo NNUE architecture values from
-the Enyo source tree, currently `src/nnue.hpp`.
-
-`NNUE`
-
-Efficiently updatable neural network. It is a neural evaluator whose first
-layer can be updated by adding and subtracting feature weight rows after a move.
-
-`feature`
-
-One possible board fact the NNUE knows how to address: perspective, king
-bucket, piece/color type, and piece square. A feature is an address into the
-input-weight table.
-
-Actual Enyo NNUE values:
-
-```text
-king buckets                 = 16
-piece/color types            = 12
-squares                      = 64
-input feature rows           = 16 * 12 * 64 = 12288
-active feature rows per view = up to one row per piece on the board
-```
-
-`active feature`
-
-One input feature that is actually present in a specific FEN. The full network
-has 12288 possible feature rows, but a normal position activates only the rows
-for pieces currently on the board.
-
-Actual Enyo behavior:
-
-```text
-piece list                  = every occupied square, including kings
-active rows per perspective = number of pieces on the board
-active rows for both views  = 2 * number of pieces on the board
-start position              = 32 active rows per view, 64 total
-king-and-pawn endgame       = fewer active rows, because fewer pieces exist
-```
-
-`king bucket`
-
-A coarse king-location category used in feature indexing. It lets the same
-piece/square use different weights depending on king placement.
-
-Actual Enyo NNUE value:
-
-```text
-king bucket ids = 16
-king squares    = 64 squares mapped into those 16 ids
-```
-
-`weight`
-
-A learned number stored in the network file. Training changes weights; engine
-search reads fixed weights.
-
-Actual Enyo NNUE trained values:
-
-```text
-input feature rows   = 12288
-input row width      = 1024
-input weights        = 12288 * 1024 = 12582912 int16 values
-                     = 12,582,912 input weights
-input biases         = 1024 int16 values
-L1 weights           = 2048 * 16 = 32768 int8 values
-L1 biases            = 16 int32 values
-L2 weights           = 16 * 32 = 512 float values
-L2 biases            = 32 float values
-output weights       = 32 float values
-output bias          = 1 float value
-total trained values = 12617297
-.nn payload size     = 25203012 bytes, about 24.0 MiB
-```
-
-`hidden neuron`
-
-One learned numeric slot inside the network. Enyo NNUE has 1024 accumulator
-slots per perspective.
-
-Actual Enyo NNUE values:
-
-```text
-first hidden / accumulator width per perspective = 1024
-perspectives                                     = 2
-combined dense-head input                         = 2048
-dense hidden layer 1                              = 16
-dense hidden layer 2                              = 32
-output                                            = 1 score
-```
-
-`accumulator`
-
-The summed first hidden layer. Each active feature adds one 1024-wide row of
-input weights into it.
-
-Actual Enyo NNUE values:
-
-```text
-white perspective accumulator = 1024 values
-black perspective accumulator = 1024 values
-combined head input           = 2048 values
-incremental update width      = 1024 values per changed feature row
-```
-
-`perspective`
-
-The side whose king bucket and board view are used for feature indexing. Enyo
-keeps both white and black perspective accumulators.
-
-`us` / `them`
-
-The side-to-move accumulator and the opponent accumulator as passed to the
-dense head.
-
-`dense head`
-
-The small non-incremental part after the accumulator. It combines
-`us[1024] + them[1024]` into one centipawn score.
-
-Actual Enyo NNUE values:
-
-```text
-input          = 2048 int8-clipped accumulator values
-L1 / layer 1   = 16 values
-L2 / layer 2   = 32 values
-output weights = 32 values
-output bias    = 1 value
-output         = 1 centipawn score
-```
-
-`L1`
-
-Layer 1 of the dense head. It is the first small calculation stage after the
-incremental accumulator. It reads the 2048 combined accumulator values and
-produces 16 values.
-
-Actual Enyo NNUE values:
-
-```text
-L1 input values  = 2048
-L1 output values = 16
-L1 weights       = 2048 * 16 = 32768 int8 values
-L1 biases        = 16 int32 values
-```
-
-`L2`
-
-Layer 2 of the dense head. It is the next small calculation stage. It reads the
-16 L1 values and produces 32 values for the final scoring layer.
-
-Actual Enyo NNUE values:
-
-```text
-L2 input values  = 16
-L2 output values = 32
-L2 weights       = 16 * 32 = 512 float values
-L2 biases        = 32 float values
-```
-
-`output layer`
-
-The final dense-head calculation. It reads the 32 L2 values and produces the
-single centipawn score used by search.
-
-Actual Enyo NNUE values:
-
-```text
-output input values = 32
-output scores       = 1
-output weights      = 32 float values
-output bias         = 1 float value
-```
-
-`packed tensor`
-
-Numeric training arrays produced from JSONL rows. They are training data, not a
-trained net.
-
-`label`
-
-The training target attached to a position, usually a teacher centipawn score.
-
-`teacher`
-
-The engine or source that supplies target scores, usually Stockfish.
-
-`batch`
-
-Many training rows processed together in one optimizer step.
-
-`epoch`
-
-One pass over the sampled training rows.
-
-`loss`
-
-The training error PyTorch minimizes.
-
-`Huber`
-
-A centipawn loss that behaves like squared error for small mistakes and closer
-to absolute error for large mistakes.
-
-`MPE`
-
-Mean probability error. In this project it means a WDL-shaped objective or
-metric.
-
-`target clamp`
-
-A maximum absolute teacher score used for training, for example clamping
-`+1800` to `+1000`.
-
-`SPRT`
-
-The engine match test used to decide whether a candidate net is stronger in
-actual play.
 
 Process map:
 
@@ -242,161 +48,6 @@ Step 8  replay gates
 Step 9  SPRT
 ```
 
-## What The NNUE Is
-
-The NNUE is a fast position-evaluation function used by Enyo search. It takes a
-chess position and returns one centipawn score.
-
-It is not a move picker by itself. Search still chooses moves. The NNUE changes
-how leaf positions are evaluated inside alpha-beta search.
-
-Conceptually:
-
-```text
-FEN position
-  -> active sparse NNUE features
-  -> accumulator values
-  -> small dense network head
-  -> centipawn score
-  -> search uses that score
-```
-
-Training changes the stored numeric weights in the network. During a game those
-weights are fixed; only the accumulator values change as pieces move.
-
-## Features, Buckets, Neurons, Weights
-
-### Feature
-
-A feature is one possible board fact used as NNUE input. It is not a value by
-itself; it is an index into the first weight table.
-
-For Enyo NNUE, a feature is roughly:
-
-```text
-perspective + king bucket + piece/color type + piece square
-```
-
-The runtime feature address is:
-
-```text
-feature =
-    king_bucket * 12 * 64
-  + relative_piece_type * 64
-  + mirrored_piece_square
-```
-
-Current shape:
-
-```text
-king buckets      = 16
-piece/color types = 12
-squares           = 64
-input features    = 16 * 12 * 64 = 12288
-```
-
-### Active Feature
-
-An active feature is a feature row that is used for the current FEN.
-
-The network has 12288 possible feature rows, but most are inactive for any one
-position. Enyo walks the board, finds every piece, and creates one feature row
-per piece for each perspective.
-
-In code terms, `enumerate_pieces()` in Enyo's `src/nnue_board.cpp` emits:
-
-```text
-(piece_type + piece_color, square)
-```
-
-for every occupied square. Then `ResetAccumulator()` in
-Enyo's `src/nnue.hpp` turns each entry into a feature index:
-
-```text
-feature = FeatureIdx(piece_type, piece_color, piece_square, view_king_square, view)
-```
-
-and adds that feature row:
-
-```text
-accumulator[view][0..1023] += input_weights[feature][0..1023]
-```
-
-Example with 32 pieces on the board:
-
-```text
-white view:
-  32 active features -> add 32 different 1024-wide rows
-
-black view:
-  32 active features -> add 32 different 1024-wide rows
-```
-
-Example after many captures with 10 pieces left:
-
-```text
-white view:
-  10 active features
-
-black view:
-  10 active features
-```
-
-Empty squares have no active feature. A missing captured piece has no active
-feature. This is why incremental update is cheap: a quiet move usually removes
-one old active feature and adds one new active feature.
-
-### King Bucket
-
-A king bucket is a coarse category for king location. It lets the same piece on
-the same square mean different things depending on king placement.
-
-Example:
-
-```text
-black knight on f5, white king in bucket 3
-black knight on f5, white king in bucket 9
-```
-
-Those are different features and therefore use different learned weights.
-
-A king bucket is not a hidden neuron. It is part of the feature address.
-
-### Weight
-
-A weight is one learned number stored in the network file.
-
-The first layer has one 1024-wide weight row per input feature:
-
-```text
-input_weights[feature] = [w0, w1, w2, ..., w1023]
-```
-
-Training changes these numbers. Engine search only reads them.
-
-### Hidden Neuron
-
-A hidden neuron is a learned numeric slot inside the network. Enyo has 1024
-accumulator slots per perspective.
-
-These slots do not have fixed human meanings like "king safety" or "hanging
-queen". A chess idea is usually spread across many weights and many hidden
-slots.
-
-### Accumulator
-
-The accumulator is the summed first hidden layer.
-
-For one perspective:
-
-```text
-acc[i] = input_bias[i]
-       + input_weights[feature_a][i]
-       + input_weights[feature_b][i]
-       + input_weights[feature_c][i]
-       + ...
-```
-
 So this line:
 
 ```text
@@ -404,15 +55,6 @@ accumulator[perspective][0..1023] += input_weights[feature][0..1023]
 ```
 
 means:
-
-```text
-for every hidden slot i from 0 to 1023:
-    add the learned contribution for this active feature to accumulator[i]
-```
-
-If the active feature is "white-view black knight on f5 with white king in
-bucket 3", then the engine adds that feature's 1024 learned numbers to the
-white-perspective accumulator.
 
 ## How Training Works
 
