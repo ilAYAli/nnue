@@ -8,10 +8,19 @@ kind of Stockfish-labeled Enyo self-play.
 
 ## Current State
 
-No trained Enyo net is proven stronger than Berserk yet. The current
-near-replacement candidate is the Enyo-owned 16-king-bucket d16 huber/sign net:
-`runs/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/train/d16-continue-latest20m-huber-sign-nocompile-lr2e7-e10-20260531/model.nn`.
-It is not Berserk-derived.
+No trained Enyo-owned net is proven stronger than Berserk yet. The previous
+near-replacement candidates (`d16-continue-latest20m-huber-sign-*` and RC2)
+are now rejected for the clean Enyo-owned lane: the provenance gate traces
+their init chain back to `berserk-d43206fe90e4.nn`.
+
+Current build intent:
+
+- Build a clean d16 candidate from random init.
+- Generate positions from Enyo self-play/replay only.
+- Allow Stockfish only as a fixed oracle labeler, not as a position source.
+- Require `net_provenance.py --require-clean-enyo-owned` before static
+  validation or SPRT.
+- First promotion threshold is "not worse than Berserk", not merely "close".
 
 2026-05-30 validation update:
 

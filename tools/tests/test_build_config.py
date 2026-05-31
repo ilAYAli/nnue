@@ -38,6 +38,44 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_bullet_can_generate_selfplay_source_and_gate_provenance(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "bullet_limit": 1000,
+                    "bullet_static_data": "",
+                    "engine_static_rows": 10,
+                    "require_clean_enyo_owned": True,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertLess(names.index("score_merge"), names.index("bullet_text"))
+            self.assertLess(names.index("bullet_train"), names.index("validate_provenance"))
+
+            bullet_text = next(
+                step for step in config["steps"] if step["name"] == "bullet_text"
+            )
+            self.assertIn("{score}/labeled.jsonl", bullet_text["command"])
+
+            engine_static = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_engine_static"
+            )
+            self.assertIn("{score}/labeled.jsonl", engine_static["command"])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()

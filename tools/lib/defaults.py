@@ -82,6 +82,7 @@ class CandidateDefaults:
     backend: str = "pytorch"
 
     bullet_source_jsonl: str = "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
+    bullet_generate_source: bool = False
     bullet_data: str = ""
     bullet_manifest: str = "~/source/bullet/Cargo.toml"
     bullet_loader: str = "direct"
@@ -122,6 +123,7 @@ class CandidateDefaults:
     engine_static_jsonl: str = ""
     engine_static_rows: int = 1000
     engine_static_engine: str = "~/code/cpp/chess/assets/engines/reference"
+    require_clean_enyo_owned: bool = False
 
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"

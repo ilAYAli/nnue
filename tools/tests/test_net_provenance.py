@@ -40,19 +40,22 @@ class NetProvenanceTests(unittest.TestCase):
             pack = run / "pack" / "train"
             pack.mkdir(parents=True)
             pack.joinpath("meta.json").write_text(
-                '{"source": "/tmp/enyo_teacher/sf_d12_20m_20260510_115338/labeled.jsonl"}\n',
+                '{'
+                '"source": "/tmp/enyo_teacher/sf_d12_20m_20260510_115338/labeled.jsonl",'
+                '"source_map": {"stockfish": 0}'
+                '}\n',
                 encoding="utf-8",
             )
 
             result = net_provenance.analyze(net)
 
             self.assertEqual(result.init, "berserk-derived")
-            self.assertEqual(result.data, "stockfish-labeled")
+            self.assertEqual(result.label_source, "stockfish-oracle")
             self.assertFalse(result.clean_enyo_owned)
-            self.assertIn("stockfish", result.data_sources)
+            self.assertIn("stockfish", result.label_sources)
             self.assertTrue(any("Berserk" in reason for reason in result.reasons))
 
-    def test_allows_random_init_enyo_replay_data(self) -> None:
+    def test_allows_random_init_enyo_replay_with_stockfish_labels(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             run = root / "runs" / "clean"
@@ -67,11 +70,18 @@ class NetProvenanceTests(unittest.TestCase):
                 "data=/data/replay-loss-20260531/loss_replay_child_targets.jsonl\n",
                 encoding="utf-8",
             )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
 
             result = net_provenance.analyze(net)
 
             self.assertEqual(result.init, "random")
-            self.assertEqual(result.data, "enyo-replay")
+            self.assertEqual(result.position_source, "enyo-replay")
+            self.assertEqual(result.label_source, "stockfish-oracle")
             self.assertTrue(result.clean_enyo_owned)
 
     def test_unknown_init_is_not_clean(self) -> None:
@@ -90,6 +100,50 @@ class NetProvenanceTests(unittest.TestCase):
             result = net_provenance.analyze(net)
 
             self.assertEqual(result.init, "unknown")
+            self.assertFalse(result.clean_enyo_owned)
+
+    def test_rejects_external_stockfish_position_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs" / "external"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "data=/data/test80-2024-01-jan-2tb7p.min-v2.v6.binpack\n",
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertEqual(result.init, "random")
+            self.assertIn("external-stockfish", result.position_sources)
+            self.assertFalse(result.clean_enyo_owned)
+
+    def test_rejects_lc0_position_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs" / "lc0"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "data=/data/lc0/run1/lc0_positions.jsonl\n",
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertEqual(result.init, "random")
+            self.assertIn("lc0", result.position_sources)
             self.assertFalse(result.clean_enyo_owned)
 
 

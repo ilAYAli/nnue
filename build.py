@@ -127,6 +127,91 @@ def write_config(run_dir: Path, config: dict) -> Path:
     return path
 
 
+def templated_path_arg(value: str | Path) -> str:
+    text = str(value)
+    if "{" in text and "}" in text:
+        return text
+    return str(expand_path(text))
+
+
+def append_source_generation_steps(
+    steps: list[dict],
+    args: argparse.Namespace,
+) -> None:
+    steps.extend([
+        {
+            "name": "posgen_selfplay",
+            "command": [
+                tool("posgen/posgen.py"), "selfplay",
+                "--runner", str(expand_path(args.runner)),
+                "--engine", str(expand_path(args.engine)),
+                "--nnue-file", str(expand_path(args.nnue_file)),
+                "--book", str(expand_path(args.book)),
+                "--output", "{posgen}/selfplay.pgn",
+                "--games", str(args.selfplay_games),
+                "--shard-games", str(args.selfplay_shard_games),
+                "--concurrency", str(args.selfplay_concurrency),
+                "--threads", str(args.selfplay_threads),
+                "--depth", str(args.selfplay_depth),
+                "--srand", str(args.selfplay_seed),
+                "--restart", "off",
+                "--engine-option", f"Hash={args.selfplay_hash}",
+            ],
+        },
+        {
+            "name": "posgen_extract",
+            "command": [
+                tool("posgen/posgen.py"), "extract",
+                "{posgen}/selfplay.pgn",
+                "--output", "{posgen}/positions.jsonl",
+                "--stats", "{posgen}/extract_stats.json",
+                "--skip-plies", str(args.skip_plies),
+                "--min-depth", str(args.selfplay_depth),
+                "--max-abs-cp", str(args.source_max_abs_cp),
+            ],
+        },
+        {
+            "name": "posgen_sample",
+            "command": [
+                tool("posgen/posgen.py"), "sample",
+                "--input", "{posgen}/positions.jsonl",
+                "--output", "{posgen}/source.jsonl",
+                "--preset", args.sample_preset,
+                "--unique-fen",
+                "--seed", str(args.selfplay_seed),
+            ],
+        },
+    ])
+
+    for shard in range(args.score_shards):
+        steps.append({
+            "name": f"score_{shard:02d}",
+            "parallel_group": "score",
+            "command": [
+                tool("score/score.py"), "uci",
+                "--input", "{posgen}/source.jsonl",
+                "--output", f"{{score}}/shards/label.{shard}.jsonl",
+                "--engine", str(expand_path(args.score_engine)),
+                "--depth", str(args.score_depth),
+                "--threads", str(args.score_threads),
+                "--hash", str(args.score_hash),
+                "--shard-count", str(args.score_shards),
+                "--shard-index", str(shard),
+                "--max-abs-cp", str(args.score_max_abs_cp),
+                "--progress", str(args.score_progress),
+            ],
+        })
+
+    steps.append({
+        "name": "score_merge",
+        "command": [
+            "bash", "-lc",
+            "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
+            "merge-score", "{score}",
+        ],
+    })
+
+
 def create_config(args: argparse.Namespace) -> dict:
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
@@ -251,6 +336,12 @@ def create_config(args: argparse.Namespace) -> dict:
             },
         ])
     elif args.backend == "bullet":
+        if args.bullet_generate_source:
+            append_source_generation_steps(steps, args)
+            args.bullet_source_jsonl = "{score}/labeled.jsonl"
+            if not args.engine_static_jsonl:
+                args.engine_static_jsonl = "{score}/labeled.jsonl"
+
         if args.bullet_loader == "direct":
             if args.bullet_data:
                 bullet_data = str(expand_user(args.bullet_data))
@@ -266,7 +357,7 @@ def create_config(args: argparse.Namespace) -> dict:
                         "name": "bullet_text",
                         "command": [
                             python, tool("bullet/jsonl_to_bullet_text.py"),
-                            "--input", str(expand_path(args.bullet_source_jsonl)),
+                            "--input", templated_path_arg(args.bullet_source_jsonl),
                             "--output", bullet_text,
                             "--limit", str(args.bullet_limit),
                             "--max-abs-cp", str(args.bullet_max_abs_cp),
@@ -370,13 +461,22 @@ def create_config(args: argparse.Namespace) -> dict:
                 *(["--export-init-only"] if args.bullet_export_init_only else []),
             ],
         })
+        if args.require_clean_enyo_owned:
+            steps.append({
+                "name": "validate_provenance",
+                "command": [
+                    python, tool("validate/net_provenance.py"),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--require-clean-enyo-owned",
+                ],
+            })
         if args.bullet_static_data:
             steps.append({
                 "name": "validate_bullet_static",
                 "command": [
                     python, tool("validate/eval_dataset.py"),
                     "--net", f"{candidate_dir}/model.nn",
-                    "--data", str(expand_path(args.bullet_static_data)),
+                    "--data", templated_path_arg(args.bullet_static_data),
                     "--rows", str(args.bullet_static_rows),
                     "--device", args.device,
                     "--buckets",
@@ -393,7 +493,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 python, tool("validate/eval_jsonl_engine.py"),
                 "--engine", str(expand_path(args.engine_static_engine)),
                 "--net", f"{candidate_dir}/model.nn",
-                "--jsonl", str(expand_path(args.engine_static_jsonl)),
+                "--jsonl", templated_path_arg(args.engine_static_jsonl),
                 "--rows", str(args.engine_static_rows),
                 "--buckets",
                 "--sources",
@@ -537,6 +637,8 @@ def add_create_args(
                         choices=["all", "float-head", "output"])
 
     parser.add_argument("--bullet-source-jsonl", default=value("bullet_source_jsonl", d.bullet_source_jsonl))
+    parser.add_argument("--bullet-generate-source", action=argparse.BooleanOptionalAction,
+                        default=value("bullet_generate_source", d.bullet_generate_source))
     parser.add_argument("--bullet-data", default=value("bullet_data", d.bullet_data))
     parser.add_argument("--bullet-manifest", default=value("bullet_manifest", d.bullet_manifest))
     parser.add_argument("--bullet-loader", default=value("bullet_loader", d.bullet_loader),
@@ -589,6 +691,8 @@ def add_create_args(
     parser.add_argument("--engine-static-jsonl", default=value("engine_static_jsonl", d.engine_static_jsonl))
     parser.add_argument("--engine-static-rows", type=int, default=value("engine_static_rows", d.engine_static_rows))
     parser.add_argument("--engine-static-engine", default=value("engine_static_engine", d.engine_static_engine))
+    parser.add_argument("--require-clean-enyo-owned", action=argparse.BooleanOptionalAction,
+                        default=value("require_clean_enyo_owned", d.require_clean_enyo_owned))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
