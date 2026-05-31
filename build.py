@@ -163,8 +163,9 @@ def append_source_generation_steps(
     steps: list[dict],
     args: argparse.Namespace,
 ) -> None:
+    python = str(expand_user(args.python))
     selfplay_command = [
-        tool("posgen/posgen.py"), "selfplay",
+        python, tool("posgen/posgen.py"), "selfplay",
         "--runner", str(expand_path(args.runner)),
         "--engine", str(expand_path(args.engine)),
         "--book", str(expand_path(args.book)),
@@ -191,7 +192,7 @@ def append_source_generation_steps(
         {
             "name": "posgen_extract",
             "command": [
-                tool("posgen/posgen.py"), "extract",
+                python, tool("posgen/posgen.py"), "extract",
                 "{posgen}/selfplay.pgn",
                 "--output", "{posgen}/positions.jsonl",
                 "--stats", "{posgen}/extract_stats.json",
@@ -203,7 +204,7 @@ def append_source_generation_steps(
         {
             "name": "posgen_sample",
             "command": [
-                tool("posgen/posgen.py"), "sample",
+                python, tool("posgen/posgen.py"), "sample",
                 "--input", "{posgen}/positions.jsonl",
                 "--output", "{posgen}/source.jsonl",
                 "--preset", args.sample_preset,
@@ -218,7 +219,7 @@ def append_source_generation_steps(
             "name": f"score_{shard:02d}",
             "parallel_group": "score",
             "command": [
-                tool("score/score.py"), "uci",
+                python, tool("score/score.py"), "uci",
                 "--input", "{posgen}/source.jsonl",
                 "--output", f"{{score}}/shards/label.{shard}.jsonl",
                 "--engine", str(expand_path(args.score_engine)),
@@ -255,7 +256,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "posgen_selfplay",
                 "command": [
-                    tool("posgen/posgen.py"), "selfplay",
+                    python, tool("posgen/posgen.py"), "selfplay",
                     "--runner", str(expand_path(args.runner)),
                     "--engine", str(expand_path(args.engine)),
                     "--nnue-file", str(expand_path(args.nnue_file)),
@@ -274,7 +275,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "posgen_extract",
                 "command": [
-                    tool("posgen/posgen.py"), "extract",
+                    python, tool("posgen/posgen.py"), "extract",
                     "{posgen}/selfplay.pgn",
                     "--output", "{posgen}/positions.jsonl",
                     "--stats", "{posgen}/extract_stats.json",
@@ -286,7 +287,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "posgen_sample",
                 "command": [
-                    tool("posgen/posgen.py"), "sample",
+                    python, tool("posgen/posgen.py"), "sample",
                     "--input", "{posgen}/positions.jsonl",
                     "--output", "{posgen}/source.jsonl",
                     "--preset", args.sample_preset,
@@ -301,7 +302,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 "name": f"score_{shard:02d}",
                 "parallel_group": "score",
                 "command": [
-                    tool("score/score.py"), "uci",
+                    python, tool("score/score.py"), "uci",
                     "--input", "{posgen}/source.jsonl",
                     "--output", f"{{score}}/shards/label.{shard}.jsonl",
                     "--engine", str(expand_path(args.score_engine)),
@@ -327,7 +328,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "pack",
                 "command": [
-                    tool("pack/pack.py"), "build",
+                    python, tool("pack/pack.py"), "build",
                     "--input", "{score}/labeled.jsonl",
                     "--out-dir", "{pack}/train",
                     "--rows-file", "{score}/labeled.wc",
@@ -339,7 +340,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "train",
                 "command": [
-                    tool("train/train.py"), "run",
+                    python, tool("train/train.py"), "run",
                     "--data", "{pack}/train",
                     "--init-from-nn", str(expand_path(args.init_net)),
                     "--objective", args.objective,
