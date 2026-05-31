@@ -175,6 +175,24 @@ def extract_input_data_refs(text: str) -> list[str]:
     return refs
 
 
+def extract_selfplay_net_refs(text: str) -> list[str]:
+    refs: list[str] = []
+    for line in text.splitlines():
+        if not any(marker in line for marker in (
+            "posgen.py selfplay",
+            "run_selfplay.sh",
+            "fastchess",
+        )):
+            continue
+        match = re.search(r"(?:^|\s)--nnue-file\s+(?P<path>\S+)", line)
+        if match:
+            refs.append(normalize_log_path(match.group("path")))
+        match = re.search(r"(?:^|\s)option\.nnue_file=(?P<path>\S+)", line)
+        if match:
+            refs.append(normalize_log_path(match.group("path")))
+    return refs
+
+
 def extract_label_engine_refs(text: str) -> list[str]:
     refs: list[str] = []
     for line in text.splitlines():
@@ -229,6 +247,7 @@ def extract_source_map_refs(text: str) -> list[str]:
 def collect_context_refs(context: RunContext) -> tuple[list[str], list[str]]:
     position_refs = extract_pattern_refs(context.text, DATA_PATTERNS)
     position_refs.extend(extract_input_data_refs(context.text))
+    position_refs.extend(extract_selfplay_net_refs(context.text))
     label_refs = extract_source_map_refs(context.text)
     label_refs.extend(extract_label_engine_refs(context.text))
     for path, doc in context.json_docs:
@@ -278,6 +297,10 @@ def expand_refs(
 def classify_position_ref(ref: str) -> set[str]:
     lower = ref.lower()
     tags: set[str] = set()
+    if "berserk" in lower:
+        tags.add("berserk")
+    if "default.net" in lower:
+        tags.add("enyo-default")
     if "lc0" in lower or "leela" in lower:
         tags.add("lc0")
     if "test80" in lower or "sfbinpack" in lower:
@@ -324,7 +347,7 @@ def classify_source(tags: set[str], *, kind: str) -> str:
         return "enyo-replay"
     if "lc0" in tags:
         return "lc0" if len(tags) == 1 else "mixed"
-    if tags <= {"enyo-selfplay", "enyo-replay"}:
+    if tags <= {"enyo-selfplay", "enyo-replay", "enyo-default"}:
         return "enyo-games"
     if tags == {"external-stockfish"}:
         return "external-stockfish"
@@ -332,7 +355,7 @@ def classify_source(tags: set[str], *, kind: str) -> str:
 
 
 def path_is_berserk(ref: str) -> bool:
-    return "berserk" in ref.lower()
+    return "berserk" in Path(ref).name.lower()
 
 
 def looks_random_init(context: RunContext) -> bool:
@@ -424,6 +447,8 @@ def analyze(path: Path) -> Provenance:
         reasons.append("no label source provenance found")
     if "external-stockfish" in position_sources:
         reasons.append("position source includes external Stockfish/test80 rows")
+    if "berserk" in position_sources:
+        reasons.append("position source uses Berserk net during generation")
     if "stockfish" in label_sources:
         reasons.append("label source includes Stockfish oracle rows")
     if "lc0" in position_sources or "lc0" in label_sources:
@@ -433,7 +458,11 @@ def analyze(path: Path) -> Provenance:
     if init != "random":
         reasons.append(f"init is {init}, not random")
 
-    clean_positions = position_sources <= {"enyo-selfplay", "enyo-replay"}
+    clean_positions = position_sources <= {
+        "enyo-selfplay",
+        "enyo-replay",
+        "enyo-default",
+    }
     clean_labels = label_sources <= {"stockfish", "enyo"}
     clean = (
         init == "random"
