@@ -1,10 +1,10 @@
 {
-  "description": "Public-data native 1.0.0 minimal-dose probe: mix 990k current native v4 self-play labels with 10k Stockfish-labeled LC0 positions, then continue from v4 at very low LR. LC0 is ODbL public position data, not external net weights.",
-  "experiment": "native-public-1.0.0-lc0-1pct-v4init",
+  "description": "Public-data native 1.0.0 LC0-value probe: train from v4 on LC0 positions labeled by LC0 root_q converted to centipawns. This tests already-labeled ODbL public data without Stockfish relabeling.",
+  "experiment": "native-public-1.0.0-lc0-rootq-v4init",
   "create": {
-    "name": "native-public-1.0.0-lc0mix1-v4init-lr1e7-sb192-20260601",
+    "name": "native-public-1.0.0-lc0q100k-v4init-lr3e7-sb256-20260601",
     "backend": "bullet",
-    "bullet_source_jsonl": "runs/native-public-1.0.0-lc0mix1-v4init-lr1e7-sb192-20260601/assets/mixed_labeled.jsonl",
+    "bullet_source_jsonl": "runs/native-public-1.0.0-lc0q100k-v4init-lr3e7-sb256-20260601/assets/lc0_q_labeled.jsonl",
     "bullet_loader": "direct",
     "bullet_mode": "enyo",
     "bullet_limit": 0,
@@ -16,16 +16,16 @@
     "bullet_l2": 16,
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
-    "bullet_superbatches": 192,
+    "bullet_superbatches": 256,
     "bullet_threads": 4,
-    "bullet_wdl": 0.25,
-    "bullet_lr": 1E-7,
-    "bullet_final_lr": 5E-8,
+    "bullet_wdl": 0.0,
+    "bullet_lr": 3E-7,
+    "bullet_final_lr": 1E-7,
     "bullet_eval_scale": 300,
     "bullet_save_rate": 64,
     "bullet_init_weights": "/home/petter/code/cpp/chess/nnue/runs/native-d16-owned-v4-selfplay-v2cont-sf-d12-lr3e6-sb512-20260601/train/native-d16-owned-v4-selfplay-v2cont-sf-d12-lr3e6-sb512-20260601/checkpoints/native-d16-owned-v4-selfplay-v2cont-sf-d12-lr3e6-sb512-20260601-512/optimiser_state/weights.bin",
     "bullet_trainable": "all",
-    "engine_static_jsonl": "runs/native-public-1.0.0-lc0mix1-v4init-lr1e7-sb192-20260601/assets/mixed_labeled.jsonl",
+    "engine_static_jsonl": "runs/native-public-1.0.0-lc0q100k-v4init-lr3e7-sb256-20260601/assets/lc0_q_labeled.jsonl",
     "engine_static_rows": 5000,
     "engine_static_engine": "/home/petter/code/cpp/chess/assets/engines/reference",
     "require_clean_enyo_owned": false,
@@ -33,7 +33,7 @@
   },
   "validation": {
     "promotion_gate": "Compare against current native v4 first. Only run Berserk if this is positive against v4.",
-    "ownership_definition": "No external net weights. Training positions are 99% Enyo/native plus 1% LC0 ODbL public positions; labels are Stockfish scalar evals.",
-    "reason": "The LC0-only and 10% LC0 scalar fine-tunes lost to v4. This final scalar dose test checks whether LC0 can act as a tiny regularizer without overwriting native behavior."
+    "ownership_definition": "No external net weights. Training positions and labels are LC0 ODbL public training data converted through root_q; initialization is clean Enyo-native v4.",
+    "reason": "LC0 positions with Stockfish-d12 scalar labels lost to v4 at 100%, 10%, and 1% doses. This tests LC0 as already-labeled public data instead of relabeling it with Stockfish."
   }
 }

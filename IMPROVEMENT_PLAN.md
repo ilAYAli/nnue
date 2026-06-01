@@ -219,6 +219,22 @@ Current build intent:
 - Exported sidecar JSON was verified against the same held-out sets and matched
   Python-side decisions at thresholds `16`, `18`, `20`, and `32`.
 
+2026-06-01 LC0 scalar/public-data update:
+
+- LC0 positions relabeled with Stockfish d12 and fine-tuned from native v4 were
+  rejected as scalar eval training data:
+  - LC0-only 100k was stopped negative versus v4 (`-75.9 +/- 47.5` at
+    `172/256`, LOS `0.1%`);
+  - 10% LC0 / 90% native mix finished `-24.5 +/- 38.0` versus v4 over
+    `256` games, LOS `10.2%`;
+  - 1% LC0 / 99% native mix finished `-20.4 +/- 36.5` versus v4 over
+    `256` games, LOS `13.6%`.
+- Conclusion: do not continue tiny LC0+Stockfish scalar dose experiments.
+  They consistently move away from the current native v4 baseline.
+- Next public-data probe: use LC0's own already-present `root_q` value label
+  converted to cp with `scale * atanh(q)`, instead of Stockfish relabeling.
+  This tests LC0 as public labeled data, not just as a position source.
+
 2026-05-31 d16 RC provenance correction:
 
 - The d16 huber/sign continuation is no longer considered Enyo-owned:
@@ -304,10 +320,11 @@ Priority order:
    - External/prepared datasets are acceptable if converted once into the Enyo
      row format and stored with provenance under `runs/` or `assets/`.
    - LC0 V6 import and oracle child-target generation now work as a data-source
-     path. The current result says not to push LC0 pairwise signal through the
-     scalar eval head without a separability change. The first sidecar proof
-     also says to exclude LC0 from the current move-policy gate until its labels
-     are audited or regenerated with a better oracle setup.
+     path. LC0 positions relabeled with Stockfish d12 are currently rejected
+     as a scalar fine-tune source. The active public-data test uses LC0's
+     own `root_q` value labels converted to cp. Do not return to LC0
+     pairwise/move-policy use until its labels are audited or regenerated with
+     a better oracle setup.
 
 2. Targeted move-choice data.
    - Expand the fixed failure-suite and disagreement/PV-instability samplers.
@@ -342,18 +359,15 @@ Priority order:
 
 ## Next Concrete Experiment
 
-The current experiment is clean-owned v4 self-play iteration:
+The current experiment is the LC0 value-label public-data probe:
 
-1. Generate 20k games of self-play using the improved clean-owned v2-cont net:
-   `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601/model.nn`.
-2. Extract/sample positions with `signed-balanced-v1`.
-3. Label with Stockfish d12.
-4. Initialize Bullet from the clean-owned v2-cont checkpoint weights:
-   `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601-512`.
-5. Train one low-dose continuation (`lr=3e-6 -> 1e-6`, `512` superbatches).
-6. Run provenance and engine-static validation.
-7. First game gate is against the previous clean-owned v2-cont baseline. Run
-   Berserk smoke only if it improves the owned baseline.
+1. Convert `targets/lc0-100k-20260528/lc0_positions.jsonl` to scored rows with
+   `tools/posgen/lc0_value_to_score.py`, using LC0 `root_q` and
+   `score_cp = round(300 * atanh(root_q))`, capped at `800cp`.
+2. Initialize Bullet from clean native v4 checkpoint weights.
+3. Train a low-dose continuation on those LC0-value rows with WDL disabled.
+4. Run engine-static validation on the same LC0-value rows.
+5. First game gate is against native v4. Run Berserk only if it improves v4.
 
 Pass criteria for continuing a lane:
 
@@ -372,15 +386,14 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `native-d16-owned-v4-selfplay-v2cont-sf-d12-lr3e6-sb512-20260601`
-- selected branch: generate self-play with clean-owned v2-cont, label with
-  Stockfish d12, and continue the clean-owned v2-cont checkpoint
+  `native-public-1.0.0-lc0q100k-v4init-lr3e7-sb256-20260601`
+- selected branch: LC0 ODbL positions with LC0 `root_q` labels converted to cp
 - backend: Bullet
-- initialization: clean-owned v2-cont Bullet checkpoint weights, with
-  `require_clean_enyo_owned=true`
-- current cap: 20k self-play games for the iteration proof
-- rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`, RC2, and all
-  pairwise repair nets
+- initialization: clean native v4 Bullet checkpoint weights
+- current cap: existing LC0 100k sample; `95,318` rows remain after the
+  `800cp` cap
+- rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`, RC2, all
+  pairwise repair nets, and LC0+Stockfish scalar dose runs
 
 Rules:
 
