@@ -373,7 +373,6 @@ def selfplay_generate_command(
         "--engine", str(expand_path(args.engine)),
         "--book", str(expand_path(args.book)),
         "--output-pgn", output_pgn,
-        "--metadata", metadata,
         "--total-games", total_games,
         "--shards", shards,
         "--shard-index", shard_index,
@@ -383,6 +382,8 @@ def selfplay_generate_command(
         "--base-seed", str(args.selfplay_seed),
         "--restart", "off",
     ]
+    if metadata:
+        command.extend(["--metadata", metadata])
     if args.nnue_file:
         command.extend(["--nnue-file", str(expand_path(args.nnue_file))])
     for option in selfplay_engine_options(args):
@@ -421,11 +422,11 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
     distrib = str(expand_user(args.selfplay_distrib_tool))
     manifest = "{posgen}/selfplay_distrib/manifest.json"
     shards = selfplay_shard_count(args)
-    metadata = "{posgen}/selfplay_shards/shard.{{index}}.meta.json"
+    shard_pgn = "{posgen}/selfplay_shards/shard.{{index}}.pgn"
     command_template = shell_join(selfplay_generate_command(
         args,
-        output_pgn="{{pgn}}",
-        metadata="{{output}}",
+        output_pgn="{{output}}",
+        metadata="",
         total_games="{{total_games}}",
         shards="{{shards}}",
         shard_index="{{index}}",
@@ -440,8 +441,7 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
         "--log-dir", "{posgen}/selfplay_distrib/logs",
         "--command-template", command_template,
         "--var", f"total_games={args.selfplay_games}",
-        "--var", "pgn={posgen}/selfplay_shards/{{task_id}}.pgn",
-        "--output-template", metadata,
+        "--output-template", shard_pgn,
     ]
     for mapping in args.selfplay_distrib_path_map or []:
         plan_command.extend(["--path-map", str(mapping)])

@@ -406,8 +406,15 @@ class BuildConfigTests(unittest.TestCase):
             self.assertIn("--total-games '{{total_games}}'", template)
             self.assertIn("--shards '{{shards}}'", template)
             self.assertIn("--shard-index '{{index}}'", template)
-            self.assertIn("--output-pgn '{{pgn}}'", template)
-            self.assertIn("--metadata '{{output}}'", template)
+            self.assertIn("--output-pgn '{{output}}'", template)
+            self.assertNotIn("{{pgn}}", template)
+            self.assertNotIn("--metadata", template)
+            outputs = [
+                plan["command"][index + 1]
+                for index, item in enumerate(plan["command"])
+                if item == "--output-template"
+            ]
+            self.assertIn("{posgen}/selfplay_shards/shard.{{index}}.pgn", outputs)
 
             merge = next(
                 step for step in config["steps"]
