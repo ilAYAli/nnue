@@ -151,7 +151,8 @@ def main() -> None:
                     stats["skipped_cp"] += 1
                     continue
 
-                row["source_score"] = row["score"]
+                if "score" in row:
+                    row["source_score"] = row["score"]
                 row["score"] = score
                 row["teacher"] = Path(args.engine).name
                 row["teacher_depth"] = args.depth
