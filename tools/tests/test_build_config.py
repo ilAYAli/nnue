@@ -291,9 +291,12 @@ class BuildConfigTests(unittest.TestCase):
             self.assertIn("score_distrib_doctor", names)
             self.assertIn("score_distrib_work_00", names)
             self.assertIn("score_distrib_work_01", names)
+            self.assertIn("score_distrib_wait", names)
             self.assertIn("score_distrib_merge", names)
             self.assertLess(names.index("score_distrib_plan"), names.index("score_distrib_add_input"))
             self.assertLess(names.index("score_distrib_add_input"), names.index("score_distrib_doctor"))
+            self.assertLess(names.index("score_distrib_work_01"), names.index("score_distrib_wait"))
+            self.assertLess(names.index("score_distrib_wait"), names.index("score_distrib_merge"))
             self.assertLess(names.index("score_distrib_merge"), names.index("bullet_text"))
 
             plan = next(
@@ -331,6 +334,13 @@ class BuildConfigTests(unittest.TestCase):
                 self.assertEqual("score_distrib_work", step["parallel_group"])
                 self.assertEqual("/coord/python", step["command"][0])
 
+            wait = next(
+                step for step in config["steps"]
+                if step["name"] == "score_distrib_wait"
+            )
+            self.assertEqual("/coord/python", wait["command"][0])
+            self.assertIn("wait", wait["command"])
+
             bullet_text = next(
                 step for step in config["steps"]
                 if step["name"] == "bullet_text"
@@ -364,7 +374,7 @@ class BuildConfigTests(unittest.TestCase):
         self.assertIn("localhost:/coord=/local", plan["command"])
         self.assertIn("pwa-wsl:/coord=/wsl", plan["command"])
 
-    def test_distributed_score_requires_local_worker_slot(self) -> None:
+    def test_distributed_score_can_wait_for_external_workers_only(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({
                 "create": {
@@ -372,6 +382,30 @@ class BuildConfigTests(unittest.TestCase):
                     "bullet_generate_source": True,
                     "score_distrib": True,
                     "score_distrib_local_slots": 0,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertNotIn("score_distrib_work_00", names)
+            self.assertIn("score_distrib_wait", names)
+            self.assertLess(names.index("score_distrib_wait"), names.index("score_distrib_merge"))
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_distributed_score_rejects_negative_local_worker_slots(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "score_distrib": True,
+                    "score_distrib_local_slots": -1,
                 }
             }, handle)
             path = handle.name

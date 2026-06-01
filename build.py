@@ -155,10 +155,8 @@ def validate_create_args(args: argparse.Namespace) -> None:
     if args.score_distrib:
         if args.score_shards <= 0:
             raise SystemExit("score_distrib requires score_shards > 0")
-        if args.score_distrib_local_slots <= 0:
-            raise SystemExit(
-                "score_distrib currently requires score_distrib_local_slots > 0; "
-                "external-only waiting is not implemented")
+        if args.score_distrib_local_slots < 0:
+            raise SystemExit("score_distrib_local_slots must be >= 0")
 
     if not (args.require_clean_enyo_owned and args.bullet_generate_source):
         return
@@ -310,6 +308,15 @@ def append_distributed_score_steps(
                 "--lease-seconds", str(args.score_distrib_lease_seconds),
             ],
         })
+
+    steps.append({
+        "name": "score_distrib_wait",
+        "command": [
+            distrib_python, distrib, "wait",
+            "--manifest", manifest,
+            "--lease-seconds", str(args.score_distrib_lease_seconds),
+        ],
+    })
 
     steps.append({
         "name": "score_distrib_merge",
