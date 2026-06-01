@@ -329,6 +329,30 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_distributed_score_accepts_cli_path_maps(self) -> None:
+        parser = build.build_parser()
+        args = parser.parse_args([
+            "create",
+            "--dry-run",
+            "--backend", "bullet",
+            "--bullet-generate-source",
+            "--score-distrib",
+            "--score-distrib-local-slots", "1",
+            "--no-score-distrib-require-notify",
+            "--score-distrib-path-map", "localhost:/coord=/local",
+            "--score-distrib-path-map", "pwa-wsl:/coord=/wsl",
+            "--engine-static-rows", "10",
+        ])
+
+        config = build.create_config(args)
+        plan = next(
+            step for step in config["steps"]
+            if step["name"] == "score_distrib_plan"
+        )
+
+        self.assertIn("localhost:/coord=/local", plan["command"])
+        self.assertIn("pwa-wsl:/coord=/wsl", plan["command"])
+
     def test_distributed_score_requires_local_worker_slot(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

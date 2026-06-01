@@ -719,6 +719,14 @@ def add_create_args(
     cfg = overrides or {}
     value = lambda key, fallback: config_default(cfg, key, fallback)
 
+    def append_default(key: str, fallback: object) -> list[object]:
+        current = value(key, fallback)
+        if current is None:
+            return []
+        if isinstance(current, str):
+            return [current]
+        return list(current)
+
     parser.add_argument("-c", "--config", default=value("config", None),
                         help="JSON create-argument config. CLI args override it.")
     parser.add_argument("--name", default=value("name", None))
@@ -775,7 +783,7 @@ def add_create_args(
     parser.add_argument("--score-distrib-lease-seconds", type=int,
                         default=value("score_distrib_lease_seconds", d.score_distrib_lease_seconds))
     parser.add_argument("--score-distrib-path-map", action="append",
-                        default=value("score_distrib_path_map", d.score_distrib_path_map))
+                        default=append_default("score_distrib_path_map", d.score_distrib_path_map))
     parser.add_argument("--score-distrib-require-notify",
                         action=argparse.BooleanOptionalAction,
                         default=value("score_distrib_require_notify", d.score_distrib_require_notify))
