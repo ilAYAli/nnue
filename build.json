@@ -1,8 +1,8 @@
 {
-  "description": "Clean Enyo-owned d16 NNUE bootstrap run: generate self-play positions with the first owned native net that clearly beats HCE, relabel with Stockfish depth 12, train from random init with Bullet, and gate with provenance plus engine-static validation before SPRT.",
-  "experiment": "native-d16-owned-bootstrap-v3",
+  "description": "Clean Enyo-owned d16 NNUE bootstrap proof run: generate 20k self-play games with the first owned native net that clearly beats HCE, relabel with Stockfish depth 12, train from random init with Bullet, and gate with provenance plus engine-static validation before SPRT.",
+  "experiment": "native-d16-owned-bootstrap-v3-20k",
   "create": {
-    "name": "native-d16-owned-bootstrap-v3-selfplay-sf-d12-20260601",
+    "name": "native-d16-owned-bootstrap-v3-20k-sf-d12-20260601",
     "backend": "bullet",
     "engine": "/home/petter/code/cpp/chess/assets/engines/reference",
     "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601/train/native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601/model.nn",
@@ -33,7 +33,7 @@
     "engine_static_jsonl": "",
     "engine_static_rows": 2000,
     "require_clean_enyo_owned": true,
-    "selfplay_games": 160000,
+    "selfplay_games": 20000,
     "selfplay_shard_games": 1000,
     "selfplay_concurrency": 12,
     "selfplay_threads": 1,
