@@ -170,18 +170,20 @@ git diff --name-only origin/main..HEAD
   `fail` messages unless the event is marked user-worthy, improved,
   promotion-candidate, or critical.
 - Always wake the agent for long-running phase completions and failures through
-  `notifai.sh`. This is agent control traffic, not user-facing status.
+  the event hook. It sends agent control traffic to `AI_stdin` by default and
+  also tries `notifai.sh` as a direct tmux wakeup path.
 - Set `NNUE_NOTIFAI_TARGET` explicitly for long-running jobs. It must point to
   the active Codex pane, never a worker tmux session such as `nnue_native`,
   `nnue_reckless`, `nnue_training`, or `nnue_test`.
-- Direct publication to the `AI_stdin` ntfy topic is disabled by default. Use
-  `NNUE_AI_STDIN_NTFY_ENABLE=1` only for an intentional diagnostic.
+- Do not disable `NNUE_AI_STDIN_NTFY_ENABLE` for long runs. `AI_stdin` is agent
+  control traffic, not user-facing status.
 - Do not rely on inherited tmux environment. Long-run launches should set the
   event split explicitly:
 
 ```sh
 NNUE_NTFY_EVENTS=done,fail,test \
 NNUE_AI_STDIN_EVENTS=phase_done,done,fail \
+NNUE_AI_STDIN_NTFY_ENABLE=1 \
 NNUE_AI_STDOUT_EVENTS=done,fail \
 NNUE_NOTIFAI_TARGET=<current-codex-pane> \
 ./build.py create -c build.json \
