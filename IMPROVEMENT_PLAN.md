@@ -31,11 +31,22 @@ Current clean-native lineage names:
 - `native-1.0.0`: clean Enyo-native baseline from the current lane.
 - `native-1.1.0`: v2-cont continuation that beat `native-1.0.0` by
   `+99.0 +/- 40.3 Elo` over 256 games.
-- `native-1.2.0-rc1`: current fresh-self-play continuation candidate, pending
-  validation against `native-1.1.0`.
+- `native-1.2.0-rc1`: fresh self-play continuation from `native-1.1.0`.
+  It is still far below Berserk, but the native-baseline control was positive
+  (`+46.4 +/- 53.7` over 128 games), so it is the current best clean-native
+  starting point.
+- `native-1.3.0-rc1`: next native-only self-play iteration, generated from
+  `native-1.2.0-rc1` and continued from its Bullet weights.
 
 Current build intent:
 
+- LC0 scalar/root-q probes are rejected for now. Do not use LC0 again unless it
+  is a materially different experiment with a clear chance to shorten the path
+  to a stronger net.
+- Current run intent: `native-1.3.0-rc1-v4selfplay-sf-d12-lr2e6-sb512-20260601`.
+  Generate self-play from the best clean-native v4/native-1.2.0-rc1 net, label
+  with Stockfish d12, continue from v4 Bullet weights at a lower dose, then gate
+  versus v4 before any Berserk test.
 - The random-init bootstrap on the v2-generated corpus is rejected:
   `native-d16-owned-bootstrap-v3-20k-sf-d12-20260601` passed provenance and
   engine-static validation, but the Berserk smoke hard-rejected at
