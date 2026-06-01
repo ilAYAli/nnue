@@ -197,7 +197,7 @@ bucket_0_50 = compact_metric_line(last_matching(log_text, r"^bucket:0-50 "))
 bucket_50_100 = compact_metric_line(last_matching(log_text, r"^bucket:50-100 "))
 train_time = last_matching(log_text, r"Total Training Time:")
 sprt_done = last_matching(log_text, r"Enyo NNUE SPRT finished")
-sprt_line = last_matching(log_text, r"^\[[[:space:]0-9]+/[0-9]+]")
+sprt_line = last_matching(log_text, r"^\[\s*\d+/\d+\]")
 failure_line = last_matching(log_text, r"^(failed .*|.*CUDA_ERROR.*|.*Traceback.*|.*ValueError:.*)")
 
 lines = ["NNUE status"]
