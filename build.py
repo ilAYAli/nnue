@@ -159,6 +159,43 @@ def validate_create_args(args: argparse.Namespace) -> None:
         )
 
 
+def append_score_steps(
+    steps: list[dict],
+    args: argparse.Namespace,
+    *,
+    input_jsonl: str,
+) -> None:
+    python = str(expand_user(args.python))
+    for shard in range(args.score_shards):
+        steps.append({
+            "name": f"score_{shard:02d}",
+            "parallel_group": "score",
+            "command": [
+                python, tool("score/score.py"), "uci",
+                "--input", input_jsonl,
+                "--output", f"{{score}}/shards/label.{shard}.jsonl",
+                "--engine", str(expand_path(args.score_engine)),
+                "--depth", str(args.score_depth),
+                "--threads", str(args.score_threads),
+                "--hash", str(args.score_hash),
+                "--shard-count", str(args.score_shards),
+                "--shard-index", str(shard),
+                "--limit", str(args.score_limit),
+                "--max-abs-cp", str(args.score_max_abs_cp),
+                "--progress", str(args.score_progress),
+            ],
+        })
+
+    steps.append({
+        "name": "score_merge",
+        "command": [
+            "bash", "-lc",
+            "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
+            "merge-score", "{score}",
+        ],
+    })
+
+
 def append_source_generation_steps(
     steps: list[dict],
     args: argparse.Namespace,
@@ -214,34 +251,7 @@ def append_source_generation_steps(
         },
     ])
 
-    for shard in range(args.score_shards):
-        steps.append({
-            "name": f"score_{shard:02d}",
-            "parallel_group": "score",
-            "command": [
-                python, tool("score/score.py"), "uci",
-                "--input", "{posgen}/source.jsonl",
-                "--output", f"{{score}}/shards/label.{shard}.jsonl",
-                "--engine", str(expand_path(args.score_engine)),
-                "--depth", str(args.score_depth),
-                "--threads", str(args.score_threads),
-                "--hash", str(args.score_hash),
-                "--shard-count", str(args.score_shards),
-                "--shard-index", str(shard),
-                "--limit", str(args.score_limit),
-                "--max-abs-cp", str(args.score_max_abs_cp),
-                "--progress", str(args.score_progress),
-            ],
-        })
-
-    steps.append({
-        "name": "score_merge",
-        "command": [
-            "bash", "-lc",
-            "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
-            "merge-score", "{score}",
-        ],
-    })
+    append_score_steps(steps, args, input_jsonl="{posgen}/source.jsonl")
 
 
 def create_config(args: argparse.Namespace) -> dict:
@@ -370,7 +380,16 @@ def create_config(args: argparse.Namespace) -> dict:
             },
         ])
     elif args.backend == "bullet":
-        if args.bullet_generate_source:
+        if args.score_source_jsonl:
+            append_score_steps(
+                steps,
+                args,
+                input_jsonl=templated_path_arg(args.score_source_jsonl),
+            )
+            args.bullet_source_jsonl = "{score}/labeled.jsonl"
+            if not args.engine_static_jsonl:
+                args.engine_static_jsonl = "{score}/labeled.jsonl"
+        elif args.bullet_generate_source:
             append_source_generation_steps(steps, args)
             args.bullet_source_jsonl = "{score}/labeled.jsonl"
             if not args.engine_static_jsonl:
@@ -642,6 +661,7 @@ def add_create_args(
     parser.add_argument("--score-threads", type=int, default=value("score_threads", d.score_threads))
     parser.add_argument("--score-hash", type=int, default=value("score_hash", d.score_hash))
     parser.add_argument("--score-limit", type=int, default=value("score_limit", d.score_limit))
+    parser.add_argument("--score-source-jsonl", default=value("score_source_jsonl", d.score_source_jsonl))
     parser.add_argument("--score-max-abs-cp", type=int, default=value("score_max_abs_cp", d.score_max_abs_cp))
     parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
 

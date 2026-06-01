@@ -206,6 +206,57 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_score_existing_source_jsonl_feeds_bullet_training(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": False,
+                    "score_source_jsonl": "/runs/source/source.jsonl",
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "score_shards": 2,
+                    "score_limit": 1000,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            score_steps = [
+                step for step in config["steps"]
+                if str(step["name"]).startswith("score_")
+                and step["name"] != "score_merge"
+            ]
+            self.assertEqual(2, len(score_steps))
+            for step in score_steps:
+                input_index = step["command"].index("--input")
+                self.assertEqual(
+                    "/runs/source/source.jsonl",
+                    step["command"][input_index + 1],
+                )
+                limit_index = step["command"].index("--limit")
+                self.assertEqual("1000", step["command"][limit_index + 1])
+
+            bullet_text = next(
+                step for step in config["steps"]
+                if step["name"] == "bullet_text"
+            )
+            input_index = bullet_text["command"].index("--input")
+            self.assertEqual("{score}/labeled.jsonl", bullet_text["command"][input_index + 1])
+
+            engine_static = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_engine_static"
+            )
+            jsonl_index = engine_static["command"].index("--jsonl")
+            self.assertEqual("{score}/labeled.jsonl", engine_static["command"][jsonl_index + 1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()

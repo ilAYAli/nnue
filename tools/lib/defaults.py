@@ -57,6 +57,7 @@ class CandidateDefaults:
     score_threads: int = 1
     score_hash: int = 128
     score_limit: int = 0
+    score_source_jsonl: str = ""
     score_max_abs_cp: int = 1600
     score_progress: int = 10000
 
