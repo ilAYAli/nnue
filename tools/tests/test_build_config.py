@@ -174,6 +174,38 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_score_limit_is_forwarded_to_all_score_shards(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "nnue_file": "/repo/enyo/net/clean-owned-source.nn",
+                    "score_limit": 12345,
+                    "score_shards": 3,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            score_steps = [
+                step for step in config["steps"]
+                if str(step["name"]).startswith("score_")
+                and step["name"] != "score_merge"
+            ]
+            self.assertEqual(3, len(score_steps))
+            for step in score_steps:
+                self.assertIn("--limit", step["command"])
+                limit_index = step["command"].index("--limit")
+                self.assertEqual("12345", step["command"][limit_index + 1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()
