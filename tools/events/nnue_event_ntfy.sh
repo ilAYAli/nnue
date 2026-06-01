@@ -35,6 +35,8 @@ PY
 user_worthy=$(NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
 import json
 import os
+import re
+from pathlib import Path
 
 event = json.loads(os.environ["NNUE_EVENT_PAYLOAD"])
 name = str(event.get("event", ""))
@@ -44,6 +46,34 @@ elif any(event.get(key) for key in (
         "user_notify", "good_news", "promotion_candidate", "improved",
         "critical", "critical_failure")):
     print("1")
+elif name == "done":
+    log = event.get("log", "")
+    try:
+        path = Path(str(log)).expanduser()
+        with path.open("rb") as handle:
+            handle.seek(0, 2)
+            end = handle.tell()
+            handle.seek(max(0, end - 700_000))
+            text = handle.read().decode("utf-8", errors="replace")
+    except OSError:
+        text = ""
+    sprt_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if "Enyo NNUE SPRT finished" in line or re.match(r"^\[\s*\d+/\d+\]", line)
+    ]
+    worthy = False
+    if sprt_lines:
+        line = sprt_lines[-1]
+        elo_match = re.search(r"Elo\s+([+-]?\d+(?:\.\d+)?)", line)
+        llr_match = re.search(r"LLR\s+([+-]?\d+(?:\.\d+)?)/", line)
+        los_match = re.search(r"LOS\s+([0-9.]+)%", line)
+        if elo_match:
+            elo = float(elo_match.group(1))
+            llr = float(llr_match.group(1)) if llr_match else 0.0
+            los = float(los_match.group(1)) if los_match else 0.0
+            worthy = elo > 0.0 and (los >= 80.0 or llr > 0.0)
+    print("1" if worthy else "0")
 else:
     print("0")
 PY
@@ -69,6 +99,7 @@ if [ "$AI_ENABLE" = "1" ]; then
 fi
 if [ "$USER_GENERIC" != "1" ] && [ "$user_worthy" != "1" ]; then
     send_nnue=0
+    send_ai_stdout=0
 fi
 
 if [ "$send_nnue" = "0" ] && [ "$send_ai_stdout" = "0" ] && [ "$send_ai_stdin" = "0" ]; then
