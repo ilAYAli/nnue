@@ -102,6 +102,99 @@ class NetProvenanceTests(unittest.TestCase):
             self.assertEqual(result.init, "unknown")
             self.assertFalse(result.clean_enyo_owned)
 
+    def test_traces_clean_bullet_init_weights(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = root / "runs" / "base-clean"
+            base_train = base / "train" / "base-clean" / "checkpoints" / "base-clean-64"
+            weights = base_train / "optimiser_state" / "weights.bin"
+            weights.parent.mkdir(parents=True)
+            weights.write_bytes(b"")
+            base_train.joinpath("quantised.bin").write_bytes(b"")
+            base.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "data=/data/replay-loss-20260531/loss_replay_child_targets.jsonl\n",
+                encoding="utf-8",
+            )
+            pack = base / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            run = root / "runs" / "continued-clean"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                f"--init-weights {weights}\n"
+                "data=/data/replay-loss-20260531/loss_replay_child_targets.jsonl\n",
+                encoding="utf-8",
+            )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertEqual(result.init, "random")
+            self.assertIn(str(weights), result.init_chain)
+            self.assertTrue(result.clean_enyo_owned)
+
+    def test_rejects_borrowed_bullet_init_weights(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = root / "runs" / "base-borrowed"
+            base_train = base / "train" / "base-borrowed" / "checkpoints" / "base-borrowed-64"
+            weights = base_train / "optimiser_state" / "weights.bin"
+            weights.parent.mkdir(parents=True)
+            weights.write_bytes(b"")
+            base_train.joinpath("quantised.bin").write_bytes(b"")
+            base.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "initializing from /repo/enyo/net/berserk-d43206fe90e4.nn\n"
+                "data=/data/replay-loss-20260531/loss_replay_child_targets.jsonl\n",
+                encoding="utf-8",
+            )
+
+            run = root / "runs" / "continued-borrowed"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                f"--init-weights {weights}\n"
+                "data=/data/replay-loss-20260531/loss_replay_child_targets.jsonl\n",
+                encoding="utf-8",
+            )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertEqual(result.init, "berserk-derived")
+            self.assertIn(str(weights), result.init_chain)
+            self.assertFalse(result.clean_enyo_owned)
+
     def test_ignores_previous_provenance_report_fields(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

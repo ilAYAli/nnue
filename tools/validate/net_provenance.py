@@ -15,6 +15,7 @@ INIT_PATTERNS = (
     re.compile(r"^init=(?P<path>\S+)"),
     re.compile(r"\binitializing from (?P<path>\S+)"),
     re.compile(r"(?:^|\s)--init-from-nn\s+(?P<path>\S+)"),
+    re.compile(r"(?:^|\s)--init-weights\s+(?P<path>\S+)"),
     re.compile(r"(?:^|\s)--base-net\s+(?P<path>\S+)"),
 )
 DATA_PATTERNS = (
