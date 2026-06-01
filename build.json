@@ -1,11 +1,11 @@
 {
-  "description": "Clean Enyo-owned d16 v4: generate self-play with the improved v2-cont net, label with Stockfish d12, then continue from the v2-cont Bullet weights at low dose.",
-  "experiment": "native-d16-owned-v4-selfplay-v2cont",
+  "description": "Clean Enyo-native 1.4.0-rc1: generate self-play with native 1.3.0-rc1, label with Stockfish d14, then continue from the native 1.3.0 Bullet weights.",
+  "experiment": "native-1.4.0-rc1-selfplay-sf-d14",
   "create": {
-    "name": "native-d16-owned-v4-selfplay-v2cont-sf-d12-lr3e6-sb512-20260601",
+    "name": "native-1.4.0-rc1-n13selfplay-sf-d14-lr2e6-sb512-20260601",
     "backend": "bullet",
     "engine": "/home/petter/code/cpp/chess/assets/engines/reference",
-    "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601/train/native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601/model.nn",
+    "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.3.0-rc1-v4selfplay-sf-d12-lr2e6-sb512-20260601/train/native-1.3.0-rc1-v4selfplay-sf-d12-lr2e6-sb512-20260601/model.nn",
     "book": "/home/petter/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd",
     "runner": "/home/petter/source/fastchess/fastchess",
     "selfplay_games": 20000,
@@ -15,12 +15,12 @@
     "selfplay_hash": 128,
     "selfplay_use_nnue": true,
     "selfplay_depth": 8,
-    "selfplay_seed": 2026060102,
+    "selfplay_seed": 2026060104,
     "skip_plies": 8,
     "source_max_abs_cp": 1600,
     "sample_preset": "signed-balanced-v1",
     "score_engine": "/home/petter/local/bin/stockfish",
-    "score_depth": 12,
+    "score_depth": 14,
     "score_shards": 24,
     "score_threads": 1,
     "score_hash": 128,
@@ -44,11 +44,11 @@
     "bullet_superbatches": 512,
     "bullet_threads": 4,
     "bullet_wdl": 0.25,
-    "bullet_lr": 0.000003,
-    "bullet_final_lr": 0.000001,
+    "bullet_lr": 2e-06,
+    "bullet_final_lr": 7e-07,
     "bullet_eval_scale": 300,
     "bullet_save_rate": 64,
-    "bullet_init_weights": "/home/petter/code/cpp/chess/nnue/runs/native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601/train/native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601/checkpoints/native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601-512/optimiser_state/weights.bin",
+    "bullet_init_weights": "/home/petter/code/cpp/chess/nnue/runs/native-1.3.0-rc1-v4selfplay-sf-d12-lr2e6-sb512-20260601/train/native-1.3.0-rc1-v4selfplay-sf-d12-lr2e6-sb512-20260601/checkpoints/native-1.3.0-rc1-v4selfplay-sf-d12-lr2e6-sb512-20260601-512/optimiser_state/weights.bin",
     "bullet_trainable": "all",
     "bullet_static_data": "",
     "engine_static_jsonl": "",
@@ -58,8 +58,8 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "promotion_gate": "Pass clean Enyo-owned provenance, engine-static sanity, 256-game triage versus the previous clean-owned net, then run Berserk smoke only if the owned baseline improves.",
-    "ownership_definition": "Clean Enyo-owned init chain; Enyo self-play/replay positions; Stockfish allowed only as oracle labeler.",
-    "reason": "The v2-cont run was still far below Berserk, but it beat the previous clean-owned v2 net by about +99 Elo in a 256-game smoke. This run tests whether iterating self-play from the improved owned net continues that improvement."
+    "promotion_gate": "Pass clean provenance and engine-static sanity, smoke against native 1.3.0-rc1 first, then compare to native v4 only if it improves the current native baseline.",
+    "ownership_definition": "Clean Enyo-native init chain; Enyo self-play positions; Stockfish allowed only as oracle labeler.",
+    "reason": "native-1.3.0-rc1 was mildly positive over v4 (+8.7 +/- 18.6 over 1000 games) but not promotable. This run tests whether an rc1 self-play refresh plus higher-quality SF d14 labels creates a clearer native-baseline step."
   }
 }

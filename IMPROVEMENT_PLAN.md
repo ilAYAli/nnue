@@ -31,25 +31,32 @@ Current clean-native lineage names:
 - `native-1.0.0`: clean Enyo-native baseline from the current lane.
 - `native-1.1.0`: v2-cont continuation that beat `native-1.0.0` by
   `+99.0 +/- 40.3 Elo` over 256 games.
-- `native-1.2.0-rc1`: current fresh-self-play continuation candidate, pending
-  validation against `native-1.1.0`.
+- `native-1.2.0-rc1`: fresh self-play continuation from `native-1.1.0`
+  (historical run name `native-d16-owned-v4-*`). It is still far below
+  Berserk, but it is a useful clean-native baseline.
+- `native-1.3.0-rc1`: generated from `native-1.2.0-rc1`, labeled with
+  Stockfish d12, and continued from the 1.2 weights. It beat 1.2/v4 by
+  `+8.7 +/- 18.6 Elo` over 1000 games, LOS `82.1%`, draw `25.9%`. This
+  is not promotable, but it is the best current clean-native parent by point
+  estimate.
+- `native-1.4.0-rc1`: current intended run. Generate self-play from
+  `native-1.3.0-rc1`, label with Stockfish d14, and continue from the 1.3
+  Bullet weights.
 
 Current build intent:
 
-- The random-init bootstrap on the v2-generated corpus is rejected:
-  `native-d16-owned-bootstrap-v3-20k-sf-d12-20260601` passed provenance and
-  engine-static validation, but the Berserk smoke hard-rejected at
-  `-961 Elo`, LLR `-2.95/2.94`, and only `0.8%` draws.
-- The clean-owned v2 continuation on that corpus produced mixed but useful
-  results:
-  - versus Berserk it is still a hard reject: `-771.8 Elo`, LLR
-    `-2.95/2.94`, and only `0.8%` draws in the 256-game smoke;
-  - versus the previous clean-owned v2 net it is a clear step forward:
-    `+99.0 +/- 40.3 Elo` over 256 games, LOS `100%`, draw `16.8%`.
-- Next test: generate self-play from the improved clean-owned v2-cont net,
-  label with Stockfish d12, and continue from v2-cont at low dose. This tests
-  whether owned self-play iteration continues to improve the clean-owned
-  baseline.
+- LC0 scalar/root-q probes are rejected for now. Do not use LC0 again unless it
+  is a materially different experiment with a clear chance to shorten the path
+  to a stronger net.
+- Current run intent: `native-1.4.0-rc1-n13selfplay-sf-d14-lr2e6-sb512-20260601`.
+  Keep the architecture and objective fixed, generate fresh Enyo self-play from
+  `native-1.3.0-rc1`, raise oracle quality from SF d12 to SF d14, and continue
+  from the 1.3 Bullet weights. This tests label-quality/self-play refresh, not
+  a new architecture.
+- Gate order: clean provenance, engine-static sanity, 256-game smoke versus
+  `native-1.3.0-rc1`, then a longer native-baseline confirm only if the smoke
+  is neutral-positive. Do not spend a Berserk gate unless the native-baseline
+  result is clearly useful.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
@@ -58,7 +65,7 @@ Current build intent:
 - First promotion threshold is "not worse than Berserk", not merely "close".
 - Do not rerun a random-init candidate on the v2-generated corpus unless the
   architecture or label objective changes. Current progress is in continuation
-  from the best clean-owned baseline, not scratch replacement strength.
+  from the best clean-native baseline, not scratch replacement strength.
 
 2026-05-31 ownership correction:
 
