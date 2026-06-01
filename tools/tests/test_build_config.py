@@ -287,10 +287,13 @@ class BuildConfigTests(unittest.TestCase):
             names = [step["name"] for step in config["steps"]]
 
             self.assertIn("score_distrib_plan", names)
+            self.assertIn("score_distrib_add_input", names)
             self.assertIn("score_distrib_doctor", names)
             self.assertIn("score_distrib_work_00", names)
             self.assertIn("score_distrib_work_01", names)
             self.assertIn("score_distrib_merge", names)
+            self.assertLess(names.index("score_distrib_plan"), names.index("score_distrib_add_input"))
+            self.assertLess(names.index("score_distrib_add_input"), names.index("score_distrib_doctor"))
             self.assertLess(names.index("score_distrib_merge"), names.index("bullet_text"))
 
             plan = next(
@@ -310,6 +313,14 @@ class BuildConfigTests(unittest.TestCase):
             self.assertIn("--shard-count '{{shards}}'", template)
             self.assertIn("--shard-index '{{index}}'", template)
             self.assertIn("--limit 123", template)
+
+            add_input = next(
+                step for step in config["steps"]
+                if step["name"] == "score_distrib_add_input"
+            )
+            self.assertEqual("/coord/python", add_input["command"][0])
+            self.assertIn("add-input", add_input["command"])
+            self.assertIn("--path", add_input["command"])
 
             workers = [
                 step for step in config["steps"]

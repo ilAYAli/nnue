@@ -274,6 +274,15 @@ def append_distributed_score_steps(
         "command": plan_command,
     })
 
+    steps.append({
+        "name": "score_distrib_add_input",
+        "command": [
+            distrib_python, distrib, "add-input",
+            "--manifest", manifest,
+            "--path", input_jsonl,
+        ],
+    })
+
     doctor_command = [
         distrib_python, distrib, "doctor",
         "--manifest", manifest,
