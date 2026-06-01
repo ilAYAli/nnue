@@ -161,6 +161,21 @@ git diff --name-only origin/main..HEAD
   stop criteria.
 - Keep public docs free of machine-specific hostnames and private paths.
 
+## Native Net Versioning Rules
+
+- Use `native-MAJOR.MINOR.PATCH[-rcN]` for clean Enyo-native NNUE lineages.
+- `MAJOR` changes only for a materially different lane: architecture, feature
+  layout, oracle/data family, objective, export format, or runtime semantics.
+- `MINOR` changes for a measurable same-lane candidate from continued training,
+  a new self-play iteration, or a non-trivial hyperparameter/data-dose change.
+- `PATCH` changes for same-lineage metadata/export/calibration fixes or tiny
+  corrective retrains that do not define a new candidate lane.
+- `rcN` marks a validation candidate before promotion.
+- Use `native` in status and docs. Avoid `owned` as a version name; reserve
+  "clean Enyo-owned" for provenance discussion only.
+- Historical run names may still contain `owned`; do not rename old run
+  artifacts just to match the current naming scheme.
+
 ## Shared Long-Run Rules
 
 - Run long NNUE jobs in tmux.

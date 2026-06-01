@@ -13,6 +13,27 @@ near-replacement candidates (`d16-continue-latest20m-huber-sign-*` and RC2)
 are now rejected for the clean Enyo-owned lane: the provenance gate traces
 their init chain back to `berserk-d43206fe90e4.nn`.
 
+Versioning rule for clean Enyo-native nets:
+
+- Use `native-MAJOR.MINOR.PATCH[-rcN]`.
+- Bump `MAJOR` only for a materially different lane: architecture, feature
+  layout, oracle/data family, objective, export format, or runtime semantics.
+- Bump `MINOR` for a measurable same-lane candidate from continued training,
+  a new self-play iteration, or a non-trivial hyperparameter/data-dose change.
+- Bump `PATCH` only for same-lineage metadata/export/calibration fixes or tiny
+  corrective retrains.
+- Use `rcN` for validation candidates before promotion.
+- Use `native` in current status and candidate names. Historical run names may
+  still contain `owned`; do not rename existing artifacts.
+
+Current clean-native lineage names:
+
+- `native-1.0.0`: clean Enyo-native baseline from the current lane.
+- `native-1.1.0`: v2-cont continuation that beat `native-1.0.0` by
+  `+99.0 +/- 40.3 Elo` over 256 games.
+- `native-1.2.0-rc1`: current fresh-self-play continuation candidate, pending
+  validation against `native-1.1.0`.
+
 Current build intent:
 
 - The random-init bootstrap on the v2-generated corpus is rejected:
