@@ -18,6 +18,40 @@ posgen -> score -> pack -> train
 
 Validation is separate and lives under `tools/validate/`.
 
+## Candidate Workflow
+
+The normal candidate pipeline is:
+
+```text
+Step 1  self-play
+Step 2  row extraction and filtering
+Step 3  signed bucket sampling
+Step 4  teacher labeling
+Step 5  tensor packing
+Step 6  training and .nn export
+Step 7  static validation
+Step 8  replay/failure gates
+Step 9  SPRT
+```
+
+Short meaning:
+
+```text
+self-play          generate Enyo-vs-Enyo games from the configured engine/net
+extraction         convert PGN into filtered JSONL position rows
+sampling           balance useful score buckets before expensive labeling
+teacher labeling   score selected positions with the configured oracle
+packing            convert JSONL/FEN rows into numeric training tensors or Bullet data
+training           train weights and export model.nn
+static validation  check exported net behavior on held-out labeled rows
+replay gates       reject known tactical/search regressions before games
+SPRT               measure actual playing strength
+```
+
+Do not promote a net from static MAE alone. Static validation is a rejection
+filter. A release candidate needs game strength: at minimum a clean smoke, and
+usually a longer SPRT against the current reference net.
+
 ## Build A Net
 
 Current reviewed improvement run:
@@ -160,10 +194,24 @@ tools/validate/validate.py sprt \
   --event-command "$HOME/scripts/nnue_event_ntfy.sh"
 ```
 
+Useful static metrics:
+
+```text
+MAE    average absolute centipawn error
+MSE    squared error, sensitive to big misses
+sign   how often net and target agree which side is better
+bias   average prediction minus target
+slope  eval calibration; low means compressed, high means exaggerated
+corr   whether prediction ordering tracks target ordering
+```
+
+SPRT compares the same Enyo binary with different `nnue_file` values. That
+isolates the net change from engine-code changes.
+
 ## Important Docs
 
 ```text
-NNUE.md              NNUE architecture, weights, accumulators, and training concepts
+NNUE.md              NNUE architecture, weights, feature rows, accumulators, and evaluation
 IMPROVEMENT_PLAN.md  Current experiment plan and lessons from failed runs
 tools/README.md      Lower-level phase tool overview
 ```
