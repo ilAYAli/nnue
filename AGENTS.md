@@ -179,14 +179,19 @@ git diff --name-only origin/main..HEAD
 ## Shared Long-Run Rules
 
 - Run long NNUE jobs in tmux.
-- Notifications should report conclusions, task, ETA, and project state.
-- The `nnue` topic is for user-facing conclusions, not phase spam. The hook
-  subscribes to `done,fail,test` by default, but suppresses generic `done` and
-  `fail` messages unless the event is marked user-worthy, improved,
-  promotion-candidate, or critical.
-- Always wake the agent for long-running phase completions and failures through
-  the event hook. It sends agent control traffic to `AI_stdin` by default and
-  also tries `notifai.sh` as a direct tmux wakeup path.
+- Route notifications by audience:
+  - `AI_stdin`: agent wakeups for actionable long-run `done` and `fail`
+    events.
+  - `AI_stdout`: user-worthy conclusions only.
+  - `nnue`: user-worthy NNUE conclusions only.
+  - `sprt`: handled by `sprt --ntfy-url`; do not duplicate SPRT summaries from
+    the NNUE event hook.
+- User-worthy means promotion-relevant, materially improved, explicitly marked
+  good news, or critical. Do not send phase spam, generic `done`, ordinary
+  failed experiments, or pings to user-facing topics.
+- Always wake the agent for long-running completions and failures through the
+  event hook. It sends agent control traffic to `AI_stdin` by default and also
+  tries `notifai.sh` as a direct tmux wakeup path.
 - Set `NNUE_NOTIFAI_TARGET` explicitly for long-running jobs. It must point to
   the active Codex pane, never a worker tmux session such as `nnue_native`,
   `nnue_reckless`, `nnue_training`, or `nnue_test`.
@@ -200,13 +205,12 @@ NNUE_NTFY_EVENTS=done,fail,test \
 NNUE_AI_STDIN_EVENTS=phase_done,done,fail \
 NNUE_AI_STDIN_NTFY_ENABLE=1 \
 NNUE_AI_STDOUT_EVENTS=done,fail \
+NNUE_USER_NOTIFY_GENERIC=0 \
 NNUE_NOTIFAI_TARGET=<current-codex-pane> \
 ./build.py create -c build.json \
   --event-command /home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh
 ```
 
-- `AI_stdout` should receive concise structured status/conclusion output when
-  a long run completes.
 - Remove temporary tmux windows when the job is done.
 - Do not leave nested shells in tmux panes.
 - Do not start a new training run without an explicit instruction and a written
