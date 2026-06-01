@@ -6,6 +6,7 @@ import argparse
 from dataclasses import fields
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -134,6 +135,10 @@ def templated_path_arg(value: str | Path) -> str:
     return str(expand_path(text))
 
 
+def shell_join(parts: list[str]) -> str:
+    return " ".join(shlex.quote(str(part)) for part in parts)
+
+
 def borrowed_selfplay_nnue_reason(value: str | Path | None) -> str | None:
     text = str(value or "").strip()
     if not text:
@@ -147,6 +152,14 @@ def borrowed_selfplay_nnue_reason(value: str | Path | None) -> str | None:
 
 
 def validate_create_args(args: argparse.Namespace) -> None:
+    if args.score_distrib:
+        if args.score_shards <= 0:
+            raise SystemExit("score_distrib requires score_shards > 0")
+        if args.score_distrib_local_slots <= 0:
+            raise SystemExit(
+                "score_distrib currently requires score_distrib_local_slots > 0; "
+                "external-only waiting is not implemented")
+
     if not (args.require_clean_enyo_owned and args.bullet_generate_source):
         return
     if not args.selfplay_use_nnue:
@@ -165,25 +178,54 @@ def append_score_steps(
     *,
     input_jsonl: str,
 ) -> None:
+    if args.score_distrib:
+        append_distributed_score_steps(steps, args, input_jsonl=input_jsonl)
+    else:
+        append_local_score_steps(steps, args, input_jsonl=input_jsonl)
+
+
+def score_command(
+    args: argparse.Namespace,
+    *,
+    input_jsonl: str,
+    output_jsonl: str,
+    shard_count: str,
+    shard_index: str,
+) -> list[str]:
     python = str(expand_user(args.python))
+    return [
+        python, tool("score/score.py"), "uci",
+        "--input", input_jsonl,
+        "--output", output_jsonl,
+        "--engine", str(expand_path(args.score_engine)),
+        "--depth", str(args.score_depth),
+        "--threads", str(args.score_threads),
+        "--hash", str(args.score_hash),
+        "--shard-count", shard_count,
+        "--shard-index", shard_index,
+        "--limit", str(args.score_limit),
+        "--max-abs-cp", str(args.score_max_abs_cp),
+        "--progress", str(args.score_progress),
+    ]
+
+
+def append_local_score_steps(
+    steps: list[dict],
+    args: argparse.Namespace,
+    *,
+    input_jsonl: str,
+) -> None:
     for shard in range(args.score_shards):
         steps.append({
             "name": f"score_{shard:02d}",
             "parallel_group": "score",
-            "command": [
-                python, tool("score/score.py"), "uci",
-                "--input", input_jsonl,
-                "--output", f"{{score}}/shards/label.{shard}.jsonl",
-                "--engine", str(expand_path(args.score_engine)),
-                "--depth", str(args.score_depth),
-                "--threads", str(args.score_threads),
-                "--hash", str(args.score_hash),
-                "--shard-count", str(args.score_shards),
-                "--shard-index", str(shard),
-                "--limit", str(args.score_limit),
-                "--max-abs-cp", str(args.score_max_abs_cp),
-                "--progress", str(args.score_progress),
-            ],
+            "command": score_command(
+                args,
+                input_jsonl=input_jsonl,
+                output_jsonl=f"{{score}}/shards/label.{shard}.jsonl",
+                shard_count=str(args.score_shards),
+                shard_index=str(shard),
+            ),
         })
 
     steps.append({
@@ -192,6 +234,90 @@ def append_score_steps(
             "bash", "-lc",
             "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
             "merge-score", "{score}",
+        ],
+    })
+
+
+def append_distributed_score_steps(
+    steps: list[dict],
+    args: argparse.Namespace,
+    *,
+    input_jsonl: str,
+) -> None:
+    distrib_python = str(expand_user(args.score_distrib_python or sys.executable))
+    distrib = str(expand_user(args.score_distrib_tool))
+    manifest = "{score}/distrib/manifest.json"
+    score_command_template = shell_join(score_command(
+        args,
+        input_jsonl="{{source}}",
+        output_jsonl="{{output}}",
+        shard_count="{{shards}}",
+        shard_index="{{index}}",
+    ))
+    plan_command = [
+        distrib_python, distrib, "plan",
+        "--name", "score-{candidate}",
+        "--shards", str(args.score_shards),
+        "--work-dir", "{repo}",
+        "--out", manifest,
+        "--state-dir", "{score}/distrib/state",
+        "--log-dir", "{score}/distrib/logs",
+        "--command-template", score_command_template,
+        "--var", f"source={input_jsonl}",
+        "--output-template", "{score}/shards/label.{{index}}.jsonl",
+    ]
+    for mapping in args.score_distrib_path_map or []:
+        plan_command.extend(["--path-map", str(mapping)])
+
+    steps.append({
+        "name": "score_distrib_plan",
+        "command": plan_command,
+    })
+
+    doctor_command = [
+        distrib_python, distrib, "doctor",
+        "--manifest", manifest,
+        "--role", "coordinator",
+    ]
+    if args.score_distrib_require_notify:
+        doctor_command.extend([
+            "--notify-command",
+            str(expand_user(args.score_distrib_notify_command)),
+        ])
+    steps.append({
+        "name": "score_distrib_doctor",
+        "command": doctor_command,
+    })
+
+    for slot in range(args.score_distrib_local_slots):
+        steps.append({
+            "name": f"score_distrib_work_{slot:02d}",
+            "parallel_group": "score_distrib_work",
+            "command": [
+                distrib_python, distrib, "work",
+                "--manifest", manifest,
+                "--coordinator", manifest,
+                "--worker", f"coordinator-{slot:02d}",
+                "--lease-seconds", str(args.score_distrib_lease_seconds),
+            ],
+        })
+
+    steps.append({
+        "name": "score_distrib_merge",
+        "command": [
+            "bash", "-lc",
+            (
+                "python=\"$1\" distrib=\"$2\" manifest=\"$3\" output=\"$4\" rows=\"$5\"; "
+                "\"$python\" \"$distrib\" verify --manifest \"$manifest\" && "
+                "\"$python\" \"$distrib\" merge --manifest \"$manifest\" --output \"$output\" --force && "
+                "wc -l \"$output\" > \"$rows\""
+            ),
+            "merge-distrib-score",
+            distrib_python,
+            distrib,
+            manifest,
+            "{score}/labeled.jsonl",
+            "{score}/labeled.wc",
         ],
     })
 
@@ -308,35 +434,9 @@ def create_config(args: argparse.Namespace) -> dict:
             },
         ]
 
-        for shard in range(args.score_shards):
-            steps.append({
-                "name": f"score_{shard:02d}",
-                "parallel_group": "score",
-                "command": [
-                    python, tool("score/score.py"), "uci",
-                    "--input", "{posgen}/source.jsonl",
-                    "--output", f"{{score}}/shards/label.{shard}.jsonl",
-                    "--engine", str(expand_path(args.score_engine)),
-                    "--depth", str(args.score_depth),
-                    "--threads", str(args.score_threads),
-                    "--hash", str(args.score_hash),
-                    "--shard-count", str(args.score_shards),
-                    "--shard-index", str(shard),
-                    "--limit", str(args.score_limit),
-                    "--max-abs-cp", str(args.score_max_abs_cp),
-                    "--progress", str(args.score_progress),
-                ],
-            })
+        append_score_steps(steps, args, input_jsonl="{posgen}/source.jsonl")
 
         steps.extend([
-            {
-                "name": "score_merge",
-                "command": [
-                    "bash", "-lc",
-                    "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
-                    "merge-score", "{score}",
-                ],
-            },
             {
                 "name": "pack",
                 "command": [
@@ -664,6 +764,23 @@ def add_create_args(
     parser.add_argument("--score-source-jsonl", default=value("score_source_jsonl", d.score_source_jsonl))
     parser.add_argument("--score-max-abs-cp", type=int, default=value("score_max_abs_cp", d.score_max_abs_cp))
     parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
+    parser.add_argument("--score-distrib", action=argparse.BooleanOptionalAction,
+                        default=value("score_distrib", d.score_distrib))
+    parser.add_argument("--score-distrib-tool",
+                        default=value("score_distrib_tool", d.score_distrib_tool))
+    parser.add_argument("--score-distrib-python",
+                        default=value("score_distrib_python", d.score_distrib_python))
+    parser.add_argument("--score-distrib-local-slots", type=int,
+                        default=value("score_distrib_local_slots", d.score_distrib_local_slots))
+    parser.add_argument("--score-distrib-lease-seconds", type=int,
+                        default=value("score_distrib_lease_seconds", d.score_distrib_lease_seconds))
+    parser.add_argument("--score-distrib-path-map", action="append",
+                        default=value("score_distrib_path_map", d.score_distrib_path_map))
+    parser.add_argument("--score-distrib-require-notify",
+                        action=argparse.BooleanOptionalAction,
+                        default=value("score_distrib_require_notify", d.score_distrib_require_notify))
+    parser.add_argument("--score-distrib-notify-command",
+                        default=value("score_distrib_notify_command", d.score_distrib_notify_command))
 
     parser.add_argument("--max-features", type=int, default=value("max_features", d.max_features))
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))

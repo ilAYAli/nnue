@@ -257,6 +257,99 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_distributed_score_plan_feeds_bullet_training(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "score_distrib": True,
+                    "python": "/score/python",
+                    "score_distrib_python": "/coord/python",
+                    "score_distrib_local_slots": 2,
+                    "score_distrib_require_notify": False,
+                    "score_distrib_path_map": [
+                        "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",
+                    ],
+                    "score_shards": 4,
+                    "score_limit": 123,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertIn("score_distrib_plan", names)
+            self.assertIn("score_distrib_doctor", names)
+            self.assertIn("score_distrib_work_00", names)
+            self.assertIn("score_distrib_work_01", names)
+            self.assertIn("score_distrib_merge", names)
+            self.assertLess(names.index("score_distrib_merge"), names.index("bullet_text"))
+
+            plan = next(
+                step for step in config["steps"]
+                if step["name"] == "score_distrib_plan"
+            )
+            self.assertEqual("/coord/python", plan["command"][0])
+            self.assertIn("--path-map", plan["command"])
+            self.assertIn(
+                "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",
+                plan["command"],
+            )
+            template = plan["command"][plan["command"].index("--command-template") + 1]
+            self.assertTrue(template.startswith("/score/python "))
+            self.assertIn("--input '{{source}}'", template)
+            self.assertIn("--output '{{output}}'", template)
+            self.assertIn("--shard-count '{{shards}}'", template)
+            self.assertIn("--shard-index '{{index}}'", template)
+            self.assertIn("--limit 123", template)
+
+            workers = [
+                step for step in config["steps"]
+                if str(step["name"]).startswith("score_distrib_work_")
+            ]
+            self.assertEqual(2, len(workers))
+            for step in workers:
+                self.assertEqual("score_distrib_work", step["parallel_group"])
+                self.assertEqual("/coord/python", step["command"][0])
+
+            bullet_text = next(
+                step for step in config["steps"]
+                if step["name"] == "bullet_text"
+            )
+            input_index = bullet_text["command"].index("--input")
+            self.assertEqual("{score}/labeled.jsonl", bullet_text["command"][input_index + 1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_distributed_score_requires_local_worker_slot(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "score_distrib": True,
+                    "score_distrib_local_slots": 0,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            with self.assertRaises(SystemExit) as ctx:
+                build.create_config(args)
+            self.assertIn("score_distrib_local_slots", str(ctx.exception))
+        finally:
+            Path(path).unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()

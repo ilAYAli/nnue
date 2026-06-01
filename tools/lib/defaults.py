@@ -60,6 +60,14 @@ class CandidateDefaults:
     score_source_jsonl: str = ""
     score_max_abs_cp: int = 1600
     score_progress: int = 10000
+    score_distrib: bool = False
+    score_distrib_python: str = ""
+    score_distrib_tool: str = "~/.local/bin/distrib"
+    score_distrib_local_slots: int = 1
+    score_distrib_lease_seconds: int = 600
+    score_distrib_path_map: tuple[str, ...] = ()
+    score_distrib_require_notify: bool = True
+    score_distrib_notify_command: str = "/home/petter/scripts/notifai.sh"
 
     max_features: int = 32
     pack_progress: int = 250000
