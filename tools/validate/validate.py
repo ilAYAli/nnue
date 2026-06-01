@@ -6,6 +6,7 @@ import argparse
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -187,6 +188,11 @@ def cmd_move_gate(args: argparse.Namespace) -> int:
 def cmd_sprt(args: argparse.Namespace) -> int:
     script = tools_root() / "validate" / "run_net_sprt_pwa.sh"
     run_dir = event_run_dir(args.run, expand_path(args.net).parent)
+    tag = args.tag or ""
+    log_dir = expand_path(args.log_dir) if args.log_dir else (
+        run_dir / (tag or "sprt") / f"sprt_confirm_{time.strftime('%Y%m%d_%H%M%S')}"
+    )
+    run_log = log_dir / "run.log"
     env = os.environ.copy()
     env.update({
         "NET": str(expand_path(args.net)),
@@ -198,9 +204,10 @@ def cmd_sprt(args: argparse.Namespace) -> int:
         "ELO0": str(args.elo0),
         "ELO1": str(args.elo1),
         "RESTART": args.restart,
+        "LOG_DIR": str(log_dir),
     })
-    if args.tag:
-        env["TAG"] = args.tag
+    if tag:
+        env["TAG"] = tag
     if args.run:
         env["RUN"] = str(expand_path(args.run))
     if args.engine:
@@ -211,22 +218,22 @@ def cmd_sprt(args: argparse.Namespace) -> int:
         env["SPRT"] = str(expand_path(args.sprt))
     if args.book:
         env["BOOK"] = str(expand_path(args.book))
-    if args.log_dir:
-        env["LOG_DIR"] = str(expand_path(args.log_dir))
     if args.ntfy_url:
         env["NTFY_URL"] = args.ntfy_url
     command = [str(script)]
     emit_event(
         run_dir, "phase_start", stage="validate_sprt", status="running",
         command=command, hook_command=args.event_command or "",
-        extra={"tag": args.tag or "", "games": args.games, "tc": args.tc},
+        log=run_log,
+        extra={"tag": tag, "games": args.games, "tc": args.tc},
     )
     rc = run(command, env=env)
     emit_event(
-        run_dir, "phase_done" if rc == 0 else "fail",
+        run_dir, "done" if rc == 0 else "fail",
         stage="validate_sprt", status="ok" if rc == 0 else "failed",
         rc=rc, command=command, hook_command=args.event_command or "",
-        extra={"tag": args.tag or "", "games": args.games, "tc": args.tc},
+        log=run_log,
+        extra={"tag": tag, "games": args.games, "tc": args.tc},
     )
     return rc
 
