@@ -36,6 +36,7 @@ def cmd_uci(args: argparse.Namespace) -> int:
         "--hash", str(args.hash),
         "--shard-count", str(args.shard_count),
         "--shard-index", str(args.shard_index),
+        "--concurrency", str(args.concurrency),
         "--limit", str(args.limit),
         "--max-abs-cp", str(args.max_abs_cp),
         "--progress", str(args.progress),
@@ -64,6 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     uci.add_argument("--hash", type=int, default=128)
     uci.add_argument("--shard-count", type=int, default=1)
     uci.add_argument("--shard-index", type=int, default=0)
+    uci.add_argument("--concurrency", type=int, default=1)
     uci.add_argument("--limit", type=int, default=0)
     uci.add_argument("--max-abs-cp", type=int, default=1600)
     uci.add_argument("--progress", type=int, default=1000)

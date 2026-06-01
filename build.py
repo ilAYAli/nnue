@@ -180,6 +180,7 @@ def append_score_steps(
                 "--hash", str(args.score_hash),
                 "--shard-count", str(args.score_shards),
                 "--shard-index", str(shard),
+                "--concurrency", str(args.score_concurrency),
                 "--limit", str(args.score_limit),
                 "--max-abs-cp", str(args.score_max_abs_cp),
                 "--progress", str(args.score_progress),
@@ -659,6 +660,7 @@ def add_create_args(
     parser.add_argument("--score-depth", type=int, default=value("score_depth", d.score_depth))
     parser.add_argument("--score-shards", type=int, default=value("score_shards", d.score_shards))
     parser.add_argument("--score-threads", type=int, default=value("score_threads", d.score_threads))
+    parser.add_argument("--score-concurrency", type=int, default=value("score_concurrency", d.score_concurrency))
     parser.add_argument("--score-hash", type=int, default=value("score_hash", d.score_hash))
     parser.add_argument("--score-limit", type=int, default=value("score_limit", d.score_limit))
     parser.add_argument("--score-source-jsonl", default=value("score_source_jsonl", d.score_source_jsonl))

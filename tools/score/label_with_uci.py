@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import re
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -81,6 +83,73 @@ class UciEngine:
                 return score_cp, mate
 
 
+def write_scored_row(
+    row: dict,
+    score: int | None,
+    mate: str | None,
+    *,
+    args: argparse.Namespace,
+    dst,
+    stats: dict[str, int | str | float],
+) -> None:
+    stats["processed"] += 1
+    if mate is not None:
+        stats["skipped_mate"] += 1
+        return
+    if score is None:
+        stats["skipped_no_score"] += 1
+        return
+    if args.max_abs_cp > 0 and abs(score) > args.max_abs_cp:
+        stats["skipped_cp"] += 1
+        return
+
+    row["source_score"] = row["score"]
+    row["score"] = score
+    row["teacher"] = Path(args.engine).name
+    row["teacher_depth"] = args.depth
+    dst.write(json.dumps(row, separators=(",", ":")))
+    dst.write("\n")
+    stats["written"] += 1
+
+
+def selected_rows(args: argparse.Namespace, stats: dict[str, int | str | float]):
+    with Path(args.input).open() as src:
+        for idx, line in enumerate(src):
+            if args.limit > 0 and idx >= args.limit:
+                break
+            stats["read"] += 1
+            if idx % args.shard_count != args.shard_index:
+                continue
+            line = line.strip()
+            if not line:
+                continue
+            stats["selected"] += 1
+            yield json.loads(line)
+
+
+def maybe_print_progress(
+    args: argparse.Namespace,
+    stats: dict[str, int | str | float],
+    start: float,
+    *,
+    force: bool = False,
+) -> None:
+    processed = int(stats.get("processed", 0))
+    if args.progress <= 0:
+        return
+    if not force and processed % args.progress != 0:
+        return
+    elapsed = max(1e-6, time.monotonic() - start)
+    rate = processed / elapsed
+    print(
+        f"shard {args.shard_index}/{args.shard_count}: "
+        f"selected={stats['selected']} processed={processed} "
+        f"written={stats['written']} "
+        f"rate={rate:.1f}/s",
+        flush=True,
+    )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
@@ -91,6 +160,12 @@ def main() -> None:
     ap.add_argument("--hash", type=int, default=128)
     ap.add_argument("--shard-count", type=int, default=1)
     ap.add_argument("--shard-index", type=int, default=0)
+    ap.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="UCI engine instances to run inside this shard.",
+    )
     ap.add_argument(
         "--limit",
         type=int,
@@ -103,6 +178,8 @@ def main() -> None:
 
     if not (0 <= args.shard_index < args.shard_count):
         raise ValueError("invalid shard index/count")
+    if args.concurrency < 1:
+        raise ValueError("--concurrency must be >= 1")
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -114,62 +191,72 @@ def main() -> None:
         "depth": args.depth,
         "threads": args.threads,
         "hash": args.hash,
+        "concurrency": args.concurrency,
         "shard_count": args.shard_count,
         "shard_index": args.shard_index,
         "limit": args.limit,
         "read": 0,
         "selected": 0,
+        "processed": 0,
         "written": 0,
         "skipped_mate": 0,
         "skipped_no_score": 0,
         "skipped_cp": 0,
     }
 
-    engine = UciEngine(args.engine, threads=args.threads, hash_mb=args.hash)
     start = time.monotonic()
-    try:
-        with Path(args.input).open() as src, out.open("w") as dst:
-            for idx, line in enumerate(src):
-                if args.limit > 0 and idx >= args.limit:
-                    break
-                stats["read"] += 1
-                if idx % args.shard_count != args.shard_index:
-                    continue
-                line = line.strip()
-                if not line:
-                    continue
-                stats["selected"] += 1
-                row = json.loads(line)
-                score, mate = engine.label(row["fen"], depth=args.depth)
-                if mate is not None:
-                    stats["skipped_mate"] += 1
-                    continue
-                if score is None:
-                    stats["skipped_no_score"] += 1
-                    continue
-                if args.max_abs_cp > 0 and abs(score) > args.max_abs_cp:
-                    stats["skipped_cp"] += 1
-                    continue
+    if args.concurrency == 1:
+        engine = UciEngine(args.engine, threads=args.threads, hash_mb=args.hash)
+        try:
+            with out.open("w") as dst:
+                for row in selected_rows(args, stats):
+                    score, mate = engine.label(row["fen"], depth=args.depth)
+                    write_scored_row(row, score, mate, args=args, dst=dst, stats=stats)
+                    maybe_print_progress(args, stats, start)
+        finally:
+            engine.close()
+    else:
+        local = threading.local()
+        engines: list[UciEngine] = []
+        engines_lock = threading.Lock()
 
-                row["source_score"] = row["score"]
-                row["score"] = score
-                row["teacher"] = Path(args.engine).name
-                row["teacher_depth"] = args.depth
-                dst.write(json.dumps(row, separators=(",", ":")))
-                dst.write("\n")
-                stats["written"] += 1
+        def engine_for_thread() -> UciEngine:
+            engine = getattr(local, "engine", None)
+            if engine is None:
+                engine = UciEngine(args.engine, threads=args.threads, hash_mb=args.hash)
+                local.engine = engine
+                with engines_lock:
+                    engines.append(engine)
+            return engine
 
-                if args.progress > 0 and stats["selected"] % args.progress == 0:
-                    elapsed = max(1e-6, time.monotonic() - start)
-                    rate = stats["selected"] / elapsed
-                    print(
-                        f"shard {args.shard_index}/{args.shard_count}: "
-                        f"selected={stats['selected']} written={stats['written']} "
-                        f"rate={rate:.1f}/s",
-                        flush=True,
-                    )
-    finally:
-        engine.close()
+        def label_row(row: dict) -> tuple[dict, int | None, str | None]:
+            engine = engine_for_thread()
+            score, mate = engine.label(row["fen"], depth=args.depth)
+            return row, score, mate
+
+        def write_batch(pool, dst, batch: list[dict]) -> None:
+            for row, score, mate in pool.map(label_row, batch, chunksize=1):
+                write_scored_row(row, score, mate, args=args, dst=dst, stats=stats)
+                maybe_print_progress(args, stats, start)
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=args.concurrency,
+            ) as pool, out.open("w") as dst:
+                batch: list[dict] = []
+                batch_size = max(1, args.concurrency * 4)
+                for row in selected_rows(args, stats):
+                    batch.append(row)
+                    if len(batch) >= batch_size:
+                        write_batch(pool, dst, batch)
+                        batch = []
+                if batch:
+                    write_batch(pool, dst, batch)
+        finally:
+            for engine in engines:
+                engine.close()
+
+    maybe_print_progress(args, stats, start, force=True)
 
     stats["elapsed_s"] = round(time.monotonic() - start, 3)
     stats_path = out.with_suffix(out.suffix + ".stats.json")
