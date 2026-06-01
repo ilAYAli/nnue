@@ -139,13 +139,25 @@ def normalize_log_path(value: str) -> str:
     return value.strip()
 
 
-def extract_pattern_refs(text: str, patterns: tuple[re.Pattern[str], ...]) -> list[str]:
+def looks_like_file_ref(value: str) -> bool:
+    return "/" in value or value.startswith(("~", "."))
+
+
+def extract_pattern_refs(
+    text: str,
+    patterns: tuple[re.Pattern[str], ...],
+    *,
+    file_refs_only: bool = False,
+) -> list[str]:
     refs: list[str] = []
     for line in text.splitlines():
         for pattern in patterns:
             match = pattern.search(line)
             if match:
-                refs.append(normalize_log_path(match.group("path")))
+                ref = normalize_log_path(match.group("path"))
+                if file_refs_only and not looks_like_file_ref(ref):
+                    continue
+                refs.append(ref)
     return refs
 
 
@@ -255,7 +267,11 @@ def extract_source_map_refs(text: str) -> list[str]:
 
 
 def collect_context_refs(context: RunContext) -> tuple[list[str], list[str]]:
-    position_refs = extract_pattern_refs(context.text, DATA_PATTERNS)
+    position_refs = extract_pattern_refs(
+        context.text,
+        DATA_PATTERNS,
+        file_refs_only=True,
+    )
     position_refs.extend(extract_input_data_refs(context.text))
     position_refs.extend(extract_selfplay_net_refs(context.text))
     label_refs = extract_source_map_refs(context.text)
@@ -401,7 +417,11 @@ def trace_init(path: Path, *, max_depth: int = 16) -> tuple[str, list[str], list
 
         context = context_for(current)
         contexts.append(context)
-        init_refs = extract_pattern_refs(context.text, INIT_PATTERNS)
+        init_refs = extract_pattern_refs(
+            context.text,
+            INIT_PATTERNS,
+            file_refs_only=True,
+        )
         init_refs.extend(extract_bullet_weight_init(context.text))
 
         if not init_refs:

@@ -102,6 +102,42 @@ class NetProvenanceTests(unittest.TestCase):
             self.assertEqual(result.init, "unknown")
             self.assertFalse(result.clean_enyo_owned)
 
+    def test_ignores_previous_provenance_report_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs" / "clean-with-report"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "posgen.py selfplay --output /runs/posgen/selfplay.pgn "
+                "--engine-option use_nnue=false\n"
+                "data=/runs/posgen/source.jsonl\n"
+                "net=/runs/clean-with-report/train/model.nn\n"
+                "init=random\n"
+                "data=mixed+mixed\n"
+                "position_source=mixed\n"
+                "label_source=mixed\n",
+                encoding="utf-8",
+            )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertEqual(result.init, "random")
+            self.assertNotIn("random", result.init_chain)
+            self.assertNotIn("mixed+mixed", result.position_refs)
+            self.assertTrue(result.clean_enyo_owned)
+
     def test_rejects_external_stockfish_position_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
