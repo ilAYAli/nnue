@@ -19,10 +19,16 @@ Current build intent:
   `native-d16-owned-bootstrap-v3-20k-sf-d12-20260601` passed provenance and
   engine-static validation, but the Berserk smoke hard-rejected at
   `-961 Elo`, LLR `-2.95/2.94`, and only `0.8%` draws.
-- Next test: continue from the best clean-owned v2 Bullet weights on the same
-  v2-generated/Stockfish-d12 corpus at very low LR. This tests whether the new
-  corpus can improve the only clean-owned net that has shown game strength over
-  HCE without destroying its existing behavior.
+- The clean-owned v2 continuation on that corpus produced mixed but useful
+  results:
+  - versus Berserk it is still a hard reject: `-771.8 Elo`, LLR
+    `-2.95/2.94`, and only `0.8%` draws in the 256-game smoke;
+  - versus the previous clean-owned v2 net it is a clear step forward:
+    `+99.0 +/- 40.3 Elo` over 256 games, LOS `100%`, draw `16.8%`.
+- Next test: generate self-play from the improved clean-owned v2-cont net,
+  label with Stockfish d12, and continue from v2-cont at low dose. This tests
+  whether owned self-play iteration continues to improve the clean-owned
+  baseline.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
@@ -30,7 +36,8 @@ Current build intent:
   validation or SPRT.
 - First promotion threshold is "not worse than Berserk", not merely "close".
 - Do not rerun a random-init candidate on the v2-generated corpus unless the
-  architecture or label objective changes.
+  architecture or label objective changes. Current progress is in continuation
+  from the best clean-owned baseline, not scratch replacement strength.
 
 2026-05-31 ownership correction:
 
@@ -314,24 +321,24 @@ Priority order:
 
 ## Next Concrete Experiment
 
-The current experiment is a clean-owned continuation proof:
+The current experiment is clean-owned v4 self-play iteration:
 
-1. Reuse the completed v2-generated/Stockfish-d12 corpus from
-   `native-d16-owned-bootstrap-v3-20k-sf-d12-20260601/score/labeled.jsonl`.
-2. Initialize Bullet from the clean-owned v2 checkpoint weights:
-   `native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601-4096`.
-3. Train one low-dose continuation (`lr=3e-6 -> 1e-6`, `512` superbatches).
-4. Run provenance and engine-static validation.
-5. Run a short Berserk smoke only if provenance passes.
-6. If the smoke remains catastrophic, reject this self-play corpus as an
-   improvement source and move to architecture/sidecar work instead of another
-   same-data scalar eval run.
+1. Generate 20k games of self-play using the improved clean-owned v2-cont net:
+   `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601/model.nn`.
+2. Extract/sample positions with `signed-balanced-v1`.
+3. Label with Stockfish d12.
+4. Initialize Bullet from the clean-owned v2-cont checkpoint weights:
+   `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601-512`.
+5. Train one low-dose continuation (`lr=3e-6 -> 1e-6`, `512` superbatches).
+6. Run provenance and engine-static validation.
+7. First game gate is against the previous clean-owned v2-cont baseline. Run
+   Berserk smoke only if it improves the owned baseline.
 
 Pass criteria for continuing a lane:
 
-- a smoke must score at least non-catastrophically against Berserk;
-- engine-static sign must improve in the `0-50cp` bucket;
-- no SPRT should run on a net that cannot draw or score in the early smoke.
+- a smoke against the previous clean-owned baseline should be positive;
+- engine-static sign should not collapse in the `0-50cp` bucket;
+- no Berserk SPRT should run until the owned-baseline gate is positive.
 
 ## Candidate Workflow
 
@@ -343,13 +350,14 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601`
-- selected branch: continue clean-owned v2 weights on the v2-generated
-  self-play corpus with Stockfish d12 oracle labels
+- candidate name:
+  `native-d16-owned-v4-selfplay-v2cont-sf-d12-lr3e6-sb512-20260601`
+- selected branch: generate self-play with clean-owned v2-cont, label with
+  Stockfish d12, and continue the clean-owned v2-cont checkpoint
 - backend: Bullet
-- initialization: clean-owned v2 Bullet checkpoint weights, with
+- initialization: clean-owned v2-cont Bullet checkpoint weights, with
   `require_clean_enyo_owned=true`
-- current cap: none; reuse the already scored `2.39M` row v3 corpus
+- current cap: 20k self-play games for the iteration proof
 - rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`, RC2, and all
   pairwise repair nets
 
