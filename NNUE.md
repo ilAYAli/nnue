@@ -3,11 +3,13 @@
 ```sh
 • Current native Enyo NNUE:
 
+  input buckets: 16
   features:      12,288
   hidden width:  1,024
   L1 input:      2 * 1024 = 2,048
-  L2:            16
-  L3/output:     scalar
+  L1 output:     16
+  L2 output:     32
+  final output:  scalar
 
   So the big accumulator matrix is:
 
@@ -18,9 +20,9 @@
   1,024 input biases
   2,048 * 16 int8 l1 weights
   16 l1 biases
-  16 l2 weights
-  1 l2 bias
-  1 output weight
+  16 * 32 float32 l2 weights
+  32 l2 biases
+  32 output weights
   1 output bias
 
   current .nn size: 25,203,012 bytes.
@@ -48,13 +50,53 @@ Step 8  replay gates
 Step 9  SPRT
 ```
 
-So this line:
+## Runtime Net Layout
+
+Enyo's native `.nn` is a raw binary file. There is no header, magic, or embedded
+architecture metadata. The loader detects the supported layout from the file
+size.
+
+For the current 16-input-bucket native net, the file is written in this order:
 
 ```text
-accumulator[perspective][0..1023] += input_weights[feature][0..1023]
+input_weights   int16   [12288, 1024]
+input_biases    int16   [1024]
+l1_weights      int8    [16, 2048]
+l1_biases       int32   [16]
+l2_weights      float32 [32, 16]
+l2_biases       float32 [32]
+output_weights  float32 [32]
+output_bias     float32 [1]
 ```
 
-means:
+Names differ by layer:
+
+```text
+NNUE.md concept       Python loader              Bullet name   Enyo runtime
+input_weights         Net.input_weights          l0w           s_input_weights
+input_biases          Net.input_biases           l0b           s_input_biases
+l1_weights            Net.l1_weights             l1w           s_l1_weights
+l1_biases             Net.l1_biases              l1b           s_l1_biases
+l2_weights            Net.l2_weights             l2w           s_l2_weights
+l2_biases             Net.l2_biases              l2b           s_l2_biases
+output_weights        Net.output_weights         l3w           s_output_weights
+output_bias           Net.output_bias            l3b           s_output_bias
+```
+
+`s_input_weights` is declared as one flat array:
+
+```cpp
+int16_t s_input_weights[N_FEATURES * N_HIDDEN];
+```
+
+The logical two-dimensional address is:
+
+```cpp
+s_input_weights[feature * N_HIDDEN + hidden]
+```
+
+This is the element that would be `input_weights[feature][hidden]` in a 2D
+matrix.
 
 ## How Training Works
 
@@ -117,6 +159,27 @@ Each active feature is an input-weight row address:
 feature = perspective + king bucket + piece/color type + piece square
 ```
 
+More precisely, a feature depends on:
+
+```text
+view side
+piece type
+piece color
+piece square
+king square for that view side
+```
+
+So a square such as `a1` is not a feature by itself. For example, "white rook on
+`a1` from White's perspective" needs the white king square too. In Enyo square
+indexing, `h1 = 0`, so `a1 = 7`.
+
+One active feature row contains one weight for every hidden slot:
+
+```cpp
+int feature = feature_index(piece_type, piece_color, square, king_square, view);
+int16_t weight = s_input_weights[feature * N_HIDDEN + hidden];
+```
+
 ### 3. Build The Accumulator
 
 The accumulator is the first hidden layer after active feature rows have been
@@ -152,6 +215,17 @@ means:
 for every hidden slot i from 0 to 1023:
     add the learned contribution for this active feature to accumulator[i]
 ```
+
+In runtime terms:
+
+```cpp
+for (int hidden = 0; hidden < N_HIDDEN; ++hidden) {
+    accumulator[hidden] += s_input_weights[feature * N_HIDDEN + hidden];
+}
+```
+
+The net weights are fixed during search. The accumulator is the per-position
+sum of the currently active fixed feature rows.
 
 ### 4. Run The Dense Head
 
@@ -249,6 +323,20 @@ King bucket change:
 ```text
 refresh affected perspective, because many feature addresses changed
 ```
+
+`s_input_weights` is not only used once at network initialization. It is loaded
+once from the `.nn` file and then kept as fixed runtime storage. Search uses it
+whenever it needs to:
+
+```text
+build an accumulator from scratch
+refresh an accumulator after a king-bucket change
+add or subtract feature rows for an incremental move update
+```
+
+What avoids work is the accumulator stack. Most search nodes start from the
+parent accumulator and apply a small delta instead of summing every piece row
+again.
 
 Simplified engine flow:
 
