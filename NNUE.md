@@ -243,6 +243,84 @@ Then the dense head computes:
 
 That final score is the NNUE prediction for the FEN.
 
+## Runtime Evaluation Path
+
+During search, Enyo evaluates the current board from the side-to-move
+perspective. Positive means good for the side to move at that node.
+
+The search entry point is:
+
+```text
+search.cpp evaluate<Us>()
+```
+
+It chooses the evaluation path in this order:
+
+```text
+if native Network is enabled and loaded:
+    nnue->Evaluate2(board, side_to_move)
+else if use_nnue is enabled:
+    old NNUE::Evaluate()
+else:
+    HCE_evaluation()
+```
+
+For the native net, `Evaluate2` does:
+
+```text
+1. Reuse cached eval if this accumulator already has a valid score.
+2. Reuse the board-hash eval cache if the same board was evaluated recently.
+3. Ensure the current accumulator is materialized.
+4. Run Network::Propagate(accumulator, side_to_move).
+5. Apply material/phase scaling and clamp.
+6. Cache and return the centipawn score.
+```
+
+`ensure_network(board)` is the bridge between search and NNUE. It makes sure
+the accumulator for the current ply is correct. If a lazy move delta is enough,
+it applies the delta from the parent accumulator. If the move crossed a king
+bucket or the lazy chain is not usable, it refreshes the affected accumulator
+from the board.
+
+`Network::Propagate` is the dense forward pass:
+
+```text
+InputReLU:
+    choose accumulator[side_to_move] as us
+    choose accumulator[other_side] as them
+    concatenate us + them -> 2048 values
+    clamp to [0, 127 << 5]
+    divide by 32 into int8 inputs
+
+L1AffineReLU:
+    2048 int8 inputs -> 16 float values
+    add l1_biases
+    ReLU
+
+L2AffineReLU:
+    16 float values -> 32 float values
+    add l2_biases
+    ReLU
+
+L3Transform:
+    dot 32 float values with output_weights
+    add output_bias
+    divide by 32
+```
+
+After `Propagate`, Enyo applies a phase scale:
+
+```text
+phase = 3 * minor_count + 5 * rook_count + 10 * queen_count
+scaled_score = (128 + phase) * score / 128
+final_score = clamp(scaled_score, -2045, 2045)
+```
+
+So evaluation is not "look up one neuron". A position activates many feature
+rows, those rows build two 1024-wide accumulators, and the side-to-move
+accumulator pair is passed through the dense head to produce one centipawn
+score.
+
 ### 5. Compare Prediction With Teacher
 
 Example:
