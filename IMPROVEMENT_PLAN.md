@@ -15,18 +15,22 @@ their init chain back to `berserk-d43206fe90e4.nn`.
 
 Current build intent:
 
-- Build a clean d16 candidate from random init using the HCE/no-NNUE source
-  run now in progress:
-  `native-d16-owned-hce-selfplay-sf-d16-v1-20260531`.
+- The random-init bootstrap on the v2-generated corpus is rejected:
+  `native-d16-owned-bootstrap-v3-20k-sf-d12-20260601` passed provenance and
+  engine-static validation, but the Berserk smoke hard-rejected at
+  `-961 Elo`, LLR `-2.95/2.94`, and only `0.8%` draws.
+- Next test: continue from the best clean-owned v2 Bullet weights on the same
+  v2-generated/Stockfish-d12 corpus at very low LR. This tests whether the new
+  corpus can improve the only clean-owned net that has shown game strength over
+  HCE without destroying its existing behavior.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
 - Require `net_provenance.py --require-clean-enyo-owned` before static
   validation or SPRT.
 - First promotion threshold is "not worse than Berserk", not merely "close".
-- The current run is intentionally capped at `score_limit=300000` for the first
-  proof pass. If this cannot produce a non-catastrophic smoke, do not spend the
-  full 3M-label pass on the same recipe.
+- Do not rerun a random-init candidate on the v2-generated corpus unless the
+  architecture or label objective changes.
 
 2026-05-31 ownership correction:
 
@@ -310,17 +314,18 @@ Priority order:
 
 ## Next Concrete Experiment
 
-The current experiment is a clean ownership proof run:
+The current experiment is a clean-owned continuation proof:
 
-1. Reuse the completed HCE/no-NNUE self-play and extraction in
-   `native-d16-owned-hce-selfplay-sf-d16-v1-20260531`.
-2. Score a capped first slice with Stockfish d16
-   (`score_limit=300000`, `score_shards=24`).
-3. Train one random-init Bullet d16 candidate from that capped source.
-4. Run provenance, engine-static, and a short Berserk smoke.
-5. If the smoke is catastrophic, reject this source recipe before spending the
-   full 3M-label pass. If it is non-catastrophic, finish or rerun the full 3M
-   scoring/training pass with the same clean source.
+1. Reuse the completed v2-generated/Stockfish-d12 corpus from
+   `native-d16-owned-bootstrap-v3-20k-sf-d12-20260601/score/labeled.jsonl`.
+2. Initialize Bullet from the clean-owned v2 checkpoint weights:
+   `native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601-4096`.
+3. Train one low-dose continuation (`lr=3e-6 -> 1e-6`, `512` superbatches).
+4. Run provenance and engine-static validation.
+5. Run a short Berserk smoke only if provenance passes.
+6. If the smoke remains catastrophic, reject this self-play corpus as an
+   improvement source and move to architecture/sidecar work instead of another
+   same-data scalar eval run.
 
 Pass criteria for continuing a lane:
 
@@ -338,12 +343,13 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name: `native-d16-owned-hce-selfplay-sf-d16-v1-20260531`
-- selected branch: clean HCE/no-NNUE self-play source plus Stockfish d16 oracle
-  labels
+- candidate name: `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601`
+- selected branch: continue clean-owned v2 weights on the v2-generated
+  self-play corpus with Stockfish d12 oracle labels
 - backend: Bullet
-- initialization: random, with `require_clean_enyo_owned=true`
-- current cap: `score_limit=300000` for the first proof pass
+- initialization: clean-owned v2 Bullet checkpoint weights, with
+  `require_clean_enyo_owned=true`
+- current cap: none; reuse the already scored `2.39M` row v3 corpus
 - rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`, RC2, and all
   pairwise repair nets
 
