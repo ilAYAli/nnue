@@ -82,6 +82,7 @@ rendered=$(
     NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
 import json
 import os
+import re
 from pathlib import Path
 
 event = json.loads(os.environ["NNUE_EVENT_PAYLOAD"])
@@ -90,9 +91,117 @@ event_name = event.get("event", "unknown")
 stage = event.get("stage", "")
 status = event.get("status", "")
 log = event.get("log", "")
+run_dir = Path(event.get("run", "")).expanduser()
 
-lines = ["Current task"]
-lines.append(f"  • Task: {event_name}")
+
+def read_json(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def tail_text(path, size=700_000):
+    if not path:
+        return ""
+    p = Path(path).expanduser()
+    try:
+        with p.open("rb") as handle:
+            handle.seek(0, 2)
+            end = handle.tell()
+            handle.seek(max(0, end - size))
+            return handle.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def last_matching(text, pattern):
+    found = [line.strip() for line in text.splitlines() if re.search(pattern, line)]
+    return found[-1] if found else ""
+
+
+def compact_metric_line(line):
+    if not line:
+        return ""
+    keys = ("rows", "mae", "sign", "wrong_sign", "bias", "corr", "slope")
+    parts = line.split()
+    out = []
+    for part in parts:
+        if any(part.startswith(f"{key}=") for key in keys):
+            out.append(part)
+    return " ".join(out) if out else line
+
+
+def count_rows(path):
+    p = Path(path)
+    if not p.exists():
+        return ""
+    try:
+        with p.open(encoding="utf-8", errors="replace") as handle:
+            return str(sum(1 for _ in handle))
+    except OSError:
+        return ""
+
+
+config = read_json(run_dir / "config.json")
+args = config.get("create_args", {}) if isinstance(config, dict) else {}
+log_text = tail_text(log)
+
+source = "unknown"
+if args.get("backend") == "bullet":
+    if args.get("score_source_jsonl"):
+        source = f"existing source JSONL: {Path(str(args['score_source_jsonl'])).name}"
+    elif args.get("bullet_generate_source"):
+        evaluator = "HCE/no-NNUE" if args.get("selfplay_use_nnue") is False else "NNUE"
+        source = f"{evaluator} self-play"
+    elif args.get("bullet_source_jsonl"):
+        source = f"pre-scored JSONL: {Path(str(args['bullet_source_jsonl'])).name}"
+    elif args.get("bullet_data"):
+        source = f"Bullet data: {Path(str(args['bullet_data'])).name}"
+
+label = "unknown"
+if args.get("score_engine"):
+    depth = args.get("score_depth")
+    label = f"{Path(str(args['score_engine'])).name}"
+    if depth:
+        label += f" depth {depth}"
+
+train_bits = []
+if args.get("backend"):
+    train_bits.append(str(args["backend"]))
+if args.get("bullet_hidden"):
+    train_bits.append(f"h{args['bullet_hidden']}")
+if args.get("bullet_enyo_runtime_input_buckets"):
+    train_bits.append(f"kb{args['bullet_enyo_runtime_input_buckets']}")
+if args.get("bullet_superbatches"):
+    train_bits.append(f"{args['bullet_superbatches']} superbatches")
+if args.get("bullet_lr"):
+    train_bits.append(f"lr={args['bullet_lr']}")
+
+candidate_net = event.get("candidate_net", "")
+if not candidate_net and run_dir:
+    candidates = sorted(run_dir.glob("train/*/model.nn"))
+    if candidates:
+        candidate_net = str(candidates[-1])
+
+score_rows = ""
+wc_path = run_dir / "score" / "labeled.wc"
+try:
+    score_rows = wc_path.read_text(encoding="utf-8").split()[0]
+except OSError:
+    score_rows = count_rows(run_dir / "score" / "labeled.jsonl")
+
+provenance = last_matching(log_text, r"clean_enyo_owned=(yes|no)")
+static_all = compact_metric_line(last_matching(log_text, r"^all rows="))
+bucket_0_50 = compact_metric_line(last_matching(log_text, r"^bucket:0-50 "))
+bucket_50_100 = compact_metric_line(last_matching(log_text, r"^bucket:50-100 "))
+train_time = last_matching(log_text, r"Total Training Time:")
+sprt_done = last_matching(log_text, r"Enyo NNUE SPRT finished")
+sprt_line = last_matching(log_text, r"^\[[[:space:]0-9]+/[0-9]+]")
+failure_line = last_matching(log_text, r"^(failed .*|.*CUDA_ERROR.*|.*Traceback.*|.*ValueError:.*)")
+
+lines = ["NNUE status"]
+lines.append(f"  • Event: {event_name}")
 if stage:
     lines.append(f"  • Stage: {stage}")
 if name:
@@ -103,21 +212,56 @@ if status:
     lines.append(f"  • State: {status}")
 if "rc" in event:
     lines.append(f"  • RC: {event['rc']}")
-if log:
-    lines.append(f"  • Log: {log}")
-if event.get("candidate_net"):
-    lines.append(f"  • Candidate net: {event['candidate_net']}")
 
 lines.append("")
-lines.append("ETA")
+lines.append("What ran")
+if source != "unknown":
+    lines.append(f"  • Source: {source}")
+if label != "unknown":
+    lines.append(f"  • Labels: {label}")
+if score_rows:
+    lines.append(f"  • Scored rows: {score_rows}")
+if train_bits:
+    lines.append(f"  • Training: {', '.join(train_bits)}")
+if train_time:
+    lines.append(f"  • {train_time}")
+
+lines.append("")
+lines.append("Result")
+if provenance:
+    lines.append(f"  • Provenance: {provenance}")
+if static_all:
+    lines.append(f"  • Static: {static_all}")
+if bucket_0_50:
+    lines.append(f"  • Near-zero 0-50: {bucket_0_50}")
+if bucket_50_100:
+    lines.append(f"  • Near-zero 50-100: {bucket_50_100}")
+if sprt_done:
+    lines.append(f"  • SPRT: {sprt_done}")
+elif sprt_line:
+    lines.append(f"  • SPRT: {sprt_line}")
+if event_name == "fail" and failure_line:
+    lines.append(f"  • Failure: {failure_line}")
+if candidate_net:
+    lines.append(f"  • Net: {candidate_net}")
+if log:
+    lines.append(f"  • Log: {log}")
+
+lines.append("")
+lines.append("Next")
 if event_name == "fail":
-    lines.append("  • Next: inspect log and fix the failed phase")
+    lines.append("  • Inspect the failing phase and fix the blocker.")
 elif event_name == "done":
-    lines.append("  • Next: inspect result and choose the next gate")
+    if sprt_done or sprt_line:
+        lines.append("  • Decide from the SPRT result.")
+    elif static_all:
+        lines.append("  • Run a game smoke if static/provenance are sane.")
+    else:
+        lines.append("  • Inspect result and choose the next gate.")
 elif event_name == "phase_done":
-    lines.append("  • Next: inspect result and continue the next task")
+    lines.append("  • Continue the current pipeline.")
 else:
-    lines.append("  • Next: no action unless this was unexpected")
+    lines.append("  • No action unless this was unexpected.")
 
 if event_name == "fail":
     prompt = f"NNUE phase failed: run={name} stage={stage or 'n/a'} status={status or 'failed'} log={log}. Inspect the log and fix the failed phase."
