@@ -1,14 +1,14 @@
 {
-  "description": "Clean Enyo-owned d16 NNUE proof run: random init, Enyo HCE/no-NNUE self-play source positions, Stockfish oracle labels capped to 300k rows for first validation, Bullet training, and mandatory provenance gate before validation.",
-  "experiment": "native-d16-owned-hce-selfplay-sf-d16-v1",
+  "description": "Clean Enyo-owned d16 NNUE scale run: reuse the 3M sampled HCE/no-NNUE self-play positions from v1, relabel with Stockfish depth 12, train from random init with Bullet, and gate with provenance plus engine-static validation before SPRT.",
+  "experiment": "native-d16-owned-hce-selfplay-sf-d12-3m-v2",
   "create": {
-    "name": "native-d16-owned-hce-selfplay-sf-d16-v1-20260531",
+    "name": "native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601",
     "backend": "bullet",
     "engine": "/home/petter/code/cpp/chess/assets/engines/reference",
     "nnue_file": "",
     "book": "/home/petter/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd",
     "runner": "/home/petter/source/fastchess/fastchess",
-    "bullet_generate_source": true,
+    "bullet_generate_source": false,
     "bullet_source_jsonl": "",
     "bullet_data": "",
     "bullet_loader": "direct",
@@ -45,7 +45,7 @@
     "source_max_abs_cp": 1600,
     "sample_preset": "signed-balanced-v1",
     "score_engine": "/home/petter/local/bin/stockfish",
-    "score_depth": 16,
+    "score_depth": 12,
     "score_shards": 24,
     "score_threads": 1,
     "score_hash": 128,
@@ -53,7 +53,8 @@
     "score_progress": 10000,
     "engine_static_engine": "/home/petter/code/cpp/chess/assets/engines/reference",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
-    "score_limit": 300000
+    "score_limit": 0,
+    "score_source_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-d16-owned-hce-selfplay-sf-d16-v1-20260531/posgen/source.jsonl"
   },
   "validation": {
     "promotion_gate": "Pass clean Enyo-owned provenance, engine-static sanity, 256-game triage versus Berserk, then 1000/2000 games if triage is not clearly negative.",
