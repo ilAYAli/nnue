@@ -231,9 +231,15 @@ Current build intent:
     `256` games, LOS `13.6%`.
 - Conclusion: do not continue tiny LC0+Stockfish scalar dose experiments.
   They consistently move away from the current native v4 baseline.
-- Next public-data probe: use LC0's own already-present `root_q` value label
-  converted to cp with `scale * atanh(q)`, instead of Stockfish relabeling.
-  This tests LC0 as public labeled data, not just as a position source.
+- LC0 `root_q` value-label probe was also rejected:
+  `native-public-1.0.0-lc0q100k-v4init-lr3e7-sb256-20260601` had weak
+  exported engine-static signal on the LC0 value rows (`sign=67.01%`,
+  `slope=0.2368`) and hard-rejected versus native v4 at `-179.7 +/- 45.6`
+  Elo, LLR `-2.95/2.94`, LOS `0.0%` in the 256-game smoke.
+- Conclusion: the current scalar LC0 public-data lane is closed. Do not run
+  more small LC0 scalar dose/root_q variants. If LC0 is revisited, use a
+  materially different representation/objective or a larger preplanned public
+  data experiment with a clear gate.
 
 2026-05-31 d16 RC provenance correction:
 
