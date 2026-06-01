@@ -55,7 +55,6 @@ class CandidateDefaults:
     score_depth: int = 16
     score_shards: int = 24
     score_threads: int = 1
-    score_concurrency: int = 1
     score_hash: int = 128
     score_limit: int = 0
     score_source_jsonl: str = ""

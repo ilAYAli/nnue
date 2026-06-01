@@ -185,7 +185,6 @@ class BuildConfigTests(unittest.TestCase):
                     "nnue_file": "/repo/enyo/net/clean-owned-source.nn",
                     "score_limit": 12345,
                     "score_shards": 3,
-                    "score_concurrency": 2,
                 }
             }, handle)
             path = handle.name
@@ -204,8 +203,6 @@ class BuildConfigTests(unittest.TestCase):
                 self.assertIn("--limit", step["command"])
                 limit_index = step["command"].index("--limit")
                 self.assertEqual("12345", step["command"][limit_index + 1])
-                concurrency_index = step["command"].index("--concurrency")
-                self.assertEqual("2", step["command"][concurrency_index + 1])
         finally:
             Path(path).unlink(missing_ok=True)
 
@@ -219,7 +216,6 @@ class BuildConfigTests(unittest.TestCase):
                     "bullet_source_jsonl": "",
                     "bullet_data": "",
                     "score_shards": 2,
-                    "score_concurrency": 3,
                     "score_limit": 1000,
                     "engine_static_rows": 10,
                 }
@@ -244,8 +240,6 @@ class BuildConfigTests(unittest.TestCase):
                 )
                 limit_index = step["command"].index("--limit")
                 self.assertEqual("1000", step["command"][limit_index + 1])
-                concurrency_index = step["command"].index("--concurrency")
-                self.assertEqual("3", step["command"][concurrency_index + 1])
 
             bullet_text = next(
                 step for step in config["steps"]
