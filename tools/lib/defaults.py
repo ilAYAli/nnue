@@ -47,6 +47,14 @@ class CandidateDefaults:
     selfplay_use_nnue: bool = True
     selfplay_depth: int = 8
     selfplay_seed: int = 2026051501
+    selfplay_distrib: bool = False
+    selfplay_distrib_tool: str = "~/.local/bin/distrib"
+    selfplay_distrib_python: str = ""
+    selfplay_distrib_local_slots: int = 1
+    selfplay_distrib_lease_seconds: int = 600
+    selfplay_distrib_path_map: tuple[str, ...] = ()
+    selfplay_distrib_require_notify: bool = True
+    selfplay_distrib_notify_command: str = "/home/petter/scripts/notifai.sh"
 
     skip_plies: int = 8
     source_max_abs_cp: int = 1600

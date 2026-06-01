@@ -34,6 +34,30 @@ def write_file(path: Path, text: str) -> str:
 
 
 class SelfplayShardTests(unittest.TestCase):
+    def test_shard_game_count_spreads_remainder_to_early_shards(self) -> None:
+        counts = [
+            selfplay_shards.shard_game_count(1001, 5, index)
+            for index in range(5)
+        ]
+        self.assertEqual([201, 200, 200, 200, 200], counts)
+        self.assertEqual(1001, sum(counts))
+
+    def test_shard_seed_offsets_numeric_seed(self) -> None:
+        self.assertEqual("2026060107", selfplay_shards.shard_seed("2026060104", 3))
+
+    def test_resolve_generate_args_from_total_games(self) -> None:
+        args = type("Args", (), {
+            "total_games": 1001,
+            "shards": 5,
+            "shard_index": 4,
+            "games": None,
+            "base_seed": "2026060104",
+            "seed": None,
+        })()
+        selfplay_shards.resolve_generate_args(args)
+        self.assertEqual(200, args.games)
+        self.assertEqual("2026060108", args.seed)
+
     def make_metadata(
         self,
         root: Path,

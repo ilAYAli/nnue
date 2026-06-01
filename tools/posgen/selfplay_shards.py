@@ -163,7 +163,46 @@ def build_metadata(args: argparse.Namespace, output_pgn: Path) -> dict[str, Any]
     }
 
 
+def shard_game_count(total_games: int, shards: int, shard_index: int) -> int:
+    if total_games <= 0:
+        raise ValueError("total_games must be > 0")
+    if shards <= 0:
+        raise ValueError("shards must be > 0")
+    if shard_index < 0 or shard_index >= shards:
+        raise ValueError(f"shard_index {shard_index} outside [0, {shards})")
+    base = total_games // shards
+    remainder = total_games % shards
+    return base + (1 if shard_index < remainder else 0)
+
+
+def shard_seed(base_seed: str, shard_index: int) -> str:
+    try:
+        return str(int(base_seed) + shard_index)
+    except ValueError:
+        return f"{base_seed}-{shard_index}"
+
+
+def resolve_generate_args(args: argparse.Namespace) -> None:
+    if args.total_games is not None:
+        if args.shards is None or args.shard_index is None:
+            raise SystemExit("--total-games requires --shards and --shard-index")
+        args.games = shard_game_count(args.total_games, args.shards, args.shard_index)
+
+    if args.base_seed is not None:
+        if args.shard_index is None:
+            raise SystemExit("--base-seed requires --shard-index")
+        args.seed = shard_seed(args.base_seed, args.shard_index)
+
+    if args.games is None:
+        raise SystemExit("generate requires --games or --total-games")
+    if args.seed is None:
+        raise SystemExit("generate requires --seed or --base-seed")
+    if args.games <= 0:
+        raise SystemExit("resolved shard has no games")
+
+
 def cmd_generate(args: argparse.Namespace) -> int:
+    resolve_generate_args(args)
     output_pgn = expand_path(args.output_pgn)
     metadata = expand_path(args.metadata) if args.metadata else output_pgn.with_suffix(
         output_pgn.suffix + ".meta.json"
@@ -297,14 +336,18 @@ def add_generate_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     parser.add_argument("--book", required=True)
     parser.add_argument("--output-pgn", required=True)
     parser.add_argument("--metadata")
-    parser.add_argument("--games", type=int, required=True)
+    parser.add_argument("--games", type=int)
+    parser.add_argument("--total-games", type=int)
+    parser.add_argument("--shards", type=int)
+    parser.add_argument("--shard-index", type=int)
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--depth", type=int, default=8)
     parser.add_argument("--tc")
     parser.add_argument("--book-format", default="epd")
     parser.add_argument("--order", default="random")
-    parser.add_argument("--seed", required=True)
+    parser.add_argument("--seed")
+    parser.add_argument("--base-seed")
     parser.add_argument("--restart", choices=("auto", "on", "off"), default="off")
     parser.add_argument("--engine-option", action="append")
     parser.add_argument("--host")

@@ -152,6 +152,14 @@ def borrowed_selfplay_nnue_reason(value: str | Path | None) -> str | None:
 
 
 def validate_create_args(args: argparse.Namespace) -> None:
+    if args.selfplay_distrib:
+        if args.selfplay_games <= 0:
+            raise SystemExit("selfplay_distrib requires selfplay_games > 0")
+        if args.selfplay_shard_games <= 0:
+            raise SystemExit("selfplay_distrib requires selfplay_shard_games > 0")
+        if args.selfplay_distrib_local_slots < 0:
+            raise SystemExit("selfplay_distrib_local_slots must be >= 0")
+
     if args.score_distrib:
         if args.score_shards <= 0:
             raise SystemExit("score_distrib requires score_shards > 0")
@@ -338,10 +346,51 @@ def append_distributed_score_steps(
     })
 
 
-def append_source_generation_steps(
-    steps: list[dict],
+def selfplay_shard_count(args: argparse.Namespace) -> int:
+    return max(1, (args.selfplay_games + args.selfplay_shard_games - 1) // args.selfplay_shard_games)
+
+
+def selfplay_engine_options(args: argparse.Namespace) -> list[str]:
+    options = [f"Hash={args.selfplay_hash}"]
+    if not args.selfplay_use_nnue:
+        options.append("use_nnue=false")
+    return options
+
+
+def selfplay_generate_command(
     args: argparse.Namespace,
-) -> None:
+    *,
+    output_pgn: str,
+    metadata: str,
+    total_games: str,
+    shards: str,
+    shard_index: str,
+) -> list[str]:
+    python = str(expand_user(args.python))
+    command = [
+        python, tool("posgen/selfplay_shards.py"), "generate",
+        "--runner", str(expand_path(args.runner)),
+        "--engine", str(expand_path(args.engine)),
+        "--book", str(expand_path(args.book)),
+        "--output-pgn", output_pgn,
+        "--metadata", metadata,
+        "--total-games", total_games,
+        "--shards", shards,
+        "--shard-index", shard_index,
+        "--concurrency", str(args.selfplay_concurrency),
+        "--threads", str(args.selfplay_threads),
+        "--depth", str(args.selfplay_depth),
+        "--base-seed", str(args.selfplay_seed),
+        "--restart", "off",
+    ]
+    if args.nnue_file:
+        command.extend(["--nnue-file", str(expand_path(args.nnue_file))])
+    for option in selfplay_engine_options(args):
+        command.extend(["--engine-option", option])
+    return command
+
+
+def append_local_selfplay_steps(steps: list[dict], args: argparse.Namespace) -> None:
     python = str(expand_user(args.python))
     selfplay_command = [
         python, tool("posgen/posgen.py"), "selfplay",
@@ -356,18 +405,132 @@ def append_source_generation_steps(
         "--depth", str(args.selfplay_depth),
         "--srand", str(args.selfplay_seed),
         "--restart", "off",
-        "--engine-option", f"Hash={args.selfplay_hash}",
     ]
-    if not args.selfplay_use_nnue:
-        selfplay_command.extend(["--engine-option", "use_nnue=false"])
     if args.nnue_file:
         selfplay_command.extend(["--nnue-file", str(expand_path(args.nnue_file))])
+    for option in selfplay_engine_options(args):
+        selfplay_command.extend(["--engine-option", option])
+    steps.append({
+        "name": "posgen_selfplay",
+        "command": selfplay_command,
+    })
 
+
+def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespace) -> None:
+    distrib_python = str(expand_user(args.selfplay_distrib_python or sys.executable))
+    distrib = str(expand_user(args.selfplay_distrib_tool))
+    manifest = "{posgen}/selfplay_distrib/manifest.json"
+    shards = selfplay_shard_count(args)
+    metadata = "{posgen}/selfplay_shards/shard.{{index}}.meta.json"
+    command_template = shell_join(selfplay_generate_command(
+        args,
+        output_pgn="{{pgn}}",
+        metadata="{{output}}",
+        total_games="{{total_games}}",
+        shards="{{shards}}",
+        shard_index="{{index}}",
+    ))
+    plan_command = [
+        distrib_python, distrib, "plan",
+        "--name", "selfplay-{candidate}",
+        "--shards", str(shards),
+        "--work-dir", "{repo}",
+        "--out", manifest,
+        "--state-dir", "{posgen}/selfplay_distrib/state",
+        "--log-dir", "{posgen}/selfplay_distrib/logs",
+        "--command-template", command_template,
+        "--var", f"total_games={args.selfplay_games}",
+        "--var", "pgn={posgen}/selfplay_shards/{{task_id}}.pgn",
+        "--output-template", metadata,
+    ]
+    for mapping in args.selfplay_distrib_path_map or []:
+        plan_command.extend(["--path-map", str(mapping)])
+    steps.append({
+        "name": "selfplay_distrib_plan",
+        "command": plan_command,
+    })
+
+    input_command = [
+        distrib_python, distrib, "add-input",
+        "--manifest", manifest,
+        "--path", str(expand_path(args.runner)),
+        "--path", str(expand_path(args.engine)),
+        "--path", str(expand_path(args.book)),
+    ]
+    if args.nnue_file:
+        input_command.extend(["--path", str(expand_path(args.nnue_file))])
+    steps.append({
+        "name": "selfplay_distrib_add_input",
+        "command": input_command,
+    })
+
+    doctor_command = [
+        distrib_python, distrib, "doctor",
+        "--manifest", manifest,
+        "--role", "coordinator",
+    ]
+    if args.selfplay_distrib_require_notify:
+        doctor_command.extend([
+            "--notify-command",
+            str(expand_user(args.selfplay_distrib_notify_command)),
+        ])
+    steps.append({
+        "name": "selfplay_distrib_doctor",
+        "command": doctor_command,
+    })
+
+    for slot in range(args.selfplay_distrib_local_slots):
+        steps.append({
+            "name": f"selfplay_distrib_work_{slot:02d}",
+            "parallel_group": "selfplay_distrib_work",
+            "command": [
+                distrib_python, distrib, "work",
+                "--manifest", manifest,
+                "--coordinator", manifest,
+                "--worker", f"coordinator-selfplay-{slot:02d}",
+                "--lease-seconds", str(args.selfplay_distrib_lease_seconds),
+            ],
+        })
+
+    steps.append({
+        "name": "selfplay_distrib_wait",
+        "command": [
+            distrib_python, distrib, "wait",
+            "--manifest", manifest,
+            "--lease-seconds", str(args.selfplay_distrib_lease_seconds),
+        ],
+    })
+
+    steps.append({
+        "name": "selfplay_distrib_merge",
+        "command": [
+            "bash", "-lc",
+            (
+                "python=\"$1\" distrib=\"$2\" manifest=\"$3\" posgen=\"$4\" shard_tool=\"$5\"; "
+                "\"$python\" \"$distrib\" verify --manifest \"$manifest\" && "
+                "shopt -s nullglob && metas=(\"$posgen\"/selfplay_shards/*.meta.json) && "
+                "if [ \"${#metas[@]}\" -eq 0 ]; then echo 'no self-play metadata shards'; exit 1; fi && "
+                "\"$python\" \"$shard_tool\" merge --output-pgn \"$posgen/selfplay.pgn\" "
+                "--manifest \"$posgen/selfplay_manifest.json\" --force \"${metas[@]}\""
+            ),
+            "merge-distrib-selfplay",
+            distrib_python,
+            distrib,
+            manifest,
+            "{posgen}",
+            tool("posgen/selfplay_shards.py"),
+        ],
+    })
+
+
+def append_position_source_steps(steps: list[dict], args: argparse.Namespace) -> None:
+    if args.selfplay_distrib:
+        append_distributed_selfplay_steps(steps, args)
+    else:
+        append_local_selfplay_steps(steps, args)
+
+    python = str(expand_user(args.python))
     steps.extend([
-        {
-            "name": "posgen_selfplay",
-            "command": selfplay_command,
-        },
         {
             "name": "posgen_extract",
             "command": [
@@ -393,6 +556,12 @@ def append_source_generation_steps(
         },
     ])
 
+
+def append_source_generation_steps(
+    steps: list[dict],
+    args: argparse.Namespace,
+) -> None:
+    append_position_source_steps(steps, args)
     append_score_steps(steps, args, input_jsonl="{posgen}/source.jsonl")
 
 
@@ -405,52 +574,7 @@ def create_config(args: argparse.Namespace) -> dict:
     steps: list[dict] = []
 
     if args.backend == "pytorch":
-        steps = [
-            {
-                "name": "posgen_selfplay",
-                "command": [
-                    python, tool("posgen/posgen.py"), "selfplay",
-                    "--runner", str(expand_path(args.runner)),
-                    "--engine", str(expand_path(args.engine)),
-                    "--nnue-file", str(expand_path(args.nnue_file)),
-                    "--book", str(expand_path(args.book)),
-                    "--output", "{posgen}/selfplay.pgn",
-                    "--games", str(args.selfplay_games),
-                    "--shard-games", str(args.selfplay_shard_games),
-                    "--concurrency", str(args.selfplay_concurrency),
-                    "--threads", str(args.selfplay_threads),
-                    "--depth", str(args.selfplay_depth),
-                    "--srand", str(args.selfplay_seed),
-                    "--restart", "off",
-                    "--engine-option", f"Hash={args.selfplay_hash}",
-                ],
-            },
-            {
-                "name": "posgen_extract",
-                "command": [
-                    python, tool("posgen/posgen.py"), "extract",
-                    "{posgen}/selfplay.pgn",
-                    "--output", "{posgen}/positions.jsonl",
-                    "--stats", "{posgen}/extract_stats.json",
-                    "--skip-plies", str(args.skip_plies),
-                    "--min-depth", str(args.selfplay_depth),
-                    "--max-abs-cp", str(args.source_max_abs_cp),
-                ],
-            },
-            {
-                "name": "posgen_sample",
-                "command": [
-                    python, tool("posgen/posgen.py"), "sample",
-                    "--input", "{posgen}/positions.jsonl",
-                    "--output", "{posgen}/source.jsonl",
-                    "--preset", args.sample_preset,
-                    "--unique-fen",
-                    "--seed", str(args.selfplay_seed),
-                ],
-            },
-        ]
-
-        append_score_steps(steps, args, input_jsonl="{posgen}/source.jsonl")
+        append_source_generation_steps(steps, args)
 
         steps.extend([
             {
@@ -774,6 +898,23 @@ def add_create_args(
                         default=value("selfplay_use_nnue", d.selfplay_use_nnue))
     parser.add_argument("--selfplay-depth", type=int, default=value("selfplay_depth", d.selfplay_depth))
     parser.add_argument("--selfplay-seed", type=int, default=value("selfplay_seed", d.selfplay_seed))
+    parser.add_argument("--selfplay-distrib", action=argparse.BooleanOptionalAction,
+                        default=value("selfplay_distrib", d.selfplay_distrib))
+    parser.add_argument("--selfplay-distrib-tool",
+                        default=value("selfplay_distrib_tool", d.selfplay_distrib_tool))
+    parser.add_argument("--selfplay-distrib-python",
+                        default=value("selfplay_distrib_python", d.selfplay_distrib_python))
+    parser.add_argument("--selfplay-distrib-local-slots", type=int,
+                        default=value("selfplay_distrib_local_slots", d.selfplay_distrib_local_slots))
+    parser.add_argument("--selfplay-distrib-lease-seconds", type=int,
+                        default=value("selfplay_distrib_lease_seconds", d.selfplay_distrib_lease_seconds))
+    parser.add_argument("--selfplay-distrib-path-map", action="append",
+                        default=append_default("selfplay_distrib_path_map", d.selfplay_distrib_path_map))
+    parser.add_argument("--selfplay-distrib-require-notify",
+                        action=argparse.BooleanOptionalAction,
+                        default=value("selfplay_distrib_require_notify", d.selfplay_distrib_require_notify))
+    parser.add_argument("--selfplay-distrib-notify-command",
+                        default=value("selfplay_distrib_notify_command", d.selfplay_distrib_notify_command))
 
     parser.add_argument("--skip-plies", type=int, default=value("skip_plies", d.skip_plies))
     parser.add_argument("--source-max-abs-cp", type=int, default=value("source_max_abs_cp", d.source_max_abs_cp))

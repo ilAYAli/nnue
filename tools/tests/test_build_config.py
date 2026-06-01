@@ -350,6 +350,80 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_distributed_selfplay_plan_feeds_source_extraction(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "selfplay_games": 1001,
+                    "selfplay_shard_games": 250,
+                    "selfplay_distrib": True,
+                    "selfplay_distrib_python": "/coord/python",
+                    "selfplay_distrib_local_slots": 2,
+                    "selfplay_distrib_require_notify": False,
+                    "selfplay_distrib_path_map": [
+                        "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",
+                    ],
+                    "python": "/work/python",
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertIn("selfplay_distrib_plan", names)
+            self.assertIn("selfplay_distrib_add_input", names)
+            self.assertIn("selfplay_distrib_doctor", names)
+            self.assertIn("selfplay_distrib_work_00", names)
+            self.assertIn("selfplay_distrib_work_01", names)
+            self.assertIn("selfplay_distrib_wait", names)
+            self.assertIn("selfplay_distrib_merge", names)
+            self.assertLess(names.index("selfplay_distrib_merge"), names.index("posgen_extract"))
+
+            plan = next(
+                step for step in config["steps"]
+                if step["name"] == "selfplay_distrib_plan"
+            )
+            self.assertEqual("/coord/python", plan["command"][0])
+            self.assertIn("--shards", plan["command"])
+            self.assertEqual("5", plan["command"][plan["command"].index("--shards") + 1])
+            self.assertIn("--path-map", plan["command"])
+            self.assertIn(
+                "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",
+                plan["command"],
+            )
+            template = plan["command"][plan["command"].index("--command-template") + 1]
+            self.assertTrue(template.startswith("/work/python "))
+            self.assertIn("posgen/selfplay_shards.py generate", template)
+            self.assertIn("--total-games '{{total_games}}'", template)
+            self.assertIn("--shards '{{shards}}'", template)
+            self.assertIn("--shard-index '{{index}}'", template)
+            self.assertIn("--output-pgn '{{pgn}}'", template)
+            self.assertIn("--metadata '{{output}}'", template)
+
+            merge = next(
+                step for step in config["steps"]
+                if step["name"] == "selfplay_distrib_merge"
+            )
+            self.assertIn("verify --manifest", merge["command"][2])
+            self.assertTrue(any("selfplay_shards.py" in item for item in merge["command"]))
+
+            extract = next(
+                step for step in config["steps"]
+                if step["name"] == "posgen_extract"
+            )
+            self.assertIn("{posgen}/selfplay.pgn", extract["command"])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_distributed_score_accepts_cli_path_maps(self) -> None:
         parser = build.build_parser()
         args = parser.parse_args([
