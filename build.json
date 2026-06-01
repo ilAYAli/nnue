@@ -1,14 +1,14 @@
 {
-  "description": "Clean Enyo-owned d16 NNUE scale run: reuse the 3M sampled HCE/no-NNUE self-play positions from v1, relabel with Stockfish depth 12, train from random init with Bullet, and gate with provenance plus engine-static validation before SPRT.",
-  "experiment": "native-d16-owned-hce-selfplay-sf-d12-3m-v2",
+  "description": "Clean Enyo-owned d16 NNUE bootstrap run: generate self-play positions with the first owned native net that clearly beats HCE, relabel with Stockfish depth 12, train from random init with Bullet, and gate with provenance plus engine-static validation before SPRT.",
+  "experiment": "native-d16-owned-bootstrap-v3",
   "create": {
-    "name": "native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601",
+    "name": "native-d16-owned-bootstrap-v3-selfplay-sf-d12-20260601",
     "backend": "bullet",
     "engine": "/home/petter/code/cpp/chess/assets/engines/reference",
-    "nnue_file": "",
+    "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601/train/native-d16-owned-hce-selfplay-sf-d12-3m-v2-20260601/model.nn",
     "book": "/home/petter/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd",
     "runner": "/home/petter/source/fastchess/fastchess",
-    "bullet_generate_source": false,
+    "bullet_generate_source": true,
     "bullet_source_jsonl": "",
     "bullet_data": "",
     "bullet_loader": "direct",
@@ -38,9 +38,9 @@
     "selfplay_concurrency": 12,
     "selfplay_threads": 1,
     "selfplay_hash": 128,
-    "selfplay_use_nnue": false,
+    "selfplay_use_nnue": true,
     "selfplay_depth": 8,
-    "selfplay_seed": 2026053101,
+    "selfplay_seed": 2026060101,
     "skip_plies": 8,
     "source_max_abs_cp": 1600,
     "sample_preset": "signed-balanced-v1",
@@ -54,7 +54,7 @@
     "engine_static_engine": "/home/petter/code/cpp/chess/assets/engines/reference",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "score_limit": 0,
-    "score_source_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-d16-owned-hce-selfplay-sf-d16-v1-20260531/posgen/source.jsonl"
+    "score_source_jsonl": ""
   },
   "validation": {
     "promotion_gate": "Pass clean Enyo-owned provenance, engine-static sanity, 256-game triage versus Berserk, then 1000/2000 games if triage is not clearly negative.",
