@@ -204,6 +204,39 @@ class NetProvenanceTests(unittest.TestCase):
             self.assertIn("enyo-hce", result.position_sources)
             self.assertTrue(result.clean_enyo_owned)
 
+    def test_ignores_selfplay_runner_diagnostic_line(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs" / "hce-selfplay-runner"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "posgen.py selfplay --output /runs/posgen/selfplay.pgn "
+                "--engine-option Hash=128 --engine-option use_nnue=false\n"
+                "/repo/tools/posgen/run_selfplay.sh --output /runs/posgen/selfplay.pgn "
+                "--engine-option Hash=128 --engine-option use_nnue=false\n"
+                "selfplay: runner=/home/petter/source/fastchess/fastchess\n"
+                "data=/runs/posgen/source.jsonl\n",
+                encoding="utf-8",
+            )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertIn("enyo-hce", result.position_sources)
+            self.assertNotIn("borrowed-default", result.position_sources)
+            self.assertTrue(result.clean_enyo_owned)
+
     def test_rejects_implicit_default_selfplay_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

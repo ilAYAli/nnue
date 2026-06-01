@@ -181,7 +181,6 @@ def extract_selfplay_net_refs(text: str) -> list[str]:
         if not any(marker in line for marker in (
             "posgen.py selfplay",
             "run_selfplay.sh",
-            "fastchess",
         )):
             continue
 
