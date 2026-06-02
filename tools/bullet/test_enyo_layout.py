@@ -59,6 +59,46 @@ def test_expand_variable_hidden() -> None:
     assert expanded[target_l0_bytes:] == raw[input_buckets * ENYO_FEATURE_STRIDE * feature_bytes:]
 
 
+def test_expand_preserves_output_bucket_tail() -> None:
+    hidden = 2
+    l2 = 1
+    l3 = 2
+    input_buckets = 8
+    runtime_buckets = 16
+    output_buckets = 4
+    feature_bytes = hidden * 2
+    size = enyo_network_size(
+        input_buckets,
+        output_buckets=output_buckets,
+        hidden=hidden,
+        l2=l2,
+        l3=l3,
+    )
+    raw = bytearray(size)
+    source_l0_bytes = input_buckets * ENYO_FEATURE_STRIDE * feature_bytes
+    raw[source_l0_bytes:] = bytes(range(1, 1 + len(raw[source_l0_bytes:])))
+
+    expanded = expand_enyo_input_buckets(
+        bytes(raw),
+        input_buckets,
+        runtime_input_buckets=runtime_buckets,
+        output_buckets=output_buckets,
+        hidden=hidden,
+        l2=l2,
+        l3=l3,
+    )
+
+    target_l0_bytes = runtime_buckets * ENYO_FEATURE_STRIDE * feature_bytes
+    assert len(expanded) == enyo_network_size(
+        runtime_buckets,
+        output_buckets=output_buckets,
+        hidden=hidden,
+        l2=l2,
+        l3=l3,
+    )
+    assert expanded[target_l0_bytes:] == raw[source_l0_bytes:]
+
+
 def test_export_exact_runtime_bucket_count() -> None:
     hidden = 2
     l2 = 1
@@ -171,6 +211,7 @@ def main() -> None:
     test_default_size()
     test_variable_hidden_size()
     test_expand_variable_hidden()
+    test_expand_preserves_output_bucket_tail()
     test_export_exact_runtime_bucket_count()
     test_expand_to_16_runtime_buckets()
     test_expand_to_32_runtime_buckets_uses_legacy_mapping()

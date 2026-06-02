@@ -5,7 +5,6 @@ format is Berserk v13's .nn layout as loaded by NNUE::LoadNetwork().
 """
 from __future__ import annotations
 
-import struct
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -18,6 +17,8 @@ PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6
 
 DEFAULT_N_KING_BUCKETS = 16
 SUPPORTED_N_KING_BUCKETS = (16, 32)
+DEFAULT_N_OUTPUT_BUCKETS = 1
+SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
 N_KING_BUCKETS = DEFAULT_N_KING_BUCKETS
 N_PIECE_TYPES = 12
 N_SQUARES = 64
@@ -38,8 +39,13 @@ def feature_count(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> int:
     return input_buckets * N_PIECE_TYPES * N_SQUARES
 
 
-def network_size(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> int:
+def network_size(
+    input_buckets: int = DEFAULT_N_KING_BUCKETS,
+    output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS,
+) -> int:
     features = feature_count(input_buckets)
+    if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
+        raise ValueError(f"unsupported output bucket count {output_buckets}")
     return (
         features * N_HIDDEN * np.dtype(np.int16).itemsize
         + N_HIDDEN * np.dtype(np.int16).itemsize
@@ -47,8 +53,8 @@ def network_size(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> int:
         + N_L2 * np.dtype(np.int32).itemsize
         + N_L2 * N_L3 * np.dtype(np.float32).itemsize
         + N_L3 * np.dtype(np.float32).itemsize
-        + N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
-        + N_OUTPUT * np.dtype(np.float32).itemsize
+        + output_buckets * N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+        + output_buckets * N_OUTPUT * np.dtype(np.float32).itemsize
     )
 
 
@@ -88,13 +94,24 @@ def king_buckets(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> tuple[int, ...]
     raise ValueError(f"unsupported input bucket count {input_buckets}")
 
 
-def detect_input_buckets(size: int) -> int:
-    for buckets in SUPPORTED_N_KING_BUCKETS:
-        if size == network_size(buckets):
-            return buckets
+def detect_network_layout(size: int) -> tuple[int, int]:
+    for input_buckets in SUPPORTED_N_KING_BUCKETS:
+        for output_buckets in SUPPORTED_N_OUTPUT_BUCKETS:
+            if size == network_size(input_buckets, output_buckets):
+                return input_buckets, output_buckets
     expected = ", ".join(
-        f"{network_size(b)} ({b} buckets)" for b in SUPPORTED_N_KING_BUCKETS)
+        f"{network_size(i, o)} ({i} input, {o} output)"
+        for i in SUPPORTED_N_KING_BUCKETS
+        for o in SUPPORTED_N_OUTPUT_BUCKETS)
     raise ValueError(f"size {size} does not match supported net sizes: {expected}")
+
+
+def detect_input_buckets(size: int) -> int:
+    return detect_network_layout(size)[0]
+
+
+def detect_output_buckets(size: int) -> int:
+    return detect_network_layout(size)[1]
 
 _FEN_PIECE = {
     "p": PAWN,
@@ -114,9 +131,14 @@ class Net:
     l1_biases: np.ndarray       # (N_L2,) int32
     l2_weights: np.ndarray      # (N_L3, N_L2) float32
     l2_biases: np.ndarray       # (N_L3,) float32
-    output_weights: np.ndarray  # (N_L3,) float32
-    output_bias: float
+    output_weights: np.ndarray  # (output_buckets, N_L3) float32
+    output_biases: np.ndarray   # (output_buckets,) float32
     input_buckets: int = DEFAULT_N_KING_BUCKETS
+    output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS
+
+    @property
+    def output_bias(self) -> float:
+        return float(np.asarray(self.output_biases, dtype=np.float32).reshape(-1)[0])
 
 
 def to_berserk_sq(enyo_sq: int) -> int:
@@ -182,10 +204,27 @@ def phase_scale_from_pieces(pieces: Sequence[tuple[int, int, int]]) -> float:
     return (128.0 + float(phase)) / 128.0
 
 
+def output_bucket_for_piece_count(
+    piece_count: int,
+    output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS,
+) -> int:
+    if output_buckets <= 1:
+        return 0
+    divisor = (32 + output_buckets - 1) // output_buckets
+    return max(0, min(output_buckets - 1, (piece_count - 2) // divisor))
+
+
+def output_bucket_from_pieces(
+    pieces: Sequence[tuple[int, int, int]],
+    output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS,
+) -> int:
+    return output_bucket_for_piece_count(len(pieces), output_buckets)
+
+
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
     try:
-        input_buckets = detect_input_buckets(len(data))
+        input_buckets, output_buckets = detect_network_layout(len(data))
     except ValueError as exc:
         raise ValueError(f"{path}: {exc}") from exc
     n_features = feature_count(input_buckets)
@@ -204,11 +243,10 @@ def load_net(path: str | Path) -> Net:
     l1b = take(np.int32, N_L2)
     l2w = take(np.float32, N_L2 * N_L3).reshape(N_L3, N_L2)
     l2b = take(np.float32, N_L3)
-    ow = take(np.float32, N_L3)
-    ob = struct.unpack_from("<f", data, off)[0]
-    off += 4
+    ow = take(np.float32, output_buckets * N_L3).reshape(output_buckets, N_L3)
+    ob = take(np.float32, output_buckets)
     assert off == len(data)
-    return Net(iw, ib, l1w, l1b, l2w, l2b, ow, float(ob), input_buckets)
+    return Net(iw, ib, l1w, l1b, l2w, l2b, ow, ob, input_buckets, output_buckets)
 
 
 def write_net(net: Net, path: str | Path) -> None:
@@ -217,6 +255,20 @@ def write_net(net: Net, path: str | Path) -> None:
         raise ValueError(
             f"input_weights shape {net.input_weights.shape} does not match "
             f"{net.input_buckets} buckets")
+    if net.output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
+        raise ValueError(f"unsupported output bucket count {net.output_buckets}")
+    output_weights = np.asarray(net.output_weights, dtype=np.float32)
+    if output_weights.shape == (N_L3,):
+        output_weights = output_weights.reshape(1, N_L3)
+    if output_weights.shape != (net.output_buckets, N_L3):
+        raise ValueError(
+            f"output_weights shape {output_weights.shape} does not match "
+            f"{net.output_buckets} output buckets")
+    output_biases = np.asarray(net.output_biases, dtype=np.float32).reshape(-1)
+    if output_biases.shape != (net.output_buckets,):
+        raise ValueError(
+            f"output_biases shape {output_biases.shape} does not match "
+            f"{net.output_buckets} output buckets")
     out = Path(path)
     with out.open("wb") as f:
         f.write(np.asarray(net.input_weights, dtype=np.int16).tobytes(order="C"))
@@ -225,9 +277,9 @@ def write_net(net: Net, path: str | Path) -> None:
         f.write(np.asarray(net.l1_biases, dtype=np.int32).tobytes(order="C"))
         f.write(np.asarray(net.l2_weights, dtype=np.float32).tobytes(order="C"))
         f.write(np.asarray(net.l2_biases, dtype=np.float32).tobytes(order="C"))
-        f.write(np.asarray(net.output_weights, dtype=np.float32).tobytes(order="C"))
-        f.write(struct.pack("<f", float(net.output_bias)))
+        f.write(output_weights.tobytes(order="C"))
+        f.write(output_biases.tobytes(order="C"))
     size = out.stat().st_size
-    expected = network_size(net.input_buckets)
+    expected = network_size(net.input_buckets, net.output_buckets)
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")

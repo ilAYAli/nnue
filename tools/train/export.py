@@ -20,7 +20,11 @@ def main() -> None:
     state = torch.load(args.state, map_location="cpu")
     input_features = int(state["embed.weight"].shape[0])
     input_buckets = input_features // (12 * 64)
-    model = EnyoNNUE(input_buckets=input_buckets)
+    output_buckets = int(state["output.weight"].shape[0])
+    model = EnyoNNUE(
+        input_buckets=input_buckets,
+        output_buckets=output_buckets,
+    )
     model.load_state_dict(state)
     export_model(model, args.out)
     print(f"wrote {args.out}")

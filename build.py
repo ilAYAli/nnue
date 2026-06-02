@@ -748,6 +748,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--enyo-input-buckets", str(args.bullet_enyo_input_buckets),
                 "--enyo-runtime-input-buckets",
                 str(args.bullet_enyo_runtime_input_buckets),
+                "--enyo-output-buckets", str(args.bullet_enyo_output_buckets),
                 "--eval-scale", str(args.bullet_eval_scale),
                 "--save-rate", str(args.bullet_save_rate),
                 *(
@@ -1022,6 +1023,9 @@ def add_create_args(
     parser.add_argument("--bullet-enyo-runtime-input-buckets", type=int,
                         default=value("bullet_enyo_runtime_input_buckets", d.bullet_enyo_runtime_input_buckets),
                         choices=[1, 2, 4, 8, 16, 32])
+    parser.add_argument("--bullet-enyo-output-buckets", type=int,
+                        default=value("bullet_enyo_output_buckets", d.bullet_enyo_output_buckets),
+                        choices=[1, 2, 4, 8])
     parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
     parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
     parser.add_argument("--bullet-init-weights", default=value("bullet_init_weights", d.bullet_init_weights))

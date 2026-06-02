@@ -1,12 +1,13 @@
 from pathlib import Path
 
 import numpy as np
+import torch
 
 from tools.lib import enyo_nnue as nn2
 from tools.lib.nnue_model import EnyoNNUE, export_model, load_model_from_nn
 
 
-def _zero_net(input_buckets: int) -> nn2.Net:
+def _zero_net(input_buckets: int, output_buckets: int = 1) -> nn2.Net:
     return nn2.Net(
         input_weights=np.zeros(
             (nn2.feature_count(input_buckets), nn2.N_HIDDEN), dtype=np.int16),
@@ -15,9 +16,10 @@ def _zero_net(input_buckets: int) -> nn2.Net:
         l1_biases=np.zeros(nn2.N_L2, dtype=np.int32),
         l2_weights=np.zeros((nn2.N_L3, nn2.N_L2), dtype=np.float32),
         l2_biases=np.zeros(nn2.N_L3, dtype=np.float32),
-        output_weights=np.zeros(nn2.N_L3, dtype=np.float32),
-        output_bias=0.0,
+        output_weights=np.zeros((output_buckets, nn2.N_L3), dtype=np.float32),
+        output_biases=np.zeros(output_buckets, dtype=np.float32),
         input_buckets=input_buckets,
+        output_buckets=output_buckets,
     )
 
 
@@ -26,6 +28,7 @@ def test_network_size_supports_16_and_32_buckets() -> None:
     assert nn2.network_size(32) > nn2.network_size(16)
     assert nn2.detect_input_buckets(nn2.network_size(16)) == 16
     assert nn2.detect_input_buckets(nn2.network_size(32)) == 32
+    assert nn2.detect_output_buckets(nn2.network_size(16, 4)) == 4
 
 
 def test_32_bucket_net_round_trip(tmp_path: Path) -> None:
@@ -50,3 +53,28 @@ def test_pytorch_model_load_and_export_preserve_bucket_count(tmp_path: Path) -> 
     assert isinstance(model, EnyoNNUE)
     assert model.input_buckets == 32
     assert nn2.load_net(exported).input_buckets == 32
+
+
+def test_pytorch_model_selects_material_output_bucket(tmp_path: Path) -> None:
+    source = tmp_path / "bucketed.nn"
+    net = _zero_net(16, output_buckets=4)
+    net.output_biases[:] = np.asarray([0.0, 32.0, 64.0, 96.0], dtype=np.float32)
+    nn2.write_net(net, source)
+
+    model = load_model_from_nn(source)
+    counts = [2, 8, 16, 32]
+    offsets = np.cumsum([0] + counts[:-1])
+    feats = np.zeros(sum(counts), dtype=np.int64)
+    pred = model(
+        torch.from_numpy(feats),
+        torch.from_numpy(feats),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.zeros(len(counts), dtype=torch.long),
+        torch.ones(len(counts), dtype=torch.float32),
+    )
+
+    np.testing.assert_allclose(
+        pred.detach().numpy(),
+        np.asarray([0.0, 0.0, 1.0, 3.0], dtype=np.float32),
+    )

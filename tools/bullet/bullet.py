@@ -11,6 +11,8 @@ import sys
 
 ENYO_DEFAULT_INPUT_BUCKETS = 16
 ENYO_SUPPORTED_INPUT_BUCKETS = (1, 2, 4, 8, 16, 32)
+ENYO_DEFAULT_OUTPUT_BUCKETS = 1
+ENYO_SUPPORTED_OUTPUT_BUCKETS = (1, 2, 4, 8)
 ENYO_PIECE_TYPES = 12
 ENYO_SQUARES = 64
 ENYO_HIDDEN = 1024
@@ -21,6 +23,7 @@ ENYO_L3 = 32
 def enyo_network_size(
     input_buckets: int = ENYO_DEFAULT_INPUT_BUCKETS,
     *,
+    output_buckets: int = ENYO_DEFAULT_OUTPUT_BUCKETS,
     hidden: int = ENYO_HIDDEN,
     l2: int = ENYO_L2,
     l3: int = ENYO_L3,
@@ -34,8 +37,8 @@ def enyo_network_size(
         + l2 * 4
         + l2 * l3 * 4
         + l3 * 4
-        + l3 * 4
-        + 4
+        + output_buckets * l3 * 4
+        + output_buckets * 4
     )
 
 
@@ -54,11 +57,17 @@ def trim_bullet_checkpoint(
     raw: bytes,
     input_buckets: int,
     *,
+    output_buckets: int = ENYO_DEFAULT_OUTPUT_BUCKETS,
     hidden: int = ENYO_HIDDEN,
     l2: int = ENYO_L2,
     l3: int = ENYO_L3,
 ) -> bytes:
-    network_size = enyo_network_size(input_buckets, hidden=hidden, l2=l2, l3=l3)
+    network_size = enyo_network_size(
+        input_buckets,
+        output_buckets=output_buckets,
+        hidden=hidden,
+        l2=l2,
+        l3=l3)
     if len(raw) < network_size:
         raise SystemExit(f"checkpoint is {len(raw)} bytes, expected at least {network_size}")
     if len(raw) == network_size:
@@ -102,11 +111,18 @@ def expand_enyo_input_buckets(
     input_buckets: int,
     *,
     runtime_input_buckets: int = ENYO_DEFAULT_INPUT_BUCKETS,
+    output_buckets: int = ENYO_DEFAULT_OUTPUT_BUCKETS,
     hidden: int = ENYO_HIDDEN,
     l2: int = ENYO_L2,
     l3: int = ENYO_L3,
 ) -> bytes:
-    raw = trim_bullet_checkpoint(raw, input_buckets, hidden=hidden, l2=l2, l3=l3)
+    raw = trim_bullet_checkpoint(
+        raw,
+        input_buckets,
+        output_buckets=output_buckets,
+        hidden=hidden,
+        l2=l2,
+        l3=l3)
     if input_buckets == runtime_input_buckets:
         return raw
 
@@ -393,6 +409,7 @@ def cmd_train(args: argparse.Namespace) -> int:
         "ENYO_BULLET_ENYO_INPUT_FACTORISER": "1" if args.enyo_input_factorizer else "0",
         "ENYO_BULLET_ENYO_INPUT_BUCKETS": str(args.enyo_input_buckets),
         "ENYO_BULLET_ENYO_RUNTIME_INPUT_BUCKETS": str(args.enyo_runtime_input_buckets),
+        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS": str(args.enyo_output_buckets),
         "ENYO_BULLET_EVAL_SCALE": str(args.eval_scale),
         "ENYO_BULLET_SAVE_RATE": str(args.save_rate),
         "ENYO_BULLET_EXPORT_INIT_ONLY": "1" if args.export_init_only else "0",
@@ -431,6 +448,7 @@ def cmd_train(args: argparse.Namespace) -> int:
             checkpoints[-1].read_bytes(),
             args.enyo_input_buckets,
             runtime_input_buckets=args.enyo_runtime_input_buckets,
+            output_buckets=args.enyo_output_buckets,
             hidden=args.hidden,
             l2=args.l2,
         )
@@ -500,6 +518,13 @@ def build_parser() -> argparse.ArgumentParser:
         choices=list(ENYO_SUPPORTED_INPUT_BUCKETS),
         default=ENYO_DEFAULT_INPUT_BUCKETS,
         help="Enyo runtime king buckets to export into the .nn file.",
+    )
+    train.add_argument(
+        "--enyo-output-buckets",
+        type=int,
+        choices=list(ENYO_SUPPORTED_OUTPUT_BUCKETS),
+        default=ENYO_DEFAULT_OUTPUT_BUCKETS,
+        help="Enyo material-count output buckets for the final head.",
     )
     train.add_argument("--eval-scale", type=float, default=400.0)
     train.add_argument("--save-rate", type=int, default=64)

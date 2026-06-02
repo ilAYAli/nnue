@@ -131,6 +131,7 @@ class CandidateDefaults:
     bullet_enyo_input_factorizer: bool = False
     bullet_enyo_input_buckets: int = 16
     bullet_enyo_runtime_input_buckets: int = 16
+    bullet_enyo_output_buckets: int = 1
     bullet_eval_scale: float = 400.0
     bullet_save_rate: int = 64
     bullet_init_weights: str = ""

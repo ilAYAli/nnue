@@ -13,16 +13,18 @@ from . import enyo_nnue as nn2
 
 class EnyoNNUE(nn_pt.Module):
     def __init__(self, init: str = "kaiming",
-                 input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS):
+                 input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
+                 output_buckets: int = nn2.DEFAULT_N_OUTPUT_BUCKETS):
         super().__init__()
         self.input_buckets = input_buckets
+        self.output_buckets = output_buckets
         self.embed = nn_pt.EmbeddingBag(
             nn2.feature_count(input_buckets), nn2.N_HIDDEN, mode="sum")
         self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
         self.l1_weight = nn_pt.Parameter(torch.zeros(nn2.N_L2, nn2.N_L1))
         self.l1_bias = nn_pt.Parameter(torch.zeros(nn2.N_L2))
         self.l2 = nn_pt.Linear(nn2.N_L2, nn2.N_L3)
-        self.output = nn_pt.Linear(nn2.N_L3, nn2.N_OUTPUT)
+        self.output = nn_pt.Linear(nn2.N_L3, output_buckets)
 
         if init == "kaiming":
             nn_pt.init.normal_(self.embed.weight, std=math.sqrt(2.0 / 32.0))
@@ -41,6 +43,24 @@ class EnyoNNUE(nn_pt.Module):
                     ) -> torch.Tensor:
         return self.embed(feats, offsets) + self.input_bias
 
+    def output_bucket_from_offsets(
+        self,
+        feats: torch.Tensor,
+        offsets: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.output_buckets <= 1:
+            return torch.zeros_like(offsets)
+        counts = torch.empty_like(offsets)
+        if len(offsets) > 1:
+            counts[:-1] = offsets[1:] - offsets[:-1]
+        counts[-1] = feats.numel() - offsets[-1]
+        divisor = (32 + self.output_buckets - 1) // self.output_buckets
+        return torch.clamp(
+            torch.div(counts - 2, divisor, rounding_mode="floor"),
+            min=0,
+            max=self.output_buckets - 1,
+        )
+
     @staticmethod
     def _quantized_input_relu(acc: torch.Tensor) -> torch.Tensor:
         x = torch.clamp(acc, min=0.0, max=float(127 << nn2.QUANT1_BITS))
@@ -50,7 +70,8 @@ class EnyoNNUE(nn_pt.Module):
 
     def raw_forward(self, w_feats: torch.Tensor, b_feats: torch.Tensor,
                     w_offsets: torch.Tensor, b_offsets: torch.Tensor,
-                    stm: torch.Tensor) -> torch.Tensor:
+                    stm: torch.Tensor,
+                    output_bucket: torch.Tensor | None = None) -> torch.Tensor:
         w_acc = self.accumulator(w_feats, w_offsets)
         b_acc = self.accumulator(b_feats, b_offsets)
 
@@ -62,19 +83,29 @@ class EnyoNNUE(nn_pt.Module):
         x0 = self._quantized_input_relu(acc)
         x1 = torch.relu(x0 @ self.l1_weight.t() + self.l1_bias)
         x2 = torch.relu(self.l2(x1))
-        return self.output(x2).squeeze(-1) / nn2.EVAL_DIVISOR
+        raw = self.output(x2) / nn2.EVAL_DIVISOR
+        if self.output_buckets == 1:
+            return raw.squeeze(-1)
+        if output_bucket is None:
+            output_bucket = self.output_bucket_from_offsets(w_feats, w_offsets)
+        return raw.gather(1, output_bucket.long().view(-1, 1)).squeeze(-1)
 
     def forward(self, w_feats: torch.Tensor, b_feats: torch.Tensor,
                 w_offsets: torch.Tensor, b_offsets: torch.Tensor,
-                stm: torch.Tensor, phase_scale: torch.Tensor
+                stm: torch.Tensor, phase_scale: torch.Tensor,
+                output_bucket: torch.Tensor | None = None,
                 ) -> torch.Tensor:
-        raw = self.raw_forward(w_feats, b_feats, w_offsets, b_offsets, stm)
+        raw = self.raw_forward(
+            w_feats, b_feats, w_offsets, b_offsets, stm, output_bucket)
         return torch.clamp(raw * phase_scale, min=-2045.0, max=2045.0)
 
 
 def load_model_from_nn(path: str | Path, device: str = "cpu") -> EnyoNNUE:
     net = nn2.load_net(path)
-    model = EnyoNNUE(init="kaiming", input_buckets=net.input_buckets)
+    model = EnyoNNUE(
+        init="kaiming",
+        input_buckets=net.input_buckets,
+        output_buckets=net.output_buckets)
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
         model.input_bias.copy_(torch.from_numpy(net.input_biases.astype(np.float32)))
@@ -82,9 +113,8 @@ def load_model_from_nn(path: str | Path, device: str = "cpu") -> EnyoNNUE:
         model.l1_bias.copy_(torch.from_numpy(net.l1_biases.astype(np.float32)))
         model.l2.weight.copy_(torch.from_numpy(net.l2_weights.astype(np.float32)))
         model.l2.bias.copy_(torch.from_numpy(net.l2_biases.astype(np.float32)))
-        model.output.weight.copy_(
-            torch.from_numpy(net.output_weights.astype(np.float32)).view(1, -1))
-        model.output.bias.copy_(torch.tensor([net.output_bias], dtype=torch.float32))
+        model.output.weight.copy_(torch.from_numpy(net.output_weights.astype(np.float32)))
+        model.output.bias.copy_(torch.from_numpy(net.output_biases.astype(np.float32)))
     return model.to(device)
 
 
@@ -126,8 +156,9 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         l1_biases=l1b,
         l2_weights=m.l2.weight.detach().numpy().astype(np.float32),
         l2_biases=m.l2.bias.detach().numpy().astype(np.float32),
-        output_weights=m.output.weight.detach().numpy().reshape(-1).astype(np.float32),
-        output_bias=float(m.output.bias.detach().numpy().item()),
+        output_weights=m.output.weight.detach().numpy().astype(np.float32),
+        output_biases=m.output.bias.detach().numpy().astype(np.float32),
         input_buckets=m.input_buckets,
+        output_buckets=m.output_buckets,
     )
     nn2.write_net(net, path)

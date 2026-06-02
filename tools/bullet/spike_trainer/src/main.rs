@@ -183,7 +183,7 @@ impl<const INPUT_BUCKETS: usize> SparseInputType for EnyoInputs<INPUT_BUCKETS> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn train_enyo<const INPUT_BUCKETS: usize>(
+fn train_enyo<const INPUT_BUCKETS: usize, const OUTPUT_BUCKETS: usize>(
     dataset: String,
     output: String,
     net_id: String,
@@ -214,6 +214,9 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
     if !matches!(INPUT_BUCKETS, 1 | 2 | 4 | 8 | 16 | 32) {
         panic!("Enyo mode supports only 1, 2, 4, 8, 16, or 32 input king buckets");
     }
+    if !matches!(OUTPUT_BUCKETS, 1 | 2 | 4 | 8) {
+        panic!("Enyo mode supports only 1, 2, 4, or 8 output buckets");
+    }
 
     println!("mode=enyo");
     println!("dataset={dataset}");
@@ -221,6 +224,7 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
     println!("net_id={net_id}");
     println!("hidden={hidden} l2={l2_size}");
     println!("enyo_input_buckets={INPUT_BUCKETS}");
+    println!("enyo_output_buckets={OUTPUT_BUCKETS}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
     println!("enyo_input_factoriser={input_factoriser}");
@@ -260,6 +264,7 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
         .dual_perspective()
         .optimiser(AdamW)
         .inputs(EnyoInputs::<INPUT_BUCKETS>)
+        .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
         .save_format(&[
             l0w_format,
             SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -286,7 +291,7 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
             }),
         ])
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
-        .build(|builder, stm_inputs, ntm_inputs| {
+        .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
             let mut l0 = maybe_frozen(builder, !train_input, || {
                 enyo_affine(builder, "l0", INPUT_BUCKETS * 12 * 64, hidden, l0_stdev)
             });
@@ -305,7 +310,9 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
             l1.weights = l1.weights.faux_quantise(l1_export_scale, true);
             l1.bias = l1.bias.faux_quantise(l1_export_scale, true);
             let l2 = maybe_frozen(builder, !train_l2, || builder.new_affine("l2", l2_size, 32));
-            let l3 = maybe_frozen(builder, !train_l3, || builder.new_affine("l3", 32, 1));
+            let l3 = maybe_frozen(builder, !train_l3, || {
+                builder.new_affine("l3", 32, OUTPUT_BUCKETS)
+            });
 
             let stm_hidden = (l0.forward(stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
                 .faux_quantise(1.0, false);
@@ -314,7 +321,7 @@ fn train_enyo<const INPUT_BUCKETS: usize>(
             let x0 = stm_hidden.concat(ntm_hidden);
             let x1 = l1.forward(x0).relu();
             let x2 = l2.forward(x1).relu();
-            l3.forward(x2)
+            l3.forward(x2).select(output_buckets)
         });
 
     let open_params = AdamWParams {
@@ -453,6 +460,7 @@ fn main() {
     let enyo_l1_export_scale = env_parse("ENYO_BULLET_ENYO_L1_EXPORT_SCALE", 1.0f32);
     let enyo_input_factoriser = env_parse("ENYO_BULLET_ENYO_INPUT_FACTORISER", 0usize) != 0;
     let enyo_input_buckets = env_parse("ENYO_BULLET_ENYO_INPUT_BUCKETS", 32usize);
+    let enyo_output_buckets = env_parse("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", 1usize);
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
@@ -460,8 +468,8 @@ fn main() {
 
     if mode == "enyo" {
         macro_rules! run_enyo {
-            ($buckets:literal) => {
-                train_enyo::<$buckets>(
+            ($input_buckets:literal, $output_buckets:literal) => {
+                train_enyo::<$input_buckets, $output_buckets>(
                     dataset,
                     output,
                     net_id,
@@ -485,13 +493,28 @@ fn main() {
                 )
             };
         }
+
+        macro_rules! run_enyo_input {
+            ($input_buckets:literal) => {
+                match enyo_output_buckets {
+                    1 => run_enyo!($input_buckets, 1),
+                    2 => run_enyo!($input_buckets, 2),
+                    4 => run_enyo!($input_buckets, 4),
+                    8 => run_enyo!($input_buckets, 8),
+                    _ => panic!(
+                        "unsupported ENYO_BULLET_ENYO_OUTPUT_BUCKETS={enyo_output_buckets}"
+                    ),
+                }
+            };
+        }
+
         match enyo_input_buckets {
-            1 => run_enyo!(1),
-            2 => run_enyo!(2),
-            4 => run_enyo!(4),
-            8 => run_enyo!(8),
-            16 => run_enyo!(16),
-            32 => run_enyo!(32),
+            1 => run_enyo_input!(1),
+            2 => run_enyo_input!(2),
+            4 => run_enyo_input!(4),
+            8 => run_enyo_input!(8),
+            16 => run_enyo_input!(16),
+            32 => run_enyo_input!(32),
             _ => panic!("unsupported ENYO_BULLET_ENYO_INPUT_BUCKETS={enyo_input_buckets}"),
         }
         return;

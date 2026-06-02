@@ -57,9 +57,25 @@ def load_legacy_net_raw(path: Path):
     net.l1_biases = l1_biases
     net.l2_weights = l2_weights
     net.l2_biases = l2_biases
-    net.output_weights = output_weights
-    net.output_bias = output_bias
+    net.output_weights = output_weights.reshape(1, N_L3)
+    net.output_biases = np.asarray([output_bias], dtype=np.float32)
+    net.output_buckets = 1
     return net
+
+
+def expand_output_head(net, output_buckets: int):
+    weights = np.asarray(net.output_weights, dtype=np.float32)
+    if weights.shape == (N_L3,):
+        weights = weights.reshape(1, N_L3)
+    biases = np.asarray(net.output_biases, dtype=np.float32).reshape(-1)
+    current = int(getattr(net, "output_buckets", weights.shape[0]))
+    if current == output_buckets:
+        return weights, biases
+    if current == 1:
+        return np.repeat(weights, output_buckets, axis=0), np.repeat(biases, output_buckets)
+    raise SystemExit(
+        f"cannot expand {current} output buckets to {output_buckets}; "
+        "only single-head init can be repeated")
 
 
 def write_tensor(handle, name: str, values: np.ndarray) -> None:
@@ -76,6 +92,7 @@ def main() -> int:
     parser.add_argument("--eval-scale", type=float, default=400.0)
     parser.add_argument("--eval-divisor", type=float, default=32.0)
     parser.add_argument("--l1-export-scale", type=float, default=1.0)
+    parser.add_argument("--output-buckets", type=int, default=1, choices=[1, 2, 4, 8])
     parser.add_argument(
         "--legacy-inputs",
         action="store_true",
@@ -91,6 +108,7 @@ def main() -> int:
     args.output.expanduser().parent.mkdir(parents=True, exist_ok=True)
 
     output_scale = args.eval_scale * args.eval_divisor
+    output_weights, output_biases = expand_output_head(net, args.output_buckets)
     with args.output.expanduser().open("wb") as handle:
         write_tensor(handle, "l0w", net.input_weights.astype(np.float32))
         write_tensor(handle, "l0b", net.input_biases.astype(np.float32))
@@ -109,9 +127,9 @@ def main() -> int:
         write_tensor(
             handle,
             "l3w",
-            np.asarray(net.output_weights, dtype=np.float32).reshape(1, -1) / output_scale,
+            output_weights / output_scale,
         )
-        write_tensor(handle, "l3b", np.asarray([net.output_bias / output_scale], dtype=np.float32))
+        write_tensor(handle, "l3b", output_biases / output_scale)
 
     print(f"wrote {args.output.expanduser()}")
     return 0
