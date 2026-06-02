@@ -78,6 +78,13 @@ def expand_output_head(net, output_buckets: int):
         "only single-head init can be repeated")
 
 
+def bullet_l3_weights(output_weights: np.ndarray) -> np.ndarray:
+    # Bullet optimiser-state affine weights use input-major orientation. The
+    # saved Enyo .nn format is bucket-major, and the trainer save_format
+    # transposes l3w back to that layout during export.
+    return np.asarray(output_weights, dtype=np.float32).T
+
+
 def write_tensor(handle, name: str, values: np.ndarray) -> None:
     flat = np.asarray(values, dtype=np.float32).ravel(order="C")
     handle.write(name.encode("ascii") + b"\n")
@@ -127,7 +134,7 @@ def main() -> int:
         write_tensor(
             handle,
             "l3w",
-            output_weights / output_scale,
+            bullet_l3_weights(output_weights) / output_scale,
         )
         write_tensor(handle, "l3b", output_biases / output_scale)
 
