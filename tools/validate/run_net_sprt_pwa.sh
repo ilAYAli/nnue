@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+timestamp() {
+  date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z'
+}
+
 log_event() {
   local msg="$1"
-  echo "$(date --iso-8601=seconds) $msg"
+  echo "$(timestamp) $msg"
 }
 
 net_size() {
@@ -15,11 +19,39 @@ PY
 }
 
 net_layout() {
-  case "$(net_size "$1")" in
-    25203012) echo "16-bucket" ;;
-    50368836) echo "32-bucket" ;;
-    *) echo "unknown" ;;
-  esac
+  python3 - "$1" <<'PY' || echo "unknown"
+import os
+import sys
+
+N_PIECE_TYPES = 12
+N_SQUARES = 64
+N_HIDDEN = 1024
+N_L1 = 2 * N_HIDDEN
+N_L2 = 16
+N_L3 = 32
+N_OUTPUT = 1
+
+def network_size(input_buckets, output_buckets):
+    features = input_buckets * N_PIECE_TYPES * N_SQUARES
+    return (
+        features * N_HIDDEN * 2
+        + N_HIDDEN * 2
+        + N_L1 * N_L2
+        + N_L2 * 4
+        + N_L2 * N_L3 * 4
+        + N_L3 * 4
+        + output_buckets * N_L3 * N_OUTPUT * 4
+        + output_buckets * N_OUTPUT * 4
+    )
+
+size = os.path.getsize(sys.argv[1])
+for input_buckets in (16, 32):
+    for output_buckets in (1, 2, 4, 8):
+        if size == network_size(input_buckets, output_buckets):
+            print(f"{input_buckets}-input/{output_buckets}-output-bucket")
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
 }
 
 check_engine_loads_net() {

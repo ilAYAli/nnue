@@ -116,7 +116,10 @@ PY
                 )
 
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn("engine cannot load candidate 32-bucket net", result.stdout)
+                self.assertIn(
+                    "engine cannot load candidate 32-input/1-output-bucket net",
+                    result.stdout,
+                )
                 self.assertFalse((tmp / "sprt-called").exists())
 
     def test_checks_candidate_and_reference_before_sprt(self) -> None:
@@ -139,8 +142,31 @@ PY
             )
 
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("load ok candidate 32-bucket", result.stdout)
-            self.assertIn("load ok reference 16-bucket", result.stdout)
+            self.assertIn("load ok candidate 32-input/1-output-bucket", result.stdout)
+            self.assertIn("load ok reference 16-input/1-output-bucket", result.stdout)
+            self.assertTrue((tmp / "sprt-called").exists())
+
+    def test_accepts_output_bucket_net(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            candidate = tmp / "candidate-output4.nn"
+            reference = tmp / "reference16.nn"
+            write_sparse(candidate, 25203408)
+            write_sparse(reference, 25203012)
+            engine, sprt = self.make_tools(tmp)
+
+            result = self.run_script(
+                tmp,
+                engine=engine,
+                sprt=sprt,
+                candidate=candidate,
+                reference=reference,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("load ok candidate 16-input/4-output-bucket", result.stdout)
             self.assertTrue((tmp / "sprt-called").exists())
 
     def test_script_does_not_call_notifai_directly(self) -> None:
