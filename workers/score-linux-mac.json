@@ -1,0 +1,19 @@
+{
+  "schema": "crucible.workers.v1",
+  "workers": [
+    {
+      "host": "pwa-5090",
+      "slots": 20
+    },
+    {
+      "host": "pwa-rce",
+      "slots": 8
+    },
+    {
+      "host": "pwa-mbp",
+      "profile": "mac",
+      "python": "/opt/homebrew/bin/python3",
+      "slots": 10
+    }
+  ]
+}
