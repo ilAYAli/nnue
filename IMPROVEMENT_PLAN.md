@@ -31,34 +31,35 @@ Current clean-native lineage names:
 - `native-1.0.0`: clean Enyo-native baseline from the current lane.
 - `native-1.1.0`: v2-cont continuation that beat `native-1.0.0` by
   `+99.0 +/- 40.3 Elo` over 256 games.
-- `native-1.2.0-rc1`: current fresh-self-play continuation candidate, pending
-  validation against `native-1.1.0`.
+- `native-1.5.0-rc1`: best current clean-native continuation baseline.
+- `native-1.5.1-rc1`: rejected. The 60k-full self-play continuation lost to
+  `native-1.5.0-rc1` in smoke at `-16.3 +/- 36.4 Elo`, LOS `18.9%`.
+- `native-2.0.0-rc1`: reserved for the material-count output-bucket
+  architecture lane after runtime/export preflight passes.
 
 Current build intent:
 
-- The random-init bootstrap on the v2-generated corpus is rejected:
-  `native-d16-owned-bootstrap-v3-20k-sf-d12-20260601` passed provenance and
-  engine-static validation, but the Berserk smoke hard-rejected at
-  `-961 Elo`, LLR `-2.95/2.94`, and only `0.8%` draws.
-- The clean-owned v2 continuation on that corpus produced mixed but useful
-  results:
-  - versus Berserk it is still a hard reject: `-771.8 Elo`, LLR
-    `-2.95/2.94`, and only `0.8%` draws in the 256-game smoke;
-  - versus the previous clean-owned v2 net it is a clear step forward:
-    `+99.0 +/- 40.3 Elo` over 256 games, LOS `100%`, draw `16.8%`.
-- Next test: generate self-play from the improved clean-owned v2-cont net,
-  label with Stockfish d12, and continue from v2-cont at low dose. This tests
-  whether owned self-play iteration continues to improve the clean-owned
-  baseline.
+- Same-architecture self-play continuation is still incrementally useful, but
+  no longer the fastest lane: `native-1.5.1-rc1` regressed against
+  `native-1.5.0-rc1`.
+- Next test is an architecture preflight, not another same-lane data dose:
+  material-count output buckets for the final scalar head. This keeps the
+  accumulator and hidden layers shared, but lets Bullet and Enyo select a
+  final output head by total material count.
+- Preflight requirements before training:
+  - Enyo runtime loads legacy single-head and new multi-head `.nn` files.
+  - Python `.nn` load/write/export preserves output bucket count.
+  - Bullet trainer compiles with `--enyo-output-buckets`.
+  - A generated 4-output-bucket `.nn` loads through Enyo and `evalnet`.
+  - NPS/runtime regression is checked before a full native-2.0 training run.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
 - Require `net_provenance.py --require-clean-enyo-owned` before static
   validation or SPRT.
 - First promotion threshold is "not worse than Berserk", not merely "close".
-- Do not rerun a random-init candidate on the v2-generated corpus unless the
-  architecture or label objective changes. Current progress is in continuation
-  from the best clean-owned baseline, not scratch replacement strength.
+- Do not rerun a random-init candidate or another same-architecture LR/data-dose
+  variant unless the architecture, label objective, or source quality changes.
 
 2026-05-31 ownership correction:
 
