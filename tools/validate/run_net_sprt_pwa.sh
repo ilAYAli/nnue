@@ -90,6 +90,7 @@ RUN="${RUN:-$(dirname "$(dirname "$NET")")}"
 ENGINE="${ENGINE:-$HOME/code/cpp/chess/assets/engines/reference}"
 INIT="${INIT:-$HOME/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn}"
 SPRT="${SPRT:-$HOME/code/cpp/chess/sprt/sprt}"
+FASTCHESS="${FASTCHESS:-}"
 BOOK="${BOOK:-$HOME/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd}"
 GAMES="${GAMES:-4000}"
 CONCURRENCY="${CONCURRENCY:-10}"
@@ -102,6 +103,15 @@ RESTART="${RESTART:-off}"
 LOG_DIR="${LOG_DIR:-$RUN/$TAG/sprt_confirm_$(date +%Y%m%d_%H%M%S)}"
 NTFY_URL="${NTFY_URL:-https://ntfy.wahlman.no/sprt}"
 
+if [ -z "$FASTCHESS" ]; then
+  for candidate_fastchess in "$HOME/.local/bin/fastchess" "$HOME/local/bin/fastchess"; do
+    if [ -x "$candidate_fastchess" ]; then
+      FASTCHESS="$candidate_fastchess"
+      break
+    fi
+  done
+fi
+
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "$LOG_DIR/run.log") 2>&1
 
@@ -111,6 +121,10 @@ for required in "$NET" "$ENGINE" "$INIT" "$SPRT"; do
     exit 1
   fi
 done
+if [ -n "$FASTCHESS" ] && [ ! -x "$FASTCHESS" ]; then
+  log_event "Enyo NNUE SPRT fastchess is not executable: $FASTCHESS"
+  exit 1
+fi
 if [ -n "$BOOK" ] && [ ! -e "$BOOK" ]; then
   log_event "Enyo NNUE SPRT missing $BOOK"
   exit 1
@@ -143,6 +157,9 @@ if [ -n "$HASH" ]; then
 fi
 if [ -n "$BOOK" ]; then
   args+=(--book "$BOOK")
+fi
+if [ -n "$FASTCHESS" ]; then
+  args+=(--fastchess "$FASTCHESS")
 fi
 
 set +e
