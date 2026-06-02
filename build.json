@@ -18,7 +18,7 @@
     "selfplay_seed": 2026060202,
     "selfplay_crucible": true,
     "selfplay_crucible_tool": "/home/petter/.local/bin/crucible",
-    "selfplay_crucible_workers": "/home/petter/code/cpp/chess/crucible/examples/workers.json",
+    "selfplay_crucible_workers": "/home/petter/code/cpp/chess/crucible/examples/workers-linux.json",
     "selfplay_crucible_jobs": 4,
     "selfplay_crucible_remote_timeout_seconds": 28800,
     "selfplay_crucible_local_slots": 0,
