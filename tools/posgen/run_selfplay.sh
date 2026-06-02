@@ -11,6 +11,7 @@ fi
 
 runner=""
 engine="$repo_root/build/enyo"
+engine_config=""
 nnue_file=""
 games=100
 shard_games=0
@@ -35,6 +36,7 @@ Generate Enyo-vs-Enyo self-play PGNs with fastchess score comments.
 Options:
   --runner PATH               fastchess binary (default: PATH or ~/source/fastchess/fastchess)
   --engine PATH               Engine binary (default: build/enyo)
+  --engine-config PATH        Optional Enyo settings.json config path
   --nnue-file PATH            Optional NNUE network path passed as UCI option
   --output PATH               Output PGN (default: runs/standalone_posgen/selfplay_TIMESTAMP.pgn)
   --games N                   Total games to generate (default: 100)
@@ -65,6 +67,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --runner) runner="$2"; shift 2 ;;
         --engine) engine="$2"; shift 2 ;;
+        --engine-config) engine_config="$2"; shift 2 ;;
         --nnue-file) nnue_file="$2"; shift 2 ;;
         --output) output="$2"; shift 2 ;;
         --games) games="$2"; shift 2 ;;
@@ -91,6 +94,9 @@ done
 engine="$(abs_path "$engine")"
 output="$(abs_path "$output")"
 book="$(abs_path "$book")"
+if [[ -n "$engine_config" ]]; then
+    engine_config="$(abs_path "$engine_config")"
+fi
 if [[ -n "$runner" ]]; then
     runner="$(abs_path "$runner")"
 fi
@@ -117,6 +123,10 @@ if [[ ! -x "$runner" ]]; then
 fi
 if [[ ! -x "$engine" ]]; then
     echo "Engine is not executable: $engine" >&2
+    exit 1
+fi
+if [[ -n "$engine_config" && ! -f "$engine_config" ]]; then
+    echo "Engine config not found: $engine_config" >&2
     exit 1
 fi
 if [[ ! -f "$book" ]]; then
@@ -146,6 +156,74 @@ if ((${#extra_engine_options[@]})); then
     engine_options+=("${extra_engine_options[@]}")
 fi
 
+generated_engine_config=""
+engine_cmd="$engine"
+if [[ -z "$engine_config" ]]; then
+    generated_engine_config="$(dirname "$output")/$(basename "$output" .pgn).enyo-config.json"
+    config_args=("$generated_engine_config" "$nnue_file" "$threads")
+    if ((${#extra_engine_options[@]})); then
+        config_args+=("${extra_engine_options[@]}")
+    fi
+    python3 - "${config_args[@]}" <<'PY'
+import json
+import sys
+
+path, nnue_file, threads, *options = sys.argv[1:]
+toggles = {
+    "use_lmr": True,
+    "use_nnue": bool(nnue_file),
+    "use_syzygy": False,
+}
+constants = {
+    "threads": int(threads),
+    "logfile": "/tmp/enyo-selfplay.log",
+    "SyzygyPath": "",
+}
+
+bool_options = {
+    "use_lmr",
+    "use_nnue",
+    "use_syzygy",
+    "use_tt",
+    "use_tt_exact_cutoff",
+    "use_tt_lower_cutoff",
+    "use_tt_upper_cutoff",
+}
+if nnue_file:
+    constants["nnue_file"] = nnue_file
+
+for option in options:
+    if option.startswith("option."):
+        option = option[len("option."):]
+    if "=" not in option:
+        continue
+    name, value = option.split("=", 1)
+    lower_name = name.lower()
+    lower_value = value.lower()
+    if lower_name in bool_options:
+        toggles[lower_name] = lower_value in {"1", "true", "yes", "on"}
+    else:
+        try:
+            parsed = int(value)
+        except ValueError:
+            parsed = value
+        constants[name] = parsed
+
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump({"toggles": toggles, "constants": constants}, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
+    engine_config="$generated_engine_config"
+fi
+
+engine_wrapper="$(dirname "$output")/$(basename "$output" .pgn).enyo-wrapper.sh"
+cat > "$engine_wrapper" <<EOF
+#!/usr/bin/env bash
+exec "$engine" --config "$engine_config" "\$@"
+EOF
+chmod +x "$engine_wrapper"
+engine_cmd="$engine_wrapper"
+
 limit_args=()
 if [[ -n "$tc" ]]; then
     limit_args=(tc="$tc")
@@ -160,6 +238,7 @@ fi
 
 echo "selfplay: runner=$runner"
 echo "selfplay: engine=$engine"
+echo "selfplay: engine_config=$engine_config"
 echo "selfplay: nnue_file=${nnue_file:-<disabled>}"
 echo "selfplay: output=$output"
 echo "selfplay: games=$games shard_games=$shard_games concurrency=$concurrency threads=$threads restart=$restart limit=${tc:-depth $depth}"
@@ -177,9 +256,9 @@ run_fastchess() {
 
     "$runner" \
         -openings file="$book" format="$book_format" order="$order" \
-        -engine name=enyo-a proto=uci restart="$restart" cmd="$engine" "${engine_options[@]}" \
-        -engine name=enyo-b proto=uci restart="$restart" cmd="$engine" "${engine_options[@]}" \
-        -concurrency "$concurrency" "${shard_srand_args[@]}" \
+        -engine name=enyo-a proto=uci restart="$restart" cmd="$engine_cmd" "${engine_options[@]}" \
+        -engine name=enyo-b proto=uci restart="$restart" cmd="$engine_cmd" "${engine_options[@]}" \
+        -concurrency "$concurrency" ${shard_srand_args[@]+"${shard_srand_args[@]}"} \
         -rounds "$shard_count" -games 1 -recover -output format=cutechess \
         -pgnout file="$shard_output" notation=san append=false \
         -each "${limit_args[@]}" \

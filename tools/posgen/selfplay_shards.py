@@ -126,6 +126,8 @@ def run_selfplay(args: argparse.Namespace, output_pgn: Path) -> int:
         "--book-format", args.book_format,
         "--order", args.order,
     ]
+    if args.engine_config:
+        command.extend(["--engine-config", str(expand_path(args.engine_config))])
     if args.nnue_file:
         command.extend(["--nnue-file", str(expand_path(args.nnue_file))])
     if args.tc:
@@ -143,6 +145,7 @@ def build_metadata(args: argparse.Namespace, output_pgn: Path) -> dict[str, Any]
     engine = expand_path(args.engine)
     book = expand_path(args.book)
     nnue = expand_path(args.nnue_file) if args.nnue_file else None
+    engine_config = expand_path(args.engine_config) if args.engine_config else None
     runner = expand_path(args.runner)
     return {
         "schema": SCHEMA,
@@ -158,6 +161,7 @@ def build_metadata(args: argparse.Namespace, output_pgn: Path) -> dict[str, Any]
             "engine": file_record(engine),
             "book": file_record(book),
             "nnue": file_record(nnue),
+            "engine_config": file_record(engine_config),
         },
         "settings": shard_settings(args),
     }
@@ -383,6 +387,7 @@ def add_generate_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     parser = subparsers.add_parser("generate", help="Generate one self-play shard and metadata.")
     parser.add_argument("--runner", required=True)
     parser.add_argument("--engine", required=True)
+    parser.add_argument("--engine-config")
     parser.add_argument("--nnue-file")
     parser.add_argument("--book", required=True)
     parser.add_argument("--output-pgn", required=True)

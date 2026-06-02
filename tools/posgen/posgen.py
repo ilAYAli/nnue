@@ -409,6 +409,8 @@ def cmd_selfplay(args: argparse.Namespace) -> int:
     ]
     if args.runner:
         command += ["--runner", str(expand_path(args.runner))]
+    if args.engine_config:
+        command += ["--engine-config", str(expand_path(args.engine_config))]
     if args.nnue_file:
         command += ["--nnue-file", str(expand_path(args.nnue_file))]
     if args.tc:
@@ -458,6 +460,7 @@ def add_selfplay_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     parser.add_argument("--runner-script", default=str(script_root() / "posgen" / "run_selfplay.sh"))
     parser.add_argument("--runner")
     parser.add_argument("--engine", required=True)
+    parser.add_argument("--engine-config")
     parser.add_argument("--nnue-file")
     parser.add_argument("--output", required=True)
     parser.add_argument("--games", type=int, default=100)
