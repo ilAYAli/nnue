@@ -34,11 +34,12 @@ Current clean-native lineage names:
 - `native-1.5.0-rc1`: best current clean-native continuation baseline.
 - `native-1.5.1-rc1`: rejected. The 60k-full self-play continuation lost to
   `native-1.5.0-rc1` in smoke at `-16.3 +/- 36.4 Elo`, LOS `18.9%`.
-- `native-1.6.0-rc1`: mixed result. The final checkpoint overshot and lost to
-  `native-1.5.0-rc1` in smoke at `-19.0 +/- 37.4 Elo`, but checkpoint 64
-  confirmed a small non-decisive edge over `native-1.5.0-rc1` at
-  `+7.6 +/- 18.7 Elo` over 1000 games, LOS `78.9%`. It is a diagnostic
-  candidate, not a promoted baseline unless a longer confirm holds.
+- `native-1.6.0-rc1`: rejected. The final checkpoint overshot and lost to
+  `native-1.5.0-rc1` in smoke at `-19.0 +/- 37.4 Elo`. Checkpoint 64 looked
+  promising in the 1000-game screen at `+7.6 +/- 18.7 Elo`, LOS `78.9%`, but
+  failed the longer 4000-game confirm against `native-1.5.0-rc1`; the match
+  stopped at 3127 games with `-8.9 +/- 10.6 Elo`, LLR `-2.95/2.94`, LOS
+  `4.9%`.
 - `native-1.6.1-rc1`: rejected. This low-dose continuation from
   `native-1.6.0` checkpoint 64 improved engine-static only marginally, then
   failed game validation. Checkpoint 96 looked good in 128 games
@@ -51,8 +52,8 @@ Current build intent:
 
 - Same-architecture self-play continuation is still incrementally useful, but
   no longer the fastest lane: `native-1.5.1-rc1` regressed against
-  `native-1.5.0-rc1`, `native-1.6.0-rc1` only produced one modest early
-  checkpoint, and `native-1.6.1-rc1` failed when that checkpoint was continued.
+  `native-1.5.0-rc1`, `native-1.6.0-rc1` failed its longer confirm, and
+  `native-1.6.1-rc1` failed when the best native 1.6 checkpoint was continued.
 - Next test is an architecture preflight, not another same-lane data dose:
   material-count output buckets for the final scalar head. This keeps the
   accumulator and hidden layers shared, but lets Bullet and Enyo select a
