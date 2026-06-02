@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import struct
 import sys
 from pathlib import Path
@@ -92,6 +93,22 @@ def write_tensor(handle, name: str, values: np.ndarray) -> None:
     handle.write(flat.tobytes(order="C"))
 
 
+def write_metadata(path: Path, args: argparse.Namespace) -> None:
+    meta = {
+        "kind": "enyo_bullet_weights",
+        "source_net": str(args.input.expanduser().resolve()),
+        "eval_scale": args.eval_scale,
+        "eval_divisor": args.eval_divisor,
+        "l1_export_scale": args.l1_export_scale,
+        "output_buckets": args.output_buckets,
+        "legacy_inputs": bool(args.legacy_inputs),
+    }
+    (path.parent / "meta.json").write_text(
+        json.dumps(meta, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
@@ -138,6 +155,7 @@ def main() -> int:
         )
         write_tensor(handle, "l3b", output_biases / output_scale)
 
+    write_metadata(args.output.expanduser(), args)
     print(f"wrote {args.output.expanduser()}")
     return 0
 

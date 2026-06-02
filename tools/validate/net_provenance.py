@@ -173,6 +173,19 @@ def extract_bullet_weight_init(text: str) -> list[str]:
     return refs
 
 
+def extract_converted_weight_init(context: RunContext) -> list[str]:
+    refs: list[str] = []
+    for path, doc in context.json_docs:
+        if path.name != "meta.json":
+            continue
+        if doc.get("kind") != "enyo_bullet_weights":
+            continue
+        source_net = doc.get("source_net")
+        if isinstance(source_net, str) and source_net.strip():
+            refs.append(source_net.strip())
+    return refs
+
+
 def extract_input_data_refs(text: str) -> list[str]:
     refs: list[str] = []
     for line in text.splitlines():
@@ -424,6 +437,7 @@ def trace_init(path: Path, *, max_depth: int = 16) -> tuple[str, list[str], list
             file_refs_only=True,
         )
         init_refs.extend(extract_bullet_weight_init(context.text))
+        init_refs.extend(extract_converted_weight_init(context))
 
         if not init_refs:
             if looks_random_init(context):
