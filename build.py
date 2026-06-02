@@ -509,9 +509,9 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
                 "python=\"$1\" distrib=\"$2\" manifest=\"$3\" posgen=\"$4\" shard_tool=\"$5\"; "
                 "\"$python\" \"$distrib\" verify --manifest \"$manifest\" && "
                 "shopt -s nullglob && metas=(\"$posgen\"/selfplay_shards/*.meta.json) && "
-                "if [ \"${#metas[@]}\" -eq 0 ]; then echo 'no self-play metadata shards'; exit 1; fi && "
+                "if [ \"${{#metas[@]}}\" -eq 0 ]; then echo 'no self-play metadata shards'; exit 1; fi && "
                 "\"$python\" \"$shard_tool\" merge --output-pgn \"$posgen/selfplay.pgn\" "
-                "--manifest \"$posgen/selfplay_manifest.json\" --force \"${metas[@]}\""
+                "--manifest \"$posgen/selfplay_manifest.json\" --force \"${{metas[@]}}\""
             ),
             "merge-distrib-selfplay",
             distrib_python,

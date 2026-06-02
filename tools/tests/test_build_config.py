@@ -422,6 +422,12 @@ class BuildConfigTests(unittest.TestCase):
             )
             self.assertIn("verify --manifest", merge["command"][2])
             self.assertTrue(any("selfplay_shards.py" in item for item in merge["command"]))
+            formatted_merge = [
+                part.format(posgen="/tmp/posgen")
+                for part in merge["command"]
+            ]
+            self.assertIn("${#metas[@]}", formatted_merge[2])
+            self.assertIn("${metas[@]}", formatted_merge[2])
 
             extract = next(
                 step for step in config["steps"]
