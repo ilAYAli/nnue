@@ -55,6 +55,10 @@ class CandidateDefaults:
     selfplay_crucible_path_map: tuple[str, ...] = ()
     selfplay_crucible_require_notify: bool = True
     selfplay_crucible_notify_command: str = "/home/petter/scripts/notifai.sh"
+    selfplay_crucible_workers: str = ""
+    selfplay_crucible_jobs: int = 4
+    selfplay_crucible_remote_timeout_seconds: int = 1800
+    selfplay_crucible_verbose: bool = False
 
     skip_plies: int = 8
     source_max_abs_cp: int = 1600
@@ -76,6 +80,10 @@ class CandidateDefaults:
     score_crucible_path_map: tuple[str, ...] = ()
     score_crucible_require_notify: bool = True
     score_crucible_notify_command: str = "/home/petter/scripts/notifai.sh"
+    score_crucible_workers: str = ""
+    score_crucible_jobs: int = 4
+    score_crucible_remote_timeout_seconds: int = 1800
+    score_crucible_verbose: bool = False
 
     max_features: int = 32
     pack_progress: int = 250000

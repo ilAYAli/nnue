@@ -244,6 +244,33 @@ def append_local_score_steps(
     })
 
 
+def append_crucible_deploy_step(
+    steps: list[dict],
+    *,
+    name: str,
+    crucible_python: str,
+    crucible: str,
+    workers: str,
+    manifest: str,
+    jobs: int,
+    remote_timeout_seconds: int,
+    verbose: bool,
+) -> None:
+    command = [
+        crucible_python, crucible, "deploy",
+        str(expand_path(workers)),
+        manifest,
+        "--jobs", str(jobs),
+        "--remote-timeout-seconds", str(remote_timeout_seconds),
+    ]
+    if verbose:
+        command.append("--verbose")
+    steps.append({
+        "name": name,
+        "command": command,
+    })
+
+
 def append_crucible_score_steps(
     steps: list[dict],
     args: argparse.Namespace,
@@ -304,27 +331,40 @@ def append_crucible_score_steps(
         "command": doctor_command,
     })
 
-    for slot in range(args.score_crucible_local_slots):
+    if args.score_crucible_workers:
+        append_crucible_deploy_step(
+            steps,
+            name="score_crucible_deploy",
+            crucible_python=crucible_python,
+            crucible=crucible,
+            workers=args.score_crucible_workers,
+            manifest=manifest,
+            jobs=args.score_crucible_jobs,
+            remote_timeout_seconds=args.score_crucible_remote_timeout_seconds,
+            verbose=args.score_crucible_verbose,
+        )
+    else:
+        for slot in range(args.score_crucible_local_slots):
+            steps.append({
+                "name": f"score_crucible_work_{slot:02d}",
+                "parallel_group": "score_crucible_work",
+                "command": [
+                    crucible_python, crucible, "work",
+                    "--manifest", manifest,
+                    "--coordinator", manifest,
+                    "--worker", f"coordinator-{slot:02d}",
+                    "--lease-seconds", str(args.score_crucible_lease_seconds),
+                ],
+            })
+
         steps.append({
-            "name": f"score_crucible_work_{slot:02d}",
-            "parallel_group": "score_crucible_work",
+            "name": "score_crucible_wait",
             "command": [
-                crucible_python, crucible, "work",
+                crucible_python, crucible, "wait",
                 "--manifest", manifest,
-                "--coordinator", manifest,
-                "--worker", f"coordinator-{slot:02d}",
                 "--lease-seconds", str(args.score_crucible_lease_seconds),
             ],
         })
-
-    steps.append({
-        "name": "score_crucible_wait",
-        "command": [
-            crucible_python, crucible, "wait",
-            "--manifest", manifest,
-            "--lease-seconds", str(args.score_crucible_lease_seconds),
-        ],
-    })
 
     steps.append({
         "name": "score_crucible_merge",
@@ -479,27 +519,40 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
         "command": doctor_command,
     })
 
-    for slot in range(args.selfplay_crucible_local_slots):
+    if args.selfplay_crucible_workers:
+        append_crucible_deploy_step(
+            steps,
+            name="selfplay_crucible_deploy",
+            crucible_python=crucible_python,
+            crucible=crucible,
+            workers=args.selfplay_crucible_workers,
+            manifest=manifest,
+            jobs=args.selfplay_crucible_jobs,
+            remote_timeout_seconds=args.selfplay_crucible_remote_timeout_seconds,
+            verbose=args.selfplay_crucible_verbose,
+        )
+    else:
+        for slot in range(args.selfplay_crucible_local_slots):
+            steps.append({
+                "name": f"selfplay_crucible_work_{slot:02d}",
+                "parallel_group": "selfplay_crucible_work",
+                "command": [
+                    crucible_python, crucible, "work",
+                    "--manifest", manifest,
+                    "--coordinator", manifest,
+                    "--worker", f"coordinator-selfplay-{slot:02d}",
+                    "--lease-seconds", str(args.selfplay_crucible_lease_seconds),
+                ],
+            })
+
         steps.append({
-            "name": f"selfplay_crucible_work_{slot:02d}",
-            "parallel_group": "selfplay_crucible_work",
+            "name": "selfplay_crucible_wait",
             "command": [
-                crucible_python, crucible, "work",
+                crucible_python, crucible, "wait",
                 "--manifest", manifest,
-                "--coordinator", manifest,
-                "--worker", f"coordinator-selfplay-{slot:02d}",
                 "--lease-seconds", str(args.selfplay_crucible_lease_seconds),
             ],
         })
-
-    steps.append({
-        "name": "selfplay_crucible_wait",
-        "command": [
-            crucible_python, crucible, "wait",
-            "--manifest", manifest,
-            "--lease-seconds", str(args.selfplay_crucible_lease_seconds),
-        ],
-    })
 
     steps.append({
         "name": "selfplay_crucible_merge",
@@ -921,6 +974,15 @@ def add_create_args(
                         default=value("selfplay_crucible_require_notify", d.selfplay_crucible_require_notify))
     parser.add_argument("--selfplay-crucible-notify-command",
                         default=value("selfplay_crucible_notify_command", d.selfplay_crucible_notify_command))
+    parser.add_argument("--selfplay-crucible-workers",
+                        default=value("selfplay_crucible_workers", d.selfplay_crucible_workers))
+    parser.add_argument("--selfplay-crucible-jobs", type=int,
+                        default=value("selfplay_crucible_jobs", d.selfplay_crucible_jobs))
+    parser.add_argument("--selfplay-crucible-remote-timeout-seconds", type=int,
+                        default=value("selfplay_crucible_remote_timeout_seconds", d.selfplay_crucible_remote_timeout_seconds))
+    parser.add_argument("--selfplay-crucible-verbose",
+                        action=argparse.BooleanOptionalAction,
+                        default=value("selfplay_crucible_verbose", d.selfplay_crucible_verbose))
 
     parser.add_argument("--skip-plies", type=int, default=value("skip_plies", d.skip_plies))
     parser.add_argument("--source-max-abs-cp", type=int, default=value("source_max_abs_cp", d.source_max_abs_cp))
@@ -952,6 +1014,15 @@ def add_create_args(
                         default=value("score_crucible_require_notify", d.score_crucible_require_notify))
     parser.add_argument("--score-crucible-notify-command",
                         default=value("score_crucible_notify_command", d.score_crucible_notify_command))
+    parser.add_argument("--score-crucible-workers",
+                        default=value("score_crucible_workers", d.score_crucible_workers))
+    parser.add_argument("--score-crucible-jobs", type=int,
+                        default=value("score_crucible_jobs", d.score_crucible_jobs))
+    parser.add_argument("--score-crucible-remote-timeout-seconds", type=int,
+                        default=value("score_crucible_remote_timeout_seconds", d.score_crucible_remote_timeout_seconds))
+    parser.add_argument("--score-crucible-verbose",
+                        action=argparse.BooleanOptionalAction,
+                        default=value("score_crucible_verbose", d.score_crucible_verbose))
 
     parser.add_argument("--max-features", type=int, default=value("max_features", d.max_features))
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))

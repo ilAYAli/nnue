@@ -490,6 +490,94 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_crucible_score_deploys_workers_file(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "score_crucible": True,
+                    "score_crucible_workers": "~/workers.json",
+                    "score_crucible_jobs": 3,
+                    "score_crucible_remote_timeout_seconds": 42,
+                    "score_crucible_verbose": True,
+                    "score_crucible_local_slots": 2,
+                    "score_crucible_require_notify": False,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertIn("score_crucible_deploy", names)
+            self.assertNotIn("score_crucible_work_00", names)
+            self.assertNotIn("score_crucible_wait", names)
+            self.assertLess(names.index("score_crucible_deploy"), names.index("score_crucible_merge"))
+
+            deploy = next(
+                step for step in config["steps"]
+                if step["name"] == "score_crucible_deploy"
+            )
+            self.assertIn("deploy", deploy["command"])
+            self.assertIn(str(Path("~/workers.json").expanduser()), deploy["command"])
+            self.assertIn("--jobs", deploy["command"])
+            self.assertEqual("3", deploy["command"][deploy["command"].index("--jobs") + 1])
+            self.assertIn("--remote-timeout-seconds", deploy["command"])
+            self.assertEqual("42", deploy["command"][deploy["command"].index("--remote-timeout-seconds") + 1])
+            self.assertIn("--verbose", deploy["command"])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_crucible_selfplay_deploys_workers_file(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "selfplay_games": 1000,
+                    "selfplay_crucible": True,
+                    "selfplay_crucible_workers": "~/workers.json",
+                    "selfplay_crucible_jobs": 3,
+                    "selfplay_crucible_remote_timeout_seconds": 42,
+                    "selfplay_crucible_verbose": True,
+                    "selfplay_crucible_local_slots": 2,
+                    "selfplay_crucible_require_notify": False,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertIn("selfplay_crucible_deploy", names)
+            self.assertNotIn("selfplay_crucible_work_00", names)
+            self.assertNotIn("selfplay_crucible_wait", names)
+            self.assertLess(names.index("selfplay_crucible_deploy"), names.index("selfplay_crucible_merge"))
+
+            deploy = next(
+                step for step in config["steps"]
+                if step["name"] == "selfplay_crucible_deploy"
+            )
+            self.assertIn("deploy", deploy["command"])
+            self.assertIn(str(Path("~/workers.json").expanduser()), deploy["command"])
+            self.assertIn("--jobs", deploy["command"])
+            self.assertEqual("3", deploy["command"][deploy["command"].index("--jobs") + 1])
+            self.assertIn("--remote-timeout-seconds", deploy["command"])
+            self.assertEqual("42", deploy["command"][deploy["command"].index("--remote-timeout-seconds") + 1])
+            self.assertIn("--verbose", deploy["command"])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_crucible_score_rejects_negative_local_worker_slots(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({
