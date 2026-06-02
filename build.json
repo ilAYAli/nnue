@@ -1,8 +1,8 @@
 {
-  "description": "Clean Enyo-native 1.5.0-rc1: generate distributed self-play with native 1.4.0-rc1, label with Stockfish d14, then continue from native 1.4 Bullet weights.",
-  "experiment": "native-1.5.0-rc1-distributed-selfplay-sf-d14",
+  "description": "Clean Enyo-native 1.5.1-rc1: reuse the full 60k native 1.4 distributed self-play PGN set after the shard merge fix, label with Stockfish d14, then continue from native 1.4 Bullet weights.",
+  "experiment": "native-1.5.1-rc1-full-distributed-selfplay-sf-d14",
   "create": {
-    "name": "native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602",
+    "name": "native-1.5.1-rc1-n14dist60kfull-sf-d14-lr2e6-sb512-20260602",
     "backend": "bullet",
     "engine": "/home/petter/assets/engines/enyo_cebcd78",
     "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.4.0-rc1-n13selfplay-sf-d14-lr2e6-sb512-20260601/train/native-1.4.0-rc1-n13selfplay-sf-d14-lr2e6-sb512-20260601/model.nn",
@@ -35,7 +35,8 @@
     "score_limit": 0,
     "score_max_abs_cp": 1600,
     "score_progress": 10000,
-    "bullet_generate_source": true,
+    "score_source_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.1-rc1-n14dist60kfull-sf-d14-lr2e6-sb512-20260602/posgen/source.jsonl",
+    "bullet_generate_source": false,
     "bullet_source_jsonl": "",
     "bullet_data": "",
     "bullet_loader": "direct",
@@ -66,8 +67,8 @@
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
   },
   "validation": {
-    "promotion_gate": "Pass clean Enyo-native provenance and engine-static sanity, then smoke native 1.5.0-rc1 against native 1.4.0-rc1. Compare against Berserk only after a clear native-vs-native improvement.",
+    "promotion_gate": "Pass clean Enyo-native provenance and engine-static sanity, then smoke native 1.5.1-rc1 against native 1.4.0-rc1. Compare against Berserk only after a clear native-vs-native improvement.",
     "ownership_definition": "Clean Enyo-native init chain; Enyo self-play positions; Stockfish allowed only as oracle labeler.",
-    "reason": "native-1.4.0-rc1 beat native-1.3.0-rc1 by +12.9 +/- 18.1 over 1000 games but is still far below Berserk. This run tests whether a larger distributed self-play refresh creates a stronger native baseline."
+    "reason": "native-1.5.0-rc1 used only 45k of the 60k distributed PGNs because merge consumed metadata sidecars. This corrected run reuses the full 60k PGN set and isolates the data-completeness change."
   }
 }
