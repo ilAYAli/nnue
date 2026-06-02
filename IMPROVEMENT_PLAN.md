@@ -58,12 +58,16 @@ Current build intent:
   material-count output buckets for the final scalar head. This keeps the
   accumulator and hidden layers shared, but lets Bullet and Enyo select a
   final output head by total material count.
-- Preflight requirements before training:
+- Output-bucket preflight is complete:
   - Enyo runtime loads legacy single-head and new multi-head `.nn` files.
   - Python `.nn` load/write/export preserves output bucket count.
   - Bullet trainer compiles with `--enyo-output-buckets`.
   - A generated 4-output-bucket `.nn` loads through Enyo and `evalnet`.
-  - NPS/runtime regression is checked before a full native-2.0 training run.
+  - Startpos fixed-node NPS was within noise versus the single-head net.
+- Current intended run: `native-2.0.0-rc1-output4-head-n16data-lr5e7-sb192-20260603`.
+  Reuse the clean native 1.6 labeled data, initialize from native 1.5.0 with
+  its single output head repeated into four material-count heads, train only
+  the float/output head first, then gate against `native-1.5.0-rc1`.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
