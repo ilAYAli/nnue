@@ -244,200 +244,233 @@ fn train_enyo<const INPUT_BUCKETS: usize, const OUTPUT_BUCKETS: usize>(
     let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
     let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
 
-    let l0w_format = if input_factoriser {
-        SavedFormat::id("l0w")
-            .transform(|store, weights| {
-                let factoriser = store.get("l0f").values.f32().repeat(INPUT_BUCKETS);
-                weights
-                    .into_iter()
-                    .zip(factoriser)
-                    .map(|(a, b)| a + b)
-                    .collect()
-            })
-            .round()
-            .quantise::<i16>(1)
-    } else {
-        SavedFormat::id("l0w").round().quantise::<i16>(1)
-    };
+    macro_rules! l0w_format {
+        () => {
+            if input_factoriser {
+                SavedFormat::id("l0w")
+                    .transform(|store, weights| {
+                        let factoriser = store.get("l0f").values.f32().repeat(INPUT_BUCKETS);
+                        weights
+                            .into_iter()
+                            .zip(factoriser)
+                            .map(|(a, b)| a + b)
+                            .collect()
+                    })
+                    .round()
+                    .quantise::<i16>(1)
+            } else {
+                SavedFormat::id("l0w").round().quantise::<i16>(1)
+            }
+        };
+    }
 
-    let mut trainer = ValueTrainerBuilder::default()
-        .dual_perspective()
-        .optimiser(AdamW)
-        .inputs(EnyoInputs::<INPUT_BUCKETS>)
-        .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
-        .save_format(&[
-            l0w_format,
-            SavedFormat::id("l0b").round().quantise::<i16>(1),
-            SavedFormat::id("l1w")
-                .transpose()
-                .round()
-                .quantise::<i8>(l1_export_scale as i16),
-            SavedFormat::id("l1b")
-                .round()
-                .quantise::<i32>(l1_export_scale as i32),
-            SavedFormat::id("l2w")
-                .transpose()
-                .transform(move |_store, weights| {
-                    weights.into_iter().map(|w| w / l1_export_scale).collect()
-                }),
-            SavedFormat::id("l2b"),
-            SavedFormat::id("l3w")
-                .transpose()
-                .transform(move |_store, weights| {
-                    weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
-                }),
-            SavedFormat::id("l3b").transform(move |_store, weights| {
-                weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
-            }),
-        ])
-        .loss_fn(|output, target| output.sigmoid().squared_error(target))
-        .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
-            let mut l0 = maybe_frozen(builder, !train_input, || {
-                enyo_affine(builder, "l0", INPUT_BUCKETS * 12 * 64, hidden, l0_stdev)
+    macro_rules! base_trainer {
+        () => {
+            ValueTrainerBuilder::default()
+                .dual_perspective()
+                .optimiser(AdamW)
+                .inputs(EnyoInputs::<INPUT_BUCKETS>)
+                .save_format(&[
+                    l0w_format!(),
+                    SavedFormat::id("l0b").round().quantise::<i16>(1),
+                    SavedFormat::id("l1w")
+                        .transpose()
+                        .round()
+                        .quantise::<i8>(l1_export_scale as i16),
+                    SavedFormat::id("l1b")
+                        .round()
+                        .quantise::<i32>(l1_export_scale as i32),
+                    SavedFormat::id("l2w")
+                        .transpose()
+                        .transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w / l1_export_scale).collect()
+                        }),
+                    SavedFormat::id("l2b"),
+                    SavedFormat::id("l3w")
+                        .transpose()
+                        .transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                        }),
+                    SavedFormat::id("l3b").transform(move |_store, weights| {
+                        weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                    }),
+                ])
+                .loss_fn(|output, target| output.sigmoid().squared_error(target))
+        };
+    }
+
+    macro_rules! enyo_forward {
+        ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr) => {{
+            let mut l0 = maybe_frozen($builder, !train_input, || {
+                enyo_affine($builder, "l0", INPUT_BUCKETS * 12 * 64, hidden, l0_stdev)
             });
             if input_factoriser {
-                let l0f = maybe_frozen(builder, !train_input, || {
-                    builder.new_weights("l0f", Shape::new(hidden, 12 * 64), InitSettings::Zeroed)
+                let l0f = maybe_frozen($builder, !train_input, || {
+                    $builder.new_weights("l0f", Shape::new(hidden, 12 * 64), InitSettings::Zeroed)
                 });
                 l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
             }
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);
 
-            let mut l1 = maybe_frozen(builder, !train_l1, || {
-                enyo_affine(builder, "l1", 2 * hidden, l2_size, l1_stdev)
+            let mut l1 = maybe_frozen($builder, !train_l1, || {
+                enyo_affine($builder, "l1", 2 * hidden, l2_size, l1_stdev)
             });
             l1.weights = l1.weights.faux_quantise(l1_export_scale, true);
             l1.bias = l1.bias.faux_quantise(l1_export_scale, true);
-            let l2 = maybe_frozen(builder, !train_l2, || builder.new_affine("l2", l2_size, 32));
-            let l3 = maybe_frozen(builder, !train_l3, || {
-                builder.new_affine("l3", 32, OUTPUT_BUCKETS)
+            let l2 = maybe_frozen($builder, !train_l2, || {
+                $builder.new_affine("l2", l2_size, 32)
+            });
+            let l3 = maybe_frozen($builder, !train_l3, || {
+                $builder.new_affine("l3", 32, OUTPUT_BUCKETS)
             });
 
-            let stm_hidden = (l0.forward(stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+            let stm_hidden = (l0.forward($stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
                 .faux_quantise(1.0, false);
-            let ntm_hidden = (l0.forward(ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+            let ntm_hidden = (l0.forward($ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
                 .faux_quantise(1.0, false);
             let x0 = stm_hidden.concat(ntm_hidden);
             let x1 = l1.forward(x0).relu();
             let x2 = l2.forward(x1).relu();
-            l3.forward(x2).select(output_buckets)
-        });
+            l3.forward(x2)
+        }};
+        ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr, $output_buckets:expr) => {{ enyo_forward!($builder, $stm_inputs, $ntm_inputs).select($output_buckets) }};
+    }
 
-    let open_params = AdamWParams {
-        decay: weight_decay,
-        max_weight: 1.0e9,
-        min_weight: -1.0e9,
-        ..Default::default()
-    };
-    trainer.optimiser.set_params(open_params);
-    if train_input {
-        trainer.optimiser.set_params_for_weight(
-            "l0w",
-            AdamWParams {
+    macro_rules! run_trainer {
+        ($trainer:expr) => {{
+            let mut trainer = $trainer;
+
+            let open_params = AdamWParams {
                 decay: weight_decay,
-                // Enyo stores accumulator weights as int16. Existing Enyo nets
-                // legitimately contain values outside the older +/-4095 guard;
-                // clamping there corrupts the first exported Bullet checkpoint.
-                max_weight: f32::from(i16::MAX),
-                min_weight: f32::from(i16::MIN),
+                max_weight: 1.0e9,
+                min_weight: -1.0e9,
                 ..Default::default()
-            },
-        );
-        trainer.optimiser.set_params_for_weight(
-            "l0b",
-            AdamWParams {
-                decay: weight_decay,
-                max_weight: f32::from(i16::MAX),
-                min_weight: f32::from(i16::MIN),
-                ..Default::default()
-            },
-        );
-        if input_factoriser {
-            trainer.optimiser.set_params_for_weight(
-                "l0f",
-                AdamWParams {
-                    decay: weight_decay,
-                    max_weight: f32::from(i16::MAX),
-                    min_weight: f32::from(i16::MIN),
-                    ..Default::default()
+            };
+            trainer.optimiser.set_params(open_params);
+            if train_input {
+                trainer.optimiser.set_params_for_weight(
+                    "l0w",
+                    AdamWParams {
+                        decay: weight_decay,
+                        // Enyo stores accumulator weights as int16. Existing Enyo nets
+                        // legitimately contain values outside the older +/-4095 guard;
+                        // clamping there corrupts the first exported Bullet checkpoint.
+                        max_weight: f32::from(i16::MAX),
+                        min_weight: f32::from(i16::MIN),
+                        ..Default::default()
+                    },
+                );
+                trainer.optimiser.set_params_for_weight(
+                    "l0b",
+                    AdamWParams {
+                        decay: weight_decay,
+                        max_weight: f32::from(i16::MAX),
+                        min_weight: f32::from(i16::MIN),
+                        ..Default::default()
+                    },
+                );
+                if input_factoriser {
+                    trainer.optimiser.set_params_for_weight(
+                        "l0f",
+                        AdamWParams {
+                            decay: weight_decay,
+                            max_weight: f32::from(i16::MAX),
+                            min_weight: f32::from(i16::MIN),
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+            if train_l1 {
+                trainer.optimiser.set_params_for_weight(
+                    "l1w",
+                    AdamWParams {
+                        decay: weight_decay,
+                        max_weight: 127.0 / l1_export_scale,
+                        min_weight: -128.0 / l1_export_scale,
+                        ..Default::default()
+                    },
+                );
+            }
+
+            if !init_weights.is_empty() {
+                trainer
+                    .optimiser
+                    .load_weights_from_file(&init_weights)
+                    .expect("failed to load initial Bullet weights");
+                println!("loaded_init_weights={init_weights}");
+                trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+                if export_init_only {
+                    println!("export_init_only=1");
+                    return;
+                }
+            } else if export_init_only {
+                panic!("ENYO_BULLET_EXPORT_INIT_ONLY requires ENYO_BULLET_INIT_WEIGHTS");
+            }
+
+            let schedule = TrainingSchedule {
+                net_id,
+                eval_scale,
+                steps: TrainingSteps {
+                    batch_size,
+                    batches_per_superbatch,
+                    start_superbatch: 1,
+                    end_superbatch,
                 },
-            );
-        }
-    }
-    if train_l1 {
-        trainer.optimiser.set_params_for_weight(
-            "l1w",
-            AdamWParams {
-                decay: weight_decay,
-                max_weight: 127.0 / l1_export_scale,
-                min_weight: -128.0 / l1_export_scale,
-                ..Default::default()
-            },
-        );
-    }
+                wdl_scheduler: wdl::ConstantWDL {
+                    value: wdl_proportion,
+                },
+                lr_scheduler: lr::CosineDecayLR {
+                    initial_lr,
+                    final_lr,
+                    final_superbatch: end_superbatch,
+                },
+                save_rate,
+            };
 
-    if !init_weights.is_empty() {
-        trainer
-            .optimiser
-            .load_weights_from_file(&init_weights)
-            .expect("failed to load initial Bullet weights");
-        println!("loaded_init_weights={init_weights}");
-        trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
-        if export_init_only {
-            println!("export_init_only=1");
-            return;
-        }
-    } else if export_init_only {
-        panic!("ENYO_BULLET_EXPORT_INIT_ONLY requires ENYO_BULLET_INIT_WEIGHTS");
-    }
-
-    let schedule = TrainingSchedule {
-        net_id,
-        eval_scale,
-        steps: TrainingSteps {
-            batch_size,
-            batches_per_superbatch,
-            start_superbatch: 1,
-            end_superbatch,
-        },
-        wdl_scheduler: wdl::ConstantWDL {
-            value: wdl_proportion,
-        },
-        lr_scheduler: lr::CosineDecayLR {
-            initial_lr,
-            final_lr,
-            final_superbatch: end_superbatch,
-        },
-        save_rate,
-    };
-
-    let settings = LocalSettings {
-        threads,
-        test_set: None,
-        output_directory: &output,
-        batch_queue_size: 16,
-    };
-
-    let loader = env_string("ENYO_BULLET_LOADER", "direct");
-    let paths = dataset_paths(&dataset);
-    let path_refs = paths.iter().map(String::as_str).collect::<Vec<_>>();
-    match loader.as_str() {
-        "direct" => {
-            let dataloader = DirectSequentialDataLoader::new(&path_refs);
-            trainer.run(&schedule, &settings, &dataloader);
-        }
-        "sfbinpack" => {
-            let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
-            let dataloader = SfBinpackLoader::new_concat_multiple(
-                &path_refs,
-                buffer_mb,
+            let settings = LocalSettings {
                 threads,
-                make_sfbinpack_filter(),
-            );
-            trainer.run(&schedule, &settings, &dataloader);
-        }
-        _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
+                test_set: None,
+                output_directory: &output,
+                batch_queue_size: 16,
+            };
+
+            let loader = env_string("ENYO_BULLET_LOADER", "direct");
+            let paths = dataset_paths(&dataset);
+            let path_refs = paths.iter().map(String::as_str).collect::<Vec<_>>();
+            match loader.as_str() {
+                "direct" => {
+                    let dataloader = DirectSequentialDataLoader::new(&path_refs);
+                    trainer.run(&schedule, &settings, &dataloader);
+                }
+                "sfbinpack" => {
+                    let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
+                    let dataloader = SfBinpackLoader::new_concat_multiple(
+                        &path_refs,
+                        buffer_mb,
+                        threads,
+                        make_sfbinpack_filter(),
+                    );
+                    trainer.run(&schedule, &settings, &dataloader);
+                }
+                _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
+            }
+        }};
+    }
+
+    if OUTPUT_BUCKETS == 1 {
+        run_trainer!(base_trainer!().build(|builder, stm_inputs, ntm_inputs| {
+            enyo_forward!(builder, stm_inputs, ntm_inputs)
+        }));
+    } else {
+        run_trainer!(
+            base_trainer!()
+                .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
+                .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
+                    enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets)
+                })
+        );
     }
 }
 
@@ -501,9 +534,9 @@ fn main() {
                     2 => run_enyo!($input_buckets, 2),
                     4 => run_enyo!($input_buckets, 4),
                     8 => run_enyo!($input_buckets, 8),
-                    _ => panic!(
-                        "unsupported ENYO_BULLET_ENYO_OUTPUT_BUCKETS={enyo_output_buckets}"
-                    ),
+                    _ => {
+                        panic!("unsupported ENYO_BULLET_ENYO_OUTPUT_BUCKETS={enyo_output_buckets}")
+                    }
                 }
             };
         }
