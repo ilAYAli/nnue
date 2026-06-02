@@ -145,6 +145,53 @@ class SelfplayShardTests(unittest.TestCase):
             self.assertEqual(0, rc)
             self.assertEqual(3, selfplay_shards.count_pgn_games(out))
 
+    def test_merge_pgns_writes_combined_pgn_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "shard.0.pgn"
+            second = root / "shard.1.pgn"
+            write_pgn(first, 2)
+            write_pgn(second, 1)
+            out = root / "merged.pgn"
+            manifest = root / "manifest.json"
+
+            with redirect_stdout(StringIO()):
+                rc = selfplay_shards.cmd_merge_pgns(
+                    type("Args", (), {
+                        "pgn": [str(first), str(second)],
+                        "output_pgn": str(out),
+                        "manifest": str(manifest),
+                        "expected_games": 3,
+                        "force": False,
+                    })()
+                )
+
+            self.assertEqual(0, rc)
+            self.assertEqual(3, selfplay_shards.count_pgn_games(out))
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(selfplay_shards.MERGE_SCHEMA, data["schema"])
+            self.assertEqual("pgn", data["source"])
+            self.assertEqual(3, data["games"])
+            self.assertEqual(2, len(data["shards"]))
+
+    def test_merge_pgns_rejects_unexpected_game_count(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pgn = root / "shard.0.pgn"
+            write_pgn(pgn, 2)
+
+            with self.assertRaisesRegex(SystemExit, "expected 3"):
+                with redirect_stdout(StringIO()):
+                    selfplay_shards.cmd_merge_pgns(
+                        type("Args", (), {
+                            "pgn": [str(pgn)],
+                            "output_pgn": str(root / "merged.pgn"),
+                            "manifest": None,
+                            "expected_games": 3,
+                            "force": False,
+                        })()
+                    )
+
     def test_merge_rejects_incompatible_net_checksum(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

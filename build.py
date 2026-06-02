@@ -506,12 +506,15 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
         "command": [
             "bash", "-lc",
             (
-                "python=\"$1\" distrib=\"$2\" manifest=\"$3\" posgen=\"$4\" shard_tool=\"$5\"; "
+                "python=\"$1\" distrib=\"$2\" manifest=\"$3\" posgen=\"$4\" shard_tool=\"$5\" "
+                "expected_shards=\"$6\" expected_games=\"$7\"; "
                 "\"$python\" \"$distrib\" verify --manifest \"$manifest\" && "
-                "shopt -s nullglob && metas=(\"$posgen\"/selfplay_shards/*.meta.json) && "
-                "if [ \"${{#metas[@]}}\" -eq 0 ]; then echo 'no self-play metadata shards'; exit 1; fi && "
-                "\"$python\" \"$shard_tool\" merge --output-pgn \"$posgen/selfplay.pgn\" "
-                "--manifest \"$posgen/selfplay_manifest.json\" --force \"${{metas[@]}}\""
+                "shopt -s nullglob && pgns=(\"$posgen\"/selfplay_shards/shard.*.pgn) && "
+                "if [ \"${{#pgns[@]}}\" -ne \"$expected_shards\" ]; then "
+                "echo \"self-play PGN shard count ${{#pgns[@]}} != expected $expected_shards\"; exit 1; fi && "
+                "\"$python\" \"$shard_tool\" merge-pgns --output-pgn \"$posgen/selfplay.pgn\" "
+                "--manifest \"$posgen/selfplay_manifest.json\" --expected-games \"$expected_games\" "
+                "--force \"${{pgns[@]}}\""
             ),
             "merge-distrib-selfplay",
             distrib_python,
@@ -519,6 +522,8 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
             manifest,
             "{posgen}",
             tool("posgen/selfplay_shards.py"),
+            str(shards),
+            str(args.selfplay_games),
         ],
     })
 

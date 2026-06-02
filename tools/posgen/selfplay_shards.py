@@ -328,6 +328,57 @@ def cmd_merge(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_merge_pgns(args: argparse.Namespace) -> int:
+    pgn_paths = [expand_path(path) for path in args.pgn]
+    if not pgn_paths:
+        raise ValueError("merge-pgns requires at least one PGN file")
+
+    output_pgn = expand_path(args.output_pgn)
+    manifest = expand_path(args.manifest) if args.manifest else output_pgn.with_suffix(
+        output_pgn.suffix + ".manifest.json"
+    )
+    output_pgn.parent.mkdir(parents=True, exist_ok=True)
+    if output_pgn.exists() and not args.force:
+        raise SystemExit(f"{output_pgn}: exists; pass --force to overwrite")
+    output_pgn.unlink(missing_ok=True)
+
+    total_games = 0
+    shards: list[dict[str, Any]] = []
+    for pgn in pgn_paths:
+        if not pgn.exists():
+            raise ValueError(f"PGN does not exist: {pgn}")
+        games = count_pgn_games(pgn)
+        append_file(pgn, output_pgn)
+        total_games += games
+        shards.append({
+            "pgn": str(pgn),
+            "games": games,
+            "sha256": sha256_file(pgn),
+            "bytes": pgn.stat().st_size,
+        })
+
+    actual_games = count_pgn_games(output_pgn)
+    if actual_games != total_games:
+        raise SystemExit(f"{output_pgn}: wrote {actual_games} games, expected {total_games}")
+    if args.expected_games is not None and actual_games != args.expected_games:
+        raise SystemExit(
+            f"{output_pgn}: wrote {actual_games} games, expected {args.expected_games}"
+        )
+
+    manifest_payload = {
+        "schema": MERGE_SCHEMA,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "output_pgn": str(output_pgn),
+        "games": total_games,
+        "expected_games": args.expected_games,
+        "source": "pgn",
+        "shards": shards,
+    }
+    write_json(manifest, manifest_payload)
+    print(json.dumps({"output_pgn": str(output_pgn), "manifest": str(manifest), "games": total_games}, indent=2), flush=True)
+    return 0
+
+
 def add_generate_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("generate", help="Generate one self-play shard and metadata.")
     parser.add_argument("--runner", required=True)
@@ -363,11 +414,22 @@ def add_merge_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPar
     parser.set_defaults(func=cmd_merge)
 
 
+def add_merge_pgns_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    parser = subparsers.add_parser("merge-pgns", help="Merge self-play PGN shards.")
+    parser.add_argument("--output-pgn", required=True)
+    parser.add_argument("--manifest")
+    parser.add_argument("--expected-games", type=int)
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("pgn", nargs="+")
+    parser.set_defaults(func=cmd_merge_pgns)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_generate_parser(subparsers)
     add_merge_parser(subparsers)
+    add_merge_pgns_parser(subparsers)
     return parser
 
 

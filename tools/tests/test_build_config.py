@@ -426,8 +426,13 @@ class BuildConfigTests(unittest.TestCase):
                 part.format(posgen="/tmp/posgen")
                 for part in merge["command"]
             ]
-            self.assertIn("${#metas[@]}", formatted_merge[2])
-            self.assertIn("${metas[@]}", formatted_merge[2])
+            self.assertIn("merge-pgns", formatted_merge[2])
+            self.assertIn('"$posgen"/selfplay_shards/shard.*.pgn', formatted_merge[2])
+            self.assertIn("${#pgns[@]}", formatted_merge[2])
+            self.assertIn("${pgns[@]}", formatted_merge[2])
+            self.assertIn("--expected-games", formatted_merge[2])
+            self.assertIn("1001", merge["command"])
+            self.assertNotIn("*.meta.json", formatted_merge[2])
 
             extract = next(
                 step for step in config["steps"]
