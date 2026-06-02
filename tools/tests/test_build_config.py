@@ -257,7 +257,7 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
-    def test_distributed_score_plan_feeds_bullet_training(self) -> None:
+    def test_crucible_score_plan_feeds_bullet_training(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({
                 "create": {
@@ -265,12 +265,12 @@ class BuildConfigTests(unittest.TestCase):
                     "bullet_generate_source": True,
                     "bullet_source_jsonl": "",
                     "bullet_data": "",
-                    "score_distrib": True,
+                    "score_crucible": True,
                     "python": "/score/python",
-                    "score_distrib_python": "/coord/python",
-                    "score_distrib_local_slots": 2,
-                    "score_distrib_require_notify": False,
-                    "score_distrib_path_map": [
+                    "score_crucible_python": "/coord/python",
+                    "score_crucible_local_slots": 2,
+                    "score_crucible_require_notify": False,
+                    "score_crucible_path_map": [
                         "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",
                     ],
                     "score_shards": 4,
@@ -286,22 +286,22 @@ class BuildConfigTests(unittest.TestCase):
             config = build.create_config(args)
             names = [step["name"] for step in config["steps"]]
 
-            self.assertIn("score_distrib_plan", names)
-            self.assertIn("score_distrib_add_input", names)
-            self.assertIn("score_distrib_doctor", names)
-            self.assertIn("score_distrib_work_00", names)
-            self.assertIn("score_distrib_work_01", names)
-            self.assertIn("score_distrib_wait", names)
-            self.assertIn("score_distrib_merge", names)
-            self.assertLess(names.index("score_distrib_plan"), names.index("score_distrib_add_input"))
-            self.assertLess(names.index("score_distrib_add_input"), names.index("score_distrib_doctor"))
-            self.assertLess(names.index("score_distrib_work_01"), names.index("score_distrib_wait"))
-            self.assertLess(names.index("score_distrib_wait"), names.index("score_distrib_merge"))
-            self.assertLess(names.index("score_distrib_merge"), names.index("bullet_text"))
+            self.assertIn("score_crucible_plan", names)
+            self.assertIn("score_crucible_add_input", names)
+            self.assertIn("score_crucible_doctor", names)
+            self.assertIn("score_crucible_work_00", names)
+            self.assertIn("score_crucible_work_01", names)
+            self.assertIn("score_crucible_wait", names)
+            self.assertIn("score_crucible_merge", names)
+            self.assertLess(names.index("score_crucible_plan"), names.index("score_crucible_add_input"))
+            self.assertLess(names.index("score_crucible_add_input"), names.index("score_crucible_doctor"))
+            self.assertLess(names.index("score_crucible_work_01"), names.index("score_crucible_wait"))
+            self.assertLess(names.index("score_crucible_wait"), names.index("score_crucible_merge"))
+            self.assertLess(names.index("score_crucible_merge"), names.index("bullet_text"))
 
             plan = next(
                 step for step in config["steps"]
-                if step["name"] == "score_distrib_plan"
+                if step["name"] == "score_crucible_plan"
             )
             self.assertEqual("/coord/python", plan["command"][0])
             self.assertIn("--path-map", plan["command"])
@@ -319,7 +319,7 @@ class BuildConfigTests(unittest.TestCase):
 
             add_input = next(
                 step for step in config["steps"]
-                if step["name"] == "score_distrib_add_input"
+                if step["name"] == "score_crucible_add_input"
             )
             self.assertEqual("/coord/python", add_input["command"][0])
             self.assertIn("add-input", add_input["command"])
@@ -327,16 +327,16 @@ class BuildConfigTests(unittest.TestCase):
 
             workers = [
                 step for step in config["steps"]
-                if str(step["name"]).startswith("score_distrib_work_")
+                if str(step["name"]).startswith("score_crucible_work_")
             ]
             self.assertEqual(2, len(workers))
             for step in workers:
-                self.assertEqual("score_distrib_work", step["parallel_group"])
+                self.assertEqual("score_crucible_work", step["parallel_group"])
                 self.assertEqual("/coord/python", step["command"][0])
 
             wait = next(
                 step for step in config["steps"]
-                if step["name"] == "score_distrib_wait"
+                if step["name"] == "score_crucible_wait"
             )
             self.assertEqual("/coord/python", wait["command"][0])
             self.assertIn("wait", wait["command"])
@@ -350,7 +350,7 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
-    def test_distributed_selfplay_plan_feeds_source_extraction(self) -> None:
+    def test_crucible_selfplay_plan_feeds_source_extraction(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({
                 "create": {
@@ -360,11 +360,11 @@ class BuildConfigTests(unittest.TestCase):
                     "bullet_data": "",
                     "selfplay_games": 1001,
                     "selfplay_shard_games": 250,
-                    "selfplay_distrib": True,
-                    "selfplay_distrib_python": "/coord/python",
-                    "selfplay_distrib_local_slots": 2,
-                    "selfplay_distrib_require_notify": False,
-                    "selfplay_distrib_path_map": [
+                    "selfplay_crucible": True,
+                    "selfplay_crucible_python": "/coord/python",
+                    "selfplay_crucible_local_slots": 2,
+                    "selfplay_crucible_require_notify": False,
+                    "selfplay_crucible_path_map": [
                         "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",
                     ],
                     "python": "/work/python",
@@ -379,18 +379,18 @@ class BuildConfigTests(unittest.TestCase):
             config = build.create_config(args)
             names = [step["name"] for step in config["steps"]]
 
-            self.assertIn("selfplay_distrib_plan", names)
-            self.assertIn("selfplay_distrib_add_input", names)
-            self.assertIn("selfplay_distrib_doctor", names)
-            self.assertIn("selfplay_distrib_work_00", names)
-            self.assertIn("selfplay_distrib_work_01", names)
-            self.assertIn("selfplay_distrib_wait", names)
-            self.assertIn("selfplay_distrib_merge", names)
-            self.assertLess(names.index("selfplay_distrib_merge"), names.index("posgen_extract"))
+            self.assertIn("selfplay_crucible_plan", names)
+            self.assertIn("selfplay_crucible_add_input", names)
+            self.assertIn("selfplay_crucible_doctor", names)
+            self.assertIn("selfplay_crucible_work_00", names)
+            self.assertIn("selfplay_crucible_work_01", names)
+            self.assertIn("selfplay_crucible_wait", names)
+            self.assertIn("selfplay_crucible_merge", names)
+            self.assertLess(names.index("selfplay_crucible_merge"), names.index("posgen_extract"))
 
             plan = next(
                 step for step in config["steps"]
-                if step["name"] == "selfplay_distrib_plan"
+                if step["name"] == "selfplay_crucible_plan"
             )
             self.assertEqual("/coord/python", plan["command"][0])
             self.assertIn("--shards", plan["command"])
@@ -418,7 +418,7 @@ class BuildConfigTests(unittest.TestCase):
 
             merge = next(
                 step for step in config["steps"]
-                if step["name"] == "selfplay_distrib_merge"
+                if step["name"] == "selfplay_crucible_merge"
             )
             self.assertIn("verify --manifest", merge["command"][2])
             self.assertTrue(any("selfplay_shards.py" in item for item in merge["command"]))
@@ -442,38 +442,38 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
-    def test_distributed_score_accepts_cli_path_maps(self) -> None:
+    def test_crucible_score_accepts_cli_path_maps(self) -> None:
         parser = build.build_parser()
         args = parser.parse_args([
             "create",
             "--dry-run",
             "--backend", "bullet",
             "--bullet-generate-source",
-            "--score-distrib",
-            "--score-distrib-local-slots", "1",
-            "--no-score-distrib-require-notify",
-            "--score-distrib-path-map", "localhost:/coord=/local",
-            "--score-distrib-path-map", "pwa-wsl:/coord=/wsl",
+            "--score-crucible",
+            "--score-crucible-local-slots", "1",
+            "--no-score-crucible-require-notify",
+            "--score-crucible-path-map", "localhost:/coord=/local",
+            "--score-crucible-path-map", "pwa-wsl:/coord=/wsl",
             "--engine-static-rows", "10",
         ])
 
         config = build.create_config(args)
         plan = next(
             step for step in config["steps"]
-            if step["name"] == "score_distrib_plan"
+            if step["name"] == "score_crucible_plan"
         )
 
         self.assertIn("localhost:/coord=/local", plan["command"])
         self.assertIn("pwa-wsl:/coord=/wsl", plan["command"])
 
-    def test_distributed_score_can_wait_for_external_workers_only(self) -> None:
+    def test_crucible_score_can_wait_for_external_workers_only(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({
                 "create": {
                     "backend": "bullet",
                     "bullet_generate_source": True,
-                    "score_distrib": True,
-                    "score_distrib_local_slots": 0,
+                    "score_crucible": True,
+                    "score_crucible_local_slots": 0,
                 }
             }, handle)
             path = handle.name
@@ -484,20 +484,20 @@ class BuildConfigTests(unittest.TestCase):
             config = build.create_config(args)
             names = [step["name"] for step in config["steps"]]
 
-            self.assertNotIn("score_distrib_work_00", names)
-            self.assertIn("score_distrib_wait", names)
-            self.assertLess(names.index("score_distrib_wait"), names.index("score_distrib_merge"))
+            self.assertNotIn("score_crucible_work_00", names)
+            self.assertIn("score_crucible_wait", names)
+            self.assertLess(names.index("score_crucible_wait"), names.index("score_crucible_merge"))
         finally:
             Path(path).unlink(missing_ok=True)
 
-    def test_distributed_score_rejects_negative_local_worker_slots(self) -> None:
+    def test_crucible_score_rejects_negative_local_worker_slots(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({
                 "create": {
                     "backend": "bullet",
                     "bullet_generate_source": True,
-                    "score_distrib": True,
-                    "score_distrib_local_slots": -1,
+                    "score_crucible": True,
+                    "score_crucible_local_slots": -1,
                 }
             }, handle)
             path = handle.name
@@ -507,7 +507,7 @@ class BuildConfigTests(unittest.TestCase):
             args = parser.parse_args(["create", "-c", path, "--dry-run"])
             with self.assertRaises(SystemExit) as ctx:
                 build.create_config(args)
-            self.assertIn("score_distrib_local_slots", str(ctx.exception))
+            self.assertIn("score_crucible_local_slots", str(ctx.exception))
         finally:
             Path(path).unlink(missing_ok=True)
 

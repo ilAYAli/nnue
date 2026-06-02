@@ -152,19 +152,19 @@ def borrowed_selfplay_nnue_reason(value: str | Path | None) -> str | None:
 
 
 def validate_create_args(args: argparse.Namespace) -> None:
-    if args.selfplay_distrib:
+    if args.selfplay_crucible:
         if args.selfplay_games <= 0:
-            raise SystemExit("selfplay_distrib requires selfplay_games > 0")
+            raise SystemExit("selfplay_crucible requires selfplay_games > 0")
         if args.selfplay_shard_games <= 0:
-            raise SystemExit("selfplay_distrib requires selfplay_shard_games > 0")
-        if args.selfplay_distrib_local_slots < 0:
-            raise SystemExit("selfplay_distrib_local_slots must be >= 0")
+            raise SystemExit("selfplay_crucible requires selfplay_shard_games > 0")
+        if args.selfplay_crucible_local_slots < 0:
+            raise SystemExit("selfplay_crucible_local_slots must be >= 0")
 
-    if args.score_distrib:
+    if args.score_crucible:
         if args.score_shards <= 0:
-            raise SystemExit("score_distrib requires score_shards > 0")
-        if args.score_distrib_local_slots < 0:
-            raise SystemExit("score_distrib_local_slots must be >= 0")
+            raise SystemExit("score_crucible requires score_shards > 0")
+        if args.score_crucible_local_slots < 0:
+            raise SystemExit("score_crucible_local_slots must be >= 0")
 
     if not (args.require_clean_enyo_owned and args.bullet_generate_source):
         return
@@ -184,8 +184,8 @@ def append_score_steps(
     *,
     input_jsonl: str,
 ) -> None:
-    if args.score_distrib:
-        append_distributed_score_steps(steps, args, input_jsonl=input_jsonl)
+    if args.score_crucible:
+        append_crucible_score_steps(steps, args, input_jsonl=input_jsonl)
     else:
         append_local_score_steps(steps, args, input_jsonl=input_jsonl)
 
@@ -244,15 +244,15 @@ def append_local_score_steps(
     })
 
 
-def append_distributed_score_steps(
+def append_crucible_score_steps(
     steps: list[dict],
     args: argparse.Namespace,
     *,
     input_jsonl: str,
 ) -> None:
-    distrib_python = str(expand_user(args.score_distrib_python or sys.executable))
-    distrib = str(expand_user(args.score_distrib_tool))
-    manifest = "{score}/distrib/manifest.json"
+    crucible_python = str(expand_user(args.score_crucible_python or sys.executable))
+    crucible = str(expand_user(args.score_crucible_tool))
+    manifest = "{score}/crucible/manifest.json"
     score_command_template = shell_join(score_command(
         args,
         input_jsonl="{{source}}",
@@ -261,84 +261,84 @@ def append_distributed_score_steps(
         shard_index="{{index}}",
     ))
     plan_command = [
-        distrib_python, distrib, "plan",
+        crucible_python, crucible, "plan",
         "--name", "score-{candidate}",
         "--shards", str(args.score_shards),
         "--work-dir", "{repo}",
         "--out", manifest,
-        "--state-dir", "{score}/distrib/state",
-        "--log-dir", "{score}/distrib/logs",
+        "--state-dir", "{score}/crucible/state",
+        "--log-dir", "{score}/crucible/logs",
         "--command-template", score_command_template,
         "--var", f"source={input_jsonl}",
         "--output-template", "{score}/shards/label.{{index}}.jsonl",
     ]
-    for mapping in args.score_distrib_path_map or []:
+    for mapping in args.score_crucible_path_map or []:
         plan_command.extend(["--path-map", str(mapping)])
 
     steps.append({
-        "name": "score_distrib_plan",
+        "name": "score_crucible_plan",
         "command": plan_command,
     })
 
     steps.append({
-        "name": "score_distrib_add_input",
+        "name": "score_crucible_add_input",
         "command": [
-            distrib_python, distrib, "add-input",
+            crucible_python, crucible, "add-input",
             "--manifest", manifest,
             "--path", input_jsonl,
         ],
     })
 
     doctor_command = [
-        distrib_python, distrib, "doctor",
+        crucible_python, crucible, "doctor",
         "--manifest", manifest,
         "--role", "coordinator",
     ]
-    if args.score_distrib_require_notify:
+    if args.score_crucible_require_notify:
         doctor_command.extend([
             "--notify-command",
-            str(expand_user(args.score_distrib_notify_command)),
+            str(expand_user(args.score_crucible_notify_command)),
         ])
     steps.append({
-        "name": "score_distrib_doctor",
+        "name": "score_crucible_doctor",
         "command": doctor_command,
     })
 
-    for slot in range(args.score_distrib_local_slots):
+    for slot in range(args.score_crucible_local_slots):
         steps.append({
-            "name": f"score_distrib_work_{slot:02d}",
-            "parallel_group": "score_distrib_work",
+            "name": f"score_crucible_work_{slot:02d}",
+            "parallel_group": "score_crucible_work",
             "command": [
-                distrib_python, distrib, "work",
+                crucible_python, crucible, "work",
                 "--manifest", manifest,
                 "--coordinator", manifest,
                 "--worker", f"coordinator-{slot:02d}",
-                "--lease-seconds", str(args.score_distrib_lease_seconds),
+                "--lease-seconds", str(args.score_crucible_lease_seconds),
             ],
         })
 
     steps.append({
-        "name": "score_distrib_wait",
+        "name": "score_crucible_wait",
         "command": [
-            distrib_python, distrib, "wait",
+            crucible_python, crucible, "wait",
             "--manifest", manifest,
-            "--lease-seconds", str(args.score_distrib_lease_seconds),
+            "--lease-seconds", str(args.score_crucible_lease_seconds),
         ],
     })
 
     steps.append({
-        "name": "score_distrib_merge",
+        "name": "score_crucible_merge",
         "command": [
             "bash", "-lc",
             (
-                "python=\"$1\" distrib=\"$2\" manifest=\"$3\" output=\"$4\" rows=\"$5\"; "
-                "\"$python\" \"$distrib\" verify --manifest \"$manifest\" && "
-                "\"$python\" \"$distrib\" merge --manifest \"$manifest\" --output \"$output\" --force && "
+                "python=\"$1\" crucible=\"$2\" manifest=\"$3\" output=\"$4\" rows=\"$5\"; "
+                "\"$python\" \"$crucible\" verify --manifest \"$manifest\" && "
+                "\"$python\" \"$crucible\" merge --manifest \"$manifest\" --output \"$output\" --force && "
                 "wc -l \"$output\" > \"$rows\""
             ),
-            "merge-distrib-score",
-            distrib_python,
-            distrib,
+            "merge-crucible-score",
+            crucible_python,
+            crucible,
             manifest,
             "{score}/labeled.jsonl",
             "{score}/labeled.wc",
@@ -417,10 +417,10 @@ def append_local_selfplay_steps(steps: list[dict], args: argparse.Namespace) -> 
     })
 
 
-def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespace) -> None:
-    distrib_python = str(expand_user(args.selfplay_distrib_python or sys.executable))
-    distrib = str(expand_user(args.selfplay_distrib_tool))
-    manifest = "{posgen}/selfplay_distrib/manifest.json"
+def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) -> None:
+    crucible_python = str(expand_user(args.selfplay_crucible_python or sys.executable))
+    crucible = str(expand_user(args.selfplay_crucible_tool))
+    manifest = "{posgen}/selfplay_crucible/manifest.json"
     shards = selfplay_shard_count(args)
     shard_pgn = "{posgen}/selfplay_shards/shard.{{index}}.pgn"
     command_template = shell_join(selfplay_generate_command(
@@ -432,26 +432,26 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
         shard_index="{{index}}",
     ))
     plan_command = [
-        distrib_python, distrib, "plan",
+        crucible_python, crucible, "plan",
         "--name", "selfplay-{candidate}",
         "--shards", str(shards),
         "--work-dir", "{repo}",
         "--out", manifest,
-        "--state-dir", "{posgen}/selfplay_distrib/state",
-        "--log-dir", "{posgen}/selfplay_distrib/logs",
+        "--state-dir", "{posgen}/selfplay_crucible/state",
+        "--log-dir", "{posgen}/selfplay_crucible/logs",
         "--command-template", command_template,
         "--var", f"total_games={args.selfplay_games}",
         "--output-template", shard_pgn,
     ]
-    for mapping in args.selfplay_distrib_path_map or []:
+    for mapping in args.selfplay_crucible_path_map or []:
         plan_command.extend(["--path-map", str(mapping)])
     steps.append({
-        "name": "selfplay_distrib_plan",
+        "name": "selfplay_crucible_plan",
         "command": plan_command,
     })
 
     input_command = [
-        distrib_python, distrib, "add-input",
+        crucible_python, crucible, "add-input",
         "--manifest", manifest,
         "--path", str(expand_path(args.runner)),
         "--path", str(expand_path(args.engine)),
@@ -460,55 +460,55 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
     if args.nnue_file:
         input_command.extend(["--path", str(expand_path(args.nnue_file))])
     steps.append({
-        "name": "selfplay_distrib_add_input",
+        "name": "selfplay_crucible_add_input",
         "command": input_command,
     })
 
     doctor_command = [
-        distrib_python, distrib, "doctor",
+        crucible_python, crucible, "doctor",
         "--manifest", manifest,
         "--role", "coordinator",
     ]
-    if args.selfplay_distrib_require_notify:
+    if args.selfplay_crucible_require_notify:
         doctor_command.extend([
             "--notify-command",
-            str(expand_user(args.selfplay_distrib_notify_command)),
+            str(expand_user(args.selfplay_crucible_notify_command)),
         ])
     steps.append({
-        "name": "selfplay_distrib_doctor",
+        "name": "selfplay_crucible_doctor",
         "command": doctor_command,
     })
 
-    for slot in range(args.selfplay_distrib_local_slots):
+    for slot in range(args.selfplay_crucible_local_slots):
         steps.append({
-            "name": f"selfplay_distrib_work_{slot:02d}",
-            "parallel_group": "selfplay_distrib_work",
+            "name": f"selfplay_crucible_work_{slot:02d}",
+            "parallel_group": "selfplay_crucible_work",
             "command": [
-                distrib_python, distrib, "work",
+                crucible_python, crucible, "work",
                 "--manifest", manifest,
                 "--coordinator", manifest,
                 "--worker", f"coordinator-selfplay-{slot:02d}",
-                "--lease-seconds", str(args.selfplay_distrib_lease_seconds),
+                "--lease-seconds", str(args.selfplay_crucible_lease_seconds),
             ],
         })
 
     steps.append({
-        "name": "selfplay_distrib_wait",
+        "name": "selfplay_crucible_wait",
         "command": [
-            distrib_python, distrib, "wait",
+            crucible_python, crucible, "wait",
             "--manifest", manifest,
-            "--lease-seconds", str(args.selfplay_distrib_lease_seconds),
+            "--lease-seconds", str(args.selfplay_crucible_lease_seconds),
         ],
     })
 
     steps.append({
-        "name": "selfplay_distrib_merge",
+        "name": "selfplay_crucible_merge",
         "command": [
             "bash", "-lc",
             (
-                "python=\"$1\" distrib=\"$2\" manifest=\"$3\" posgen=\"$4\" shard_tool=\"$5\" "
+                "python=\"$1\" crucible=\"$2\" manifest=\"$3\" posgen=\"$4\" shard_tool=\"$5\" "
                 "expected_shards=\"$6\" expected_games=\"$7\"; "
-                "\"$python\" \"$distrib\" verify --manifest \"$manifest\" && "
+                "\"$python\" \"$crucible\" verify --manifest \"$manifest\" && "
                 "shopt -s nullglob && pgns=(\"$posgen\"/selfplay_shards/shard.*.pgn) && "
                 "if [ \"${{#pgns[@]}}\" -ne \"$expected_shards\" ]; then "
                 "echo \"self-play PGN shard count ${{#pgns[@]}} != expected $expected_shards\"; exit 1; fi && "
@@ -516,9 +516,9 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
                 "--manifest \"$posgen/selfplay_manifest.json\" --expected-games \"$expected_games\" "
                 "--force \"${{pgns[@]}}\""
             ),
-            "merge-distrib-selfplay",
-            distrib_python,
-            distrib,
+            "merge-crucible-selfplay",
+            crucible_python,
+            crucible,
             manifest,
             "{posgen}",
             tool("posgen/selfplay_shards.py"),
@@ -529,8 +529,8 @@ def append_distributed_selfplay_steps(steps: list[dict], args: argparse.Namespac
 
 
 def append_position_source_steps(steps: list[dict], args: argparse.Namespace) -> None:
-    if args.selfplay_distrib:
-        append_distributed_selfplay_steps(steps, args)
+    if args.selfplay_crucible:
+        append_crucible_selfplay_steps(steps, args)
     else:
         append_local_selfplay_steps(steps, args)
 
@@ -904,23 +904,23 @@ def add_create_args(
                         default=value("selfplay_use_nnue", d.selfplay_use_nnue))
     parser.add_argument("--selfplay-depth", type=int, default=value("selfplay_depth", d.selfplay_depth))
     parser.add_argument("--selfplay-seed", type=int, default=value("selfplay_seed", d.selfplay_seed))
-    parser.add_argument("--selfplay-distrib", action=argparse.BooleanOptionalAction,
-                        default=value("selfplay_distrib", d.selfplay_distrib))
-    parser.add_argument("--selfplay-distrib-tool",
-                        default=value("selfplay_distrib_tool", d.selfplay_distrib_tool))
-    parser.add_argument("--selfplay-distrib-python",
-                        default=value("selfplay_distrib_python", d.selfplay_distrib_python))
-    parser.add_argument("--selfplay-distrib-local-slots", type=int,
-                        default=value("selfplay_distrib_local_slots", d.selfplay_distrib_local_slots))
-    parser.add_argument("--selfplay-distrib-lease-seconds", type=int,
-                        default=value("selfplay_distrib_lease_seconds", d.selfplay_distrib_lease_seconds))
-    parser.add_argument("--selfplay-distrib-path-map", action="append",
-                        default=append_default("selfplay_distrib_path_map", d.selfplay_distrib_path_map))
-    parser.add_argument("--selfplay-distrib-require-notify",
+    parser.add_argument("--selfplay-crucible", action=argparse.BooleanOptionalAction,
+                        default=value("selfplay_crucible", d.selfplay_crucible))
+    parser.add_argument("--selfplay-crucible-tool",
+                        default=value("selfplay_crucible_tool", d.selfplay_crucible_tool))
+    parser.add_argument("--selfplay-crucible-python",
+                        default=value("selfplay_crucible_python", d.selfplay_crucible_python))
+    parser.add_argument("--selfplay-crucible-local-slots", type=int,
+                        default=value("selfplay_crucible_local_slots", d.selfplay_crucible_local_slots))
+    parser.add_argument("--selfplay-crucible-lease-seconds", type=int,
+                        default=value("selfplay_crucible_lease_seconds", d.selfplay_crucible_lease_seconds))
+    parser.add_argument("--selfplay-crucible-path-map", action="append",
+                        default=append_default("selfplay_crucible_path_map", d.selfplay_crucible_path_map))
+    parser.add_argument("--selfplay-crucible-require-notify",
                         action=argparse.BooleanOptionalAction,
-                        default=value("selfplay_distrib_require_notify", d.selfplay_distrib_require_notify))
-    parser.add_argument("--selfplay-distrib-notify-command",
-                        default=value("selfplay_distrib_notify_command", d.selfplay_distrib_notify_command))
+                        default=value("selfplay_crucible_require_notify", d.selfplay_crucible_require_notify))
+    parser.add_argument("--selfplay-crucible-notify-command",
+                        default=value("selfplay_crucible_notify_command", d.selfplay_crucible_notify_command))
 
     parser.add_argument("--skip-plies", type=int, default=value("skip_plies", d.skip_plies))
     parser.add_argument("--source-max-abs-cp", type=int, default=value("source_max_abs_cp", d.source_max_abs_cp))
@@ -935,23 +935,23 @@ def add_create_args(
     parser.add_argument("--score-source-jsonl", default=value("score_source_jsonl", d.score_source_jsonl))
     parser.add_argument("--score-max-abs-cp", type=int, default=value("score_max_abs_cp", d.score_max_abs_cp))
     parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
-    parser.add_argument("--score-distrib", action=argparse.BooleanOptionalAction,
-                        default=value("score_distrib", d.score_distrib))
-    parser.add_argument("--score-distrib-tool",
-                        default=value("score_distrib_tool", d.score_distrib_tool))
-    parser.add_argument("--score-distrib-python",
-                        default=value("score_distrib_python", d.score_distrib_python))
-    parser.add_argument("--score-distrib-local-slots", type=int,
-                        default=value("score_distrib_local_slots", d.score_distrib_local_slots))
-    parser.add_argument("--score-distrib-lease-seconds", type=int,
-                        default=value("score_distrib_lease_seconds", d.score_distrib_lease_seconds))
-    parser.add_argument("--score-distrib-path-map", action="append",
-                        default=append_default("score_distrib_path_map", d.score_distrib_path_map))
-    parser.add_argument("--score-distrib-require-notify",
+    parser.add_argument("--score-crucible", action=argparse.BooleanOptionalAction,
+                        default=value("score_crucible", d.score_crucible))
+    parser.add_argument("--score-crucible-tool",
+                        default=value("score_crucible_tool", d.score_crucible_tool))
+    parser.add_argument("--score-crucible-python",
+                        default=value("score_crucible_python", d.score_crucible_python))
+    parser.add_argument("--score-crucible-local-slots", type=int,
+                        default=value("score_crucible_local_slots", d.score_crucible_local_slots))
+    parser.add_argument("--score-crucible-lease-seconds", type=int,
+                        default=value("score_crucible_lease_seconds", d.score_crucible_lease_seconds))
+    parser.add_argument("--score-crucible-path-map", action="append",
+                        default=append_default("score_crucible_path_map", d.score_crucible_path_map))
+    parser.add_argument("--score-crucible-require-notify",
                         action=argparse.BooleanOptionalAction,
-                        default=value("score_distrib_require_notify", d.score_distrib_require_notify))
-    parser.add_argument("--score-distrib-notify-command",
-                        default=value("score_distrib_notify_command", d.score_distrib_notify_command))
+                        default=value("score_crucible_require_notify", d.score_crucible_require_notify))
+    parser.add_argument("--score-crucible-notify-command",
+                        default=value("score_crucible_notify_command", d.score_crucible_notify_command))
 
     parser.add_argument("--max-features", type=int, default=value("max_features", d.max_features))
     parser.add_argument("--pack-progress", type=int, default=value("pack_progress", d.pack_progress))
