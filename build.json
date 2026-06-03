@@ -1,8 +1,8 @@
 {
-  "description": "Native 1.7.1 rc1: filtered low-dose replay child-position mix. Keep the proven single-output native architecture, initialize from native 1.5.0, mix broad native 1.6 self-play labels with a small replay-pair dose, and filter both sources to abs(score)<=800 before sampling.",
-  "experiment": "native-1.7.1-rc1-replaypair-filter800",
+  "description": "Native 1.7.2 rc1: tiny unfiltered replay child-position mix. Keep the proven single-output native architecture, initialize from native 1.5.0, mix broad native 1.6 self-play labels with a smaller unfiltered replay-pair dose, and gate against native 1.5.0.",
+  "experiment": "native-1.7.2-rc1-replaypair-tiny",
   "create": {
-    "name": "native-1.7.1-rc1-replaypair-filter800-lr1e7-sb256-20260603",
+    "name": "native-1.7.2-rc1-replaypair-tiny-lr1e7-sb256-20260603",
     "backend": "bullet",
     "engine": "/home/petter/assets/engines/candidate",
     "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
@@ -51,10 +51,10 @@
     ],
     "bullet_generate_source": false,
     "source_mix_jsonl": [
-      "/home/petter/code/cpp/chess/nnue/runs/native-1.6.0-rc1-n15dist60k-sf-d14-lr1e6-sb384-20260602/score/labeled.jsonl:300000:800",
-      "/home/petter/code/cpp/chess/nnue/runs/rc1-replay-fullpair-r2-20260531/replay_full_pairs.jsonl:12000:800"
+      "/home/petter/code/cpp/chess/nnue/runs/native-1.6.0-rc1-n15dist60k-sf-d14-lr1e6-sb384-20260602/score/labeled.jsonl:300000",
+      "/home/petter/code/cpp/chess/nnue/runs/rc1-replay-fullpair-r2-20260531/replay_full_pairs.jsonl:3000"
     ],
-    "source_mix_seed": 2026060303,
+    "source_mix_seed": 2026060304,
     "source_mix_progress": 50000,
     "bullet_source_jsonl": "",
     "bullet_data": "",
@@ -89,6 +89,6 @@
   "validation": {
     "promotion_gate": "Pass clean provenance, engine-static sanity, 256-game triage versus native 1.5.0, then 1000-game confirm if the smoke is positive.",
     "ownership_definition": "Clean Enyo-native init chain; Enyo self-play positions; Stockfish is used only as oracle labeler.",
-    "reason": "Native 1.5.0 remains the current clean-native game baseline. Output4 did not produce a promotion signal. Native 1.7.0 was weak-positive but too noisy, and its mixed static set exposed replay mate-sentinel rows. This retry tests the same replay child-position idea after filtering extreme labels before sampling."
+    "reason": "Native 1.5.0 remains the current clean-native game baseline. Output4 did not produce a promotion signal. Native 1.7.0 was weak-positive but too noisy, while filtered 1.7.1 was negative. This retry keeps the high-severity replay signal available but cuts the replay dose to reduce broad regression risk."
   }
 }

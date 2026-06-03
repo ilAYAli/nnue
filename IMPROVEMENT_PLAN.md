@@ -56,6 +56,9 @@ Current clean-native lineage names:
   `+6.8 +/- 36.5 Elo`, LOS `64.3%`, but not strong enough for confirmation.
   Its mixed engine-static gate also included replay mate-sentinel rows, so the
   next retry filters source scores before sampling.
+- `native-1.7.1-rc1`: rejected. Filtering the replay-pair mix to
+  `abs(score) <= 800` before sampling lost to `native-1.5.0-rc1` in smoke at
+  `-17.7 +/- 37.5 Elo`, LOS `17.7%`.
 
 Current build intent:
 
@@ -78,11 +81,12 @@ Current build intent:
 - `native-2.0.0-rc2` also failed to produce a promotion signal. Close the
   output-bucket lane until the representation or source data changes.
 - Current intended run:
-  `native-1.7.1-rc1-replaypair-filter800-lr1e7-sb256-20260603`. Reuse the
-  native 1.6 broad labels and replay child-pair rows, but filter both sources
-  to `abs(score) <= 800` before sampling. Gate against `native-1.5.0-rc1`.
-  Promote to a 1000-game confirm only if the 256-game smoke has a clear
-  positive signal, not merely weak LOS.
+  `native-1.7.2-rc1-replaypair-tiny-lr1e7-sb256-20260603`. Reuse the native
+  1.6 broad labels and replay child-pair rows, but cut the replay dose from
+  12k to 3k and leave it unfiltered. The hypothesis is that the high-severity
+  replay rows may be useful, while the previous dose was too noisy. Gate
+  against `native-1.5.0-rc1`. Promote to a 1000-game confirm only if the
+  256-game smoke has a clear positive signal, not merely weak LOS.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
