@@ -386,6 +386,22 @@ class BuildConfigTests(unittest.TestCase):
             self.assertIn("--shard-count '{{shards}}'", template)
             self.assertIn("--shard-index '{{index}}'", template)
             self.assertIn("--limit 123", template)
+            self.assertIn("--progress-unit", plan["command"])
+            self.assertEqual(
+                "rows",
+                plan["command"][plan["command"].index("--progress-unit") + 1],
+            )
+            self.assertEqual(
+                "{posgen}/source.jsonl",
+                plan["command"][plan["command"].index("--progress-total-lines") + 1],
+            )
+            progress_regex = plan["command"][plan["command"].index("--progress-log-regex") + 1]
+            self.assertIn("?P<done>", progress_regex)
+            self.assertIn("?P<output>", progress_regex)
+            self.assertEqual(
+                "output",
+                plan["command"][plan["command"].index("--progress-output-unit") + 1],
+            )
 
             add_input = next(
                 step for step in config["steps"]
@@ -473,6 +489,13 @@ class BuildConfigTests(unittest.TestCase):
             self.assertEqual("/coord/python", plan["command"][0])
             self.assertIn("--shards", plan["command"])
             self.assertEqual("5", plan["command"][plan["command"].index("--shards") + 1])
+            self.assertIn("--progress-unit", plan["command"])
+            self.assertEqual(
+                "games",
+                plan["command"][plan["command"].index("--progress-unit") + 1],
+            )
+            self.assertIn("?P<done>", plan["command"][plan["command"].index("--progress-log-regex") + 1])
+            self.assertIn("?P<total>", plan["command"][plan["command"].index("--progress-log-regex") + 1])
             self.assertIn("--path-map", plan["command"])
             self.assertIn(
                 "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",

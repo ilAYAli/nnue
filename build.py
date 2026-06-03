@@ -343,6 +343,10 @@ def append_crucible_score_steps(
         "--command-template", score_command_template,
         "--var", f"source={input_jsonl}",
         "--output-template", "{score}/shards/label.{{index}}.jsonl",
+        "--progress-unit", "rows",
+        "--progress-total-lines", input_jsonl,
+        "--progress-log-regex", r"selected=(?P<done>\d+)\s+written=(?P<output>\d+)",
+        "--progress-output-unit", "output",
     ]
     for mapping in args.score_crucible_path_map or []:
         plan_command.extend(["--path-map", str(mapping)])
@@ -528,6 +532,8 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
         "--command-template", command_template,
         "--var", f"total_games={args.selfplay_games}",
         "--output-template", shard_pgn,
+        "--progress-unit", "games",
+        "--progress-log-regex", r"\[\s*\d+/\d+\s+(?P<done>\d+)\s*/\s*(?P<total>\d+)\]",
     ]
     for mapping in args.selfplay_crucible_path_map or []:
         plan_command.extend(["--path-map", str(mapping)])
