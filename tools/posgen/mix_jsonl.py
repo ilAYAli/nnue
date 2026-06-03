@@ -4,6 +4,9 @@
 This script is designed for large training sets. It counts rows first, then
 streams an exact-size deterministic sample from each source while interleaving
 the selected rows, so it does not hold the mixed dataset in memory.
+
+Source specs are either PATH:ROWS or PATH:ROWS:MAX_ABS_CP. The optional
+MAX_ABS_CP filter is applied to row["score"] before sampling.
 """
 
 from __future__ import annotations
@@ -20,26 +23,61 @@ class Source:
     path: Path
     requested: int
     total_rows: int
+    eligible_rows: int
     selected_rows: int
+    max_abs_cp: int
     written: int = 0
 
 
-def count_rows(path: Path) -> int:
+def keep_line(line: str, max_abs_cp: int) -> bool:
+    if max_abs_cp <= 0:
+        return True
+    try:
+        score = float(json.loads(line)["score"])
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return False
+    return abs(score) <= max_abs_cp
+
+
+def count_rows(path: Path, max_abs_cp: int) -> tuple[int, int]:
     rows = 0
+    eligible = 0
     with path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
-            if line.strip():
-                rows += 1
-    return rows
+            line = line.strip()
+            if not line:
+                continue
+            rows += 1
+            if keep_line(line, max_abs_cp):
+                eligible += 1
+    return rows, eligible
+
+
+def parse_source_spec(spec: str) -> tuple[Path, int, int]:
+    try:
+        path_s, rows_s, max_abs_cp_s = spec.rsplit(":", 2)
+        requested = int(rows_s)
+        max_abs_cp = int(max_abs_cp_s)
+    except ValueError:
+        path_s, rows_s = spec.rsplit(":", 1)
+        requested = int(rows_s)
+        max_abs_cp = 0
+    if requested < 0:
+        raise ValueError(f"{spec}: ROWS must be >= 0")
+    if max_abs_cp < 0:
+        raise ValueError(f"{spec}: MAX_ABS_CP must be >= 0")
+    return Path(path_s).expanduser(), requested, max_abs_cp
 
 
 def selected_lines(source: Source, rng: random.Random):
-    remaining_available = source.total_rows
+    remaining_available = source.eligible_rows
     remaining_needed = source.selected_rows
     with source.path.open(encoding="utf-8", errors="replace") as handle:
         for line in handle:
             line = line.strip()
             if not line:
+                continue
+            if not keep_line(line, source.max_abs_cp):
                 continue
             if remaining_needed <= 0:
                 break
@@ -53,7 +91,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", required=True)
     ap.add_argument("--source", action="append", required=True,
-                    help="Source spec PATH:ROWS. Repeat for each dataset.")
+                    help=(
+                        "Source spec PATH:ROWS or PATH:ROWS:MAX_ABS_CP. "
+                        "Repeat for each dataset."))
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--progress", type=int, default=250000)
     ap.add_argument("--unique-fen", action="store_true",
@@ -74,19 +114,24 @@ def main() -> None:
 
     sources: list[Source] = []
     for spec in args.source:
-        path_s, rows_s = spec.rsplit(":", 1)
-        path = Path(path_s).expanduser()
-        requested = int(rows_s)
-        total_rows = count_rows(path)
-        selected_rows = min(requested, total_rows)
+        try:
+            path, requested, max_abs_cp = parse_source_spec(spec)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        total_rows, eligible_rows = count_rows(path, max_abs_cp)
+        selected_rows = min(requested, eligible_rows)
         source = Source(path=path, requested=requested,
-                        total_rows=total_rows, selected_rows=selected_rows)
+                        total_rows=total_rows, eligible_rows=eligible_rows,
+                        selected_rows=selected_rows, max_abs_cp=max_abs_cp)
         sources.append(source)
         stats["sources"].append({
             "path": str(path),
             "requested": requested,
             "total_rows": total_rows,
+            "eligible_rows": eligible_rows,
+            "filtered_rows": total_rows - eligible_rows,
             "selected_rows": selected_rows,
+            "max_abs_cp": max_abs_cp,
         })
 
     out = Path(args.output).expanduser()

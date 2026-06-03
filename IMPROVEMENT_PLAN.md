@@ -48,8 +48,14 @@ Current clean-native lineage names:
 - `native-2.0.0-rc1`: rejected. The material-count output-bucket head-only
   adaptation lost to `native-1.5.0-rc1` in smoke at `-16.3 +/- 36.2 Elo`,
   LOS `18.8%`.
-- `native-2.0.0-rc2`: current material-count output-bucket all-layer
-  adaptation proof.
+- `native-2.0.0-rc2`: rejected. The material-count output-bucket all-layer
+  adaptation was approximately neutral-negative versus `native-1.5.0-rc1` in
+  smoke at `-5.4 +/- 37.4 Elo`, LOS `38.8%`.
+- `native-1.7.0-rc1`: inconclusive. The unfiltered low-dose replay-pair mix
+  was weak-positive versus `native-1.5.0-rc1` in smoke at
+  `+6.8 +/- 36.5 Elo`, LOS `64.3%`, but not strong enough for confirmation.
+  Its mixed engine-static gate also included replay mate-sentinel rows, so the
+  next retry filters source scores before sampling.
 
 Current build intent:
 
@@ -57,10 +63,8 @@ Current build intent:
   no longer the fastest lane: `native-1.5.1-rc1` regressed against
   `native-1.5.0-rc1`, `native-1.6.0-rc1` failed its longer confirm, and
   `native-1.6.1-rc1` failed when the best native 1.6 checkpoint was continued.
-- Next test is an architecture preflight, not another same-lane data dose:
-  material-count output buckets for the final scalar head. This keeps the
-  accumulator and hidden layers shared, but lets Bullet and Enyo select a
-  final output head by total material count.
+- The next test returns to the proven single-output architecture with a more
+  carefully filtered replay-pair source mix.
 - Output-bucket preflight is complete:
   - Enyo runtime loads legacy single-head and new multi-head `.nn` files.
   - Python `.nn` load/write/export preserves output bucket count.
@@ -71,12 +75,14 @@ Current build intent:
   `native-2.0.0-output4-vs-native-1.5.0-smoke256-20260603` finished
   `-16.3 +/- 36.2 Elo`, LLR `-0.39/2.94`, LOS `18.8%`. Do not extend the
   head-only lane.
+- `native-2.0.0-rc2` also failed to produce a promotion signal. Close the
+  output-bucket lane until the representation or source data changes.
 - Current intended run:
-  `native-2.0.0-rc2-output4-all-n16data-lr2e7-sb384-20260603`. Reuse the
-  clean native 1.6 labeled data, initialize from native 1.5.0 with its single
-  output head repeated into four material-count heads, adapt all layers at very
-  low LR, then gate against `native-1.5.0-rc1`. If this also smokes negative,
-  close the output-bucket lane until the representation or source data changes.
+  `native-1.7.1-rc1-replaypair-filter800-lr1e7-sb256-20260603`. Reuse the
+  native 1.6 broad labels and replay child-pair rows, but filter both sources
+  to `abs(score) <= 800` before sampling. Gate against `native-1.5.0-rc1`.
+  Promote to a 1000-game confirm only if the 256-game smoke has a clear
+  positive signal, not merely weak LOS.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
