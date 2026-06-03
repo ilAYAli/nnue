@@ -345,7 +345,7 @@ def append_crucible_score_steps(
         "--output-template", "{score}/shards/label.{{index}}.jsonl",
         "--progress-unit", "rows",
         "--progress-total-lines", input_jsonl,
-        "--progress-log-regex", r"selected=(?P<done>\d+)\s+written=(?P<output>\d+)",
+        "--progress-log-regex", r"selected=(?P<done>\d+)\s+written=(?P<output>\d+)\s+rate=(?P<rate>[0-9.]+)/s",
         "--progress-output-unit", "output",
     ]
     for mapping in args.score_crucible_path_map or []:

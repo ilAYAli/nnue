@@ -398,6 +398,7 @@ class BuildConfigTests(unittest.TestCase):
             progress_regex = plan["command"][plan["command"].index("--progress-log-regex") + 1]
             self.assertIn("?P<done>", progress_regex)
             self.assertIn("?P<output>", progress_regex)
+            self.assertIn("?P<rate>", progress_regex)
             self.assertEqual(
                 "output",
                 plan["command"][plan["command"].index("--progress-output-unit") + 1],
