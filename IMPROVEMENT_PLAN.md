@@ -110,11 +110,14 @@ Current build intent:
   negative hard examples or abandon the sidecar as a runtime selector. Do not
   launch another sidecar SPRT until an oracle-confirmed trigger has a clean
   helpful/harmful split offline.
-- Current build config is `native-1.8.0-rc1-n16fresh40k-sf-d16`: a fresh-data
-  continuation from `native-1.5.0-rc1` using Crucible-distributed native-1.5
-  self-play and Stockfish 18 depth-16 labels. This changes source quality after
-  the same-architecture overshoot, replay-pair scalar, output-bucket, and
-  sidecar-hard-negative lanes failed to beat `native-1.5.0-rc1`.
+- Current build config is `native-1.9.0-rc1-n18self80k-sf-d16`: a
+  same-architecture continuation from `native-1.8.0` checkpoint 256 using
+  80k native-1.8 self-play games distributed across all healthy Crucible
+  workers and Stockfish 18 depth-16 labels. This keeps the legacy 16-bucket,
+  single-head runtime format and tests whether more current clean-native
+  source data plus a lower LR continuation beats the `native-1.5.0-rc1`
+  baseline after the output-bucket, replay-pair scalar, and sidecar-runtime
+  lanes failed.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
