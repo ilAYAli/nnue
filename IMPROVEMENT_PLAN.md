@@ -91,12 +91,16 @@ Current build intent:
     static eval safety cap from `move_policy_max_eval_drop`.
   - Engine-side checks matched Python on held-out sidecar rows, including a
     selected row with margin `22.029897`.
-- Current intended task: validate the sidecar root guard in games before doing
-  more scalar `.nn` work. Active gate:
-  `sidecar-rootguard-vs-native15-smoke1000-20260603`, same Enyo binary and
-  same `native-1.5.0-rc1` net on both sides, candidate only adds
-  `move_policy_file=runs/move-policy-export-x1-heldout-20260531/model.json`
-  and `move_policy_max_eval_drop=80`.
+- `sidecar-rootguard-vs-native15-smoke1000-20260603` hard-rejected the
+  generic root-override deployment at 144 games:
+  `-266.9 +/- 66.1 Elo`, LLR `-2.95/2.94`, LOS `0.0%`.
+  The sidecar is not safe as a broad root move selector, even with
+  `move_policy_max_eval_drop=80`. Keep the default-off engine path only as
+  instrumentation for active learning and targeted audits.
+- Current intended task: analyze sidecar/root-search disagreement from the
+  failed SPRT PGN and convert useful disagreements into labeled hard examples.
+  Do not launch another sidecar SPRT until the trigger is narrowed to positions
+  where an oracle confirms the sidecar candidate is better.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
