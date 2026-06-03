@@ -1,8 +1,8 @@
 {
-  "description": "Native 1.9.0 continuation: continue from native-1.8.0 checkpoint 256, generate 80k native-1.8 self-play across all healthy Crucible workers, label with Stockfish 18 depth 16, then run a conservative same-architecture Bullet continuation.",
-  "experiment": "native-1.9.0-depth16-crucible-all-workers",
+  "description": "Native 1.9.1 continuation: continue from native-1.8.0 checkpoint 256, generate 80k native-1.8 self-play across all healthy Crucible workers, label with Stockfish 18 depth 16, then run a conservative same-architecture Bullet continuation.",
+  "experiment": "native-1.9.1-depth16-crucible-all-workers",
   "create": {
-    "name": "native-1.9.0-rc1-n18self80k-sf-d16-lr3e7-sb384-20260603",
+    "name": "native-1.9.1-rc1-n18self80k-sf-d16-lr3e7-sb384-20260604",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "engine": "~/assets/engines/reference",
     "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.8.0-rc1-n16fresh40k-sf-d16-lr5e7-sb256-20260603/train/native-1.8.0-rc1-n16fresh40k-sf-d16-lr5e7-sb256-20260603/model.nn",
@@ -80,6 +80,6 @@
   "validation": {
     "baseline": "native-1.5.0-rc1",
     "promotion_gate": "Must beat native-1.5.0-rc1 in smoke before any longer confirm. If the smoke is positive, screen saved checkpoints before committing to a 1000+ game confirm.",
-    "reason": "native-1.8.0 established a clean latest-source continuation point. native-1.9.0 tests whether a larger all-worker native-1.8 self-play batch plus the lower LR continuation can produce a measurable same-lane gain."
+    "reason": "native-1.8.0 established a clean latest-source continuation point. native-1.9.1 tests whether a larger all-worker native-1.8 self-play batch plus the lower LR continuation can produce a measurable same-lane gain after the Crucible setup-barrier and worker-local binary fixes."
   }
 }
