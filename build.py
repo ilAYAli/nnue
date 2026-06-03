@@ -459,8 +459,8 @@ def selfplay_generate_command(
     python = str(expand_user(args.python))
     command = [
         python, tool("posgen/selfplay_shards.py"), "generate",
-        "--runner", str(expand_path(args.runner)),
-        "--engine", str(expand_path(args.engine)),
+        "--runner", str(expand_user(args.runner)),
+        "--engine", str(expand_user(args.engine)),
         "--book", str(expand_path(args.book)),
         "--output-pgn", output_pgn,
         "--total-games", total_games,
@@ -485,8 +485,8 @@ def append_local_selfplay_steps(steps: list[dict], args: argparse.Namespace) -> 
     python = str(expand_user(args.python))
     selfplay_command = [
         python, tool("posgen/posgen.py"), "selfplay",
-        "--runner", str(expand_path(args.runner)),
-        "--engine", str(expand_path(args.engine)),
+        "--runner", str(expand_user(args.runner)),
+        "--engine", str(expand_user(args.engine)),
         "--book", str(expand_path(args.book)),
         "--output", "{posgen}/selfplay.pgn",
         "--games", str(args.selfplay_games),
@@ -546,8 +546,6 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
     input_command = [
         crucible_python, crucible, "add-input",
         "--manifest", manifest,
-        "--path", str(expand_path(args.runner)),
-        "--path", str(expand_path(args.engine)),
         "--path", str(expand_path(args.book)),
     ]
     if args.nnue_file:

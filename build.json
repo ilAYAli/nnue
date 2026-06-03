@@ -7,7 +7,7 @@
     "engine": "~/assets/engines/reference",
     "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.8.0-rc1-n16fresh40k-sf-d16-lr5e7-sb256-20260603/train/native-1.8.0-rc1-n16fresh40k-sf-d16-lr5e7-sb256-20260603/model.nn",
     "book": "/home/petter/assets/books/UHO_Lichess_4852_v1.epd",
-    "runner": "/home/petter/source/fastchess/fastchess",
+    "runner": "~/.local/bin/fastchess",
     "python": "~/.venv/bin/python",
     "backend": "bullet",
     "selfplay_games": 80000,
