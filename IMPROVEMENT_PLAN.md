@@ -62,6 +62,9 @@ Current clean-native lineage names:
 - `native-1.7.2-rc1`: rejected. Cutting the unfiltered replay-pair dose to
   `3000` rows still lost to `native-1.5.0-rc1` in smoke at
   `-9.5 +/- 36.9 Elo`, LOS `30.6%`.
+- `native-1.7.3-rc1`: rejected. A low-dose scalar continuation using repeated
+  SF14-labeled child rows from harmful sidecar root-trigger pairs lost to
+  `native-1.5.0-rc1` in smoke at `-23.1 +/- 36.6 Elo`, LOS `10.6%`.
 
 Current build intent:
 
@@ -107,10 +110,11 @@ Current build intent:
   negative hard examples or abandon the sidecar as a runtime selector. Do not
   launch another sidecar SPRT until an oracle-confirmed trigger has a clean
   helpful/harmful split offline.
-- Current build config is `native-1.7.3-rc1-sidecarhardneg`: a low-dose scalar
-  continuation from `native-1.5.0-rc1` that mixes 300k broad native-1.5 rows
-  with 30k repeated SF14-labeled child rows from harmful sidecar root triggers.
-  This is a diagnostic correction attempt, not a sidecar runtime deployment.
+- Current build config is `native-1.8.0-rc1-n16fresh40k-sf-d16`: a fresh-data
+  continuation from `native-1.5.0-rc1` using Crucible-distributed native-1.5
+  self-play and Stockfish 18 depth-16 labels. This changes source quality after
+  the same-architecture overshoot, replay-pair scalar, output-bucket, and
+  sidecar-hard-negative lanes failed to beat `native-1.5.0-rc1`.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
