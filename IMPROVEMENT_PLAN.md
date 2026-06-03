@@ -97,10 +97,16 @@ Current build intent:
   The sidecar is not safe as a broad root move selector, even with
   `move_policy_max_eval_drop=80`. Keep the default-off engine path only as
   instrumentation for active learning and targeted audits.
-- Current intended task: analyze sidecar/root-search disagreement from the
-  failed SPRT PGN and convert useful disagreements into labeled hard examples.
-  Do not launch another sidecar SPRT until the trigger is narrowed to positions
-  where an oracle confirms the sidecar candidate is better.
+- Sidecar/root-search audit tooling now parses the failed SPRT PGN and compares
+  policy top moves against baseline Enyo search/eval. On the first 500
+  candidate plies, 19 choices passed the current root-guard trigger. Stockfish
+  d14 could score 13 of those pairs: 9 harmful, 1 neutral, 3 helpful. Huge
+  sidecar margins were still sometimes harmful, so raising the threshold is not
+  sufficient.
+- Current intended task: convert harmful sidecar/root-search disagreements into
+  negative hard examples or abandon the sidecar as a runtime selector. Do not
+  launch another sidecar SPRT until an oracle-confirmed trigger has a clean
+  helpful/harmful split offline.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
