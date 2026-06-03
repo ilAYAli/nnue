@@ -1,8 +1,8 @@
 {
-  "description": "Native 2.0.0 rc1: material-count output-bucket architecture probe. Reuse the clean native 1.6 labeled data, initialize from native 1.5.0 with the single output head repeated into four heads, train only the float/output head first, then gate against native 1.5.0.",
-  "experiment": "native-2.0.0-rc1-output4-head-probe",
+  "description": "Native 2.0.0 rc2: material-count output-bucket architecture adaptation probe. Reuse the clean native 1.6 labeled data, initialize from native 1.5.0 with the single output head repeated into four heads, adapt all layers at very low LR, then gate against native 1.5.0.",
+  "experiment": "native-2.0.0-rc2-output4-all-adapt",
   "create": {
-    "name": "native-2.0.0-rc1-output4-head-n16data-lr5e7-sb192-20260603",
+    "name": "native-2.0.0-rc2-output4-all-n16data-lr2e7-sb384-20260603",
     "backend": "bullet",
     "engine": "/home/petter/assets/engines/candidate",
     "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
@@ -64,15 +64,15 @@
     "bullet_l2": 16,
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
-    "bullet_superbatches": 192,
+    "bullet_superbatches": 384,
     "bullet_threads": 4,
     "bullet_wdl": 0.25,
-    "bullet_lr": 0.0000005,
-    "bullet_final_lr": 0.0000002,
+    "bullet_lr": 0.0000002,
+    "bullet_final_lr": 0.00000005,
     "bullet_eval_scale": 300,
     "bullet_save_rate": 64,
     "bullet_init_weights": "/home/petter/code/cpp/chess/nnue/runs/native-2.0.0-outputbucket-preflight-20260602/init/native-1.5.0-output4/optimiser_state/weights.bin",
-    "bullet_trainable": "float-head",
+    "bullet_trainable": "all",
     "bullet_static_data": "",
     "engine_static_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-1.6.0-rc1-n15dist60k-sf-d14-lr1e6-sb384-20260602/score/labeled.jsonl",
     "engine_static_rows": 2000,
@@ -83,6 +83,6 @@
   "validation": {
     "promotion_gate": "Pass clean provenance, engine-static sanity, 256-game triage versus native 1.5.0, then 1000-game confirm if the smoke is positive.",
     "ownership_definition": "Clean Enyo-native init chain; Enyo self-play positions; Stockfish is used only as oracle labeler.",
-    "reason": "Native 1.5.0 remains the current clean-native game baseline. Same-architecture continuation regressed, so this probes a small architecture change without spending another self-play/scoring cycle first."
+    "reason": "Native 1.5.0 remains the current clean-native game baseline. The output-head-only output4 probe regressed in smoke, so this tests whether the shared layers need a small adaptation before closing the architecture lane."
   }
 }

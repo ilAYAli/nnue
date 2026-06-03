@@ -45,8 +45,11 @@ Current clean-native lineage names:
   failed game validation. Checkpoint 96 looked good in 128 games
   (`+19.0 +/- 51.7`) but contradicted itself in the 1000-game confirm and was
   stopped at 354 games around `-23.6 +/- 32.0`, LOS `7.3%`.
-- `native-2.0.0-rc1`: reserved for the material-count output-bucket
-  architecture lane after runtime/export preflight passes.
+- `native-2.0.0-rc1`: rejected. The material-count output-bucket head-only
+  adaptation lost to `native-1.5.0-rc1` in smoke at `-16.3 +/- 36.2 Elo`,
+  LOS `18.8%`.
+- `native-2.0.0-rc2`: current material-count output-bucket all-layer
+  adaptation proof.
 
 Current build intent:
 
@@ -64,10 +67,16 @@ Current build intent:
   - Bullet trainer compiles with `--enyo-output-buckets`.
   - A generated 4-output-bucket `.nn` loads through Enyo and `evalnet`.
   - Startpos fixed-node NPS was within noise versus the single-head net.
-- Current intended run: `native-2.0.0-rc1-output4-head-n16data-lr5e7-sb192-20260603`.
-  Reuse the clean native 1.6 labeled data, initialize from native 1.5.0 with
-  its single output head repeated into four material-count heads, train only
-  the float/output head first, then gate against `native-1.5.0-rc1`.
+- First output-bucket game gate was negative:
+  `native-2.0.0-output4-vs-native-1.5.0-smoke256-20260603` finished
+  `-16.3 +/- 36.2 Elo`, LLR `-0.39/2.94`, LOS `18.8%`. Do not extend the
+  head-only lane.
+- Current intended run:
+  `native-2.0.0-rc2-output4-all-n16data-lr2e7-sb384-20260603`. Reuse the
+  clean native 1.6 labeled data, initialize from native 1.5.0 with its single
+  output head repeated into four material-count heads, adapt all layers at very
+  low LR, then gate against `native-1.5.0-rc1`. If this also smokes negative,
+  close the output-bucket lane until the representation or source data changes.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
