@@ -10,7 +10,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lib.move_policy import move_features  # noqa: E402
+from lib.move_policy_features import move_features  # noqa: E402
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
