@@ -59,6 +59,9 @@ Current clean-native lineage names:
 - `native-1.7.1-rc1`: rejected. Filtering the replay-pair mix to
   `abs(score) <= 800` before sampling lost to `native-1.5.0-rc1` in smoke at
   `-17.7 +/- 37.5 Elo`, LOS `17.7%`.
+- `native-1.7.2-rc1`: rejected. Cutting the unfiltered replay-pair dose to
+  `3000` rows still lost to `native-1.5.0-rc1` in smoke at
+  `-9.5 +/- 36.9 Elo`, LOS `30.6%`.
 
 Current build intent:
 
@@ -66,8 +69,9 @@ Current build intent:
   no longer the fastest lane: `native-1.5.1-rc1` regressed against
   `native-1.5.0-rc1`, `native-1.6.0-rc1` failed its longer confirm, and
   `native-1.6.1-rc1` failed when the best native 1.6 checkpoint was continued.
-- The next test returns to the proven single-output architecture with a more
-  carefully filtered replay-pair source mix.
+- Scalar replay-pair mixing is closed for now. The only replay result with a
+  clear signal is the separable sidecar move-policy gate, not another scalar
+  `.nn` fine-tune.
 - Output-bucket preflight is complete:
   - Enyo runtime loads legacy single-head and new multi-head `.nn` files.
   - Python `.nn` load/write/export preserves output bucket count.
@@ -80,13 +84,12 @@ Current build intent:
   head-only lane.
 - `native-2.0.0-rc2` also failed to produce a promotion signal. Close the
   output-bucket lane until the representation or source data changes.
-- Current intended run:
-  `native-1.7.2-rc1-replaypair-tiny-lr1e7-sb256-20260603`. Reuse the native
-  1.6 broad labels and replay child-pair rows, but cut the replay dose from
-  12k to 3k and leave it unfiltered. The hypothesis is that the high-severity
-  replay rows may be useful, while the previous dose was too noisy. Gate
-  against `native-1.5.0-rc1`. Promote to a 1000-game confirm only if the
-  256-game smoke has a clear positive signal, not merely weak LOS.
+- Current intended task: move-policy sidecar runtime preflight. Use the
+  exported `enyo.move_policy.v1` JSON from
+  `runs/move-policy-export-x1-heldout-20260531/model.json` at threshold `18`.
+  First verify export decisions still match Python on the held-out mistake and
+  guard gates, then add a no-op/tie-break runtime path only if the engine work
+  can be kept isolated from the scalar NNUE evaluator.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
@@ -95,6 +98,8 @@ Current build intent:
 - First promotion threshold is "not worse than Berserk", not merely "close".
 - Do not rerun a random-init candidate or another same-architecture LR/data-dose
   variant unless the architecture, label objective, or source quality changes.
+- Do not run another scalar replay-pair dose variant until the representation
+  changes or a move-choice gate shows a concrete reason.
 
 2026-05-31 ownership correction:
 
