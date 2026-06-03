@@ -107,6 +107,10 @@ Current build intent:
   negative hard examples or abandon the sidecar as a runtime selector. Do not
   launch another sidecar SPRT until an oracle-confirmed trigger has a clean
   helpful/harmful split offline.
+- Current build config is `native-1.7.3-rc1-sidecarhardneg`: a low-dose scalar
+  continuation from `native-1.5.0-rc1` that mixes 300k broad native-1.5 rows
+  with 30k repeated SF14-labeled child rows from harmful sidecar root triggers.
+  This is a diagnostic correction attempt, not a sidecar runtime deployment.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.

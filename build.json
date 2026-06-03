@@ -1,34 +1,62 @@
 {
-  "description": "Sidecar move-policy preflight. No scalar NNUE training run is currently selected; the next task is to verify the exported Enyo loss-log move-policy sidecar and then add an isolated engine runtime path if the preflight remains clean.",
-  "experiment": "move-policy-sidecar-runtime-preflight",
+  "description": "Native 1.7.3 low-dose scalar continuation using oracle-confirmed harmful sidecar root-trigger child rows. This is a diagnostic hard-example attempt, not another sidecar runtime gate.",
+  "experiment": "native-1.7.3-sidecar-hardneg",
   "create": {
-    "disabled": true,
-    "disabled_reason": "No scalar NNUE candidate is selected. Run the sidecar_preflight command and then use a dedicated engine feature branch for runtime integration.",
-    "name": "move-policy-sidecar-runtime-preflight-disabled",
-    "dry_run": true,
-    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh"
-  },
-  "sidecar_preflight": {
-    "model": "/home/petter/code/cpp/chess/nnue/runs/move-policy-export-x1-heldout-20260531/model.json",
-    "checkpoint": "/home/petter/code/cpp/chess/nnue/runs/move-policy-loss-full-guardtrain-heldout-20260531/model.pt",
-    "mistake_gate": "/home/petter/code/cpp/chess/nnue/runs/move-policy-loss-full-heldout-20260531/mistake_val.jsonl",
-    "guard_gate": "/home/petter/code/cpp/chess/nnue/runs/move-policy-loss-full-heldout-20260531/guard_val.jsonl",
-    "threshold": 18,
-    "expected": {
-      "mistake_cases": 622,
-      "mistake_selected": 101,
-      "mistake_selected_wrong": 0,
-      "guard_cases": 596,
-      "guard_overrides": 1,
-      "guard_harmful": 0
-    },
-    "commands": [
-      "/home/petter/.venv/bin/python tools/validate/eval_move_policy_export.py --model /home/petter/code/cpp/chess/nnue/runs/move-policy-export-x1-heldout-20260531/model.json --gate /home/petter/code/cpp/chess/nnue/runs/move-policy-loss-full-heldout-20260531/mistake_val.jsonl --guard /home/petter/code/cpp/chess/nnue/runs/move-policy-loss-full-heldout-20260531/guard_val.jsonl --thresholds 18 --summary-json /home/petter/code/cpp/chess/nnue/runs/move-policy-export-x1-heldout-20260531/summary-refresh.json"
-    ]
+    "name": "native-1.7.3-rc1-sidecarhardneg-lr1e7-sb256-20260603",
+    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
+    "engine": "/home/petter/assets/engines/candidate",
+    "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
+    "book": "/home/petter/assets/books/UHO_Lichess_4852_v1.epd",
+    "runner": "/home/petter/source/fastchess/fastchess",
+    "python": "~/.venv/bin/python",
+    "backend": "bullet",
+    "selfplay_games": 0,
+    "score_shards": 0,
+    "score_engine": "/home/petter/.local/bin/stockfish",
+    "score_depth": 14,
+    "source_mix_jsonl": [
+      "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl:300000",
+      "/home/petter/code/cpp/chess/nnue/runs/sidecar-rootguard-vs-native15-smoke1000-20260603/sidecar_root_harmful_children_sf14_x100.jsonl:30000"
+    ],
+    "source_mix_seed": 2026060305,
+    "source_mix_progress": 50000,
+    "bullet_source_jsonl": "",
+    "bullet_loader": "direct",
+    "bullet_limit": 0,
+    "bullet_max_abs_cp": 800,
+    "bullet_enyo_runtime_target": true,
+    "bullet_manifest": "~/source/bullet/Cargo.toml",
+    "bullet_hidden": 1024,
+    "bullet_l2": 16,
+    "bullet_batch_size": 4096,
+    "bullet_batches": 64,
+    "bullet_superbatches": 256,
+    "bullet_threads": 4,
+    "bullet_wdl": 0.25,
+    "bullet_lr": 1e-7,
+    "bullet_final_lr": 3e-8,
+    "bullet_enyo_l0_std": 8.0,
+    "bullet_enyo_l1_std": 1.0,
+    "bullet_enyo_l1_export_scale": 1.0,
+    "bullet_enyo_input_factorizer": false,
+    "bullet_enyo_input_buckets": 16,
+    "bullet_enyo_runtime_input_buckets": 16,
+    "bullet_enyo_output_buckets": 1,
+    "bullet_eval_scale": 300,
+    "bullet_save_rate": 64,
+    "bullet_init_weights": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/checkpoints/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602-512/optimiser_state/weights.bin",
+    "bullet_trainable": "all",
+    "bullet_weight_decay": 0.0,
+    "bullet_static_data": "",
+    "engine_static_jsonl": "{score}/mixed.jsonl",
+    "engine_static_rows": 2000,
+    "engine_static_engine": "/home/petter/assets/engines/candidate",
+    "require_clean_enyo_owned": true
   },
   "validation": {
-    "promotion_gate": "Do not promote from sidecar offline gates. Runtime integration must pass no-op/load tests, action-rate measurement, and SPRT.",
-    "ownership_definition": "Sidecar model is trained from Enyo loss-log replay rows. Stockfish is used only as oracle labeler.",
-    "reason": "Native 1.5.0 remains the clean-native scalar baseline. Native 1.7.0 was weak-positive, while 1.7.1 and 1.7.2 were negative. The replay signal is separable as a move-choice sidecar, not as another scalar .nn dose."
+    "baseline": "native-1.5.0-rc1",
+    "hard_examples": "/home/petter/code/cpp/chess/nnue/runs/sidecar-rootguard-vs-native15-smoke1000-20260603/sidecar_root_harmful_children_sf14_x100.jsonl",
+    "promotion_gate": "Must beat native-1.5.0-rc1 in smoke before any longer confirm. Reject immediately if engine-static degrades materially or smoke is negative.",
+    "reason": "The sidecar root guard failed catastrophically, but its harmful SF14-labeled trigger pairs may be useful as a small scalar hard-example correction."
   }
 }
