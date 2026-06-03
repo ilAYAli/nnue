@@ -257,6 +257,57 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_source_mix_feeds_bullet_training(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "source_mix_jsonl": [
+                        "/runs/broad/labeled.jsonl:200000",
+                        "/runs/replay/pairs.jsonl:4000",
+                    ],
+                    "source_mix_seed": 2026060302,
+                    "source_mix_progress": 123,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertLess(names.index("source_mix"), names.index("bullet_text"))
+
+            source_mix = next(
+                step for step in config["steps"]
+                if step["name"] == "source_mix"
+            )
+            self.assertIn("--source", source_mix["command"])
+            self.assertIn("/runs/broad/labeled.jsonl:200000", source_mix["command"])
+            self.assertIn("/runs/replay/pairs.jsonl:4000", source_mix["command"])
+            self.assertEqual(
+                "2026060302",
+                source_mix["command"][source_mix["command"].index("--seed") + 1],
+            )
+            self.assertEqual(
+                "123",
+                source_mix["command"][source_mix["command"].index("--progress") + 1],
+            )
+
+            bullet_text = next(
+                step for step in config["steps"]
+                if step["name"] == "bullet_text"
+            )
+            input_index = bullet_text["command"].index("--input")
+            self.assertEqual("{score}/mixed.jsonl", bullet_text["command"][input_index + 1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_crucible_score_plan_feeds_bullet_training(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

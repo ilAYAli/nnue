@@ -254,6 +254,13 @@ def collect_json_refs(doc: Any) -> tuple[list[str], list[str]]:
                 position_refs.append(value)
             elif key in {"input"} and isinstance(value, str):
                 position_refs.append(value)
+            elif key == "source_mix_jsonl" and isinstance(value, list):
+                for item in value:
+                    if not isinstance(item, str):
+                        continue
+                    path, _, _rows = item.rpartition(":")
+                    if path:
+                        position_refs.append(path)
             elif key in {"engine", "oracle", "teacher"} and isinstance(value, str):
                 label_refs.append(value)
             elif key == "source_map" and isinstance(value, dict):

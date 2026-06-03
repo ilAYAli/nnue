@@ -135,6 +135,17 @@ def templated_path_arg(value: str | Path) -> str:
     return str(expand_path(text))
 
 
+def templated_source_spec_arg(value: str | Path) -> str:
+    text = str(value)
+    try:
+        path, rows = text.rsplit(":", 1)
+    except ValueError as exc:
+        raise SystemExit(f"invalid source mix spec: {value}") from exc
+    if not path or not rows:
+        raise SystemExit(f"invalid source mix spec: {value}")
+    return f"{templated_path_arg(path)}:{rows}"
+
+
 def shell_join(parts: list[str]) -> str:
     return " ".join(shlex.quote(str(part)) for part in parts)
 
@@ -165,6 +176,16 @@ def validate_create_args(args: argparse.Namespace) -> None:
             raise SystemExit("score_crucible requires score_shards > 0")
         if args.score_crucible_local_slots < 0:
             raise SystemExit("score_crucible_local_slots must be >= 0")
+
+    if args.source_mix_jsonl:
+        if args.bullet_generate_source:
+            raise SystemExit("source_mix_jsonl conflicts with bullet_generate_source")
+        if args.score_source_jsonl:
+            raise SystemExit("source_mix_jsonl conflicts with score_source_jsonl")
+        if args.bullet_data:
+            raise SystemExit("source_mix_jsonl conflicts with bullet_data")
+        if args.bullet_source_jsonl:
+            raise SystemExit("source_mix_jsonl conflicts with bullet_source_jsonl")
 
     if not (args.require_clean_enyo_owned and args.bullet_generate_source):
         return
@@ -678,7 +699,24 @@ def create_config(args: argparse.Namespace) -> dict:
             },
         ])
     elif args.backend == "bullet":
-        if args.score_source_jsonl:
+        if args.source_mix_jsonl:
+            mix_output = "{score}/mixed.jsonl"
+            command = [
+                python, tool("posgen/mix_jsonl.py"),
+                "--output", mix_output,
+                "--seed", str(args.source_mix_seed),
+                "--progress", str(args.source_mix_progress),
+            ]
+            for spec in args.source_mix_jsonl:
+                command.extend(["--source", templated_source_spec_arg(spec)])
+            steps.append({
+                "name": "source_mix",
+                "command": command,
+            })
+            args.bullet_source_jsonl = mix_output
+            if not args.engine_static_jsonl:
+                args.engine_static_jsonl = mix_output
+        elif args.score_source_jsonl:
             append_score_steps(
                 steps,
                 args,
@@ -1052,6 +1090,13 @@ def add_create_args(
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "float-head", "output"])
 
+    parser.add_argument("--source-mix-jsonl", action="append",
+                        default=append_default("source_mix_jsonl", d.source_mix_jsonl),
+                        help="JSONL source mix spec PATH:ROWS. Repeatable.")
+    parser.add_argument("--source-mix-seed", type=int,
+                        default=value("source_mix_seed", d.source_mix_seed))
+    parser.add_argument("--source-mix-progress", type=int,
+                        default=value("source_mix_progress", d.source_mix_progress))
     parser.add_argument("--bullet-source-jsonl", default=value("bullet_source_jsonl", d.bullet_source_jsonl))
     parser.add_argument("--bullet-generate-source", action=argparse.BooleanOptionalAction,
                         default=value("bullet_generate_source", d.bullet_generate_source))

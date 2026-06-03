@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -82,6 +83,46 @@ class NetProvenanceTests(unittest.TestCase):
             self.assertEqual(result.init, "random")
             self.assertEqual(result.position_source, "enyo-replay")
             self.assertEqual(result.label_source, "stockfish-oracle")
+            self.assertTrue(result.clean_enyo_owned)
+
+    def test_source_mix_refs_feed_position_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs" / "mix"
+            train = run / "train"
+            train.mkdir(parents=True)
+            net = train / "model.nn"
+            net.write_bytes(b"")
+            run.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "data=/runs/mix/assets/bullet.data\n",
+                encoding="utf-8",
+            )
+            run.joinpath("config.json").write_text(
+                json.dumps({
+                    "create_args": {
+                        "source_mix_jsonl": [
+                            "/data/enyo-selfplay/labeled.jsonl:200000",
+                            "/data/replay-loss/replay_pairs.jsonl:4000",
+                        ],
+                    }
+                }) + "\n",
+                encoding="utf-8",
+            )
+            pack = run / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertIn("enyo-selfplay", result.position_sources)
+            self.assertIn("enyo-replay", result.position_sources)
+            self.assertEqual(result.position_source, "enyo-games")
             self.assertTrue(result.clean_enyo_owned)
 
     def test_unknown_init_is_not_clean(self) -> None:

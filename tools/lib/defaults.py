@@ -109,6 +109,9 @@ class CandidateDefaults:
     backend: str = "pytorch"
 
     bullet_source_jsonl: str = "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"
+    source_mix_jsonl: tuple[str, ...] = ()
+    source_mix_seed: int = 1
+    source_mix_progress: int = 250000
     bullet_generate_source: bool = False
     bullet_data: str = ""
     bullet_manifest: str = "~/source/bullet/Cargo.toml"
