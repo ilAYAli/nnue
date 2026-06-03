@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# NNUE event hook. Agent wakeups are controlled through NNUE_AI_STDIN_EVENTS.
-# The user-facing nnue topic should only receive explicit good-news/conclusion
-# events, not generic phase/run completion or ordinary experiment-failure spam.
+# NNUE event hook.
+#
+# Routing contract:
+# - AI_stdin wakes the agent and is controlled by NNUE_AI_STDIN_EVENTS.
+# - AI_stdout gets concise done/fail/test summaries for user-visible progress.
+# - The nnue topic is filtered to good-news/conclusion events unless
+#   NNUE_USER_NOTIFY_GENERIC=1.
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
@@ -99,7 +103,6 @@ if [ "$AI_ENABLE" = "1" ]; then
 fi
 if [ "$USER_GENERIC" != "1" ] && [ "$user_worthy" != "1" ]; then
     send_nnue=0
-    send_ai_stdout=0
 fi
 
 if [ "$send_nnue" = "0" ] && [ "$send_ai_stdout" = "0" ] && [ "$send_ai_stdin" = "0" ]; then
