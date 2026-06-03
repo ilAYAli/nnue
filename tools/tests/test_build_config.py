@@ -635,6 +635,8 @@ class BuildConfigTests(unittest.TestCase):
             self.assertIn("--verbose", deploy["command"][2])
             self.assertIn("${cmd[@]}", deploy["command"][2].format())
             self.assertIn("${PIPESTATUS[0]}", deploy["command"][2].format())
+            self.assertIn('if [ "$rc" -eq 0 ]', deploy["command"][2].format())
+            self.assertNotIn('if "${cmd[@]}" 2>&1 | tee "$tmp"; then', deploy["command"][2].format())
             self.assertEqual(str(Path("~/workers.json").expanduser()), deploy["command"][6])
             self.assertEqual("3", deploy["command"][8])
             self.assertEqual("42", deploy["command"][9])

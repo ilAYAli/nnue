@@ -126,6 +126,19 @@ Current build intent:
 - Do not run another scalar replay-pair dose variant until the representation
   changes or a move-choice gate shows a concrete reason.
 
+2026-06-03 Crucible deploy wrapper correction:
+
+- `build.py` previously wrapped `crucible deploy ... | tee tmp` inside `if`.
+  Because `tee` returned success, a failed deploy could be recorded as
+  `score_crucible_deploy rc=0`, letting `score_crucible_merge` run while score
+  tasks were still active.
+- The wrapper now captures `${PIPESTATUS[0]}` before deciding success, so a
+  nonzero deploy exits nonzero unless the explicit `--resume` recovery path is
+  used. A focused build-config regression test covers this.
+- The `native-1.8.0-rc1` score merge failure was therefore a premature merge
+  attempt, not corrupted labeled data. Let active Crucible score tasks finish,
+  then verify/merge and resume after `score_merge`.
+
 2026-05-31 ownership correction:
 
 - `default.net` is also a borrowed-weight source. It cannot be used to generate
