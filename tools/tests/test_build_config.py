@@ -15,6 +15,25 @@ import build  # noqa: E402
 
 
 class BuildConfigTests(unittest.TestCase):
+    def test_disabled_create_config_fails_before_default_build(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "disabled": True,
+                    "disabled_reason": "sidecar preflight only",
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            with self.assertRaises(SystemExit) as ctx:
+                build.create_config(args)
+            self.assertIn("sidecar preflight only", str(ctx.exception))
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_engine_static_validation_includes_source_breakdown(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

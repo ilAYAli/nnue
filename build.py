@@ -99,7 +99,15 @@ def load_create_arg_defaults(path: str | Path | None) -> dict[str, object]:
         raise SystemExit(f"{config_path}: 'create' must be a JSON object")
 
     allowed = {field.name for field in fields(DEFAULTS)}
-    allowed.update({"name", "run_dir", "dry_run", "force", "event_command"})
+    allowed.update({
+        "name",
+        "run_dir",
+        "dry_run",
+        "force",
+        "event_command",
+        "disabled",
+        "disabled_reason",
+    })
     out: dict[str, object] = {"config": str(config_path)}
     for raw_key, value in create.items():
         key = normalize_key(str(raw_key))
@@ -645,6 +653,10 @@ def append_source_generation_steps(
 
 
 def create_config(args: argparse.Namespace) -> dict:
+    if args.disabled:
+        reason = str(args.disabled_reason or "no candidate build is selected")
+        raise SystemExit(f"build config is disabled: {reason}")
+
     validate_create_args(args)
     name = args.name or default_name()
     run_dir = run_dir_for(name, args.run_dir)
@@ -972,6 +984,11 @@ def add_create_args(
                         default=value("dry_run", False))
     parser.add_argument("--force", action="store_true",
                         default=value("force", False))
+    parser.add_argument("--disabled", action=argparse.BooleanOptionalAction,
+                        default=value("disabled", False),
+                        help="Make this create config fail safely instead of launching a run.")
+    parser.add_argument("--disabled-reason",
+                        default=value("disabled_reason", "no candidate build is selected"))
     parser.add_argument(
         "--event-command",
         default=value("event_command", None),
