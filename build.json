@@ -1,8 +1,8 @@
 {
-  "description": "Native 2.0.0 rc2: material-count output-bucket architecture adaptation probe. Reuse the clean native 1.6 labeled data, initialize from native 1.5.0 with the single output head repeated into four heads, adapt all layers at very low LR, then gate against native 1.5.0.",
-  "experiment": "native-2.0.0-rc2-output4-all-adapt",
+  "description": "Native 1.7.0 rc1: low-dose replay child-position mix. Keep the proven single-output native architecture, initialize from native 1.5.0, mix broad native 1.6 self-play labels with a small replay-pair dose, and gate against native 1.5.0.",
+  "experiment": "native-1.7.0-rc1-replaypair-lowdose",
   "create": {
-    "name": "native-2.0.0-rc2-output4-all-n16data-lr2e7-sb384-20260603",
+    "name": "native-1.7.0-rc1-replaypair-lowdose-lr1e7-sb256-20260603",
     "backend": "bullet",
     "engine": "/home/petter/assets/engines/candidate",
     "nnue_file": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
@@ -50,8 +50,14 @@
       "mac:/home/petter/.local=/Users/pwahlman/.local"
     ],
     "bullet_generate_source": false,
+    "source_mix_jsonl": [
+      "/home/petter/code/cpp/chess/nnue/runs/native-1.6.0-rc1-n15dist60k-sf-d14-lr1e6-sb384-20260602/score/labeled.jsonl:300000",
+      "/home/petter/code/cpp/chess/nnue/runs/rc1-replay-fullpair-r2-20260531/replay_full_pairs.jsonl:12000"
+    ],
+    "source_mix_seed": 2026060302,
+    "source_mix_progress": 50000,
     "bullet_source_jsonl": "",
-    "bullet_data": "/home/petter/code/cpp/chess/nnue/runs/native-1.6.0-rc1-n15dist60k-sf-d14-lr1e6-sb384-20260602/assets/bullet.data",
+    "bullet_data": "",
     "bullet_loader": "direct",
     "bullet_mode": "enyo",
     "bullet_limit": 0,
@@ -59,22 +65,22 @@
     "bullet_enyo_runtime_target": true,
     "bullet_enyo_input_buckets": 16,
     "bullet_enyo_runtime_input_buckets": 16,
-    "bullet_enyo_output_buckets": 4,
+    "bullet_enyo_output_buckets": 1,
     "bullet_hidden": 1024,
     "bullet_l2": 16,
     "bullet_batch_size": 4096,
     "bullet_batches": 64,
-    "bullet_superbatches": 384,
+    "bullet_superbatches": 256,
     "bullet_threads": 4,
     "bullet_wdl": 0.25,
-    "bullet_lr": 0.0000002,
-    "bullet_final_lr": 0.00000005,
+    "bullet_lr": 0.0000001,
+    "bullet_final_lr": 0.00000003,
     "bullet_eval_scale": 300,
     "bullet_save_rate": 64,
-    "bullet_init_weights": "/home/petter/code/cpp/chess/nnue/runs/native-2.0.0-outputbucket-preflight-20260602/init/native-1.5.0-output4/optimiser_state/weights.bin",
+    "bullet_init_weights": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/checkpoints/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602-512/optimiser_state/weights.bin",
     "bullet_trainable": "all",
     "bullet_static_data": "",
-    "engine_static_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-1.6.0-rc1-n15dist60k-sf-d14-lr1e6-sb384-20260602/score/labeled.jsonl",
+    "engine_static_jsonl": "",
     "engine_static_rows": 2000,
     "engine_static_engine": "/home/petter/assets/engines/candidate",
     "require_clean_enyo_owned": true,
@@ -83,6 +89,6 @@
   "validation": {
     "promotion_gate": "Pass clean provenance, engine-static sanity, 256-game triage versus native 1.5.0, then 1000-game confirm if the smoke is positive.",
     "ownership_definition": "Clean Enyo-native init chain; Enyo self-play positions; Stockfish is used only as oracle labeler.",
-    "reason": "Native 1.5.0 remains the current clean-native game baseline. The output-head-only output4 probe regressed in smoke, so this tests whether the shared layers need a small adaptation before closing the architecture lane."
+    "reason": "Native 1.5.0 remains the current clean-native game baseline. Output4 did not produce a promotion signal. This tests whether replay child-position labels can repair concrete move-choice failures without another broad self-play cycle."
   }
 }

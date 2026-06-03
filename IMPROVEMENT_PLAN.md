@@ -368,18 +368,20 @@ Priority order:
 
 ## Next Concrete Experiment
 
-The current experiment is clean-owned v4 self-play iteration:
+The current experiment is native 1.7.0 rc1 replay-pair low-dose repair:
 
-1. Generate 20k games of self-play using the improved clean-owned v2-cont net:
-   `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601/model.nn`.
-2. Extract/sample positions with `signed-balanced-v1`.
-3. Label with Stockfish d12.
-4. Initialize Bullet from the clean-owned v2-cont checkpoint weights:
-   `native-d16-owned-v2cont-v3data-lr3e6-sb512-20260601-512`.
-5. Train one low-dose continuation (`lr=3e-6 -> 1e-6`, `512` superbatches).
-6. Run provenance and engine-static validation.
-7. First game gate is against the previous clean-owned v2-cont baseline. Run
-   Berserk smoke only if it improves the owned baseline.
+1. Keep the proven single-output native architecture. The output4 architecture
+   lane is closed for now after two negative/neutral smokes.
+2. Initialize from the current clean-native game baseline:
+   `native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602`.
+3. Build a deterministic source mix inside the run:
+   - 300k broad rows from native 1.6 self-play Stockfish labels.
+   - 12k replay child-position rows from `rc1-replay-fullpair-r2`.
+4. Train one low-dose Bullet continuation (`lr=1e-7 -> 3e-8`, `256`
+   superbatches).
+5. Run clean provenance and engine-static validation.
+6. First game gate is against native 1.5.0. Run a 1000-game confirm only if
+   the 256-game smoke is positive.
 
 Pass criteria for continuing a lane:
 
@@ -398,13 +400,13 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - candidate name:
-  `native-d16-owned-v4-selfplay-v2cont-sf-d12-lr3e6-sb512-20260601`
-- selected branch: generate self-play with clean-owned v2-cont, label with
-  Stockfish d12, and continue the clean-owned v2-cont checkpoint
+  `native-1.7.0-rc1-replaypair-lowdose-lr1e7-sb256-20260603`
+- selected branch: deterministic JSONL mix of broad native self-play labels and
+  replay child-position labels, then continue native 1.5.0
 - backend: Bullet
-- initialization: clean-owned v2-cont Bullet checkpoint weights, with
+- initialization: native 1.5.0 Bullet checkpoint weights, with
   `require_clean_enyo_owned=true`
-- current cap: 20k self-play games for the iteration proof
+- current cap: no new self-play or oracle scoring; reuse existing labeled rows
 - rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`, RC2, and all
   pairwise repair nets
 
@@ -508,6 +510,11 @@ If this architecture branch fails gates or SPRT:
 
 Important failed signals:
 
+- Native 2.0.0 output4 architecture probes did not beat native 1.5.0:
+  - rc1 head-only smoke: `-16.3 +/- 36.2`, LOS `18.8%`, 256 games.
+  - rc2 all-layer adaptation smoke: `-5.4 +/- 37.4`, LOS `38.8%`, 256 games.
+  Output4 is closed for now unless a new failure analysis points directly at
+  material-count output heads.
 - d18 conservative `huber_cp1000_lr5e7_e4` looked promising at 1000 games
   (`+7.0 +/- 15.1`) but collapsed in the add-on run (`-1.7 +/- 9.8` at
   2302/3000).
