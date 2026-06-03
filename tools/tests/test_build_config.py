@@ -602,14 +602,17 @@ class BuildConfigTests(unittest.TestCase):
                 step for step in config["steps"]
                 if step["name"] == "score_crucible_deploy"
             )
-            self.assertIn("deploy", deploy["command"])
-            self.assertIn(str(Path("~/workers.json").expanduser()), deploy["command"])
-            self.assertIn("--resume", deploy["command"])
-            self.assertIn("--jobs", deploy["command"])
-            self.assertEqual("3", deploy["command"][deploy["command"].index("--jobs") + 1])
-            self.assertIn("--remote-timeout-seconds", deploy["command"])
-            self.assertEqual("42", deploy["command"][deploy["command"].index("--remote-timeout-seconds") + 1])
-            self.assertIn("--verbose", deploy["command"])
+            self.assertEqual(["bash", "-lc"], deploy["command"][:2])
+            self.assertIn("deploy", deploy["command"][2])
+            self.assertIn("pass --resume or --replace", deploy["command"][2])
+            self.assertIn("--resume", deploy["command"][2])
+            self.assertIn("--jobs", deploy["command"][2])
+            self.assertIn("--remote-timeout-seconds", deploy["command"][2])
+            self.assertIn("--verbose", deploy["command"][2])
+            self.assertEqual(str(Path("~/workers.json").expanduser()), deploy["command"][6])
+            self.assertEqual("3", deploy["command"][8])
+            self.assertEqual("42", deploy["command"][9])
+            self.assertEqual("1", deploy["command"][10])
 
             merge = next(
                 step for step in config["steps"]
@@ -655,14 +658,17 @@ class BuildConfigTests(unittest.TestCase):
                 step for step in config["steps"]
                 if step["name"] == "selfplay_crucible_deploy"
             )
-            self.assertIn("deploy", deploy["command"])
-            self.assertIn(str(Path("~/workers.json").expanduser()), deploy["command"])
-            self.assertIn("--resume", deploy["command"])
-            self.assertIn("--jobs", deploy["command"])
-            self.assertEqual("3", deploy["command"][deploy["command"].index("--jobs") + 1])
-            self.assertIn("--remote-timeout-seconds", deploy["command"])
-            self.assertEqual("42", deploy["command"][deploy["command"].index("--remote-timeout-seconds") + 1])
-            self.assertIn("--verbose", deploy["command"])
+            self.assertEqual(["bash", "-lc"], deploy["command"][:2])
+            self.assertIn("deploy", deploy["command"][2])
+            self.assertIn("pass --resume or --replace", deploy["command"][2])
+            self.assertIn("--resume", deploy["command"][2])
+            self.assertIn("--jobs", deploy["command"][2])
+            self.assertIn("--remote-timeout-seconds", deploy["command"][2])
+            self.assertIn("--verbose", deploy["command"][2])
+            self.assertEqual(str(Path("~/workers.json").expanduser()), deploy["command"][6])
+            self.assertEqual("3", deploy["command"][8])
+            self.assertEqual("42", deploy["command"][9])
+            self.assertEqual("1", deploy["command"][10])
 
             merge = next(
                 step for step in config["steps"]

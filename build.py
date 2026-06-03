@@ -286,15 +286,29 @@ def append_crucible_deploy_step(
     verbose: bool,
 ) -> None:
     command = [
-        crucible_python, crucible, "deploy",
+        "bash", "-lc",
+        (
+            "python=\"$1\" crucible=\"$2\" workers=\"$3\" manifest=\"$4\" "
+            "jobs=\"$5\" timeout=\"$6\" verbose=\"$7\"; "
+            "tmp=$(mktemp); "
+            "cmd=(\"$python\" \"$crucible\" deploy \"$workers\" \"$manifest\" "
+            "--jobs \"$jobs\" --remote-timeout-seconds \"$timeout\"); "
+            "if [ \"$verbose\" = 1 ]; then cmd+=(--verbose); fi; "
+            "if \"${cmd[@]}\" 2>&1 | tee \"$tmp\"; then rm -f \"$tmp\"; exit 0; fi; "
+            "rc=${PIPESTATUS[0]}; "
+            "if grep -q 'run already exists; pass --resume or --replace' \"$tmp\"; then "
+            "rm -f \"$tmp\"; \"${cmd[@]}\" --resume; exit $?; fi; "
+            "rm -f \"$tmp\"; exit \"$rc\""
+        ),
+        "crucible-deploy",
+        crucible_python,
+        crucible,
         str(expand_path(workers)),
         manifest,
-        "--resume",
-        "--jobs", str(jobs),
-        "--remote-timeout-seconds", str(remote_timeout_seconds),
+        str(jobs),
+        str(remote_timeout_seconds),
+        "1" if verbose else "0",
     ]
-    if verbose:
-        command.append("--verbose")
     steps.append({
         "name": name,
         "command": command,
