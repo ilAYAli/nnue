@@ -84,12 +84,19 @@ Current build intent:
   head-only lane.
 - `native-2.0.0-rc2` also failed to produce a promotion signal. Close the
   output-bucket lane until the representation or source data changes.
-- Current intended task: move-policy sidecar runtime preflight. Use the
-  exported `enyo.move_policy.v1` JSON from
-  `runs/move-policy-export-x1-heldout-20260531/model.json` at threshold `18`.
-  First verify export decisions still match Python on the held-out mistake and
-  guard gates, then add a no-op/tie-break runtime path only if the engine work
-  can be kept isolated from the scalar NNUE evaluator.
+- Move-policy sidecar runtime preflight is complete in Enyo:
+  - `0c2598a` adds the exported `enyo.move_policy.v1` JSON loader and
+    `movepolicy` diagnostic command.
+  - `8b0426b` adds a default-off root guard behind `move_policy_file`, with a
+    static eval safety cap from `move_policy_max_eval_drop`.
+  - Engine-side checks matched Python on held-out sidecar rows, including a
+    selected row with margin `22.029897`.
+- Current intended task: validate the sidecar root guard in games before doing
+  more scalar `.nn` work. Active gate:
+  `sidecar-rootguard-vs-native15-smoke1000-20260603`, same Enyo binary and
+  same `native-1.5.0-rc1` net on both sides, candidate only adds
+  `move_policy_file=runs/move-policy-export-x1-heldout-20260531/model.json`
+  and `move_policy_max_eval_drop=80`.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
