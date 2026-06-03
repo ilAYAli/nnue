@@ -182,13 +182,22 @@ git diff --name-only origin/main..HEAD
 - Route notifications by audience:
   - `AI_stdin`: agent wakeups for actionable long-run `done` and `fail`
     events.
-  - `AI_stdout`: user-worthy conclusions only.
+  - `AI_stdout`: the agent stdout stream. Send concise summaries of status,
+    conclusions, actions taken, rejected lanes, critical failures, and next
+    actions. Strip raw shell commands and long logs; summarize them as actions
+    instead.
   - `nnue`: user-worthy NNUE conclusions only.
   - `sprt`: handled by `sprt --ntfy-url`; do not duplicate SPRT summaries from
-    the NNUE event hook.
+    the NNUE event hook. Raw SPRT belongs on `sprt`; the interpreted conclusion
+    belongs on `AI_stdout`.
 - User-worthy means promotion-relevant, materially improved, explicitly marked
   good news, or critical. Do not send phase spam, generic `done`, ordinary
   failed experiments, or pings to user-facing topics.
+- `AI_stdout` is not the same as the `nnue` user topic. Do not suppress
+  `AI_stdout` merely because the message is not good news; if the agent would
+  tell the user in chat, mirror the concise version to `AI_stdout`.
+- Use `tools/events/ai_stdout.sh` for manual agent summaries. Do not use raw
+  unauthenticated `curl` calls to `AI_stdout`.
 - Always wake the agent for long-running completions and failures through the
   event hook. It sends agent control traffic to `AI_stdin` by default and also
   tries `notifai.sh` as a direct tmux wakeup path.
@@ -213,5 +222,15 @@ NNUE_NOTIFAI_TARGET=<current-codex-pane> \
 
 - Remove temporary tmux windows when the job is done.
 - Do not leave nested shells in tmux panes.
+- Do not leave stale `tail -f` commands as apparent work. If a pane shows a
+  log tail, verify that a producer process is still running; otherwise stop the
+  tail and leave a one-line status.
+- Before distributed validation or SPRT, prove the exact runtime engine can
+  load and evaluate the candidate net. For architecture or export-format
+  changes, deploy the matching engine to all workers first or do not distribute
+  that validation.
+- Use Crucible for CPU fan-out work such as self-play and Stockfish scoring
+  when healthy workers are available. If a long CPU-bound stage is not
+  distributed, record why in the status.
 - Do not start a new training run without an explicit instruction and a written
   hypothesis in `IMPROVEMENT_PLAN.md`.
