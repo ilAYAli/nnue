@@ -411,6 +411,14 @@ class BuildConfigTests(unittest.TestCase):
             self.assertEqual("/coord/python", wait["command"][0])
             self.assertIn("wait", wait["command"])
 
+            merge = next(
+                step for step in config["steps"]
+                if step["name"] == "score_crucible_merge"
+            )
+            self.assertIn('verify "$run"', merge["command"][2])
+            self.assertNotIn("--manifest", merge["command"][2])
+            self.assertEqual("{score}/crucible", merge["command"][6])
+
             bullet_text = next(
                 step for step in config["steps"]
                 if step["name"] == "bullet_text"
@@ -490,7 +498,9 @@ class BuildConfigTests(unittest.TestCase):
                 step for step in config["steps"]
                 if step["name"] == "selfplay_crucible_merge"
             )
-            self.assertIn("verify --manifest", merge["command"][2])
+            self.assertIn('verify "$run"', merge["command"][2])
+            self.assertNotIn("verify --manifest", merge["command"][2])
+            self.assertEqual("{posgen}/selfplay_crucible", merge["command"][6])
             self.assertTrue(any("selfplay_shards.py" in item for item in merge["command"]))
             formatted_merge = [
                 part.format(posgen="/tmp/posgen")
@@ -594,11 +604,18 @@ class BuildConfigTests(unittest.TestCase):
             )
             self.assertIn("deploy", deploy["command"])
             self.assertIn(str(Path("~/workers.json").expanduser()), deploy["command"])
+            self.assertIn("--resume", deploy["command"])
             self.assertIn("--jobs", deploy["command"])
             self.assertEqual("3", deploy["command"][deploy["command"].index("--jobs") + 1])
             self.assertIn("--remote-timeout-seconds", deploy["command"])
             self.assertEqual("42", deploy["command"][deploy["command"].index("--remote-timeout-seconds") + 1])
             self.assertIn("--verbose", deploy["command"])
+
+            merge = next(
+                step for step in config["steps"]
+                if step["name"] == "score_crucible_merge"
+            )
+            self.assertEqual("score-{candidate}", merge["command"][6])
         finally:
             Path(path).unlink(missing_ok=True)
 
@@ -640,11 +657,18 @@ class BuildConfigTests(unittest.TestCase):
             )
             self.assertIn("deploy", deploy["command"])
             self.assertIn(str(Path("~/workers.json").expanduser()), deploy["command"])
+            self.assertIn("--resume", deploy["command"])
             self.assertIn("--jobs", deploy["command"])
             self.assertEqual("3", deploy["command"][deploy["command"].index("--jobs") + 1])
             self.assertIn("--remote-timeout-seconds", deploy["command"])
             self.assertEqual("42", deploy["command"][deploy["command"].index("--remote-timeout-seconds") + 1])
             self.assertIn("--verbose", deploy["command"])
+
+            merge = next(
+                step for step in config["steps"]
+                if step["name"] == "selfplay_crucible_merge"
+            )
+            self.assertEqual("selfplay-{candidate}", merge["command"][6])
         finally:
             Path(path).unlink(missing_ok=True)
 

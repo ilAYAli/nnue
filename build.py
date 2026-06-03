@@ -289,6 +289,7 @@ def append_crucible_deploy_step(
         crucible_python, crucible, "deploy",
         str(expand_path(workers)),
         manifest,
+        "--resume",
         "--jobs", str(jobs),
         "--remote-timeout-seconds", str(remote_timeout_seconds),
     ]
@@ -309,6 +310,7 @@ def append_crucible_score_steps(
     crucible_python = str(expand_user(args.score_crucible_python or sys.executable))
     crucible = str(expand_user(args.score_crucible_tool))
     manifest = "{score}/crucible/manifest.json"
+    merge_run = "score-{candidate}" if args.score_crucible_workers else "{score}/crucible"
     score_command_template = shell_join(score_command(
         args,
         input_jsonl="{{source}}",
@@ -400,15 +402,15 @@ def append_crucible_score_steps(
         "command": [
             "bash", "-lc",
             (
-                "python=\"$1\" crucible=\"$2\" manifest=\"$3\" output=\"$4\" rows=\"$5\"; "
-                "\"$python\" \"$crucible\" verify --manifest \"$manifest\" && "
-                "\"$python\" \"$crucible\" merge --manifest \"$manifest\" --output \"$output\" --force && "
+                "python=\"$1\" crucible=\"$2\" run=\"$3\" output=\"$4\" rows=\"$5\"; "
+                "\"$python\" \"$crucible\" verify \"$run\" && "
+                "\"$python\" \"$crucible\" merge \"$run\" --output \"$output\" --force && "
                 "wc -l \"$output\" > \"$rows\""
             ),
             "merge-crucible-score",
             crucible_python,
             crucible,
-            manifest,
+            merge_run,
             "{score}/labeled.jsonl",
             "{score}/labeled.wc",
         ],
@@ -490,6 +492,7 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
     crucible_python = str(expand_user(args.selfplay_crucible_python or sys.executable))
     crucible = str(expand_user(args.selfplay_crucible_tool))
     manifest = "{posgen}/selfplay_crucible/manifest.json"
+    merge_run = "selfplay-{candidate}" if args.selfplay_crucible_workers else "{posgen}/selfplay_crucible"
     shards = selfplay_shard_count(args)
     shard_pgn = "{posgen}/selfplay_shards/shard.{{index}}.pgn"
     command_template = shell_join(selfplay_generate_command(
@@ -588,9 +591,9 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
         "command": [
             "bash", "-lc",
             (
-                "python=\"$1\" crucible=\"$2\" manifest=\"$3\" posgen=\"$4\" shard_tool=\"$5\" "
+                "python=\"$1\" crucible=\"$2\" run=\"$3\" posgen=\"$4\" shard_tool=\"$5\" "
                 "expected_shards=\"$6\" expected_games=\"$7\"; "
-                "\"$python\" \"$crucible\" verify --manifest \"$manifest\" && "
+                "\"$python\" \"$crucible\" verify \"$run\" && "
                 "shopt -s nullglob && pgns=(\"$posgen\"/selfplay_shards/shard.*.pgn) && "
                 "if [ \"${{#pgns[@]}}\" -ne \"$expected_shards\" ]; then "
                 "echo \"self-play PGN shard count ${{#pgns[@]}} != expected $expected_shards\"; exit 1; fi && "
@@ -601,7 +604,7 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
             "merge-crucible-selfplay",
             crucible_python,
             crucible,
-            manifest,
+            merge_run,
             "{posgen}",
             tool("posgen/selfplay_shards.py"),
             str(shards),
