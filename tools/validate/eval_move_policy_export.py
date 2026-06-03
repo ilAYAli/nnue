@@ -61,6 +61,34 @@ def score(model: dict[str, Any], fen: str, move: str) -> float:
     return float(y[0])
 
 
+def score_many(model: dict[str, Any], fen: str, moves: list[str]) -> list[float]:
+    try:
+        import numpy as np
+    except ImportError:
+        return [score(model, fen, move) for move in moves]
+
+    feature_set = str(model.get("feature_set", "compact"))
+    rows = [move_features(fen, move, feature_set) for move in moves]
+    if not rows:
+        return []
+    x = np.asarray(rows, dtype=np.float32)
+    mean = np.asarray(model["mean"], dtype=np.float32)
+    std = np.asarray(model["std"], dtype=np.float32)
+    if x.shape[1] != mean.shape[0] or x.shape[1] != std.shape[0]:
+        raise ValueError(
+            f"feature dimension {x.shape[1]} does not match model {mean.shape[0]}")
+    y = (x - mean) / std
+    for layer in model["layers"]:
+        weight = np.asarray(layer["weight"], dtype=np.float32)
+        bias = np.asarray(layer["bias"], dtype=np.float32)
+        y = y @ weight.T + bias
+        if layer.get("activation") == "relu":
+            y = np.maximum(y, 0.0)
+    if y.ndim != 2 or y.shape[1] != 1:
+        raise ValueError(f"expected scalar output, got shape {y.shape}")
+    return [float(item) for item in y[:, 0]]
+
+
 def eval_gate(model: dict[str, Any], rows: list[dict[str, Any]],
               thresholds: list[float]) -> dict[str, Any]:
     margins = [

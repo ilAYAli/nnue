@@ -18,7 +18,7 @@ except ImportError as exc:  # pragma: no cover - environment guard
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from validate.eval_move_policy_export import load_model, score  # noqa: E402
+from validate.eval_move_policy_export import load_model, score_many  # noqa: E402
 
 
 SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
@@ -159,10 +159,12 @@ def parent_cp_after_move(engine: UciEngine, board: chess.Board, move_uci: str) -
 
 def policy_scores(model: dict[str, Any], fen: str) -> list[dict[str, Any]]:
     board = chess.Board(fen)
-    out = []
-    for move in board.legal_moves:
-        move_uci = move.uci()
-        out.append({"move": move_uci, "policy_score": score(model, fen, move_uci)})
+    moves = [move.uci() for move in board.legal_moves]
+    values = score_many(model, fen, moves)
+    out = [
+        {"move": move_uci, "policy_score": value}
+        for move_uci, value in zip(moves, values)
+    ]
     out.sort(key=lambda item: (-float(item["policy_score"]), str(item["move"])))
     for rank, item in enumerate(out, start=1):
         item["policy_rank"] = rank
