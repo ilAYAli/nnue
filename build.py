@@ -534,6 +534,7 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
         "--var", f"total_games={args.selfplay_games}",
         "--output-template", shard_pgn,
         "--progress-unit", "games",
+        "--progress-total", str(args.selfplay_shard_games),
         "--progress-log-regex", r"\[\s*\d+/\d+\s+(?P<done>\d+)\s*/\s*(?P<total>\d+)\]",
     ]
     for mapping in args.selfplay_crucible_path_map or []:

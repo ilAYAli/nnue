@@ -495,6 +495,11 @@ class BuildConfigTests(unittest.TestCase):
                 "games",
                 plan["command"][plan["command"].index("--progress-unit") + 1],
             )
+            self.assertIn("--progress-total", plan["command"])
+            self.assertEqual(
+                "250",
+                plan["command"][plan["command"].index("--progress-total") + 1],
+            )
             self.assertIn("?P<done>", plan["command"][plan["command"].index("--progress-log-regex") + 1])
             self.assertIn("?P<total>", plan["command"][plan["command"].index("--progress-log-regex") + 1])
             self.assertIn("--path-map", plan["command"])
