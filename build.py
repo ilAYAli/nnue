@@ -294,10 +294,10 @@ def append_crucible_deploy_step(
             "cmd=(\"$python\" \"$crucible\" deploy \"$workers\" \"$manifest\" "
             "--jobs \"$jobs\" --remote-timeout-seconds \"$timeout\"); "
             "if [ \"$verbose\" = 1 ]; then cmd+=(--verbose); fi; "
-            "if \"${cmd[@]}\" 2>&1 | tee \"$tmp\"; then rm -f \"$tmp\"; exit 0; fi; "
-            "rc=${PIPESTATUS[0]}; "
+            "if \"${{cmd[@]}}\" 2>&1 | tee \"$tmp\"; then rm -f \"$tmp\"; exit 0; fi; "
+            "rc=${{PIPESTATUS[0]}}; "
             "if grep -q 'run already exists; pass --resume or --replace' \"$tmp\"; then "
-            "rm -f \"$tmp\"; \"${cmd[@]}\" --resume; exit $?; fi; "
+            "rm -f \"$tmp\"; \"${{cmd[@]}}\" --resume; exit $?; fi; "
             "rm -f \"$tmp\"; exit \"$rc\""
         ),
         "crucible-deploy",
