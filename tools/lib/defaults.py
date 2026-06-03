@@ -31,7 +31,7 @@ class CandidateDefaults:
     nnue_file: str = "~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn"
     book: str = "~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd"
     runner: str = "~/.local/bin/fastchess"
-    score_engine: str = default_executable("~/local/bin/stockfish", "stockfish")
+    score_engine: str = default_executable("~/.local/bin/stockfish", "stockfish")
     python: str = default_executable("~/.venv/bin/python", "python3")
     init_net: str = "~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn"
     reference_net: str = "~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn"

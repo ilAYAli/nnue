@@ -232,7 +232,7 @@ def score_command(
         python, tool("score/score.py"), "uci",
         "--input", input_jsonl,
         "--output", output_jsonl,
-        "--engine", str(expand_path(args.score_engine)),
+        "--engine", str(expand_user(args.score_engine)),
         "--depth", str(args.score_depth),
         "--threads", str(args.score_threads),
         "--hash", str(args.score_hash),

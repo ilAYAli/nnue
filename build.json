@@ -74,7 +74,6 @@
     ],
     "score_crucible_verbose": false,
     "score_crucible_path_map": [
-      "pwa-mbp:/home/petter/local/stockfish-18/stockfish-ubuntu-x86-64-avx2=/Users/pwahlman/.local/bin/stockfish",
       "pwa-mbp:/home/petter=/Users/pwahlman"
     ]
   },
