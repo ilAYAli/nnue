@@ -12,9 +12,9 @@ set -euo pipefail
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
-EVENTS=${NNUE_NTFY_EVENTS:-done,fail,test}
-AI_EVENTS=${NNUE_AI_STDIN_EVENTS:-phase_done,done,fail}
-AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS:-done,fail}
+EVENTS=${NNUE_NTFY_EVENTS-done,fail,test}
+AI_EVENTS=${NNUE_AI_STDIN_EVENTS-phase_done,done,fail}
+AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS-done,fail}
 USER_GENERIC=${NNUE_USER_NOTIFY_GENERIC:-0}
 AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 AI_STDIN_NTFY_ENABLE=${NNUE_AI_STDIN_NTFY_ENABLE:-1}
@@ -110,7 +110,9 @@ if [ "$send_nnue" = "0" ] && [ "$send_ai_stdout" = "0" ] && [ "$send_ai_stdin" =
     exit 0
 fi
 
-source "$HOME/.ntfy" 2>/dev/null || true
+if [ -r "$HOME/.ntfy" ]; then
+    source "$HOME/.ntfy"
+fi
 
 rendered=$(
     NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
