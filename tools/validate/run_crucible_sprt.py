@@ -473,7 +473,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--jobs", str(args.jobs),
         "--remote-timeout-seconds", str(args.remote_timeout_seconds),
     ]
-    if args.notify:
+    if args.crucible_notify:
         command.extend(["--notify-command", str(args.crucible_notify_command)])
     if args.replace:
         command.append("--replace")
@@ -578,6 +578,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--replace", action="store_true")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--crucible-notify", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--retry-startup-failures", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--notify", action=argparse.BooleanOptionalAction, default=True)
     return parser

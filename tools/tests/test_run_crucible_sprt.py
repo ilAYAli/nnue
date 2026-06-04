@@ -59,6 +59,7 @@ class RunCrucibleSprtTests(unittest.TestCase):
             resume=False,
             replace=False,
             verbose=False,
+            crucible_notify=False,
             retry_startup_failures=True,
             notify=False,
             task_count=2,
