@@ -82,11 +82,18 @@ Current build intent:
 - The `native-2.1.0` output-only material/phase head lane is closed. It is a
   useful diagnostic because it improved static MAE and bias, but it weakened
   the move-choice gate and therefore is not game-test worthy.
-- Next useful NNUE action: change the training signal rather than another
-  scalar eval calibration. The working hypothesis should target move choice
-  directly: build a small root/child ranking proof from the replay loss gate,
-  require it to improve `eval_move_gate.py` offline, and only then consider a
-  scalar `.nn` fine-tune or runtime sidecar deployment.
+- The first replay-loss ranking proof was diagnostically positive but not a
+  candidate. Target-only pairwise training from `native-1.5.0-rc1` on
+  `replay_full_pairs.jsonl` improved the fixed replay-loss move gate from
+  `1139/2487` to `1401/2487`, with `fixed=810`, `regressed=548`,
+  `delta_avg_margin=+29.5cp`, and `delta_loss_weighted_margin=+23.7cp`.
+  However, broad engine-static collapsed on 2000 native 1.5 labeled rows:
+  `mae=282.46`, `sign=49.20%`, `bias=+100.82`, `corr=0.148`.
+- Next useful NNUE action: preserve or separate that ranking signal. Do not
+  SPRT the target-only proof net. The next proof must keep the move-gate gain
+  while preventing broad scalar eval collapse, either through much stronger
+  broad preservation or by keeping the ranking signal outside the scalar `.nn`
+  eval path.
 - Same-architecture self-play continuation is still incrementally useful, but
   no longer the fastest lane: `native-1.5.1-rc1` regressed against
   `native-1.5.0-rc1`, `native-1.6.0-rc1` failed its longer confirm, and
@@ -472,8 +479,8 @@ Priority order:
 
 No candidate build is currently selected.
 
-The next experiment must be a move-choice/ranking proof, not another scalar
-eval calibration:
+The next experiment must be a preserved or separated move-choice/ranking proof,
+not another scalar eval calibration:
 
 1. Use the fixed replay-loss move gate as the first target suite.
 2. Preserve the current clean-native baseline:
@@ -481,14 +488,17 @@ eval calibration:
 3. Build or select child-ranking rows with real oracle scores for the `played`
    and `best` children. Rows where both children have placeholder `score=0` are
    invalid for this proof.
-4. Train or evaluate an isolated ranking signal that does not immediately
-   damage broad scalar eval behavior.
+4. Train or evaluate a ranking signal with explicit broad preservation, or keep
+   it in a separate ranking/policy path. Target-only scalar fine-tuning is
+   already proven to collapse broad eval.
 5. Require offline `eval_move_gate.py` improvement before any SPRT:
    candidate prefers best at least as often as baseline, fixed > regressed, and
    both average margin deltas non-negative.
-6. Only after the offline gate passes, decide whether the signal belongs in a
-   scalar `.nn` fine-tune, a separate sidecar/ranking path, or a new
-   representation.
+6. Also require broad engine-static to remain near baseline. A proof that only
+   improves the move gate while dropping broad sign toward random is diagnostic
+   only.
+7. Only after both gates pass, decide whether the signal belongs in a scalar
+   `.nn` fine-tune, a separate sidecar/ranking path, or a new representation.
 
 Pass criteria for continuing a lane:
 
@@ -507,7 +517,8 @@ Normal candidate creation:
 Current `build.json` intent:
 
 - disabled on purpose. `./build.py create -c build.json` should fail until the
-  next move-choice/ranking proof is written into a reviewable config.
+  next preserved/separated move-choice proof is written into a reviewable
+  config.
 - rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`,
   `native-2.1.0-rc2`, and all scalar pairwise repair nets.
 
