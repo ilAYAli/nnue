@@ -27,7 +27,7 @@
     "bullet_static_data": "",
     "engine_static_jsonl": "~/code/cpp/chess/nnue/runs/native-1.9.1-rc1-n18self80k-sf-d16-lr3e7-sb384-20260604/score/labeled.jsonl",
     "engine_static_rows": 2000,
-    "engine_static_engine": "~/assets/engines/reference",
+    "engine_static_engine": "~/assets/engines/candidate",
     "require_clean_enyo_owned": true
   },
   "validation": {
