@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -451,6 +455,58 @@ def notify_stdout(message: str, *, enabled: bool) -> None:
     subprocess.run([str(script)], input=message + "\n", text=True, check=False)
 
 
+def load_ntfy_auth() -> str:
+    if os.environ.get("NTFY_AUTH"):
+        return os.environ["NTFY_AUTH"]
+    if os.environ.get("LICHESS_NTFY_AUTH"):
+        return os.environ["LICHESS_NTFY_AUTH"]
+
+    ntfy_file = Path.home() / ".ntfy"
+    if not ntfy_file.is_file():
+        return ""
+
+    for line in ntfy_file.read_text(errors="ignore").splitlines():
+        line = line.strip()
+        if line.startswith("export "):
+            line = line[7:]
+        if line.startswith("NTFY_AUTH="):
+            value = line.split("=", 1)[1].strip()
+        elif line.startswith("LICHESS_NTFY_AUTH="):
+            value = line.split("=", 1)[1].strip()
+        else:
+            continue
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            value = value[1:-1]
+        return value
+    return ""
+
+
+def post_sprt_ntfy(url: str, message: str, *, title: str) -> bool:
+    if not url:
+        return True
+
+    req = urllib.request.Request(url, data=message.encode(), method="POST")
+    if title:
+        req.add_header("Title", title)
+    auth = load_ntfy_auth()
+    if auth:
+        token = base64.b64encode(auth.encode()).decode()
+        req.add_header("Authorization", f"Basic {token}")
+
+    try:
+        urllib.request.urlopen(req, timeout=10).close()
+    except (OSError, urllib.error.URLError):
+        print(f"sprt ntfy post failed: {url}", file=sys.stderr)
+        return False
+    return True
+
+
+def notify_sprt(args: argparse.Namespace, message: str, *, title: str) -> None:
+    post_sprt_ntfy(args.sprt_ntfy_url, message, title=title)
+
+
 def emit_completion_event(args: argparse.Namespace, rc: int, run_dir: Path, message: str) -> None:
     if not args.notify:
         return
@@ -521,6 +577,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     if rc != 0:
         message = f"Distributed SPRT failed: run={run_name} log={local_run_dir / 'deploy.log'}"
         notify_stdout(message, enabled=args.notify)
+        notify_sprt(args, message, title="SPRT failed")
         emit_completion_event(args, rc, run_dir, message)
         return rc
 
@@ -532,6 +589,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"done={counts.get('done')}/{args.task_count} fail={counts.get('fail', 0)}"
         )
         notify_stdout(message, enabled=args.notify)
+        notify_sprt(args, message, title="SPRT failed")
         emit_completion_event(args, 1, run_dir, message)
         return 1
 
@@ -539,11 +597,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     if aggregate.games != args.games:
         message = f"Distributed SPRT game count mismatch: got={aggregate.games} expected={args.games}"
         notify_stdout(message, enabled=args.notify)
+        notify_sprt(args, message, title="SPRT failed")
         emit_completion_event(args, 1, run_dir, message)
         return 1
 
     message = conclusion_text(args, aggregate, run_dir)
     notify_stdout(message, enabled=args.notify)
+    notify_sprt(args, message, title="SPRT finished")
     emit_completion_event(args, 0, run_dir, message)
     return 0
 
@@ -597,6 +657,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--crucible-notify", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--retry-startup-failures", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--notify", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--sprt-ntfy-url",
+        default=os.environ.get("SPRT_NTFY_URL", ""),
+        help="Aggregate SPRT ntfy URL. Empty disables SPRT ntfy.",
+    )
     return parser
 
 

@@ -63,6 +63,7 @@ class RunCrucibleSprtTests(unittest.TestCase):
             crucible_notify=False,
             retry_startup_failures=True,
             notify=False,
+            sprt_ntfy_url="",
             task_count=2,
         )
 
@@ -160,16 +161,69 @@ class RunCrucibleSprtTests(unittest.TestCase):
             self.assertIn("NNUE_AI_STDIN_EVENTS=done,fail", hook)
             self.assertNotIn("NNUE_AI_STDOUT_ENABLE=0", hook)
 
+    def test_empty_sprt_ntfy_url_is_noop(self) -> None:
+        old_urlopen = run_crucible_sprt.urllib.request.urlopen
+        calls: list[object] = []
+
+        def fake_urlopen(*args, **kwargs):
+            calls.append(args)
+            raise AssertionError("urlopen should not be called")
+
+        try:
+            run_crucible_sprt.urllib.request.urlopen = fake_urlopen
+            ok = run_crucible_sprt.post_sprt_ntfy("", "message", title="SPRT finished")
+        finally:
+            run_crucible_sprt.urllib.request.urlopen = old_urlopen
+
+        self.assertTrue(ok)
+        self.assertEqual([], calls)
+
+    def test_sprt_ntfy_posts_aggregate_message(self) -> None:
+        old_urlopen = run_crucible_sprt.urllib.request.urlopen
+        old_auth = run_crucible_sprt.load_ntfy_auth
+        requests = []
+
+        class Response:
+            def close(self) -> None:
+                pass
+
+        def fake_urlopen(request, timeout):
+            requests.append((request, timeout))
+            return Response()
+
+        try:
+            run_crucible_sprt.load_ntfy_auth = lambda: "user:pass"
+            run_crucible_sprt.urllib.request.urlopen = fake_urlopen
+            ok = run_crucible_sprt.post_sprt_ntfy(
+                "https://ntfy.example/sprt",
+                "Distributed SPRT result",
+                title="SPRT finished",
+            )
+        finally:
+            run_crucible_sprt.urllib.request.urlopen = old_urlopen
+            run_crucible_sprt.load_ntfy_auth = old_auth
+
+        self.assertTrue(ok)
+        self.assertEqual(1, len(requests))
+        request, timeout = requests[0]
+        self.assertEqual(10, timeout)
+        self.assertEqual("https://ntfy.example/sprt", request.full_url)
+        self.assertEqual("SPRT finished", request.headers["Title"])
+        self.assertIn("Authorization", request.headers)
+
     def test_nonzero_deploy_is_ok_when_status_is_complete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             root = Path(tmp_name)
             args = self.args(root)
+            args.sprt_ntfy_url = "https://ntfy.example/sprt"
             calls: list[list[str]] = []
             messages: list[str] = []
+            sprt_messages: list[tuple[str, str]] = []
             old_run_streamed = run_crucible_sprt.run_streamed
             old_status_json = run_crucible_sprt.status_json
             old_aggregate = run_crucible_sprt.aggregate_sprt_logs
             old_notify = run_crucible_sprt.notify_stdout
+            old_sprt_notify = run_crucible_sprt.notify_sprt
 
             def fake_run_streamed(command: list[str], log_path: Path) -> int:
                 calls.append(command)
@@ -184,22 +238,70 @@ class RunCrucibleSprtTests(unittest.TestCase):
             def fake_notify(message: str, *, enabled: bool) -> None:
                 messages.append(message)
 
+            def fake_sprt_notify(args: Namespace, message: str, *, title: str) -> None:
+                sprt_messages.append((title, message))
+
             try:
                 run_crucible_sprt.run_streamed = fake_run_streamed
                 run_crucible_sprt.status_json = fake_status_json
                 run_crucible_sprt.aggregate_sprt_logs = fake_aggregate
                 run_crucible_sprt.notify_stdout = fake_notify
+                run_crucible_sprt.notify_sprt = fake_sprt_notify
                 rc = run_crucible_sprt.cmd_run(args)
             finally:
                 run_crucible_sprt.run_streamed = old_run_streamed
                 run_crucible_sprt.status_json = old_status_json
                 run_crucible_sprt.aggregate_sprt_logs = old_aggregate
                 run_crucible_sprt.notify_stdout = old_notify
+                run_crucible_sprt.notify_sprt = old_sprt_notify
 
             self.assertEqual(0, rc)
             self.assertTrue(calls)
             self.assertNotIn("--notify-command", calls[0])
             self.assertIn("Distributed SPRT", messages[-1])
+            self.assertEqual(1, len(sprt_messages))
+            self.assertEqual("SPRT finished", sprt_messages[0][0])
+            self.assertIn("Distributed SPRT", sprt_messages[0][1])
+
+    def test_failed_deploy_posts_sprt_failure_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            args = self.args(root)
+            args.sprt_ntfy_url = "https://ntfy.example/sprt"
+            sprt_messages: list[tuple[str, str]] = []
+            old_run_streamed = run_crucible_sprt.run_streamed
+            old_status_json = run_crucible_sprt.status_json
+            old_notify = run_crucible_sprt.notify_stdout
+            old_sprt_notify = run_crucible_sprt.notify_sprt
+            old_retry = run_crucible_sprt.retry_transient_failures
+
+            def fake_run_streamed(command: list[str], log_path: Path) -> int:
+                return 1
+
+            def fake_status_json(crucible: str, run_name: str) -> dict:
+                return {"counts": {"done": 0, "fail": 1}}
+
+            def fake_sprt_notify(args: Namespace, message: str, *, title: str) -> None:
+                sprt_messages.append((title, message))
+
+            try:
+                run_crucible_sprt.run_streamed = fake_run_streamed
+                run_crucible_sprt.status_json = fake_status_json
+                run_crucible_sprt.notify_stdout = lambda message, *, enabled: None
+                run_crucible_sprt.notify_sprt = fake_sprt_notify
+                run_crucible_sprt.retry_transient_failures = lambda args, run_name, run_dir: 0
+                rc = run_crucible_sprt.cmd_run(args)
+            finally:
+                run_crucible_sprt.run_streamed = old_run_streamed
+                run_crucible_sprt.status_json = old_status_json
+                run_crucible_sprt.notify_stdout = old_notify
+                run_crucible_sprt.notify_sprt = old_sprt_notify
+                run_crucible_sprt.retry_transient_failures = old_retry
+
+            self.assertEqual(1, rc)
+            self.assertEqual(1, len(sprt_messages))
+            self.assertEqual("SPRT failed", sprt_messages[0][0])
+            self.assertIn("Distributed SPRT failed", sprt_messages[0][1])
 
 
 if __name__ == "__main__":
