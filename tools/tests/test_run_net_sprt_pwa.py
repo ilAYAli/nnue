@@ -117,7 +117,7 @@ PY
 
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(
-                    "engine cannot load candidate 32-input/1-output-bucket net",
+                    "engine cannot load candidate 32-input/12-channel/1-output-bucket net",
                     result.stdout,
                 )
                 self.assertFalse((tmp / "sprt-called").exists())
@@ -142,8 +142,8 @@ PY
             )
 
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("load ok candidate 32-input/1-output-bucket", result.stdout)
-            self.assertIn("load ok reference 16-input/1-output-bucket", result.stdout)
+            self.assertIn("load ok candidate 32-input/12-channel/1-output-bucket", result.stdout)
+            self.assertIn("load ok reference 16-input/12-channel/1-output-bucket", result.stdout)
             self.assertTrue((tmp / "sprt-called").exists())
 
     def test_accepts_output_bucket_net(self) -> None:
@@ -166,7 +166,7 @@ PY
             )
 
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("load ok candidate 16-input/4-output-bucket", result.stdout)
+            self.assertIn("load ok candidate 16-input/12-channel/4-output-bucket", result.stdout)
             self.assertTrue((tmp / "sprt-called").exists())
 
     def test_script_does_not_call_notifai_directly(self) -> None:

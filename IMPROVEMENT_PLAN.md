@@ -212,6 +212,21 @@ Current build intent:
   `native-1.9` continuation lane rather than spending a long confirm on a
   weak `+5 Elo` screen signal.
 
+2026-06-04 replay-pair checkpoint confirmation:
+
+- `replaypair-ck1` is rejected. The corrected distributed 4000-game confirm
+  against `native-1.5.0-rc1` finished `1569-1657-774`, score `0.4890`,
+  about `-7.6 Elo` with approximate `+/- 9.7` CI.
+- The single failed SPRT chunk was a transient engine startup failure
+  (`Engine didn't respond to uciok after startup`) and reran cleanly. Future
+  distributed SPRT manifests must pass `--restart off` to the SPRT runner and
+  probe both candidate and reference nets through an actual `go depth 1`
+  search before starting tasks.
+- Add NNUE-side distributed SPRT orchestration before the next confirm:
+  generate the Crucible manifest, deploy it, retry only classified transient
+  startup failures, aggregate the final W/L/D result, and notify the aggregate
+  conclusion through `AI_stdout` plus a wake event through `AI_stdin`.
+
 2026-06-03 Crucible deploy wrapper correction:
 
 - `build.py` previously wrapped `crucible deploy ... | tee tmp` inside `if`.
