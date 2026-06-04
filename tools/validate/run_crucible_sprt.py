@@ -455,7 +455,7 @@ def emit_completion_event(args: argparse.Namespace, rc: int, run_dir: Path, mess
     if not args.notify:
         return
     hook = getattr(args, "event_command", None) or (
-        f"NNUE_NTFY_EVENTS= NNUE_AI_STDOUT_ENABLE=0 "
+        f"NNUE_NTFY_EVENTS= "
         f"NNUE_AI_STDIN_EVENTS=done,fail {repo_root() / 'tools' / 'events' / 'nnue_event_ntfy.sh'}"
     )
     emit_event(

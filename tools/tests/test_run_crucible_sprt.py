@@ -154,7 +154,11 @@ class RunCrucibleSprtTests(unittest.TestCase):
                 run_crucible_sprt.emit_event = old_emit_event
 
             self.assertEqual(1, len(calls))
-            self.assertIn("nnue_event_ntfy.sh", calls[0]["kwargs"]["hook_command"])
+            hook = calls[0]["kwargs"]["hook_command"]
+            self.assertIn("nnue_event_ntfy.sh", hook)
+            self.assertIn("NNUE_NTFY_EVENTS=", hook)
+            self.assertIn("NNUE_AI_STDIN_EVENTS=done,fail", hook)
+            self.assertNotIn("NNUE_AI_STDOUT_ENABLE=0", hook)
 
     def test_nonzero_deploy_is_ok_when_status_is_complete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
