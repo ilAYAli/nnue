@@ -336,6 +336,9 @@ def append_crucible_score_steps(
     plan_command = [
         crucible_python, crucible, "plan",
         "--name", "score-{candidate}",
+        "--kind", "score",
+        "--description", "NNUE source scoring",
+        "--task-label", "score:uci",
         "--shards", str(args.score_shards),
         "--work-dir", "{repo}",
         "--out", manifest,
@@ -525,6 +528,9 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
     plan_command = [
         crucible_python, crucible, "plan",
         "--name", "selfplay-{candidate}",
+        "--kind", "selfplay",
+        "--description", "NNUE selfplay generation",
+        "--task-label", "selfplay",
         "--shards", str(shards),
         "--work-dir", "{repo}",
         "--out", manifest,

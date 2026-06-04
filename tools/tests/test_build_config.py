@@ -374,6 +374,11 @@ class BuildConfigTests(unittest.TestCase):
                 if step["name"] == "score_crucible_plan"
             )
             self.assertEqual("/coord/python", plan["command"][0])
+            self.assertEqual("score", plan["command"][plan["command"].index("--kind") + 1])
+            self.assertEqual(
+                "score:uci",
+                plan["command"][plan["command"].index("--task-label") + 1],
+            )
             self.assertIn("--path-map", plan["command"])
             self.assertIn(
                 "localhost:/home/petter/code/cpp/chess=/Users/pwahlman/code/cpp/chess",
@@ -488,6 +493,11 @@ class BuildConfigTests(unittest.TestCase):
                 if step["name"] == "selfplay_crucible_plan"
             )
             self.assertEqual("/coord/python", plan["command"][0])
+            self.assertEqual("selfplay", plan["command"][plan["command"].index("--kind") + 1])
+            self.assertEqual(
+                "selfplay",
+                plan["command"][plan["command"].index("--task-label") + 1],
+            )
             self.assertIn("--shards", plan["command"])
             self.assertEqual("5", plan["command"][plan["command"].index("--shards") + 1])
             self.assertIn("--progress-unit", plan["command"])
