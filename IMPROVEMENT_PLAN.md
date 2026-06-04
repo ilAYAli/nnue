@@ -212,6 +212,34 @@ Current build intent:
   `native-1.9` continuation lane rather than spending a long confirm on a
   weak `+5 Elo` screen signal.
 
+2026-06-04 native 1.5 checkpoint-screen update:
+
+- Screened saved `native-1.5.0-rc1` Bullet checkpoints against final
+  `native-1.5.0-rc1` using distributed Crucible SPRT chunks.
+- The only weak-positive 256-game screen was checkpoint 320:
+  `90-87-79`, `+4.07 +/- 35.46 Elo`, LOS `58.9%`.
+- The 2048-game confirm rejected that checkpoint as a replacement:
+  `762-770-516`, score `0.4980`, about `-1.36 +/- 13.02 Elo`, LOS `41.9%`.
+- Conclusion: saved-checkpoint selection did not find a stronger native 1.5
+  replacement. Do not spend more time confirming native 1.5 checkpoints.
+
+2026-06-04 notification routing correction:
+
+- Distributed SPRT completion routing was wrong in two ways:
+  - `run_crucible_sprt.py` defaulted to `NNUE_AI_STDOUT_ENABLE=0`, so aggregate
+    SPRT completions woke `AI_stdin` but suppressed the user-facing
+    `AI_stdout` summary.
+  - `nnue_event_ntfy.sh` used Bash `:-` defaults, so
+    `NNUE_NTFY_EVENTS=` did not disable the `nnue` topic; it fell back to the
+    default `done,fail,test` list.
+- Both bugs are fixed and covered by focused tests. The default distributed
+  SPRT hook now sends aggregate conclusions to `AI_stdout`, wakes through
+  `AI_stdin`, and can suppress the `nnue` topic without disabling
+  `AI_stdout`.
+- pwa-5090 verification after deploying `279c755` logged
+  `ai_stdout_sent`, `notifai_ok`, `ai_stdin_ntfy_ok`, and no `nnue_sent`.
+  The `AI_stdout` topic contained the diagnostic result at priority 4.
+
 2026-06-04 replay-pair checkpoint confirmation:
 
 - `replaypair-ck1` is rejected. The corrected distributed 4000-game confirm
