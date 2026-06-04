@@ -106,6 +106,7 @@ class CandidateDefaults:
     select_metric: str = "mae"
     weight_decay: float = 1e-6
     trainable: str = "all"
+    output_head_features: str = "none"
     backend: str = "pytorch"
 
     bullet_source_jsonl: str = "runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl"

@@ -16,7 +16,7 @@ from . import enyo_nnue as nn2
 class FenScoreDataset(Dataset):
     def __init__(self, rows: Iterable[dict]):
         self.items: list[
-            tuple[list[int], list[int], int, float, float, float, int]
+            tuple[list[int], list[int], int, int, float, float, float, int]
         ] = []
         source_map: dict[str, int] = {}
         for row in rows:
@@ -33,6 +33,7 @@ class FenScoreDataset(Dataset):
             self.items.append((
                 w_feats,
                 b_feats,
+                len(pieces),
                 stm,
                 float(row["score"]),
                 float(row.get("wdl", 0.5)),
@@ -60,10 +61,11 @@ class FenScoreDataset(Dataset):
         return len(self.items)
 
     def __getitem__(self, idx: int):
-        w, b, stm, score, wdl, phase_scale, source_id = self.items[idx]
+        w, b, count, stm, score, wdl, phase_scale, source_id = self.items[idx]
         return (
             torch.tensor(w, dtype=torch.long),
             torch.tensor(b, dtype=torch.long),
+            torch.tensor(count, dtype=torch.long),
             torch.tensor(stm, dtype=torch.long),
             torch.tensor(score, dtype=torch.float32),
             torch.tensor(wdl, dtype=torch.float32),
@@ -114,12 +116,13 @@ class PackedFenScoreDataset(Dataset):
 def collate(batch):
     w_all, b_all = [], []
     w_offsets, b_offsets = [0], [0]
-    stms, scores, wdls, phase_scales, source_ids = [], [], [], [], []
-    for w, b, stm, score, wdl, phase_scale, source_id in batch:
+    stms, counts, scores, wdls, phase_scales, source_ids = [], [], [], [], [], []
+    for w, b, count, stm, score, wdl, phase_scale, source_id in batch:
         w_all.append(w)
         b_all.append(b)
         w_offsets.append(w_offsets[-1] + len(w))
         b_offsets.append(b_offsets[-1] + len(b))
+        counts.append(count)
         stms.append(stm)
         scores.append(score)
         wdls.append(wdl)
@@ -131,6 +134,7 @@ def collate(batch):
         torch.cat(b_all) if b_all else torch.empty(0, dtype=torch.long),
         torch.tensor(w_offsets[:-1], dtype=torch.long),
         torch.tensor(b_offsets[:-1], dtype=torch.long),
+        torch.stack(counts),
         torch.stack(stms),
         torch.stack(scores),
         torch.stack(wdls),
@@ -157,6 +161,7 @@ def collate_packed(batch):
         b_padded[mask],
         offsets,
         offsets,
+        counts_t,
         torch.as_tensor(np.asarray(stms), dtype=torch.long),
         torch.as_tensor(np.asarray(scores), dtype=torch.float32),
         torch.as_tensor(np.asarray(wdls), dtype=torch.float32),

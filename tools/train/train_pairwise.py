@@ -208,7 +208,7 @@ def train(args) -> EnyoNNUE:
             if use_broad:
                 assert broad_iter is not None
                 broad_batch = to_device(next(broad_iter), args.device)
-                w, b, w_off, b_off, stm, y, _wdl, phase_scale, _source_ids = broad_batch
+                w, b, w_off, b_off, _counts, stm, y, _wdl, phase_scale, _source_ids = broad_batch
                 if args.target_clamp > 0:
                     y = torch.clamp(y, -args.target_clamp, args.target_clamp)
                 pred = model(w, b, w_off, b_off, stm, phase_scale)

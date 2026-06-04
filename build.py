@@ -733,6 +733,7 @@ def create_config(args: argparse.Namespace) -> dict:
                     "--patience", str(args.patience),
                     "--val-rows", str(args.val_rows),
                     "--trainable", args.trainable,
+                    "--output-head-features", args.output_head_features,
                     "--python", python,
                     "--out", f"{candidate_dir}/model.pt",
                     "--out-nn", f"{candidate_dir}/model.nn",
@@ -1135,6 +1136,9 @@ def add_create_args(
     parser.add_argument("--weight-decay", type=float, default=value("weight_decay", d.weight_decay))
     parser.add_argument("--trainable", default=value("trainable", d.trainable),
                         choices=["all", "float-head", "output"])
+    parser.add_argument("--output-head-features",
+                        default=value("output_head_features", d.output_head_features),
+                        choices=["none", "material-phase"])
 
     parser.add_argument("--source-mix-jsonl", action="append",
                         default=append_default("source_mix_jsonl", d.source_mix_jsonl),

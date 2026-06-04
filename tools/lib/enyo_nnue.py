@@ -19,6 +19,9 @@ DEFAULT_N_KING_BUCKETS = 16
 SUPPORTED_N_KING_BUCKETS = (16, 32)
 DEFAULT_N_OUTPUT_BUCKETS = 1
 SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
+DEFAULT_N_OUTPUT_HEAD_FEATURES = 0
+N_HEAD_FEATURES = 2
+SUPPORTED_N_OUTPUT_HEAD_FEATURES = (0, N_HEAD_FEATURES)
 N_KING_BUCKETS = DEFAULT_N_KING_BUCKETS
 N_PIECE_TYPES = 12
 N_SQUARES = 64
@@ -42,10 +45,15 @@ def feature_count(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> int:
 def network_size(
     input_buckets: int = DEFAULT_N_KING_BUCKETS,
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS,
+    output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES,
 ) -> int:
     features = feature_count(input_buckets)
     if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {output_buckets}")
+    if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
+        raise ValueError(
+            f"unsupported output head feature count {output_head_features}")
+    output_width = N_L3 + output_head_features
     return (
         features * N_HIDDEN * np.dtype(np.int16).itemsize
         + N_HIDDEN * np.dtype(np.int16).itemsize
@@ -53,7 +61,7 @@ def network_size(
         + N_L2 * np.dtype(np.int32).itemsize
         + N_L2 * N_L3 * np.dtype(np.float32).itemsize
         + N_L3 * np.dtype(np.float32).itemsize
-        + output_buckets * N_L3 * N_OUTPUT * np.dtype(np.float32).itemsize
+        + output_buckets * output_width * N_OUTPUT * np.dtype(np.float32).itemsize
         + output_buckets * N_OUTPUT * np.dtype(np.float32).itemsize
     )
 
@@ -94,15 +102,19 @@ def king_buckets(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> tuple[int, ...]
     raise ValueError(f"unsupported input bucket count {input_buckets}")
 
 
-def detect_network_layout(size: int) -> tuple[int, int]:
+def detect_network_layout(size: int) -> tuple[int, int, int]:
     for input_buckets in SUPPORTED_N_KING_BUCKETS:
         for output_buckets in SUPPORTED_N_OUTPUT_BUCKETS:
-            if size == network_size(input_buckets, output_buckets):
-                return input_buckets, output_buckets
+            for output_head_features in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
+                if size == network_size(
+                    input_buckets, output_buckets, output_head_features
+                ):
+                    return input_buckets, output_buckets, output_head_features
     expected = ", ".join(
-        f"{network_size(i, o)} ({i} input, {o} output)"
+        f"{network_size(i, o, h)} ({i} input, {o} output, {h} head)"
         for i in SUPPORTED_N_KING_BUCKETS
-        for o in SUPPORTED_N_OUTPUT_BUCKETS)
+        for o in SUPPORTED_N_OUTPUT_BUCKETS
+        for h in SUPPORTED_N_OUTPUT_HEAD_FEATURES)
     raise ValueError(f"size {size} does not match supported net sizes: {expected}")
 
 
@@ -112,6 +124,10 @@ def detect_input_buckets(size: int) -> int:
 
 def detect_output_buckets(size: int) -> int:
     return detect_network_layout(size)[1]
+
+
+def detect_output_head_features(size: int) -> int:
+    return detect_network_layout(size)[2]
 
 _FEN_PIECE = {
     "p": PAWN,
@@ -131,14 +147,19 @@ class Net:
     l1_biases: np.ndarray       # (N_L2,) int32
     l2_weights: np.ndarray      # (N_L3, N_L2) float32
     l2_biases: np.ndarray       # (N_L3,) float32
-    output_weights: np.ndarray  # (output_buckets, N_L3) float32
+    output_weights: np.ndarray  # (output_buckets, N_L3 + output_head_features) float32
     output_biases: np.ndarray   # (output_buckets,) float32
     input_buckets: int = DEFAULT_N_KING_BUCKETS
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS
+    output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES
 
     @property
     def output_bias(self) -> float:
         return float(np.asarray(self.output_biases, dtype=np.float32).reshape(-1)[0])
+
+    @property
+    def output_width(self) -> int:
+        return N_L3 + self.output_head_features
 
 
 def to_berserk_sq(enyo_sq: int) -> int:
@@ -221,13 +242,24 @@ def output_bucket_from_pieces(
     return output_bucket_for_piece_count(len(pieces), output_buckets)
 
 
+def material_head_features_from_pieces(
+    pieces: Sequence[tuple[int, int, int]],
+) -> tuple[float, float]:
+    return (
+        phase_scale_from_pieces(pieces) - 1.0,
+        (float(len(pieces)) - 16.0) / 16.0,
+    )
+
+
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
     try:
-        input_buckets, output_buckets = detect_network_layout(len(data))
+        input_buckets, output_buckets, output_head_features = detect_network_layout(
+            len(data))
     except ValueError as exc:
         raise ValueError(f"{path}: {exc}") from exc
     n_features = feature_count(input_buckets)
+    output_width = N_L3 + output_head_features
 
     off = 0
 
@@ -243,10 +275,13 @@ def load_net(path: str | Path) -> Net:
     l1b = take(np.int32, N_L2)
     l2w = take(np.float32, N_L2 * N_L3).reshape(N_L3, N_L2)
     l2b = take(np.float32, N_L3)
-    ow = take(np.float32, output_buckets * N_L3).reshape(output_buckets, N_L3)
+    ow = take(np.float32, output_buckets * output_width).reshape(
+        output_buckets, output_width)
     ob = take(np.float32, output_buckets)
     assert off == len(data)
-    return Net(iw, ib, l1w, l1b, l2w, l2b, ow, ob, input_buckets, output_buckets)
+    return Net(
+        iw, ib, l1w, l1b, l2w, l2b, ow, ob, input_buckets, output_buckets,
+        output_head_features)
 
 
 def write_net(net: Net, path: str | Path) -> None:
@@ -257,13 +292,18 @@ def write_net(net: Net, path: str | Path) -> None:
             f"{net.input_buckets} buckets")
     if net.output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {net.output_buckets}")
+    if net.output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
+        raise ValueError(
+            f"unsupported output head feature count {net.output_head_features}")
+    output_width = net.output_width
     output_weights = np.asarray(net.output_weights, dtype=np.float32)
-    if output_weights.shape == (N_L3,):
-        output_weights = output_weights.reshape(1, N_L3)
-    if output_weights.shape != (net.output_buckets, N_L3):
+    if output_weights.shape == (output_width,):
+        output_weights = output_weights.reshape(1, output_width)
+    if output_weights.shape != (net.output_buckets, output_width):
         raise ValueError(
             f"output_weights shape {output_weights.shape} does not match "
-            f"{net.output_buckets} output buckets")
+            f"{net.output_buckets} output buckets and "
+            f"{net.output_head_features} output head features")
     output_biases = np.asarray(net.output_biases, dtype=np.float32).reshape(-1)
     if output_biases.shape != (net.output_buckets,):
         raise ValueError(
@@ -280,6 +320,7 @@ def write_net(net: Net, path: str | Path) -> None:
         f.write(output_weights.tobytes(order="C"))
         f.write(output_biases.tobytes(order="C"))
     size = out.stat().st_size
-    expected = network_size(net.input_buckets, net.output_buckets)
+    expected = network_size(
+        net.input_buckets, net.output_buckets, net.output_head_features)
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")

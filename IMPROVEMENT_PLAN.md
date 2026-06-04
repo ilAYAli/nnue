@@ -581,6 +581,22 @@ Use this sequence for the next serious attempt:
 7. Run static validation plus failure-suite/move-choice gates.
 8. Start SPRT only if gates are clean.
 
+Current material/phase head status:
+
+- Enyo runtime support is merged in engine commit `ada4452`.
+- NNUE Python tooling now supports material/phase output-head nets for the
+  PyTorch backend: layout detection, load/write, zero-preserving expansion from
+  legacy nets, train/export, and static validation.
+- Verified gates:
+  - Enyo full test binary: `79 passed`, `11 skipped` due unavailable
+    tablebases.
+  - NNUE tool tests: `71 passed`.
+  - A tiny PyTorch train/export smoke produced a 16-input/1-output/2-head net
+    of `25203020` bytes.
+  - Enyo candidate `ada4452` loaded that net and `evalnet` returned a score.
+- Bullet does not yet train dense material/phase output-head features. Use
+  `backend=pytorch` for the first architecture probe.
+
 If this architecture branch fails gates or SPRT:
 
 - Try at most one more independent small architecture branch before reassessing.

@@ -10,7 +10,8 @@ import numpy as np
 from tools.lib import enyo_nnue as nn2
 
 
-def zero_net(*, input_buckets: int = 16, output_buckets: int = 1) -> nn2.Net:
+def zero_net(*, input_buckets: int = 16, output_buckets: int = 1,
+             output_head_features: int = 0) -> nn2.Net:
     features = nn2.feature_count(input_buckets)
     return nn2.Net(
         input_weights=np.zeros((features, nn2.N_HIDDEN), dtype=np.int16),
@@ -19,10 +20,13 @@ def zero_net(*, input_buckets: int = 16, output_buckets: int = 1) -> nn2.Net:
         l1_biases=np.zeros((nn2.N_L2,), dtype=np.int32),
         l2_weights=np.zeros((nn2.N_L3, nn2.N_L2), dtype=np.float32),
         l2_biases=np.zeros((nn2.N_L3,), dtype=np.float32),
-        output_weights=np.zeros((output_buckets, nn2.N_L3), dtype=np.float32),
+        output_weights=np.zeros(
+            (output_buckets, nn2.N_L3 + output_head_features),
+            dtype=np.float32),
         output_biases=np.arange(output_buckets, dtype=np.float32),
         input_buckets=input_buckets,
         output_buckets=output_buckets,
+        output_head_features=output_head_features,
     )
 
 
@@ -46,7 +50,9 @@ class EnyoNNUEFormatTests(unittest.TestCase):
             nn2.write_net(zero_net(output_buckets=4), path)
 
             self.assertEqual(path.stat().st_size, nn2.network_size(16, 4))
-            self.assertEqual(nn2.detect_network_layout(path.stat().st_size), (16, 4))
+            self.assertEqual(
+                nn2.detect_network_layout(path.stat().st_size),
+                (16, 4, 0))
             loaded = nn2.load_net(path)
 
             self.assertEqual(loaded.output_buckets, 4)
@@ -55,6 +61,27 @@ class EnyoNNUEFormatTests(unittest.TestCase):
                 loaded.output_biases,
                 np.asarray([0.0, 1.0, 2.0, 3.0], dtype=np.float32),
             )
+
+    def test_material_phase_head_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "material-head.nn"
+            nn2.write_net(
+                zero_net(output_buckets=4,
+                         output_head_features=nn2.N_HEAD_FEATURES),
+                path)
+
+            self.assertEqual(
+                path.stat().st_size,
+                nn2.network_size(16, 4, nn2.N_HEAD_FEATURES))
+            self.assertEqual(
+                nn2.detect_network_layout(path.stat().st_size),
+                (16, 4, nn2.N_HEAD_FEATURES))
+            loaded = nn2.load_net(path)
+
+            self.assertEqual(loaded.output_head_features, nn2.N_HEAD_FEATURES)
+            self.assertEqual(
+                loaded.output_weights.shape,
+                (4, nn2.N_L3 + nn2.N_HEAD_FEATURES))
 
     def test_material_count_bucket_matches_bullet_formula(self) -> None:
         self.assertEqual(nn2.output_bucket_for_piece_count(32, 4), 3)

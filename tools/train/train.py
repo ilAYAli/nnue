@@ -57,6 +57,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--skip-rows", str(args.skip_rows),
         "--val-rows", str(args.val_rows),
         "--trainable", args.trainable,
+        "--output-head-features", args.output_head_features,
     ]
     if args.val:
         command += ["--val", str(expand_path(args.val))]
@@ -132,6 +133,8 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--val-rows", type=int, default=0)
     train.add_argument("--trainable", default="all",
                        choices=["all", "float-head", "output"])
+    train.add_argument("--output-head-features", default="none",
+                       choices=["none", "material-phase"])
     train.add_argument("--python", default=sys.executable)
     train.set_defaults(func=cmd_run)
 

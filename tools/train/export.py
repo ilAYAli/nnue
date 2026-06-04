@@ -21,9 +21,12 @@ def main() -> None:
     input_features = int(state["embed.weight"].shape[0])
     input_buckets = input_features // (12 * 64)
     output_buckets = int(state["output.weight"].shape[0])
+    output_width = int(state["output.weight"].shape[1])
+    output_head_features = output_width - 32
     model = EnyoNNUE(
         input_buckets=input_buckets,
         output_buckets=output_buckets,
+        output_head_features=output_head_features,
     )
     model.load_state_dict(state)
     export_model(model, args.out)

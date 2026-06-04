@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lib import enyo_nnue as nn2
 from lib.nnue_dataset import count_rows, load_score_dataset
 from lib.nnue_model import EnyoNNUE, export_model, load_model_from_nn
 
@@ -141,15 +142,15 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
     sign_sum = 0
     sign_n = 0
     n = 0
-    for w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids in loader:
-        w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = move_batch(
-            (w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids),
+    for w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids in loader:
+        w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids = move_batch(
+            (w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids),
             args.device,
         )
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
         with autocast_context(args):
-            pred = model(w, b, w_off, b_off, stm, phase_scale)
+            pred = model(w, b, w_off, b_off, stm, phase_scale, piece_count=counts)
             loss = score_loss(pred.float(), y, wdl, source_ids, args)
         err = pred - y
         sign_mask = y != 0
@@ -204,9 +205,20 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     if args.init_from_nn:
         print(f"initializing from {args.init_from_nn}", flush=True)
-        model = load_model_from_nn(args.init_from_nn, device=args.device)
+        output_head_features = (
+            nn2.N_HEAD_FEATURES if args.output_head_features == "material-phase"
+            else 0)
+        model = load_model_from_nn(
+            args.init_from_nn,
+            device=args.device,
+            output_head_features=output_head_features)
     else:
-        model = EnyoNNUE(init=args.init).to(args.device)
+        output_head_features = (
+            nn2.N_HEAD_FEATURES if args.output_head_features == "material-phase"
+            else 0)
+        model = EnyoNNUE(
+            init=args.init,
+            output_head_features=output_head_features).to(args.device)
 
     if args.trainable != "all":
         for param in model.parameters():
@@ -243,16 +255,17 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         mae_sum = 0.0
         mse_sum = 0.0
         n = 0
-        for w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids in train_loader:
-            w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids = move_batch(
-                (w, b, w_off, b_off, stm, y, wdl, phase_scale, source_ids),
+        for w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids in train_loader:
+            w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids = move_batch(
+                (w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids),
                 args.device,
             )
             if args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
 
             with autocast_context(args):
-                pred = forward_model(w, b, w_off, b_off, stm, phase_scale)
+                pred = forward_model(
+                    w, b, w_off, b_off, stm, phase_scale, piece_count=counts)
                 loss = score_loss(pred.float(), y, wdl, source_ids, args)
 
             opt.zero_grad()
@@ -349,6 +362,10 @@ def main() -> None:
                          "the quantized input/L1 layers and trains only "
                          "L2+output floats. 'output' trains only the final "
                          "linear layer.")
+    ap.add_argument("--output-head-features", default="none",
+                    choices=["none", "material-phase"],
+                    help="Append material/phase scalar features to the final "
+                         "output layer.")
     args = ap.parse_args()
     source_map = load_source_map(args.data)
     args.source_wdl_lambdas = parse_source_values(

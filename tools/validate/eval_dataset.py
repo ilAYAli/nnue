@@ -132,18 +132,19 @@ def main() -> None:
          "pred": 0.0, "target": 0.0}
         for _ in BUCKETS
     ]
-    for w, b, w_off, b_off, stm, y, _wdl, phase_scale, source_ids in loader:
+    for w, b, w_off, b_off, counts, stm, y, _wdl, phase_scale, source_ids in loader:
         w = w.to(args.device)
         b = b.to(args.device)
         w_off = w_off.to(args.device)
         b_off = b_off.to(args.device)
+        counts = counts.to(args.device)
         stm = stm.to(args.device)
         y = y.to(args.device)
         phase_scale = phase_scale.to(args.device)
         source_ids = source_ids.to(args.device)
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-        pred = model(w, b, w_off, b_off, stm, phase_scale)
+        pred = model(w, b, w_off, b_off, stm, phase_scale, piece_count=counts)
         err = pred - y
         sign_mask = y != 0
         update_stats(overall, pred, y)
