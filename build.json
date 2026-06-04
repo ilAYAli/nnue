@@ -1,42 +1,15 @@
 {
-  "description": "Native 2.1.0 rc2 material/phase output-head probe: initialize from native 1.5.0, add two dense output-head features, train only the output layer on existing native 1.5 labeled data with calibrated LR 0.1, and validate with the material-head-capable Enyo candidate.",
-  "experiment": "native-2.1.0-material-phase-head-output-probe",
+  "description": "No active NNUE candidate build. native-2.1.0 rc2 was rejected by the move-choice gate; the next experiment must change the training signal before another candidate run.",
+  "experiment": "native-move-choice-proof-pending",
   "create": {
-    "name": "native-2.1.0-rc2-materialhead-output-native15-lr1e1-e24-20260604",
-    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
-    "python": "~/.venv/bin/python",
-    "backend": "pytorch",
-    "labeled_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl",
-    "init_net": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
-    "output_head_features": "material-phase",
-    "trainable": "output",
-    "objective": "huber",
-    "target_clamp": 800,
-    "huber_beta": 200,
-    "wdl_lambda": 0.75,
-    "lr": 0.1,
-    "epochs": 24,
-    "batch_size": 16384,
-    "device": "cuda",
-    "workers": 4,
-    "prefetch_factor": 2,
-    "amp": "bf16",
-    "torch_compile": false,
-    "dataset_in_memory": true,
-    "val_rows": 100000,
-    "patience": 6,
-    "select_metric": "mae",
-    "weight_decay": 0.0,
-    "max_features": 32,
-    "pack_progress": 250000,
-    "engine_static_jsonl": "/home/petter/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl",
-    "engine_static_rows": 2000,
-    "engine_static_engine": "/home/petter/assets/engines/candidate",
-    "require_clean_enyo_owned": true
+    "disabled": true,
+    "disabled_reason": "native-2.1.0 material-head output-only lane is closed; define and commit a move-choice/ranking proof before launching another NNUE run"
   },
   "validation": {
+    "last_rejected_run": "native-2.1.0-rc2-materialhead-output-native15-lr1e1-e24-20260604",
     "baseline": "native-1.5.0-rc1",
-    "promotion_gate": "First gate is engine-static plus move-choice failure replay. If those are neutral-positive, run a 256-game Crucible-distributed smoke versus native-1.5.0 before any 1000+ game confirm.",
-    "reason": "The zero-expanded material/phase head is eval-identical to native-1.5.0 and measured at 0.9965x legacy NPS in candidate-engine fixed-depth preflight. rc1 used lr=3e-6 and was effectively a no-op; a short output-only LR calibration found lr=0.1 produced the best held-out static signal. This probe tests whether two cheap dense output features can correct phase/material scaling without changing the feature layout or regenerating data."
+    "engine_static_result": "MAE improved 127.06 -> 126.03 and bias improved -5.26 -> +0.50 on 2000 rows",
+    "move_gate_result": "Rejected: baseline_prefers_best=1139/2487, candidate_prefers_best=1138/2487, fixed=11, regressed=12, delta_avg_margin=-2.0cp, delta_loss_weighted_margin=-3.0cp",
+    "next_hypothesis": "Build a small root/child move-choice ranking proof from replay loss gate data. Require offline eval_move_gate improvement before any scalar fine-tune, runtime sidecar deployment, or SPRT."
   }
 }

@@ -51,6 +51,17 @@ Current clean-native lineage names:
 - `native-2.0.0-rc2`: rejected. The material-count output-bucket all-layer
   adaptation was approximately neutral-negative versus `native-1.5.0-rc1` in
   smoke at `-5.4 +/- 37.4 Elo`, LOS `38.8%`.
+- `native-2.1.0-rc1`: rejected before games. The material/phase dense
+  output-head probe used `lr=3e-6` and was effectively a no-op; the output-head
+  weights moved only to about `0.0005`, and engine-static matched
+  `native-1.5.0-rc1`.
+- `native-2.1.0-rc2`: rejected before games. Calibrating the same output-only
+  material/phase head at `lr=0.1` improved engine-static MAE on 2000 rows
+  (`127.06 -> 126.03`) and bias (`-5.26 -> +0.50`), but failed the
+  move-choice gate against `native-1.5.0-rc1`: baseline preferred the best move
+  on `1139/2487`, candidate `1138/2487`, fixed `11`, regressed `12`,
+  `delta_avg_margin=-2.0cp`, `delta_loss_weighted_margin=-3.0cp`. Do not run
+  SPRT for this net.
 - `native-1.7.0-rc1`: inconclusive. The unfiltered low-dose replay-pair mix
   was weak-positive versus `native-1.5.0-rc1` in smoke at
   `+6.8 +/- 36.5 Elo`, LOS `64.3%`, but not strong enough for confirmation.
@@ -68,12 +79,14 @@ Current clean-native lineage names:
 
 Current build intent:
 
-- `build.json` now points at `native-2.1.0-rc2-materialhead-output-native15-lr1e1-e24-20260604`.
-  Hypothesis: adding two dense material/phase output features can fix cheap
-  phase/material scaling errors while preserving the native 1.5 feature layout.
-  This first probe initializes from `native-1.5.0-rc1`, trains only the output
-  layer, uses existing native 1.5 Stockfish-labeled data, and validates with
-  the material-head-capable Enyo candidate engine.
+- The `native-2.1.0` output-only material/phase head lane is closed. It is a
+  useful diagnostic because it improved static MAE and bias, but it weakened
+  the move-choice gate and therefore is not game-test worthy.
+- Next useful NNUE action: change the training signal rather than another
+  scalar eval calibration. The working hypothesis should target move choice
+  directly: build a small root/child ranking proof from the replay loss gate,
+  require it to improve `eval_move_gate.py` offline, and only then consider a
+  scalar `.nn` fine-tune or runtime sidecar deployment.
 - Same-architecture self-play continuation is still incrementally useful, but
   no longer the fastest lane: `native-1.5.1-rc1` regressed against
   `native-1.5.0-rc1`, `native-1.6.0-rc1` failed its longer confirm, and
@@ -457,20 +470,25 @@ Priority order:
 
 ## Next Concrete Experiment
 
-The current experiment is native 1.7.0 rc1 replay-pair low-dose repair:
+No candidate build is currently selected.
 
-1. Keep the proven single-output native architecture. The output4 architecture
-   lane is closed for now after two negative/neutral smokes.
-2. Initialize from the current clean-native game baseline:
+The next experiment must be a move-choice/ranking proof, not another scalar
+eval calibration:
+
+1. Use the fixed replay-loss move gate as the first target suite.
+2. Preserve the current clean-native baseline:
    `native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602`.
-3. Build a deterministic source mix inside the run:
-   - 300k broad rows from native 1.6 self-play Stockfish labels.
-   - 12k replay child-position rows from `rc1-replay-fullpair-r2`.
-4. Train one low-dose Bullet continuation (`lr=1e-7 -> 3e-8`, `256`
-   superbatches).
-5. Run clean provenance and engine-static validation.
-6. First game gate is against native 1.5.0. Run a 1000-game confirm only if
-   the 256-game smoke is positive.
+3. Build or select child-ranking rows with real oracle scores for the `played`
+   and `best` children. Rows where both children have placeholder `score=0` are
+   invalid for this proof.
+4. Train or evaluate an isolated ranking signal that does not immediately
+   damage broad scalar eval behavior.
+5. Require offline `eval_move_gate.py` improvement before any SPRT:
+   candidate prefers best at least as often as baseline, fixed > regressed, and
+   both average margin deltas non-negative.
+6. Only after the offline gate passes, decide whether the signal belongs in a
+   scalar `.nn` fine-tune, a separate sidecar/ranking path, or a new
+   representation.
 
 Pass criteria for continuing a lane:
 
@@ -488,16 +506,10 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- candidate name:
-  `native-1.7.0-rc1-replaypair-lowdose-lr1e7-sb256-20260603`
-- selected branch: deterministic JSONL mix of broad native self-play labels and
-  replay child-position labels, then continue native 1.5.0
-- backend: Bullet
-- initialization: native 1.5.0 Bullet checkpoint weights, with
-  `require_clean_enyo_owned=true`
-- current cap: no new self-play or oracle scoring; reuse existing labeled rows
-- rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`, RC2, and all
-  pairwise repair nets
+- disabled on purpose. `./build.py create -c build.json` should fail until the
+  next move-choice/ranking proof is written into a reviewable config.
+- rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`,
+  `native-2.1.0-rc2`, and all scalar pairwise repair nets.
 
 Rules:
 
