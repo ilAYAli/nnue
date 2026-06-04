@@ -131,6 +131,31 @@ Current build intent:
 - Do not run another scalar replay-pair dose variant until the representation
   changes or a move-choice gate shows a concrete reason.
 
+
+2026-06-04 native 1.9.1 checkpoint-screen update:
+
+- `native-1.9.1-rc1` is not a promotion candidate. Its corrected distributed
+  4096-game confirm against `native-1.5.0-rc1` finished `1517-1571-1008`,
+  about `-4.6 Elo`, after invalid pwa-wsl disconnect-only chunks were
+  quarantined and rerun on healthy workers.
+- The 256-game smoke was positive (`+17.7 +/- 36.5 Elo`), while the longer
+  confirm was slightly negative. This points to noisy smoke plus possible
+  checkpoint overshoot rather than a clear data-lane gain.
+- Next hypothesis: screen the saved `native-1.9.1` Bullet checkpoints
+  (`64,128,192,256,320,384`) before generating new positions. If an earlier
+  checkpoint is clearly better than the final net, confirm that checkpoint;
+  otherwise close the same-architecture `native-1.9` continuation lane and move
+  to a representation/objective change.
+- Use Crucible for checkpoint screens and require actual engine+net search
+  probes on every worker before tasks start.
+- Checkpoint screen result, 256 games each versus `native-1.5.0-rc1`, no
+  fatal/disconnect markers: ck64 `-14.9 +/- 37.9`, ck128 `+5.4 +/- 36.2`,
+  ck192 `0.0 +/- 38.0`, ck256 `+5.4 +/- 36.8`, ck320 `-25.8 +/- 36.8`,
+  ck384 `-5.4 +/- 36.6`.
+- Conclusion: no checkpoint is clearly better. Close the same-architecture
+  `native-1.9` continuation lane rather than spending a long confirm on a
+  weak `+5 Elo` screen signal.
+
 2026-06-03 Crucible deploy wrapper correction:
 
 - `build.py` previously wrapped `crucible deploy ... | tee tmp` inside `if`.
