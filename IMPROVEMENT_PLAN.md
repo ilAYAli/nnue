@@ -79,78 +79,35 @@ Current clean-native lineage names:
 
 Current build intent:
 
-- The `native-2.1.0` output-only material/phase head lane is closed. It is a
-  useful diagnostic because it improved static MAE and bias, but it weakened
-  the move-choice gate and therefore is not game-test worthy.
-- The first replay-loss ranking proof was diagnostically positive but not a
-  candidate. Target-only pairwise training from `native-1.5.0-rc1` on
-  `replay_full_pairs.jsonl` improved the fixed replay-loss move gate from
-  `1139/2487` to `1401/2487`, with `fixed=810`, `regressed=548`,
-  `delta_avg_margin=+29.5cp`, and `delta_loss_weighted_margin=+23.7cp`.
-  However, broad engine-static collapsed on 2000 native 1.5 labeled rows:
-  `mae=282.46`, `sign=49.20%`, `bias=+100.82`, `corr=0.148`.
-- Next useful NNUE action: preserve or separate that ranking signal. Do not
-  SPRT the target-only proof net. The next proof must keep the move-gate gain
-  while preventing broad scalar eval collapse, either through much stronger
-  broad preservation or by keeping the ranking signal outside the scalar `.nn`
-  eval path.
-- Same-architecture self-play continuation is still incrementally useful, but
-  no longer the fastest lane: `native-1.5.1-rc1` regressed against
-  `native-1.5.0-rc1`, `native-1.6.0-rc1` failed its longer confirm, and
-  `native-1.6.1-rc1` failed when the best native 1.6 checkpoint was continued.
-- Scalar replay-pair mixing is closed for now. The only replay result with a
-  clear signal is the separable sidecar move-policy gate, not another scalar
-  `.nn` fine-tune.
-- Output-bucket preflight is complete:
-  - Enyo runtime loads legacy single-head and new multi-head `.nn` files.
-  - Python `.nn` load/write/export preserves output bucket count.
-  - Bullet trainer compiles with `--enyo-output-buckets`.
-  - A generated 4-output-bucket `.nn` loads through Enyo and `evalnet`.
-  - Startpos fixed-node NPS was within noise versus the single-head net.
-- First output-bucket game gate was negative:
-  `native-2.0.0-output4-vs-native-1.5.0-smoke256-20260603` finished
-  `-16.3 +/- 36.2 Elo`, LLR `-0.39/2.94`, LOS `18.8%`. Do not extend the
-  head-only lane.
-- `native-2.0.0-rc2` also failed to produce a promotion signal. Close the
-  output-bucket lane until the representation or source data changes.
-- Move-policy sidecar runtime preflight is complete in Enyo:
-  - `0c2598a` adds the exported `enyo.move_policy.v1` JSON loader and
-    `movepolicy` diagnostic command.
-  - `8b0426b` adds a default-off root guard behind `move_policy_file`, with a
-    static eval safety cap from `move_policy_max_eval_drop`.
-  - Engine-side checks matched Python on held-out sidecar rows, including a
-    selected row with margin `22.029897`.
-- `sidecar-rootguard-vs-native15-smoke1000-20260603` hard-rejected the
-  generic root-override deployment at 144 games:
-  `-266.9 +/- 66.1 Elo`, LLR `-2.95/2.94`, LOS `0.0%`.
-  The sidecar is not safe as a broad root move selector, even with
-  `move_policy_max_eval_drop=80`. Keep the default-off engine path only as
-  instrumentation for active learning and targeted audits.
-- Sidecar/root-search audit tooling now parses the failed SPRT PGN and compares
-  policy top moves against baseline Enyo search/eval. On the first 500
-  candidate plies, 19 choices passed the current root-guard trigger. Stockfish
-  d14 could score 13 of those pairs: 9 harmful, 1 neutral, 3 helpful. Huge
-  sidecar margins were still sometimes harmful, so raising the threshold is not
-  sufficient.
-- Current intended task: convert harmful sidecar/root-search disagreements into
-  negative hard examples or abandon the sidecar as a runtime selector. Do not
-  launch another sidecar SPRT until an oracle-confirmed trigger has a clean
-  helpful/harmful split offline.
-- Current build config is `native-3.0.0-rc1-halfka-v2hm-n19data`: a controlled
-  feature-layout probe that keeps the single scalar output head but changes the
-  input representation to `32 x 11 x 64` HalfKAv2-style mirrored king buckets
-  with merged king piece channels. It reuses native-1.9.1 SF18-labeled data and
-  initializes from the clean `native-1.5.0-rc1` baseline.
+- Current `build.json` is `native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128`.
+  It keeps the proven `16 x 12` scalar architecture and starts from
+  `native-1.5.0-rc1`.
+- Hypothesis: previous same-architecture candidates were too small, noisy, or
+  overfit. Crucible now makes a controlled larger-data test cheap enough. A
+  500k-label preflight should show whether scaling fresh clean Enyo self-play
+  with Stockfish d16 labels improves engine-side gates before spending time on
+  a full 10M-label run.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
 - Require `net_provenance.py --require-clean-enyo-owned` before static
   validation or SPRT.
+- Preflight gates:
+  - all Crucible workers must pass setup and contribute or be explicitly
+    excluded with a reason;
+  - self-play and scoring must finish with no fatal/disconnect shards;
+  - provenance must remain clean Enyo-owned;
+  - engine-static on the scored rows must not collapse versus
+    `native-1.5.0-rc1`;
+  - a 200-300 game smoke versus `native-1.5.0-rc1` must be neutral-positive.
+- If the preflight passes, update `build.json` to a full 10M scored-row run and
+  keep the same architecture/objective. If it fails, do not start the 10M run;
+  inspect whether the failure is data quality, label quality, or training
+  overshoot.
 - First promotion threshold is "not worse than Berserk", not merely "close".
-- Do not rerun a random-init candidate or another same-architecture LR/data-dose
-  variant unless the architecture, label objective, or source quality changes.
-- Do not run another scalar replay-pair dose variant until the representation
-  changes or a move-choice gate shows a concrete reason.
+- Closed lanes remain closed unless their representation or objective changes:
+  output buckets, scalar replay-pair mixing, sidecar root override, and the
+  `16 x 12` to `32 x 11` HalfKAv2-style initialization recipe.
 
 2026-06-04 native 3.0.0 HalfKAv2-style hypothesis:
 
