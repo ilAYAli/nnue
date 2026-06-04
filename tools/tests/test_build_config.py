@@ -276,6 +276,51 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_pytorch_can_train_from_existing_labeled_jsonl(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            labeled = root / "labeled.jsonl"
+            labeled.write_text("", encoding="utf-8")
+            labeled.with_suffix(".wc").write_text("0 labeled.jsonl\n", encoding="utf-8")
+            config_path = root / "config.json"
+            config_path.write_text(json.dumps({
+                "create": {
+                    "backend": "pytorch",
+                    "labeled_jsonl": str(labeled),
+                    "epochs": 1,
+                    "engine_static_rows": 10,
+                }
+            }), encoding="utf-8")
+
+            defaults = build.load_create_arg_defaults(str(config_path))
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", str(config_path), "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertEqual("pack", names[0])
+            self.assertNotIn("posgen_selfplay", names)
+            self.assertNotIn("score_merge", names)
+
+            pack = next(step for step in config["steps"] if step["name"] == "pack")
+            self.assertEqual(
+                str(labeled.resolve()),
+                pack["command"][pack["command"].index("--input") + 1],
+            )
+            self.assertEqual(
+                str(labeled.with_suffix(".wc").resolve()),
+                pack["command"][pack["command"].index("--rows-file") + 1],
+            )
+
+            engine_static = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_engine_static"
+            )
+            self.assertEqual(
+                str(labeled.resolve()),
+                engine_static["command"][engine_static["command"].index("--jsonl") + 1],
+            )
+
     def test_source_mix_feeds_bullet_training(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

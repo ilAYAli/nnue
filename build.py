@@ -154,6 +154,15 @@ def templated_source_spec_arg(value: str | Path) -> str:
     return f"{templated_path_arg(path)}:{rows}"
 
 
+def sibling_rows_file_arg(value: str | Path) -> str:
+    text = str(value)
+    if "{" in text and "}" in text:
+        return ""
+    path = expand_path(text)
+    rows_file = path.with_suffix(".wc")
+    return str(rows_file) if rows_file.exists() else ""
+
+
 def shell_join(parts: list[str]) -> str:
     return " ".join(shlex.quote(str(part)) for part in parts)
 
@@ -190,10 +199,18 @@ def validate_create_args(args: argparse.Namespace) -> None:
             raise SystemExit("source_mix_jsonl conflicts with bullet_generate_source")
         if args.score_source_jsonl:
             raise SystemExit("source_mix_jsonl conflicts with score_source_jsonl")
+        if args.labeled_jsonl:
+            raise SystemExit("source_mix_jsonl conflicts with labeled_jsonl")
         if args.bullet_data:
             raise SystemExit("source_mix_jsonl conflicts with bullet_data")
         if args.bullet_source_jsonl:
             raise SystemExit("source_mix_jsonl conflicts with bullet_source_jsonl")
+
+    if args.labeled_jsonl:
+        if args.backend != "pytorch":
+            raise SystemExit("labeled_jsonl currently requires backend=pytorch")
+        if args.score_source_jsonl:
+            raise SystemExit("labeled_jsonl conflicts with score_source_jsonl")
 
     if not (args.require_clean_enyo_owned and args.bullet_generate_source):
         return
@@ -694,20 +711,31 @@ def create_config(args: argparse.Namespace) -> dict:
     steps: list[dict] = []
 
     if args.backend == "pytorch":
-        append_source_generation_steps(steps, args)
+        if args.labeled_jsonl:
+            labeled_jsonl = templated_path_arg(args.labeled_jsonl)
+            rows_file = sibling_rows_file_arg(args.labeled_jsonl)
+            if not args.engine_static_jsonl:
+                args.engine_static_jsonl = labeled_jsonl
+        else:
+            append_source_generation_steps(steps, args)
+            labeled_jsonl = "{score}/labeled.jsonl"
+            rows_file = "{score}/labeled.wc"
+
+        pack_command = [
+            python, tool("pack/pack.py"), "build",
+            "--input", labeled_jsonl,
+            "--out-dir", "{pack}/train",
+            "--max-features", str(args.max_features),
+            "--progress", str(args.pack_progress),
+            "--python", python,
+        ]
+        if rows_file:
+            pack_command.extend(["--rows-file", rows_file])
 
         steps.extend([
             {
                 "name": "pack",
-                "command": [
-                    python, tool("pack/pack.py"), "build",
-                    "--input", "{score}/labeled.jsonl",
-                    "--out-dir", "{pack}/train",
-                    "--rows-file", "{score}/labeled.wc",
-                    "--max-features", str(args.max_features),
-                    "--progress", str(args.pack_progress),
-                    "--python", python,
-                ],
+                "command": pack_command,
             },
             {
                 "name": "train",
@@ -1080,6 +1108,8 @@ def add_create_args(
     parser.add_argument("--score-hash", type=int, default=value("score_hash", d.score_hash))
     parser.add_argument("--score-limit", type=int, default=value("score_limit", d.score_limit))
     parser.add_argument("--score-source-jsonl", default=value("score_source_jsonl", d.score_source_jsonl))
+    parser.add_argument("--labeled-jsonl", default=value("labeled_jsonl", d.labeled_jsonl),
+                        help="Pre-scored JSONL for backend=pytorch; skips source generation and scoring.")
     parser.add_argument("--score-max-abs-cp", type=int, default=value("score_max_abs_cp", d.score_max_abs_cp))
     parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
     parser.add_argument("--score-crucible", action=argparse.BooleanOptionalAction,

@@ -68,6 +68,12 @@ Current clean-native lineage names:
 
 Current build intent:
 
+- `build.json` now points at `native-2.1.0-rc1-materialhead-output-native15-lr3e6-e32-20260604`.
+  Hypothesis: adding two dense material/phase output features can fix cheap
+  phase/material scaling errors while preserving the native 1.5 feature layout.
+  This first probe initializes from `native-1.5.0-rc1`, trains only the output
+  layer, uses existing native 1.5 Stockfish-labeled data, and validates with
+  the material-head-capable Enyo candidate engine.
 - Same-architecture self-play continuation is still incrementally useful, but
   no longer the fastest lane: `native-1.5.1-rc1` regressed against
   `native-1.5.0-rc1`, `native-1.6.0-rc1` failed its longer confirm, and
@@ -594,6 +600,10 @@ Current material/phase head status:
   - A tiny PyTorch train/export smoke produced a 16-input/1-output/2-head net
     of `25203020` bytes.
   - Enyo candidate `ada4452` loaded that net and `evalnet` returned a score.
+  - Zero-expanded material/phase native 1.5 is eval-identical to legacy native
+    1.5 on sampled FENs.
+  - Candidate-engine single-thread depth-12 NPS preflight measured
+    material-head/legacy mean ratio `0.9965`.
 - Bullet does not yet train dense material/phase output-head features. Use
   `backend=pytorch` for the first architecture probe.
 
