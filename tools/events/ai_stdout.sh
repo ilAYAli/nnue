@@ -7,7 +7,7 @@ set -euo pipefail
 
 URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
 TITLE=${NNUE_AI_STDOUT_TITLE:-Enyo NNUE agent}
-PRIORITY=${NNUE_AI_STDOUT_PRIORITY:-3}
+PRIORITY=${NNUE_AI_STDOUT_PRIORITY:-4}
 DRY_RUN=${NNUE_AI_STDOUT_DRY_RUN:-0}
 
 if [ "$#" -gt 0 ]; then
