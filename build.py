@@ -336,7 +336,7 @@ def append_crucible_score_steps(
     plan_command = [
         crucible_python, crucible, "plan",
         "--name", "score-{candidate}",
-        "--kind", "score",
+        "--kind", "label",
         "--description", "NNUE source scoring",
         "--task-label", "score:uci",
         "--shards", str(args.score_shards),

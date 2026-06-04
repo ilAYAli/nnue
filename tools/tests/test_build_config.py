@@ -374,7 +374,7 @@ class BuildConfigTests(unittest.TestCase):
                 if step["name"] == "score_crucible_plan"
             )
             self.assertEqual("/coord/python", plan["command"][0])
-            self.assertEqual("score", plan["command"][plan["command"].index("--kind") + 1])
+            self.assertEqual("label", plan["command"][plan["command"].index("--kind") + 1])
             self.assertEqual(
                 "score:uci",
                 plan["command"][plan["command"].index("--task-label") + 1],
