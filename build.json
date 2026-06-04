@@ -1,8 +1,8 @@
 {
-  "description": "Native 2.1.0 material/phase output-head probe: initialize from native 1.5.0, add two dense output-head features, train only the output layer on existing native 1.5 labeled data, and validate with the material-head-capable Enyo candidate.",
+  "description": "Native 2.1.0 rc2 material/phase output-head probe: initialize from native 1.5.0, add two dense output-head features, train only the output layer on existing native 1.5 labeled data with calibrated LR 0.1, and validate with the material-head-capable Enyo candidate.",
   "experiment": "native-2.1.0-material-phase-head-output-probe",
   "create": {
-    "name": "native-2.1.0-rc1-materialhead-output-native15-lr3e6-e32-20260604",
+    "name": "native-2.1.0-rc2-materialhead-output-native15-lr1e1-e24-20260604",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "python": "~/.venv/bin/python",
     "backend": "pytorch",
@@ -14,8 +14,8 @@
     "target_clamp": 800,
     "huber_beta": 200,
     "wdl_lambda": 0.75,
-    "lr": 3e-06,
-    "epochs": 32,
+    "lr": 0.1,
+    "epochs": 24,
     "batch_size": 16384,
     "device": "cuda",
     "workers": 4,
@@ -24,7 +24,7 @@
     "torch_compile": false,
     "dataset_in_memory": true,
     "val_rows": 100000,
-    "patience": 5,
+    "patience": 6,
     "select_metric": "mae",
     "weight_decay": 0.0,
     "max_features": 32,
@@ -37,6 +37,6 @@
   "validation": {
     "baseline": "native-1.5.0-rc1",
     "promotion_gate": "First gate is engine-static plus move-choice failure replay. If those are neutral-positive, run a 256-game Crucible-distributed smoke versus native-1.5.0 before any 1000+ game confirm.",
-    "reason": "The zero-expanded material/phase head is eval-identical to native-1.5.0 and measured at 0.9965x legacy NPS in candidate-engine fixed-depth preflight. This probe tests whether two cheap dense output features can correct phase/material scaling without changing the feature layout or regenerating data."
+    "reason": "The zero-expanded material/phase head is eval-identical to native-1.5.0 and measured at 0.9965x legacy NPS in candidate-engine fixed-depth preflight. rc1 used lr=3e-6 and was effectively a no-op; a short output-only LR calibration found lr=0.1 produced the best held-out static signal. This probe tests whether two cheap dense output features can correct phase/material scaling without changing the feature layout or regenerating data."
   }
 }

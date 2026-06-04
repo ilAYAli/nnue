@@ -68,7 +68,7 @@ Current clean-native lineage names:
 
 Current build intent:
 
-- `build.json` now points at `native-2.1.0-rc1-materialhead-output-native15-lr3e6-e32-20260604`.
+- `build.json` now points at `native-2.1.0-rc2-materialhead-output-native15-lr1e1-e24-20260604`.
   Hypothesis: adding two dense material/phase output features can fix cheap
   phase/material scaling errors while preserving the native 1.5 feature layout.
   This first probe initializes from `native-1.5.0-rc1`, trains only the output
@@ -606,6 +606,15 @@ Current material/phase head status:
     material-head/legacy mean ratio `0.9965`.
 - Bullet does not yet train dense material/phase output-head features. Use
   `backend=pytorch` for the first architecture probe.
+- `native-2.1.0-rc1` completed cleanly but was effectively a no-op:
+  `lr=3e-6` only moved the new output-head weights to about `0.0005`, and
+  engine-static metrics were identical to native 1.5 on the same 2000 rows.
+- A short output-only LR calibration on the same packed data found:
+  - `lr=1e-3`: held-out MAE `125.97`.
+  - `lr=1e-2`: held-out MAE `125.22`.
+  - `lr=1e-1`: held-out MAE `124.92`, and engine-static 2000-row MAE
+    `125.915` versus native 1.5/rc1 `127.059`.
+  `native-2.1.0-rc2` therefore uses `lr=0.1`.
 
 If this architecture branch fails gates or SPRT:
 
