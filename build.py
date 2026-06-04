@@ -194,6 +194,17 @@ def validate_create_args(args: argparse.Namespace) -> None:
         if args.score_crucible_local_slots < 0:
             raise SystemExit("score_crucible_local_slots must be >= 0")
 
+    if args.bullet_init_net and args.bullet_init_weights:
+        raise SystemExit("bullet_init_net conflicts with bullet_init_weights")
+    if args.bullet_enyo_feature_channels == 11 and (
+        args.bullet_enyo_input_buckets != 32
+        or args.bullet_enyo_runtime_input_buckets != 32
+    ):
+        raise SystemExit(
+            "bullet_enyo_feature_channels=11 requires "
+            "bullet_enyo_input_buckets=32 and "
+            "bullet_enyo_runtime_input_buckets=32")
+
     if args.source_mix_jsonl:
         if args.bullet_generate_source:
             raise SystemExit("source_mix_jsonl conflicts with bullet_generate_source")
@@ -868,6 +879,22 @@ def create_config(args: argparse.Namespace) -> dict:
         if args.bullet_loader == "direct":
             bullet_loader = "direct"
 
+        if args.bullet_init_net:
+            args.bullet_init_weights = "{assets}/init/optimiser_state/weights.bin"
+            steps.append({
+                "name": "bullet_init_weights",
+                "command": [
+                    python, tool("bullet/enyo_nn_to_bullet_weights.py"),
+                    "--input", str(expand_path(args.bullet_init_net)),
+                    "--output", args.bullet_init_weights,
+                    "--eval-scale", str(args.bullet_eval_scale),
+                    "--l1-export-scale", str(args.bullet_enyo_l1_export_scale),
+                    "--input-buckets", str(args.bullet_enyo_input_buckets),
+                    "--feature-channels", str(args.bullet_enyo_feature_channels),
+                    "--output-buckets", str(args.bullet_enyo_output_buckets),
+                ],
+            })
+
         steps.append({
             "name": "bullet_train",
             "command": [
@@ -907,13 +934,14 @@ def create_config(args: argparse.Namespace) -> dict:
                     else "--no-enyo-input-factorizer"
                 ),
                 "--enyo-input-buckets", str(args.bullet_enyo_input_buckets),
+                "--enyo-feature-channels", str(args.bullet_enyo_feature_channels),
                 "--enyo-runtime-input-buckets",
                 str(args.bullet_enyo_runtime_input_buckets),
                 "--enyo-output-buckets", str(args.bullet_enyo_output_buckets),
                 "--eval-scale", str(args.bullet_eval_scale),
                 "--save-rate", str(args.bullet_save_rate),
                 *(
-                    ["--init-weights", str(expand_path(args.bullet_init_weights))]
+                    ["--init-weights", templated_path_arg(args.bullet_init_weights)]
                     if args.bullet_init_weights else []
                 ),
                 "--trainable", args.bullet_trainable,
@@ -1216,6 +1244,9 @@ def add_create_args(
     parser.add_argument("--bullet-enyo-input-buckets", type=int,
                         default=value("bullet_enyo_input_buckets", d.bullet_enyo_input_buckets),
                         choices=[1, 2, 4, 8, 16, 32])
+    parser.add_argument("--bullet-enyo-feature-channels", type=int,
+                        default=value("bullet_enyo_feature_channels", d.bullet_enyo_feature_channels),
+                        choices=[11, 12])
     parser.add_argument("--bullet-enyo-runtime-input-buckets", type=int,
                         default=value("bullet_enyo_runtime_input_buckets", d.bullet_enyo_runtime_input_buckets),
                         choices=[1, 2, 4, 8, 16, 32])
@@ -1225,6 +1256,7 @@ def add_create_args(
     parser.add_argument("--bullet-eval-scale", type=float, default=value("bullet_eval_scale", d.bullet_eval_scale))
     parser.add_argument("--bullet-save-rate", type=int, default=value("bullet_save_rate", d.bullet_save_rate))
     parser.add_argument("--bullet-init-weights", default=value("bullet_init_weights", d.bullet_init_weights))
+    parser.add_argument("--bullet-init-net", default=value("bullet_init_net", d.bullet_init_net))
     parser.add_argument("--bullet-trainable", default=value("bullet_trainable", d.bullet_trainable),
                         choices=["all", "input", "float-head", "output"])
     parser.add_argument("--bullet-weight-decay", type=float, default=value("bullet_weight_decay", d.bullet_weight_decay))

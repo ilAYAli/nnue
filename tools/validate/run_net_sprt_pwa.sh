@@ -31,8 +31,8 @@ N_L2 = 16
 N_L3 = 32
 N_OUTPUT = 1
 
-def network_size(input_buckets, output_buckets):
-    features = input_buckets * N_PIECE_TYPES * N_SQUARES
+def network_size(input_buckets, feature_channels, output_buckets):
+    features = input_buckets * feature_channels * N_SQUARES
     return (
         features * N_HIDDEN * 2
         + N_HIDDEN * 2
@@ -45,10 +45,10 @@ def network_size(input_buckets, output_buckets):
     )
 
 size = os.path.getsize(sys.argv[1])
-for input_buckets in (16, 32):
+for input_buckets, feature_channels in ((16, 12), (32, 12), (32, 11)):
     for output_buckets in (1, 2, 4, 8):
-        if size == network_size(input_buckets, output_buckets):
-            print(f"{input_buckets}-input/{output_buckets}-output-bucket")
+        if size == network_size(input_buckets, feature_channels, output_buckets):
+            print(f"{input_buckets}-input/{feature_channels}-channel/{output_buckets}-output-bucket")
             raise SystemExit(0)
 raise SystemExit(1)
 PY

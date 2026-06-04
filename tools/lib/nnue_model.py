@@ -14,14 +14,17 @@ from . import enyo_nnue as nn2
 class EnyoNNUE(nn_pt.Module):
     def __init__(self, init: str = "kaiming",
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
+                 feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
                  output_buckets: int = nn2.DEFAULT_N_OUTPUT_BUCKETS,
                  output_head_features: int = nn2.DEFAULT_N_OUTPUT_HEAD_FEATURES):
         super().__init__()
         self.input_buckets = input_buckets
+        self.feature_channels = feature_channels
         self.output_buckets = output_buckets
         self.output_head_features = output_head_features
         self.embed = nn_pt.EmbeddingBag(
-            nn2.feature_count(input_buckets), nn2.N_HIDDEN, mode="sum")
+            nn2.feature_count(input_buckets, feature_channels), nn2.N_HIDDEN,
+            mode="sum")
         self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
         self.l1_weight = nn_pt.Parameter(torch.zeros(nn2.N_L2, nn2.N_L1))
         self.l1_bias = nn_pt.Parameter(torch.zeros(nn2.N_L2))
@@ -154,6 +157,7 @@ def load_model_from_nn(
     model = EnyoNNUE(
         init="kaiming",
         input_buckets=net.input_buckets,
+        feature_channels=net.feature_channels,
         output_buckets=net.output_buckets,
         output_head_features=output_head_features)
     with torch.no_grad():
@@ -212,6 +216,7 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         output_weights=m.output.weight.detach().numpy().astype(np.float32),
         output_biases=m.output.bias.detach().numpy().astype(np.float32),
         input_buckets=m.input_buckets,
+        feature_channels=m.feature_channels,
         output_buckets=m.output_buckets,
         output_head_features=m.output_head_features,
     )

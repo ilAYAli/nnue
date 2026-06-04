@@ -17,6 +17,9 @@ PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6
 
 DEFAULT_N_KING_BUCKETS = 16
 SUPPORTED_N_KING_BUCKETS = (16, 32)
+DEFAULT_N_FEATURE_CHANNELS = 12
+HALFKA_V2_FEATURE_CHANNELS = 11
+SUPPORTED_N_FEATURE_LAYOUTS = ((16, 12), (32, 12), (32, 11))
 DEFAULT_N_OUTPUT_BUCKETS = 1
 SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
 DEFAULT_N_OUTPUT_HEAD_FEATURES = 0
@@ -36,18 +39,24 @@ LEGACY_N_FEATURES = N_FEATURES
 QUANT1_BITS = 5
 EVAL_DIVISOR = 32.0
 
-def feature_count(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> int:
-    if input_buckets not in SUPPORTED_N_KING_BUCKETS:
-        raise ValueError(f"unsupported input bucket count {input_buckets}")
-    return input_buckets * N_PIECE_TYPES * N_SQUARES
+def feature_count(
+    input_buckets: int = DEFAULT_N_KING_BUCKETS,
+    feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
+) -> int:
+    if (input_buckets, feature_channels) not in SUPPORTED_N_FEATURE_LAYOUTS:
+        raise ValueError(
+            "unsupported feature layout "
+            f"{input_buckets} input buckets / {feature_channels} channels")
+    return input_buckets * feature_channels * N_SQUARES
 
 
 def network_size(
     input_buckets: int = DEFAULT_N_KING_BUCKETS,
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS,
     output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES,
+    feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
 ) -> int:
-    features = feature_count(input_buckets)
+    features = feature_count(input_buckets, feature_channels)
     if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {output_buckets}")
     if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
@@ -102,17 +111,23 @@ def king_buckets(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> tuple[int, ...]
     raise ValueError(f"unsupported input bucket count {input_buckets}")
 
 
-def detect_network_layout(size: int) -> tuple[int, int, int]:
-    for input_buckets in SUPPORTED_N_KING_BUCKETS:
+def detect_network_layout(size: int) -> tuple[int, int, int, int]:
+    for input_buckets, feature_channels in SUPPORTED_N_FEATURE_LAYOUTS:
         for output_buckets in SUPPORTED_N_OUTPUT_BUCKETS:
             for output_head_features in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
                 if size == network_size(
-                    input_buckets, output_buckets, output_head_features
+                    input_buckets, output_buckets, output_head_features,
+                    feature_channels
                 ):
-                    return input_buckets, output_buckets, output_head_features
+                    return (
+                        input_buckets,
+                        feature_channels,
+                        output_buckets,
+                        output_head_features)
     expected = ", ".join(
-        f"{network_size(i, o, h)} ({i} input, {o} output, {h} head)"
-        for i in SUPPORTED_N_KING_BUCKETS
+        f"{network_size(i, o, h, c)} "
+        f"({i} input, {c} channels, {o} output, {h} head)"
+        for i, c in SUPPORTED_N_FEATURE_LAYOUTS
         for o in SUPPORTED_N_OUTPUT_BUCKETS
         for h in SUPPORTED_N_OUTPUT_HEAD_FEATURES)
     raise ValueError(f"size {size} does not match supported net sizes: {expected}")
@@ -122,12 +137,27 @@ def detect_input_buckets(size: int) -> int:
     return detect_network_layout(size)[0]
 
 
-def detect_output_buckets(size: int) -> int:
+def detect_feature_channels(size: int) -> int:
     return detect_network_layout(size)[1]
 
 
-def detect_output_head_features(size: int) -> int:
+def detect_output_buckets(size: int) -> int:
     return detect_network_layout(size)[2]
+
+
+def detect_output_head_features(size: int) -> int:
+    return detect_network_layout(size)[3]
+
+
+def detect_feature_layout_from_count(feature_count_value: int) -> tuple[int, int]:
+    for input_buckets, feature_channels in SUPPORTED_N_FEATURE_LAYOUTS:
+        if feature_count(input_buckets, feature_channels) == feature_count_value:
+            return input_buckets, feature_channels
+    expected = ", ".join(
+        f"{feature_count(i, c)} ({i} input, {c} channels)"
+        for i, c in SUPPORTED_N_FEATURE_LAYOUTS)
+    raise ValueError(
+        f"feature count {feature_count_value} does not match supported layouts: {expected}")
 
 _FEN_PIECE = {
     "p": PAWN,
@@ -150,6 +180,7 @@ class Net:
     output_weights: np.ndarray  # (output_buckets, N_L3 + output_head_features) float32
     output_biases: np.ndarray   # (output_buckets,) float32
     input_buckets: int = DEFAULT_N_KING_BUCKETS
+    feature_channels: int = DEFAULT_N_FEATURE_CHANNELS
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS
     output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES
 
@@ -166,21 +197,38 @@ def to_berserk_sq(enyo_sq: int) -> int:
     return enyo_sq ^ 63
 
 
+def feature_channel(
+    piece_type: int,
+    piece_color: int,
+    view: int,
+    feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
+) -> int:
+    piece = ((piece_type - 1) << 1) | piece_color
+    if feature_channels == HALFKA_V2_FEATURE_CHANNELS:
+        zero_based_type = piece_type - 1
+        if zero_based_type == 5:
+            return 10
+        return 5 * ((piece ^ view) & 0x1) + zero_based_type
+    if feature_channels == DEFAULT_N_FEATURE_CHANNELS:
+        return 6 * ((piece ^ view) & 0x1) + (piece >> 1)
+    raise ValueError(f"unsupported feature channel count {feature_channels}")
+
+
 def feature_index(piece_type: int, piece_color: int, enyo_sq: int,
                   enyo_kingsq: int, view: int,
-                  input_buckets: int = DEFAULT_N_KING_BUCKETS) -> int:
+                  input_buckets: int = DEFAULT_N_KING_BUCKETS,
+                  feature_channels: int = DEFAULT_N_FEATURE_CHANNELS) -> int:
     if piece_type == 0:
         return 0
 
-    piece = ((piece_type - 1) << 1) | piece_color
     sq = to_berserk_sq(enyo_sq)
     kingsq = to_berserk_sq(enyo_kingsq)
 
-    op = 6 * ((piece ^ view) & 0x1) + (piece >> 1)
+    op = feature_channel(piece_type, piece_color, view, feature_channels)
     ok = (7 * (0 if (kingsq & 4) else 1)) ^ (56 * view) ^ kingsq
     osq = (7 * (0 if (kingsq & 4) else 1)) ^ (56 * view) ^ sq
 
-    return king_buckets(input_buckets)[ok] * 12 * 64 + op * 64 + osq
+    return king_buckets(input_buckets)[ok] * feature_channels * 64 + op * 64 + osq
 
 
 def parse_fen(fen: str) -> tuple[list[tuple[int, int, int]], int]:
@@ -209,10 +257,11 @@ def parse_fen(fen: str) -> tuple[list[tuple[int, int, int]], int]:
 
 def features_from_pieces(pieces: Sequence[tuple[int, int, int]],
                          view: int,
-                         input_buckets: int = DEFAULT_N_KING_BUCKETS) -> list[int]:
+                         input_buckets: int = DEFAULT_N_KING_BUCKETS,
+                         feature_channels: int = DEFAULT_N_FEATURE_CHANNELS) -> list[int]:
     king_sq = next(sq for pt, color, sq in pieces
                    if pt == KING and color == view)
-    return [feature_index(pt, color, sq, king_sq, view, input_buckets)
+    return [feature_index(pt, color, sq, king_sq, view, input_buckets, feature_channels)
             for pt, color, sq in pieces]
 
 
@@ -254,11 +303,11 @@ def material_head_features_from_pieces(
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
     try:
-        input_buckets, output_buckets, output_head_features = detect_network_layout(
+        input_buckets, feature_channels, output_buckets, output_head_features = detect_network_layout(
             len(data))
     except ValueError as exc:
         raise ValueError(f"{path}: {exc}") from exc
-    n_features = feature_count(input_buckets)
+    n_features = feature_count(input_buckets, feature_channels)
     output_width = N_L3 + output_head_features
 
     off = 0
@@ -280,16 +329,26 @@ def load_net(path: str | Path) -> Net:
     ob = take(np.float32, output_buckets)
     assert off == len(data)
     return Net(
-        iw, ib, l1w, l1b, l2w, l2b, ow, ob, input_buckets, output_buckets,
-        output_head_features)
+        input_weights=iw,
+        input_biases=ib,
+        l1_weights=l1w,
+        l1_biases=l1b,
+        l2_weights=l2w,
+        l2_biases=l2b,
+        output_weights=ow,
+        output_biases=ob,
+        input_buckets=input_buckets,
+        feature_channels=feature_channels,
+        output_buckets=output_buckets,
+        output_head_features=output_head_features)
 
 
 def write_net(net: Net, path: str | Path) -> None:
-    expected_features = feature_count(net.input_buckets)
+    expected_features = feature_count(net.input_buckets, net.feature_channels)
     if net.input_weights.shape != (expected_features, N_HIDDEN):
         raise ValueError(
             f"input_weights shape {net.input_weights.shape} does not match "
-            f"{net.input_buckets} buckets")
+            f"{net.input_buckets} buckets / {net.feature_channels} channels")
     if net.output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {net.output_buckets}")
     if net.output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
@@ -321,6 +380,7 @@ def write_net(net: Net, path: str | Path) -> None:
         f.write(output_biases.tobytes(order="C"))
     size = out.stat().st_size
     expected = network_size(
-        net.input_buckets, net.output_buckets, net.output_head_features)
+        net.input_buckets, net.output_buckets, net.output_head_features,
+        net.feature_channels)
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")

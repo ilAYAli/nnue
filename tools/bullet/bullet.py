@@ -11,6 +11,8 @@ import sys
 
 ENYO_DEFAULT_INPUT_BUCKETS = 16
 ENYO_SUPPORTED_INPUT_BUCKETS = (1, 2, 4, 8, 16, 32)
+ENYO_DEFAULT_FEATURE_CHANNELS = 12
+ENYO_SUPPORTED_FEATURE_CHANNELS = (11, 12)
 ENYO_DEFAULT_OUTPUT_BUCKETS = 1
 ENYO_SUPPORTED_OUTPUT_BUCKETS = (1, 2, 4, 8)
 ENYO_PIECE_TYPES = 12
@@ -23,12 +25,13 @@ ENYO_L3 = 32
 def enyo_network_size(
     input_buckets: int = ENYO_DEFAULT_INPUT_BUCKETS,
     *,
+    feature_channels: int = ENYO_DEFAULT_FEATURE_CHANNELS,
     output_buckets: int = ENYO_DEFAULT_OUTPUT_BUCKETS,
     hidden: int = ENYO_HIDDEN,
     l2: int = ENYO_L2,
     l3: int = ENYO_L3,
 ) -> int:
-    features = input_buckets * ENYO_PIECE_TYPES * ENYO_SQUARES
+    features = input_buckets * feature_channels * ENYO_SQUARES
     l1 = 2 * hidden
     return (
         features * hidden * 2
@@ -57,6 +60,7 @@ def trim_bullet_checkpoint(
     raw: bytes,
     input_buckets: int,
     *,
+    feature_channels: int = ENYO_DEFAULT_FEATURE_CHANNELS,
     output_buckets: int = ENYO_DEFAULT_OUTPUT_BUCKETS,
     hidden: int = ENYO_HIDDEN,
     l2: int = ENYO_L2,
@@ -64,6 +68,7 @@ def trim_bullet_checkpoint(
 ) -> bytes:
     network_size = enyo_network_size(
         input_buckets,
+        feature_channels=feature_channels,
         output_buckets=output_buckets,
         hidden=hidden,
         l2=l2,
@@ -110,6 +115,7 @@ def expand_enyo_input_buckets(
     raw: bytes,
     input_buckets: int,
     *,
+    feature_channels: int = ENYO_DEFAULT_FEATURE_CHANNELS,
     runtime_input_buckets: int = ENYO_DEFAULT_INPUT_BUCKETS,
     output_buckets: int = ENYO_DEFAULT_OUTPUT_BUCKETS,
     hidden: int = ENYO_HIDDEN,
@@ -119,6 +125,7 @@ def expand_enyo_input_buckets(
     raw = trim_bullet_checkpoint(
         raw,
         input_buckets,
+        feature_channels=feature_channels,
         output_buckets=output_buckets,
         hidden=hidden,
         l2=l2,
@@ -126,8 +133,9 @@ def expand_enyo_input_buckets(
     if input_buckets == runtime_input_buckets:
         return raw
 
-    source_features = input_buckets * ENYO_FEATURE_STRIDE
-    target_features = runtime_input_buckets * ENYO_FEATURE_STRIDE
+    feature_stride = feature_channels * ENYO_SQUARES
+    source_features = input_buckets * feature_stride
+    target_features = runtime_input_buckets * feature_stride
     feature_bytes = hidden * 2
     source_l0_bytes = source_features * feature_bytes
     target_l0_bytes = target_features * feature_bytes
@@ -140,9 +148,9 @@ def expand_enyo_input_buckets(
             input_buckets,
             runtime_input_buckets=runtime_input_buckets,
         )
-        for offset in range(ENYO_FEATURE_STRIDE):
-            source_feature = source_bucket * ENYO_FEATURE_STRIDE + offset
-            target_feature = target_bucket * ENYO_FEATURE_STRIDE + offset
+        for offset in range(feature_stride):
+            source_feature = source_bucket * feature_stride + offset
+            target_feature = target_bucket * feature_stride + offset
             source_start = source_feature * feature_bytes
             target_start = target_feature * feature_bytes
             expanded[target_start:target_start + feature_bytes] = raw[
@@ -381,6 +389,13 @@ def cmd_train(args: argparse.Namespace) -> int:
     manifest = repo_root() / "tools" / "bullet" / "spike_trainer" / "Cargo.toml"
     out_dir.mkdir(parents=True, exist_ok=True)
     target_dir.mkdir(parents=True, exist_ok=True)
+    if args.enyo_feature_channels == 11 and (
+        args.enyo_input_buckets != 32 or args.enyo_runtime_input_buckets != 32
+    ):
+        raise SystemExit(
+            "11-channel HalfKAv2-style Enyo layout requires "
+            "--enyo-input-buckets 32 and --enyo-runtime-input-buckets 32"
+        )
 
     env = os.environ.copy()
     env.update({
@@ -408,6 +423,7 @@ def cmd_train(args: argparse.Namespace) -> int:
         "ENYO_BULLET_ENYO_L1_EXPORT_SCALE": str(args.enyo_l1_export_scale),
         "ENYO_BULLET_ENYO_INPUT_FACTORISER": "1" if args.enyo_input_factorizer else "0",
         "ENYO_BULLET_ENYO_INPUT_BUCKETS": str(args.enyo_input_buckets),
+        "ENYO_BULLET_ENYO_FEATURE_CHANNELS": str(args.enyo_feature_channels),
         "ENYO_BULLET_ENYO_RUNTIME_INPUT_BUCKETS": str(args.enyo_runtime_input_buckets),
         "ENYO_BULLET_ENYO_OUTPUT_BUCKETS": str(args.enyo_output_buckets),
         "ENYO_BULLET_EVAL_SCALE": str(args.eval_scale),
@@ -447,6 +463,7 @@ def cmd_train(args: argparse.Namespace) -> int:
         raw = expand_enyo_input_buckets(
             checkpoints[-1].read_bytes(),
             args.enyo_input_buckets,
+            feature_channels=args.enyo_feature_channels,
             runtime_input_buckets=args.enyo_runtime_input_buckets,
             output_buckets=args.enyo_output_buckets,
             hidden=args.hidden,
@@ -511,6 +528,13 @@ def build_parser() -> argparse.ArgumentParser:
         choices=list(ENYO_SUPPORTED_INPUT_BUCKETS),
         default=ENYO_DEFAULT_INPUT_BUCKETS,
         help="Enyo training input king buckets.",
+    )
+    train.add_argument(
+        "--enyo-feature-channels",
+        type=int,
+        choices=list(ENYO_SUPPORTED_FEATURE_CHANNELS),
+        default=ENYO_DEFAULT_FEATURE_CHANNELS,
+        help="Enyo feature channels: 12 legacy, 11 HalfKAv2-style merged kings.",
     )
     train.add_argument(
         "--enyo-runtime-input-buckets",

@@ -372,6 +372,53 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_bullet_init_net_converts_to_layout_weights(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_source_jsonl": "/runs/source/labeled.jsonl",
+                    "bullet_init_net": "/runs/native15/train/model.nn",
+                    "bullet_enyo_input_buckets": 32,
+                    "bullet_enyo_feature_channels": 11,
+                    "bullet_enyo_runtime_input_buckets": 32,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertLess(names.index("bullet_init_weights"), names.index("bullet_train"))
+            init_step = next(
+                step for step in config["steps"]
+                if step["name"] == "bullet_init_weights"
+            )
+            self.assertIn("--feature-channels", init_step["command"])
+            self.assertEqual(
+                "11",
+                init_step["command"][init_step["command"].index("--feature-channels") + 1],
+            )
+            train = next(
+                step for step in config["steps"] if step["name"] == "bullet_train"
+            )
+            self.assertIn("--enyo-feature-channels", train["command"])
+            self.assertEqual(
+                "11",
+                train["command"][train["command"].index("--enyo-feature-channels") + 1],
+            )
+            self.assertIn("--init-weights", train["command"])
+            self.assertEqual(
+                "{assets}/init/optimiser_state/weights.bin",
+                train["command"][train["command"].index("--init-weights") + 1],
+            )
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_crucible_score_plan_feeds_bullet_training(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

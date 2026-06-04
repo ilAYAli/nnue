@@ -143,11 +143,13 @@ class CandidateDefaults:
     bullet_enyo_l1_export_scale: float = 1.0
     bullet_enyo_input_factorizer: bool = False
     bullet_enyo_input_buckets: int = 16
+    bullet_enyo_feature_channels: int = 12
     bullet_enyo_runtime_input_buckets: int = 16
     bullet_enyo_output_buckets: int = 1
     bullet_eval_scale: float = 400.0
     bullet_save_rate: int = 64
     bullet_init_weights: str = ""
+    bullet_init_net: str = ""
     bullet_trainable: str = "all"
     bullet_weight_decay: float = 0.0
     bullet_export_init_only: bool = False

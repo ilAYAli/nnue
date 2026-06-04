@@ -8,6 +8,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from lib import enyo_nnue as nn2
 from lib.nnue_model import EnyoNNUE, export_model
 
 
@@ -19,12 +20,13 @@ def main() -> None:
 
     state = torch.load(args.state, map_location="cpu")
     input_features = int(state["embed.weight"].shape[0])
-    input_buckets = input_features // (12 * 64)
+    input_buckets, feature_channels = nn2.detect_feature_layout_from_count(input_features)
     output_buckets = int(state["output.weight"].shape[0])
     output_width = int(state["output.weight"].shape[1])
     output_head_features = output_width - 32
     model = EnyoNNUE(
         input_buckets=input_buckets,
+        feature_channels=feature_channels,
         output_buckets=output_buckets,
         output_head_features=output_head_features,
     )

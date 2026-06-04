@@ -97,7 +97,7 @@ fn maybe_frozen<'a, T>(builder: &'a ModelBuilder, frozen: bool, mut f: impl FnMu
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct EnyoInputs<const INPUT_BUCKETS: usize>;
+struct EnyoInputs<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize>;
 
 #[rustfmt::skip]
 const ENYO_KING_BUCKETS_16: [usize; 64] = [
@@ -131,7 +131,7 @@ fn enyo_bucket<const INPUT_BUCKETS: usize>(oriented_king_square: usize) -> usize
     }
 }
 
-fn enyo_feature<const INPUT_BUCKETS: usize>(
+fn enyo_feature<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize>(
     piece: u8,
     sq_berserk: u8,
     king_berserk: u8,
@@ -144,17 +144,29 @@ fn enyo_feature<const INPUT_BUCKETS: usize>(
     let sq = usize::from(sq_berserk);
     let flip = 7 * usize::from((king & 4) == 0);
     let orient = flip ^ (56 * view);
-    let op = 6 * ((piece_code ^ view) & 1) + (piece_code >> 1);
+    let op = match FEATURE_CHANNELS {
+        11 => {
+            if piece_type == 5 {
+                10
+            } else {
+                5 * ((piece_code ^ view) & 1) + piece_type
+            }
+        }
+        12 => 6 * ((piece_code ^ view) & 1) + (piece_code >> 1),
+        _ => panic!("unsupported Enyo feature channel count: {FEATURE_CHANNELS}"),
+    };
     let ok = orient ^ king;
     let osq = orient ^ sq;
-    enyo_bucket::<INPUT_BUCKETS>(ok) * 12 * 64 + op * 64 + osq
+    enyo_bucket::<INPUT_BUCKETS>(ok) * FEATURE_CHANNELS * 64 + op * 64 + osq
 }
 
-impl<const INPUT_BUCKETS: usize> SparseInputType for EnyoInputs<INPUT_BUCKETS> {
+impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize> SparseInputType
+    for EnyoInputs<INPUT_BUCKETS, FEATURE_CHANNELS>
+{
     type RequiredDataType = ChessBoard;
 
     fn num_inputs(&self) -> usize {
-        INPUT_BUCKETS * 12 * 64
+        INPUT_BUCKETS * FEATURE_CHANNELS * 64
     }
 
     fn max_active(&self) -> usize {
@@ -167,23 +179,23 @@ impl<const INPUT_BUCKETS: usize> SparseInputType for EnyoInputs<INPUT_BUCKETS> {
         for (piece, square) in pos.into_iter() {
             let sq = square ^ 56;
             f(
-                enyo_feature::<INPUT_BUCKETS>(piece, sq, stm_king, 0),
-                enyo_feature::<INPUT_BUCKETS>(piece, sq, ntm_king, 1),
+                enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, stm_king, 0),
+                enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, ntm_king, 1),
             );
         }
     }
 
     fn shorthand(&self) -> String {
-        format!("enyo-{INPUT_BUCKETS}kb")
+        format!("enyo-{INPUT_BUCKETS}kb-{FEATURE_CHANNELS}ch")
     }
 
     fn description(&self) -> String {
-        format!("Enyo {INPUT_BUCKETS}-king-bucket exported NNUE inputs")
+        format!("Enyo {INPUT_BUCKETS}-king-bucket {FEATURE_CHANNELS}-channel exported NNUE inputs")
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn train_enyo<const INPUT_BUCKETS: usize, const OUTPUT_BUCKETS: usize>(
+fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const OUTPUT_BUCKETS: usize>(
     dataset: String,
     output: String,
     net_id: String,
@@ -214,6 +226,12 @@ fn train_enyo<const INPUT_BUCKETS: usize, const OUTPUT_BUCKETS: usize>(
     if !matches!(INPUT_BUCKETS, 1 | 2 | 4 | 8 | 16 | 32) {
         panic!("Enyo mode supports only 1, 2, 4, 8, 16, or 32 input king buckets");
     }
+    if !matches!(FEATURE_CHANNELS, 11 | 12) {
+        panic!("Enyo mode supports only 11 or 12 feature channels");
+    }
+    if FEATURE_CHANNELS == 11 && INPUT_BUCKETS != 32 {
+        panic!("11-channel Enyo mode requires 32 input king buckets");
+    }
     if !matches!(OUTPUT_BUCKETS, 1 | 2 | 4 | 8) {
         panic!("Enyo mode supports only 1, 2, 4, or 8 output buckets");
     }
@@ -224,6 +242,7 @@ fn train_enyo<const INPUT_BUCKETS: usize, const OUTPUT_BUCKETS: usize>(
     println!("net_id={net_id}");
     println!("hidden={hidden} l2={l2_size}");
     println!("enyo_input_buckets={INPUT_BUCKETS}");
+    println!("enyo_feature_channels={FEATURE_CHANNELS}");
     println!("enyo_output_buckets={OUTPUT_BUCKETS}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
@@ -269,7 +288,7 @@ fn train_enyo<const INPUT_BUCKETS: usize, const OUTPUT_BUCKETS: usize>(
             ValueTrainerBuilder::default()
                 .dual_perspective()
                 .optimiser(AdamW)
-                .inputs(EnyoInputs::<INPUT_BUCKETS>)
+                .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS>)
                 .save_format(&[
                     l0w_format!(),
                     SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -302,11 +321,11 @@ fn train_enyo<const INPUT_BUCKETS: usize, const OUTPUT_BUCKETS: usize>(
     macro_rules! enyo_forward {
         ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr) => {{
             let mut l0 = maybe_frozen($builder, !train_input, || {
-                enyo_affine($builder, "l0", INPUT_BUCKETS * 12 * 64, hidden, l0_stdev)
+                enyo_affine($builder, "l0", INPUT_BUCKETS * FEATURE_CHANNELS * 64, hidden, l0_stdev)
             });
             if input_factoriser {
                 let l0f = maybe_frozen($builder, !train_input, || {
-                    $builder.new_weights("l0f", Shape::new(hidden, 12 * 64), InitSettings::Zeroed)
+                    $builder.new_weights("l0f", Shape::new(hidden, FEATURE_CHANNELS * 64), InitSettings::Zeroed)
                 });
                 l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
             }
@@ -493,6 +512,7 @@ fn main() {
     let enyo_l1_export_scale = env_parse("ENYO_BULLET_ENYO_L1_EXPORT_SCALE", 1.0f32);
     let enyo_input_factoriser = env_parse("ENYO_BULLET_ENYO_INPUT_FACTORISER", 0usize) != 0;
     let enyo_input_buckets = env_parse("ENYO_BULLET_ENYO_INPUT_BUCKETS", 32usize);
+    let enyo_feature_channels = env_parse("ENYO_BULLET_ENYO_FEATURE_CHANNELS", 12usize);
     let enyo_output_buckets = env_parse("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", 1usize);
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
@@ -501,8 +521,8 @@ fn main() {
 
     if mode == "enyo" {
         macro_rules! run_enyo {
-            ($input_buckets:literal, $output_buckets:literal) => {
-                train_enyo::<$input_buckets, $output_buckets>(
+            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal) => {
+                train_enyo::<$input_buckets, $feature_channels, $output_buckets>(
                     dataset,
                     output,
                     net_id,
@@ -527,13 +547,13 @@ fn main() {
             };
         }
 
-        macro_rules! run_enyo_input {
-            ($input_buckets:literal) => {
+        macro_rules! run_enyo_layout {
+            ($input_buckets:literal, $feature_channels:literal) => {
                 match enyo_output_buckets {
-                    1 => run_enyo!($input_buckets, 1),
-                    2 => run_enyo!($input_buckets, 2),
-                    4 => run_enyo!($input_buckets, 4),
-                    8 => run_enyo!($input_buckets, 8),
+                    1 => run_enyo!($input_buckets, $feature_channels, 1),
+                    2 => run_enyo!($input_buckets, $feature_channels, 2),
+                    4 => run_enyo!($input_buckets, $feature_channels, 4),
+                    8 => run_enyo!($input_buckets, $feature_channels, 8),
                     _ => {
                         panic!("unsupported ENYO_BULLET_ENYO_OUTPUT_BUCKETS={enyo_output_buckets}")
                     }
@@ -541,14 +561,18 @@ fn main() {
             };
         }
 
-        match enyo_input_buckets {
-            1 => run_enyo_input!(1),
-            2 => run_enyo_input!(2),
-            4 => run_enyo_input!(4),
-            8 => run_enyo_input!(8),
-            16 => run_enyo_input!(16),
-            32 => run_enyo_input!(32),
-            _ => panic!("unsupported ENYO_BULLET_ENYO_INPUT_BUCKETS={enyo_input_buckets}"),
+        match (enyo_input_buckets, enyo_feature_channels) {
+            (1, 12) => run_enyo_layout!(1, 12),
+            (2, 12) => run_enyo_layout!(2, 12),
+            (4, 12) => run_enyo_layout!(4, 12),
+            (8, 12) => run_enyo_layout!(8, 12),
+            (16, 12) => run_enyo_layout!(16, 12),
+            (32, 12) => run_enyo_layout!(32, 12),
+            (32, 11) => run_enyo_layout!(32, 11),
+            _ => panic!(
+                "unsupported Enyo input layout: buckets={enyo_input_buckets} \
+                 channels={enyo_feature_channels}"
+            ),
         }
         return;
     }

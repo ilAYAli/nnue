@@ -136,16 +136,11 @@ Current build intent:
   negative hard examples or abandon the sidecar as a runtime selector. Do not
   launch another sidecar SPRT until an oracle-confirmed trigger has a clean
   helpful/harmful split offline.
-- Current build config is `native-1.9.1-rc1-n18self80k-sf-d16`: a
-  same-architecture continuation from `native-1.8.0` checkpoint 256 using
-  80k native-1.8 self-play games distributed across all healthy Crucible
-  workers and Stockfish 18 depth-16 labels. This keeps the legacy 16-bucket,
-  single-head runtime format and tests whether more current clean-native
-  source data plus a lower LR continuation beats the `native-1.5.0-rc1`
-  baseline after the output-bucket, replay-pair scalar, and sidecar-runtime
-  lanes failed. `native-1.9.0` was abandoned before training because the
-  orchestration was launched before the Crucible setup-barrier and
-  worker-local binary fixes were proven; relaunch with a fresh run directory.
+- Current build config is `native-3.0.0-rc1-halfka-v2hm-n19data`: a controlled
+  feature-layout probe that keeps the single scalar output head but changes the
+  input representation to `32 x 11 x 64` HalfKAv2-style mirrored king buckets
+  with merged king piece channels. It reuses native-1.9.1 SF18-labeled data and
+  initializes from the clean `native-1.5.0-rc1` baseline.
 - Generate positions from Enyo self-play/replay only. Self-play generated with
   Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
@@ -156,6 +151,31 @@ Current build intent:
   variant unless the architecture, label objective, or source quality changes.
 - Do not run another scalar replay-pair dose variant until the representation
   changes or a move-choice gate shows a concrete reason.
+
+2026-06-04 native 3.0.0 HalfKAv2-style hypothesis:
+
+- Exact Stockfish-style `HalfKAv2_hm` is not just "32 buckets". It combines
+  horizontal mirroring with an 11-channel piece-square layout that merges the
+  own-king and opponent-king channels into one `PS_KING` channel.
+- Enyo already had horizontal mirroring and supported plain `32 x 12 x 64`
+  inputs. The new representation target is `32 x 11 x 64 = 22528` input
+  features per perspective.
+- The first 32-bucket scratch run failed, so this is not another scratch
+  retry. The controlled probe initializes from clean `native-1.5.0-rc1`
+  `16 x 12` weights, maps them into `32 x 11`, and continues on the already
+  generated native-1.9.1 SF18-labeled data. This isolates the representation
+  change from new self-play/scoring data.
+- Current `build.json` is
+  `native-3.0.0-rc1-halfka-v2hm-n19data-lr5e7-sb256-20260604`.
+- Required gates before games:
+  - C++ and Python feature-layout tests pass.
+  - A converted init-only `32 x 11` `.nn` loads in Enyo and reports
+    32 input buckets / 11 feature channels.
+  - Engine-static broad metrics do not collapse versus `native-1.5.0-rc1`.
+  - The move-choice gate is neutral-positive versus `native-1.5.0-rc1`.
+- Stop criteria: reject before SPRT if engine-static or move-choice regresses.
+  If the 256-game smoke is negative, close this HalfKAv2-style init lane before
+  generating more data.
 
 
 2026-06-04 native 1.9.1 checkpoint-screen update:

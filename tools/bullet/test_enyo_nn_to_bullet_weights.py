@@ -6,6 +6,8 @@ import numpy as np
 from enyo_nn_to_bullet_weights import (
     bullet_l3_weights,
     expand_output_head,
+    source_bucket_for_target,
+    source_channel_for_target,
 )
 from lib.enyo_nnue import N_L3
 
@@ -29,3 +31,18 @@ def test_expanded_l3_weights_use_bullet_internal_orientation() -> None:
         bullet_weights[:, 0],
         np.arange(N_L3, dtype=np.float32),
     )
+
+
+def test_32_bucket_init_uses_legacy_parent_buckets() -> None:
+    assert source_bucket_for_target(11, 16, 32) == 11
+    assert source_bucket_for_target(12, 16, 32) == 8
+    assert source_bucket_for_target(31, 16, 32) == 15
+
+
+def test_halfka_v2_init_merges_king_channels_by_square_legality() -> None:
+    assert source_channel_for_target(0, 0, 31, 12, 11) == 0
+    assert source_channel_for_target(4, 0, 31, 12, 11) == 4
+    assert source_channel_for_target(5, 0, 31, 12, 11) == 6
+    assert source_channel_for_target(9, 0, 31, 12, 11) == 10
+    assert source_channel_for_target(10, 0, 31, 12, 11) == 5
+    assert source_channel_for_target(10, 1, 31, 12, 11) == 11

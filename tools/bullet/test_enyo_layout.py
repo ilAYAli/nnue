@@ -19,6 +19,8 @@ def test_default_size() -> None:
 def test_variable_hidden_size() -> None:
     assert enyo_network_size(hidden=1280) > enyo_network_size(hidden=1024)
     assert enyo_network_size(8, hidden=1280) < enyo_network_size(32, hidden=1280)
+    assert enyo_network_size(
+        32, feature_channels=11) < enyo_network_size(32, feature_channels=12)
 
 
 def test_expand_variable_hidden() -> None:
