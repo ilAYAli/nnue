@@ -638,6 +638,31 @@ Current material/phase head status:
   - `lr=1e-1`: held-out MAE `124.92`, and engine-static 2000-row MAE
     `125.915` versus native 1.5/rc1 `127.059`.
   `native-2.1.0-rc2` therefore uses `lr=0.1`.
+- `native-2.1.0-rc2` was rejected by the move-choice gate despite slightly
+  better broad static MAE. Gate result versus native 1.5: baseline
+  `1139/2487`, candidate `1138/2487`, fixed `11`, regressed `12`,
+  `delta_avg_margin=-2.0cp`, `delta_loss_weighted_margin=-3.0cp`.
+
+Replay-loss ranking status:
+
+- Target-only replay-pair training proved the ranking signal exists:
+  `movechoice-proof-replaypair-targetonly-lr1e4-e24-20260604` improved the
+  gate to `1401/2487`, fixed `810`, regressed `548`,
+  `delta_avg_margin=+29.5cp`, but collapsed broad eval to MAE `282.459` and
+  sign `49.20%`.
+- Preserved scalar fine-tunes were not enough:
+  - `pair_weight=2`: candidate `1150/2487`, fixed `38`, regressed `27`,
+    `delta_avg_margin=+0.9cp`, `delta_loss_weighted_margin=-1.1cp`,
+    broad static MAE `130.239`.
+  - `pair_weight=3`: candidate `1155/2487`, fixed `42`, regressed `26`,
+    `delta_avg_margin=+0.9cp`, `delta_loss_weighted_margin=-1.3cp`,
+    broad static MAE `131.933`.
+  - `pair_weight=5`: candidate `1180/2487`, fixed `164`, regressed `123`,
+    `delta_avg_margin=+5.4cp`, `delta_loss_weighted_margin=+1.2cp`,
+    but broad static MAE worsened to `151.115`.
+- The immediate tooling fix is epoch checkpoint export in `train_pairwise.py`.
+  Use it to validate the actual broad-vs-ranking tradeoff points before
+  launching another scalar candidate. Do not rely on the final epoch alone.
 
 If this architecture branch fails gates or SPRT:
 

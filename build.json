@@ -1,9 +1,9 @@
 {
-  "description": "No active NNUE candidate build. native-2.1.0 rc2 was rejected by the move-choice gate, and the first target-only replay-loss ranking proof improved the gate but collapsed broad eval.",
+  "description": "No active NNUE candidate build. native-2.1.0 rc2 was rejected by the move-choice gate, target-only replay-loss ranking collapsed broad eval, and preserved scalar final-epoch fine-tunes did not pass the combined gate.",
   "experiment": "native-move-choice-preservation-pending",
   "create": {
     "disabled": true,
-    "disabled_reason": "native-2.1.0 material-head output-only lane is closed; target-only replay-loss ranking improved the gate but collapsed broad eval; define and commit a preserved/separated ranking proof before launching another candidate run"
+    "disabled_reason": "native-2.1.0 material-head output-only lane is closed; replay-loss ranking needs checkpointed broad-vs-gate selection or a separated ranking path before launching another candidate run"
   },
   "validation": {
     "last_rejected_run": "native-2.1.0-rc2-materialhead-output-native15-lr1e1-e24-20260604",
@@ -11,6 +11,7 @@
     "engine_static_result": "MAE improved 127.06 -> 126.03 and bias improved -5.26 -> +0.50 on 2000 rows",
     "move_gate_result": "Rejected: baseline_prefers_best=1139/2487, candidate_prefers_best=1138/2487, fixed=11, regressed=12, delta_avg_margin=-2.0cp, delta_loss_weighted_margin=-3.0cp",
     "target_only_ranking_proof": "movechoice-proof-replaypair-targetonly-lr1e4-e24-20260604 improved the fixed move gate 1139/2487 -> 1401/2487, fixed=810, regressed=548, delta_avg_margin=+29.5cp, but broad static collapsed to mae=282.459, sign=49.20%, bias=+100.823",
-    "next_hypothesis": "Preserve or separate the replay-loss ranking signal. Require both offline eval_move_gate improvement and broad engine-static preservation before any scalar fine-tune, runtime deployment, or SPRT."
+    "preserved_ranking_proofs": "pair_weight=2/3 preserved static better but left delta_loss_weighted_margin negative; pair_weight=5 made the gate positive but degraded broad static to mae=151.115",
+    "next_hypothesis": "Use train_pairwise epoch checkpoints to select a broad-preserving replay-loss checkpoint, or switch to a separated ranking path. Require both offline eval_move_gate improvement and broad engine-static preservation before any scalar fine-tune, runtime deployment, or SPRT."
   }
 }

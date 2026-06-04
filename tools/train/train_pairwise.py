@@ -150,6 +150,34 @@ def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
     }
 
 
+def save_model(model: EnyoNNUE, out: Path, out_nn: Path | None, device: str
+               ) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model.cpu().state_dict(), out)
+    print(f"wrote {out}", flush=True)
+    if out_nn is not None:
+        out_nn.parent.mkdir(parents=True, exist_ok=True)
+        export_model(model, out_nn)
+        print(f"wrote {out_nn}", flush=True)
+    model.to(device)
+
+
+def maybe_save_checkpoint(model: EnyoNNUE, epoch: int, args) -> None:
+    if not args.checkpoint_dir:
+        return
+    if args.checkpoint_every <= 0:
+        return
+    if (epoch + 1) % args.checkpoint_every != 0:
+        return
+    checkpoint_dir = Path(args.checkpoint_dir)
+    stem = f"epoch-{epoch:04d}"
+    save_model(
+        model,
+        checkpoint_dir / f"{stem}.pt",
+        checkpoint_dir / f"{stem}.nn",
+        args.device)
+
+
 def train(args) -> EnyoNNUE:
     use_broad = args.broad_weight > 0.0
     if use_broad:
@@ -256,6 +284,7 @@ def train(args) -> EnyoNNUE:
             f" pred_margin={metrics['pred_margin']:7.2f}"
             f" target_margin={metrics['target_margin']:7.2f}",
             flush=True)
+        maybe_save_checkpoint(model, epoch, args)
 
     return model
 
@@ -266,6 +295,10 @@ def main() -> None:
     ap.add_argument("--pairs", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--out-nn", default=None)
+    ap.add_argument("--checkpoint-dir", default=None,
+                    help="Optional directory for per-epoch .pt and .nn files.")
+    ap.add_argument("--checkpoint-every", type=int, default=1,
+                    help="Save every N epochs when --checkpoint-dir is set.")
     ap.add_argument("--init-from-nn", default=None)
     ap.add_argument("--init", default="kaiming",
                     choices=["kaiming", "berserk-ish"])
@@ -291,13 +324,11 @@ def main() -> None:
     args = ap.parse_args()
 
     model = train(args)
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(model.cpu().state_dict(), out)
-    print(f"wrote {out}", flush=True)
-    if args.out_nn:
-        export_model(model, args.out_nn)
-        print(f"wrote {args.out_nn}", flush=True)
+    save_model(
+        model,
+        Path(args.out),
+        Path(args.out_nn) if args.out_nn else None,
+        args.device)
 
 
 if __name__ == "__main__":
