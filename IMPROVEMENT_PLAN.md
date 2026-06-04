@@ -593,6 +593,15 @@ If this architecture branch fails gates or SPRT:
 
 Important failed signals:
 
+- Native 1.9.1 checkpoint screen did not produce a promotion candidate.
+  The best 256-game checkpoint smokes were only ck128 and ck256 at about
+  +5.4 Elo versus native 1.5.0, and both failed the move-choice gate:
+  ck128 had fixed=36, regressed=25, delta_avg_margin=-0.7cp,
+  delta_loss_weighted_margin=-0.8cp; ck256 had fixed=41, regressed=30,
+  delta_avg_margin=-0.6cp, delta_loss_weighted_margin=-0.7cp. Close the
+  native 1.9 continuation lane and do not extend these checkpoints to long
+  SPRT.
+
 - Native 2.0.0 output4 architecture probes did not beat native 1.5.0:
   - rc1 head-only smoke: `-16.3 +/- 36.2`, LOS `18.8%`, 256 games.
   - rc2 all-layer adaptation smoke: `-5.4 +/- 37.4`, LOS `38.8%`, 256 games.
