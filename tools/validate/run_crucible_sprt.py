@@ -454,7 +454,7 @@ def notify_stdout(message: str, *, enabled: bool) -> None:
 def emit_completion_event(args: argparse.Namespace, rc: int, run_dir: Path, message: str) -> None:
     if not args.notify:
         return
-    hook = args.event_command or (
+    hook = getattr(args, "event_command", None) or (
         f"NNUE_NTFY_EVENTS= NNUE_AI_STDOUT_ENABLE=0 "
         f"NNUE_AI_STDIN_EVENTS=done,fail {repo_root() / 'tools' / 'events' / 'nnue_event_ntfy.sh'}"
     )
@@ -573,6 +573,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--work-dir", default="~/code/cpp/chess/nnue")
     parser.add_argument("--output-dir")
     parser.add_argument("--nnue-run", help="NNUE run dir used for done/fail wake events.")
+    parser.add_argument("--event-command", help="Event hook command for done/fail wake events.")
     parser.add_argument("--cache-dir", default="~/.cache/crucible")
     parser.add_argument("--book", default="~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd")
     parser.add_argument("--games", type=positive_int, default=4000)

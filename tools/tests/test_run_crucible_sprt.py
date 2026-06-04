@@ -39,6 +39,7 @@ class RunCrucibleSprtTests(unittest.TestCase):
             work_dir=str(root),
             output_dir=str(root / "out"),
             nnue_run="",
+            event_command=None,
             cache_dir=str(root / "cache"),
             book=str(write_file(root / "book.epd")),
             games=200,
@@ -133,6 +134,27 @@ class RunCrucibleSprtTests(unittest.TestCase):
             run_crucible_sprt.run_capture = old_run_capture
 
         self.assertEqual(1, status["counts"]["fail"])
+
+    def test_completion_event_accepts_default_hook(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            args = self.args(root)
+            args.notify = True
+            args.event_command = None
+            calls: list[dict] = []
+            old_emit_event = run_crucible_sprt.emit_event
+
+            def fake_emit_event(*call_args, **kwargs) -> None:
+                calls.append({"args": call_args, "kwargs": kwargs})
+
+            try:
+                run_crucible_sprt.emit_event = fake_emit_event
+                run_crucible_sprt.emit_completion_event(args, 0, root / "run", "ok")
+            finally:
+                run_crucible_sprt.emit_event = old_emit_event
+
+            self.assertEqual(1, len(calls))
+            self.assertIn("nnue_event_ntfy.sh", calls[0]["kwargs"]["hook_command"])
 
     def test_nonzero_deploy_is_ok_when_status_is_complete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
