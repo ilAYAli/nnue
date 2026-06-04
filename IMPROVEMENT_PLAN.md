@@ -167,6 +167,12 @@ Current build intent:
   change from new self-play/scoring data.
 - Current `build.json` is
   `native-3.0.0-rc1-halfka-v2hm-n19data-lr5e7-sb256-20260604`.
+- Result: runtime/tooling support passed, but the candidate is rejected before
+  games. Enyo candidate `62c929b` loaded an init-only `32 x 11` net and
+  reported 32 input buckets / 11 feature channels. Training completed, but
+  engine-static on the same 2000 native-1.9.1 SF18-labeled rows regressed from
+  `native-1.5.0-rc1` MAE `146.057`, sign `82.98%` to candidate MAE `190.988`,
+  sign `82.92%`. No SPRT was launched.
 - Required gates before games:
   - C++ and Python feature-layout tests pass.
   - A converted init-only `32 x 11` `.nn` loads in Enyo and reports
@@ -176,6 +182,10 @@ Current build intent:
 - Stop criteria: reject before SPRT if engine-static or move-choice regresses.
   If the 256-game smoke is negative, close this HalfKAv2-style init lane before
   generating more data.
+- Next useful action: do not rerun this `16 x 12` to `32 x 11` initialization
+  recipe. Either keep the proven `16 x 12` architecture and improve objective /
+  checkpoint selection, or only revisit `32 x 11` with a different projection
+  that passes the engine-static gate before training.
 
 
 2026-06-04 native 1.9.1 checkpoint-screen update:
