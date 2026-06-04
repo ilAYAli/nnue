@@ -82,6 +82,16 @@ class RunCrucibleSprtTests(unittest.TestCase):
             self.assertEqual("sprt:100", manifest["tasks"][0]["label"])
             self.assertEqual("games", manifest["tasks"][0]["progress"]["unit"])
 
+    def test_home_paths_expand_in_worker_commands(self) -> None:
+        self.assertEqual(
+            '"$HOME/.cache/crucible/book.epd"',
+            run_crucible_sprt.shell_quote_expand_home("$HOME/.cache/crucible/book.epd"),
+        )
+        self.assertEqual(
+            '"nnue_file=$HOME/.cache/crucible/model.nn"',
+            run_crucible_sprt.shell_quote_expand_home("nnue_file=$HOME/.cache/crucible/model.nn"),
+        )
+
     def test_aggregate_sprt_logs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             root = Path(tmp_name)
@@ -108,6 +118,21 @@ class RunCrucibleSprtTests(unittest.TestCase):
             )
         )
         self.assertFalse(run_crucible_sprt.is_transient_startup_failure("missing book"))
+
+    def test_status_json_accepts_failed_run_json(self) -> None:
+        old_run_capture = run_crucible_sprt.run_capture
+
+        class Result:
+            returncode = 1
+            stdout = '{"counts": {"done": 0, "fail": 1}}\n'
+
+        try:
+            run_crucible_sprt.run_capture = lambda command: Result()
+            status = run_crucible_sprt.status_json("crucible", "failed-run")
+        finally:
+            run_crucible_sprt.run_capture = old_run_capture
+
+        self.assertEqual(1, status["counts"]["fail"])
 
     def test_nonzero_deploy_is_ok_when_status_is_complete(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:

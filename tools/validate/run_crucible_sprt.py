@@ -89,6 +89,17 @@ def shell_quote(value: str) -> str:
     return shlex.quote(value)
 
 
+def shell_quote_expand_home(value: str) -> str:
+    if "$HOME/" not in value:
+        return shell_quote(value)
+    before, after = value.split("$HOME/", 1)
+    if "$HOME/" in after:
+        return shell_quote(value)
+    escaped_before = before.replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`").replace("$", "\\$")
+    escaped_after = after.replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`").replace("$", "\\$")
+    return f'"{escaped_before}$HOME/{escaped_after}"'
+
+
 def safe_name(value: str) -> str:
     text = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-")
     return text or "sprt"
@@ -191,8 +202,8 @@ def task_command(
             "--reference $HOME/assets/engines/reference "
             "--candidate-uci use_syzygy=false "
             "--reference-uci use_syzygy=false "
-            f"--candidate-uci {shell_quote(candidate_arg)} "
-            f"--reference-uci {shell_quote(reference_arg)} "
+            f"--candidate-uci {shell_quote_expand_home(candidate_arg)} "
+            f"--reference-uci {shell_quote_expand_home(reference_arg)} "
             f"--candidate-uci Hash={hash_mb} "
             f"--reference-uci Hash={hash_mb} "
             f"--games {games} "
@@ -203,7 +214,7 @@ def task_command(
             f"--elo1 {elo1} "
             "--restart off "
             "--fastchess $HOME/.local/bin/fastchess "
-            f"--book {shell_quote(book_arg)} "
+            f"--book {shell_quote_expand_home(book_arg)} "
             '--log-dir "$logdir" '
             '--name "$name" '
             "--order random "
@@ -343,6 +354,10 @@ def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
 
 def status_json(crucible: str, run_name: str) -> dict[str, Any]:
     result = run_capture([crucible, "status", run_name, "--json"])
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        pass
     if result.returncode != 0:
         raise RuntimeError(result.stdout)
     return json.loads(result.stdout)
