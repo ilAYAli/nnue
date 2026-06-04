@@ -102,13 +102,25 @@ def context_for(path: Path) -> RunContext:
     search_roots: list[Path] = []
     current = path if path.is_dir() else path.parent
     search_roots.append(current)
-    search_roots.extend(parent for parent in current.parents[:4])
+    search_roots.extend(list(current.parents)[:4])
     if root is not None:
         search_roots.append(root)
 
     files: list[Path] = []
+    if path.is_file():
+        stem_meta = path.with_suffix(".meta.json")
+        if stem_meta.exists():
+            files.append(stem_meta)
     for base in dict.fromkeys(search_roots):
-        for name in ("runs.log", "train.log", "config.json", "manifest.json", "meta.json"):
+        for name in (
+            "runs.log",
+            "run.log",
+            "train.log",
+            "events.jsonl",
+            "config.json",
+            "manifest.json",
+            "meta.json",
+        ):
             candidate = base / name
             if candidate.exists() and candidate not in files:
                 files.append(candidate)
@@ -186,6 +198,17 @@ def extract_converted_weight_init(context: RunContext) -> list[str]:
     return refs
 
 
+def extract_pairwise_metadata_init(context: RunContext) -> list[str]:
+    refs: list[str] = []
+    for _path, doc in context.json_docs:
+        if doc.get("schema") != "enyo.train_pairwise.v1":
+            continue
+        init_from_nn = doc.get("init_from_nn")
+        if isinstance(init_from_nn, str) and init_from_nn.strip():
+            refs.append(init_from_nn.strip())
+    return refs
+
+
 def extract_input_data_refs(text: str) -> list[str]:
     refs: list[str] = []
     for line in text.splitlines():
@@ -249,11 +272,20 @@ def collect_json_refs(doc: Any) -> tuple[list[str], list[str]]:
     position_refs: list[str] = []
     label_refs: list[str] = []
     if isinstance(doc, dict):
+        if "clean_enyo_owned" in doc and "init_chain" in doc and "reasons" in doc:
+            return position_refs, label_refs
+        is_pairwise_metadata = doc.get("schema") == "enyo.train_pairwise.v1"
         for key, value in doc.items():
             if key in {"source", "imported_from"} and isinstance(value, str):
                 position_refs.append(value)
             elif key in {"input"} and isinstance(value, str):
                 position_refs.append(value)
+            elif is_pairwise_metadata and key in {"data", "pairs"} and isinstance(value, str):
+                position_refs.append(value)
+            elif is_pairwise_metadata and key == "position_refs" and isinstance(value, list):
+                position_refs.extend(str(item) for item in value if isinstance(item, str))
+            elif is_pairwise_metadata and key == "label_refs" and isinstance(value, list):
+                label_refs.extend(str(item) for item in value if isinstance(item, str))
             elif key == "source_mix_jsonl" and isinstance(value, list):
                 for item in value:
                     if not isinstance(item, str):
@@ -413,6 +445,13 @@ def path_is_berserk(ref: str) -> bool:
 
 def looks_random_init(context: RunContext) -> bool:
     text = context.text.lower()
+    for _path, doc in context.json_docs:
+        if doc.get("schema") != "enyo.train_pairwise.v1":
+            continue
+        if doc.get("init_from_nn"):
+            continue
+        if str(doc.get("init", "")).lower() in {"kaiming", "random", "berserk-ish"}:
+            return True
     markers = (
         "start bullet_train",
         "training preamble",
@@ -445,6 +484,7 @@ def trace_init(path: Path, *, max_depth: int = 16) -> tuple[str, list[str], list
         )
         init_refs.extend(extract_bullet_weight_init(context.text))
         init_refs.extend(extract_converted_weight_init(context))
+        init_refs.extend(extract_pairwise_metadata_init(context))
 
         if not init_refs:
             if looks_random_init(context):

@@ -150,15 +150,64 @@ def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
     }
 
 
-def save_model(model: EnyoNNUE, out: Path, out_nn: Path | None, device: str
+def write_metadata(path: Path, metadata: dict) -> None:
+    path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+
+
+def pairwise_metadata(args, *, epoch: int | None = None) -> dict:
+    label_refs = ["enyo"]
+    source_map = Path(args.data) / "source_map.json"
+    if source_map.exists():
+        try:
+            raw = json.loads(source_map.read_text())
+            if isinstance(raw, dict):
+                label_refs.extend(str(name) for name in raw)
+        except (OSError, json.JSONDecodeError):
+            pass
+    metadata = {
+        "schema": "enyo.train_pairwise.v1",
+        "kind": "pairwise_nnue_checkpoint",
+        "data": str(args.data),
+        "pairs": str(args.pairs),
+        "position_refs": [str(args.data), str(args.pairs)],
+        "label_refs": sorted(set(label_refs)),
+        "init_from_nn": args.init_from_nn,
+        "init": None if args.init_from_nn else args.init,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "pair_batch_size": args.pair_batch_size,
+        "lr": args.lr,
+        "weight_decay": args.weight_decay,
+        "huber_beta": args.huber_beta,
+        "pair_beta": args.pair_beta,
+        "pair_weight": args.pair_weight,
+        "broad_weight": args.broad_weight,
+        "target_clamp": args.target_clamp,
+        "max_target_margin": args.max_target_margin,
+        "min_target_margin": args.min_target_margin,
+        "loss_weight_by_cp": bool(args.loss_weight_by_cp),
+        "max_rows": args.max_rows,
+        "skip_rows": args.skip_rows,
+    }
+    if epoch is not None:
+        metadata["epoch"] = epoch
+    return metadata
+
+
+def save_model(model: EnyoNNUE, out: Path, out_nn: Path | None, device: str,
+               metadata: dict | None = None
                ) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.cpu().state_dict(), out)
     print(f"wrote {out}", flush=True)
+    if metadata is not None:
+        write_metadata(out.with_suffix(".meta.json"), metadata)
     if out_nn is not None:
         out_nn.parent.mkdir(parents=True, exist_ok=True)
         export_model(model, out_nn)
         print(f"wrote {out_nn}", flush=True)
+        if metadata is not None:
+            write_metadata(out_nn.with_suffix(".meta.json"), metadata)
     model.to(device)
 
 
@@ -175,7 +224,8 @@ def maybe_save_checkpoint(model: EnyoNNUE, epoch: int, args) -> None:
         model,
         checkpoint_dir / f"{stem}.pt",
         checkpoint_dir / f"{stem}.nn",
-        args.device)
+        args.device,
+        pairwise_metadata(args, epoch=epoch))
 
 
 def train(args) -> EnyoNNUE:
@@ -328,7 +378,8 @@ def main() -> None:
         model,
         Path(args.out),
         Path(args.out_nn) if args.out_nn else None,
-        args.device)
+        args.device,
+        pairwise_metadata(args))
 
 
 if __name__ == "__main__":

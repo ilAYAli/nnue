@@ -251,6 +251,63 @@ class NetProvenanceTests(unittest.TestCase):
             self.assertIn(str(source_net), result.init_chain)
             self.assertTrue(result.clean_enyo_owned)
 
+    def test_traces_pairwise_checkpoint_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = root / "runs" / "base-clean"
+            base_train = base / "train" / "base-clean"
+            source_net = base_train / "model.nn"
+            source_net.parent.mkdir(parents=True)
+            source_net.write_bytes(b"")
+            base.joinpath("runs.log").write_text(
+                "start bullet_train\n"
+                "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
+                "Training Preamble\n"
+                "data=/data/enyo-selfplay/labeled.jsonl\n",
+                encoding="utf-8",
+            )
+            pack = base / "pack" / "train"
+            pack.mkdir(parents=True)
+            pack.joinpath("meta.json").write_text(
+                '{"source_map": {"stockfish": 0}}\n',
+                encoding="utf-8",
+            )
+
+            run = root / "runs" / "pairwise-checkpoints"
+            checkpoint_dir = run / "checkpoints"
+            checkpoint_dir.mkdir(parents=True)
+            net = checkpoint_dir / "epoch-0001.nn"
+            net.write_bytes(b"")
+            run.joinpath("run.log").write_text(
+                "checkpointed replay-pair screen start\n",
+                encoding="utf-8",
+            )
+            net.with_suffix(".meta.json").write_text(
+                json.dumps({
+                    "schema": "enyo.train_pairwise.v1",
+                    "kind": "pairwise_nnue_checkpoint",
+                    "epoch": 1,
+                    "init_from_nn": str(source_net),
+                    "data": str(base / "pack" / "train"),
+                    "pairs": "/data/replay-loss/replay_full_pairs.jsonl",
+                    "position_refs": [
+                        str(base / "pack" / "train"),
+                        "/data/replay-loss/replay_full_pairs.jsonl",
+                    ],
+                    "label_refs": ["stockfish", "enyo"],
+                }) + "\n",
+                encoding="utf-8",
+            )
+
+            result = net_provenance.analyze(net)
+
+            self.assertEqual(result.init, "random")
+            self.assertIn(str(source_net), result.init_chain)
+            self.assertIn("enyo-replay", result.position_sources)
+            self.assertIn("stockfish", result.label_sources)
+            self.assertIn("enyo", result.label_sources)
+            self.assertTrue(result.clean_enyo_owned)
+
     def test_rejects_borrowed_bullet_init_weights(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
