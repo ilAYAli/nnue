@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
@@ -84,6 +85,53 @@ class RunCrucibleSprtTests(unittest.TestCase):
             self.assertEqual("sprt:100", manifest["tasks"][0]["label"])
             self.assertEqual("games", manifest["tasks"][0]["progress"]["unit"])
 
+    def test_manifest_maps_worker_run_and_cache_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            workers = {
+                "workers": [
+                    {
+                        "host": "pwa-rce",
+                        "profile": "pwa-rce",
+                        "cache_dir": "/home/petter/.cache/crucible",
+                    },
+                    {
+                        "host": "pwa-mbp",
+                        "profile": "pwa-mbp",
+                        "cache_dir": "/Users/pwahlman/.cache/crucible",
+                    },
+                    {
+                        "host": "pwa-mbp0",
+                        "profile": "pwa-mbp0",
+                        "cache_dir": "/Users/petter/Library/Caches/crucible",
+                    },
+                ],
+            }
+            args = self.args(root)
+            args.cache_dir = "~/.cache/crucible"
+            write_file(Path(args.workers), json.dumps(workers))
+            manifest = run_crucible_sprt.build_manifest(args, root / "manifest-out")
+
+            runs = str((root / "crucible-runs").resolve())
+            cache = str(Path("~/.cache/crucible").expanduser().resolve())
+            self.assertEqual(str((root / "crucible-runs" / "unit-sprt").resolve()), manifest["work_dir"])
+            self.assertEqual(
+                "/home/petter/.cache/crucible/runs",
+                manifest["path_maps"]["pwa-rce"][runs],
+            )
+            self.assertEqual(
+                "/Users/pwahlman/.cache/crucible/runs",
+                manifest["path_maps"]["pwa-mbp"][runs],
+            )
+            self.assertEqual(
+                "/Users/petter/Library/Caches/crucible",
+                manifest["path_maps"]["pwa-mbp0"][cache],
+            )
+            self.assertEqual(
+                "/Users/petter/Library/Caches/crucible",
+                manifest["path_maps"]["pwa-mbp0"]["$HOME/.cache/crucible"],
+            )
+
     def test_home_paths_expand_in_worker_commands(self) -> None:
         self.assertEqual(
             '"$HOME/.cache/crucible/book.epd"',
@@ -150,7 +198,13 @@ class RunCrucibleSprtTests(unittest.TestCase):
 
             try:
                 run_crucible_sprt.emit_event = fake_emit_event
-                run_crucible_sprt.emit_completion_event(args, 0, root / "run", "ok")
+                run_crucible_sprt.emit_completion_event(
+                    args,
+                    0,
+                    root / "run",
+                    "ok",
+                    log_path=root / "out" / "deploy.log",
+                )
             finally:
                 run_crucible_sprt.emit_event = old_emit_event
 
@@ -160,6 +214,7 @@ class RunCrucibleSprtTests(unittest.TestCase):
             self.assertIn("NNUE_NTFY_EVENTS=", hook)
             self.assertIn("NNUE_AI_STDIN_EVENTS=done,fail", hook)
             self.assertNotIn("NNUE_AI_STDOUT_ENABLE=0", hook)
+            self.assertEqual(root / "out" / "deploy.log", calls[0]["kwargs"]["log"])
 
     def test_empty_sprt_ntfy_url_is_noop(self) -> None:
         old_urlopen = run_crucible_sprt.urllib.request.urlopen

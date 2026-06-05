@@ -16,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -140,6 +140,72 @@ def worker_command_path(path: str) -> str:
     return path
 
 
+def add_path_map(path_maps: dict[str, dict[str, str]], profile: str, src: str, dst: str) -> None:
+    if not profile or not src or not dst or src == dst:
+        return
+    path_maps.setdefault(profile, {}).setdefault(src, dst)
+
+
+def cache_runs_dir(cache_dir: str) -> str:
+    return str(PurePath(cache_dir) / "runs")
+
+
+def worker_cache_dir(worker: dict[str, Any]) -> str:
+    cache = str(worker.get("cache_dir") or "").strip()
+    if cache:
+        return cache
+    host = str(worker.get("host") or "").strip()
+    if host in ("localhost", "127.0.0.1") or bool(worker.get("local", False)):
+        return "~/.cache/crucible"
+    return ".cache/crucible"
+
+
+def worker_profiles(path: Path) -> dict[str, str]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError:
+        return {}
+    workers = payload.get("workers", [])
+    if not isinstance(workers, list):
+        return {}
+    profiles: dict[str, str] = {}
+    for item in workers:
+        if isinstance(item, str):
+            host, _, profile = item.partition("=")
+            profile = profile or host
+            cache = "~/.cache/crucible"
+        elif isinstance(item, dict):
+            if not bool(item.get("enabled", True)):
+                continue
+            host = str(item.get("host") or "").strip()
+            profile = str(item.get("profile") or host).strip()
+            cache = worker_cache_dir(item)
+        else:
+            continue
+        if profile and profile not in profiles:
+            profiles[profile] = cache
+    return profiles
+
+
+def worker_path_maps(args: argparse.Namespace) -> dict[str, dict[str, str]]:
+    maps: dict[str, dict[str, str]] = {}
+    workers = worker_profiles(expand_path(args.workers))
+    coordinator_runs = str(expand_path(args.crucible_runs_dir))
+    coordinator_cache = str(expand_path(args.cache_dir))
+    cache_text = str(args.cache_dir)
+    cache_tilde = tilde_path(expand_path(args.cache_dir))
+    cache_arg_home = worker_command_path(cache_text)
+    cache_home = worker_command_path(cache_tilde)
+    for profile, cache in workers.items():
+        add_path_map(maps, profile, coordinator_runs, cache_runs_dir(cache))
+        add_path_map(maps, profile, coordinator_cache, cache)
+        add_path_map(maps, profile, cache_text, cache)
+        add_path_map(maps, profile, cache_arg_home, cache)
+        add_path_map(maps, profile, cache_tilde, cache)
+        add_path_map(maps, profile, cache_home, cache)
+    return maps
+
+
 def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -232,6 +298,7 @@ def task_command(
 
 
 def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
+    run_name = safe_name(args.tag)
     chunk_count = (args.games + args.chunk_games - 1) // args.chunk_games
     if chunk_count <= 0:
         raise SystemExit("--games and --chunk-games must produce at least one task")
@@ -308,7 +375,7 @@ def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
         "name": args.tag,
         "kind": "sprt",
         "description": args.description or f"{args.tag}: distributed SPRT",
-        "work_dir": str(expand_path(args.work_dir)),
+        "work_dir": str(expand_path(args.crucible_runs_dir) / run_name),
         "requirements": {
             "python_min": "3.11",
             "git_min": "2.38",
@@ -343,7 +410,7 @@ def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
                 {"path": book},
             ],
         },
-        "path_maps": {},
+        "path_maps": worker_path_maps(args),
         "tasks": tasks,
     }
     for mapping in args.path_map:
@@ -507,7 +574,14 @@ def notify_sprt(args: argparse.Namespace, message: str, *, title: str) -> None:
     post_sprt_ntfy(args.sprt_ntfy_url, message, title=title)
 
 
-def emit_completion_event(args: argparse.Namespace, rc: int, run_dir: Path, message: str) -> None:
+def emit_completion_event(
+    args: argparse.Namespace,
+    rc: int,
+    run_dir: Path,
+    message: str,
+    *,
+    log_path: Path | None = None,
+) -> None:
     if not args.notify:
         return
     hook = getattr(args, "event_command", None) or (
@@ -520,7 +594,7 @@ def emit_completion_event(args: argparse.Namespace, rc: int, run_dir: Path, mess
         stage="validate_crucible_sprt",
         status="ok" if rc == 0 else "failed",
         rc=rc,
-        log=run_dir / "deploy.log",
+        log=log_path or (run_dir / "deploy.log"),
         message=message,
         hook_command=hook,
         extra={"tag": args.tag, "games": args.games},
@@ -555,7 +629,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     if args.verbose:
         command.append("--verbose")
 
-    rc = run_streamed(command, local_run_dir / "deploy.log")
+    deploy_log = local_run_dir / "deploy.log"
+    rc = run_streamed(command, deploy_log)
     run_dir = expand_path(args.crucible_runs_dir) / run_name
 
     if rc != 0:
@@ -578,7 +653,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         message = f"Distributed SPRT failed: run={run_name} log={local_run_dir / 'deploy.log'}"
         notify_stdout(message, enabled=args.notify)
         notify_sprt(args, message, title="SPRT failed")
-        emit_completion_event(args, rc, run_dir, message)
+        emit_completion_event(args, rc, run_dir, message, log_path=deploy_log)
         return rc
 
     status = status_json(args.crucible, run_name)
@@ -590,7 +665,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         notify_stdout(message, enabled=args.notify)
         notify_sprt(args, message, title="SPRT failed")
-        emit_completion_event(args, 1, run_dir, message)
+        emit_completion_event(args, 1, run_dir, message, log_path=deploy_log)
         return 1
 
     aggregate = aggregate_sprt_logs(run_dir)
@@ -598,13 +673,13 @@ def cmd_run(args: argparse.Namespace) -> int:
         message = f"Distributed SPRT game count mismatch: got={aggregate.games} expected={args.games}"
         notify_stdout(message, enabled=args.notify)
         notify_sprt(args, message, title="SPRT failed")
-        emit_completion_event(args, 1, run_dir, message)
+        emit_completion_event(args, 1, run_dir, message, log_path=deploy_log)
         return 1
 
     message = conclusion_text(args, aggregate, run_dir)
     notify_stdout(message, enabled=args.notify)
     notify_sprt(args, message, title="SPRT finished")
-    emit_completion_event(args, 0, run_dir, message)
+    emit_completion_event(args, 0, run_dir, message, log_path=deploy_log)
     return 0
 
 
