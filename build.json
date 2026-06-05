@@ -1,7 +1,9 @@
 {
-  "description": "Preserved replay-pair proof: full native-1.5 broad labels plus replay child-pair supervision, with baseline/candidate broad static and move gate before any games.",
-  "experiment": "native-1.12.0-rc1-fullbroad-replaypair-pw3",
+  "description": "No active candidate build. native-1.12.0 full-broad replay-pair proof passed local gates but failed the game smoke.",
+  "experiment": "disabled-after-native-1.12.0-rejection",
   "create": {
+    "disabled": true,
+    "disabled_reason": "native-1.12.0 full-broad replay-pair proof lost the 256-game smoke versus native-1.5.0; write a new hypothesis in IMPROVEMENT_PLAN.md before re-enabling build.json",
     "name": "native-1.12.0-rc1-fullbroad-replaypair-pw3-lr1e6-e8-20260605",
     "backend": "pairwise",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",

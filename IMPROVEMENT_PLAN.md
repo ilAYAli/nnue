@@ -76,12 +76,17 @@ Current clean-native lineage names:
 - `native-1.7.3-rc1`: rejected. A low-dose scalar continuation using repeated
   SF14-labeled child rows from harmful sidecar root-trigger pairs lost to
   `native-1.5.0-rc1` in smoke at `-23.1 +/- 36.6 Elo`, LOS `10.6%`.
+- `native-1.12.0-rc1`: rejected. Full `native-1.5.0` broad preservation plus
+  replay child-pair supervision passed provenance and the replay move gate, but
+  lost the 256-game distributed smoke versus `native-1.5.0-rc1`:
+  `89-104-63`, score `0.4707`, about `-20.38 +/- 37.07 Elo`, LOS `14.0%`.
+  Do not promote or extend this scalar replay-pair setup.
 
 Current build intent:
 
 - No active training build is configured. `build.json` is intentionally
-  disabled after the `native-1.10.1` rescue rejection, so `build.py create`
-  cannot accidentally rerun a closed lane.
+  disabled after the `native-1.12.0` replay-pair smoke rejection, so
+  `build.py create` cannot accidentally rerun a closed lane.
 - The next training run requires one new written hypothesis in this file before
   `build.json` is re-enabled.
 
@@ -526,69 +531,37 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Current `build.json` is
+No active training experiment is selected.
+
+The last concrete experiment was
 `native-1.12.0-rc1-fullbroad-replaypair-pw3-lr1e6-e8-20260605`.
+It passed the local replay move gate but failed the 256-game smoke:
 
-Hypothesis: replay child-pair supervision is a real local ranking signal, but
-the previous preserved scalar probes used too little broad preservation and
-then selected a checkpoint from a manual screen. Repacking and training against
-the full `native-1.5.0-rc1` broad label set should make the pairwise pressure a
-small correction instead of a broad-eval rewrite.
+- broad engine-static on the same 5000 rows regressed from baseline
+  `mae=129.570`, `sign=82.71%` to candidate `mae=133.833`,
+  `sign=82.50%`;
+- replay move gate improved only slightly:
+  candidate `1144/2487`, baseline `1137/2487`, fixed `25`,
+  regressed `18`, `delta_avg=+2.1cp`, weighted `+1.5cp`;
+- distributed smoke versus `native-1.5.0-rc1` finished `89-104-63`,
+  score `0.4707`, about `-20.38 +/- 37.07 Elo`, LOS `14.0%`.
 
-This is still a scalar proof, so it is a gate-only experiment until it proves
-that the signal transfers cleanly:
+Conclusion: the replay child-pair signal is real enough to move the local gate,
+but the scalar `.nn` path still does not transfer to game strength. Do not run
+more scalar replay-pair variants unless the mechanism changes, for example a
+separate ranking/policy path or a different representation that first passes
+broad engine-static.
 
-1. Use the fixed replay-loss move gate as the first target suite.
-2. Preserve the current clean-native baseline:
-   `native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602`.
-3. Build or select child-ranking rows with real oracle scores for the `played`
-   and `best` children. Rows where both children have placeholder `score=0` are
-   invalid for this proof.
-4. Train or evaluate a ranking signal with explicit broad preservation, or keep
-   it in a separate ranking/policy path. Target-only scalar fine-tuning is
-   already proven to collapse broad eval.
-5. Require offline `eval_move_gate.py` improvement before any SPRT:
-   candidate prefers best at least as often as baseline, fixed > regressed, and
-   both average margin deltas non-negative.
-6. Also require broad engine-static to remain near baseline. A proof that only
-   improves the move gate while dropping broad sign toward random is diagnostic
-   only.
-7. Only after both gates pass, decide whether the signal belongs in a scalar
-   `.nn` fine-tune, a separate sidecar/ranking path, or a new representation.
+Next useful work should choose one new hypothesis, then enable `build.json` in
+the same commit. Good candidates are:
 
-Concrete run settings:
-
-- broad data:
-  `runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl`
-  (`2,943,810` rows);
-- pair data:
-  `runs/rc1-replay-fullpair-r2-20260531/replay_full_pairs.jsonl`
-  (`27,814` child rows);
-- baseline/init net:
-  `native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602`;
-- training: `backend=pairwise`, `pair_weight=3`, `broad_weight=1`,
-  `lr=1e-6`, `epochs=8`, checkpoint every epoch;
-- gates before any games:
-  - `net_provenance.py --require-clean-enyo-owned`;
-  - baseline and candidate `eval_jsonl_engine.py` on the same 5000 broad rows;
-  - `eval_move_gate.py` on
-    `runs/gate-baseline-native18-vs-native15-20260603/move_gate.jsonl`.
-
-Stop criteria:
-
-- reject before SPRT if provenance fails;
-- reject before SPRT if broad engine-static clearly regresses versus baseline;
-- reject before SPRT if the move gate has candidate below baseline or negative
-  average / loss-weighted margin deltas;
-- if the final epoch fails but checkpoints contain a materially better
-  broad-vs-ranking tradeoff, screen only the best checkpoint. Do not run a
-  matrix of replay-pair variants.
-
-Pass criteria for continuing a lane:
-
-- a smoke against the previous clean-owned baseline should be positive;
-- engine-static sign should not collapse in the `0-50cp` bucket;
-- no Berserk SPRT should run until the owned-baseline gate is positive.
+- data-scale lane: generate and label a larger clean-native dataset, but only
+  after writing explicit data-quality gates that predict game strength better
+  than broad MAE alone;
+- objective lane: add a gate that measures search move choice on non-replay
+  positions, so a local replay repair cannot overfit one suite;
+- representation lane: revisit architecture only with an initialization or
+  projection that does not collapse broad engine-static before games.
 
 ## Candidate Workflow
 
@@ -600,12 +573,11 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- enabled for
-  `native-1.12.0-rc1-fullbroad-replaypair-pw3-lr1e6-e8-20260605`.
-  Run it with `./build.py create -c build.json`; do not start games unless the
-  configured gates pass.
+- disabled after the `native-1.12.0` replay-pair smoke rejection. Do not run
+  `./build.py create -c build.json` until the next hypothesis is written here
+  and committed with the matching `build.json` change.
 - rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`,
-  `native-2.1.0-rc2`, and all scalar pairwise repair nets.
+  `native-2.1.0-rc2`, `native-1.12.0-rc1`, and all scalar pairwise repair nets.
 
 Rules:
 
