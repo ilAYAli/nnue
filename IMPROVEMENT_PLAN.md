@@ -79,7 +79,15 @@ Current clean-native lineage names:
 
 Current build intent:
 
-- Current `build.json` is
+- No active training build is configured. `build.json` is intentionally
+  disabled after the `native-1.10.1` rescue rejection, so `build.py create`
+  cannot accidentally rerun a closed lane.
+- The next training run requires one new written hypothesis in this file before
+  `build.json` is re-enabled.
+
+Closed build intent:
+
+- Previous `build.json` was
   `native-1.10.1-rc1-rescued480k-sf-d16-lr3e7-sb128-20260605`. It keeps the
   proven `16 x 12` scalar architecture and starts from `native-1.5.0-rc1`.
 - Hypothesis: the failed `native-1.10.0` orchestration still produced a valid
