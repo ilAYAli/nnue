@@ -361,13 +361,79 @@ class BuildConfigTests(unittest.TestCase):
                 engine_static["command"][engine_static["command"].index("--jsonl") + 1],
             )
 
+    def test_pytorch_source_mix_feeds_pack_and_static_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            broad = root / "broad.jsonl"
+            rescue = root / "rescue.jsonl"
+            broad.write_text("", encoding="utf-8")
+            rescue.write_text("", encoding="utf-8")
+            config_path = root / "config.json"
+            config_path.write_text(json.dumps({
+                "create": {
+                    "backend": "pytorch",
+                    "source_mix_jsonl": [
+                        f"{broad}:1000:800",
+                        f"{rescue}:500:800",
+                    ],
+                    "source_mix_seed": 2026060601,
+                    "source_mix_progress": 77,
+                    "engine_static_rows": 10,
+                    "require_clean_enyo_owned": True,
+                }
+            }), encoding="utf-8")
+
+            defaults = build.load_create_arg_defaults(str(config_path))
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", str(config_path), "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertEqual("source_mix", names[0])
+            self.assertLess(names.index("source_mix"), names.index("pack"))
+            self.assertLess(names.index("train"), names.index("validate_provenance"))
+            self.assertLess(
+                names.index("validate_provenance"),
+                names.index("validate_engine_static"),
+            )
+
+            source_mix = next(
+                step for step in config["steps"]
+                if step["name"] == "source_mix"
+            )
+            self.assertIn(f"{broad.resolve()}:1000:800", source_mix["command"])
+            self.assertIn(f"{rescue.resolve()}:500:800", source_mix["command"])
+            self.assertEqual(
+                "2026060601",
+                source_mix["command"][source_mix["command"].index("--seed") + 1],
+            )
+            self.assertEqual(
+                "77",
+                source_mix["command"][source_mix["command"].index("--progress") + 1],
+            )
+
+            pack = next(step for step in config["steps"] if step["name"] == "pack")
+            self.assertEqual(
+                "{score}/mixed.jsonl",
+                pack["command"][pack["command"].index("--input") + 1],
+            )
+
+            engine_static = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_engine_static"
+            )
+            self.assertEqual(
+                "{score}/mixed.jsonl",
+                engine_static["command"][engine_static["command"].index("--jsonl") + 1],
+            )
+
     def test_source_mix_feeds_bullet_training(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({
                 "create": {
                     "backend": "bullet",
                     "source_mix_jsonl": [
-                        "/runs/broad/labeled.jsonl:200000",
+                        "/runs/broad/labeled.jsonl:200000:800",
                         "/runs/replay/pairs.jsonl:4000",
                     ],
                     "source_mix_seed": 2026060302,
@@ -392,7 +458,7 @@ class BuildConfigTests(unittest.TestCase):
                 if step["name"] == "source_mix"
             )
             self.assertIn("--source", source_mix["command"])
-            self.assertIn("/runs/broad/labeled.jsonl:200000", source_mix["command"])
+            self.assertIn("/runs/broad/labeled.jsonl:200000:800", source_mix["command"])
             self.assertIn("/runs/replay/pairs.jsonl:4000", source_mix["command"])
             self.assertEqual(
                 "2026060302",

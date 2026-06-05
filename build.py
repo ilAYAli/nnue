@@ -146,12 +146,39 @@ def templated_path_arg(value: str | Path) -> str:
 def templated_source_spec_arg(value: str | Path) -> str:
     text = str(value)
     try:
-        path, rows = text.rsplit(":", 1)
+        path, rows, max_abs_cp = text.rsplit(":", 2)
     except ValueError as exc:
-        raise SystemExit(f"invalid source mix spec: {value}") from exc
+        try:
+            path, rows = text.rsplit(":", 1)
+        except ValueError as inner_exc:
+            raise SystemExit(f"invalid source mix spec: {value}") from inner_exc
+        max_abs_cp = ""
     if not path or not rows:
         raise SystemExit(f"invalid source mix spec: {value}")
+    if max_abs_cp:
+        return f"{templated_path_arg(path)}:{rows}:{max_abs_cp}"
     return f"{templated_path_arg(path)}:{rows}"
+
+
+def append_source_mix_step(
+    steps: list[dict],
+    args: argparse.Namespace,
+) -> str:
+    python = str(expand_user(args.python))
+    mix_output = "{score}/mixed.jsonl"
+    command = [
+        python, tool("posgen/mix_jsonl.py"),
+        "--output", mix_output,
+        "--seed", str(args.source_mix_seed),
+        "--progress", str(args.source_mix_progress),
+    ]
+    for spec in args.source_mix_jsonl:
+        command.extend(["--source", templated_source_spec_arg(spec)])
+    steps.append({
+        "name": "source_mix",
+        "command": command,
+    })
+    return mix_output
 
 
 def sibling_rows_file_arg(value: str | Path) -> str:
@@ -212,10 +239,11 @@ def validate_create_args(args: argparse.Namespace) -> None:
             raise SystemExit("source_mix_jsonl conflicts with score_source_jsonl")
         if args.labeled_jsonl:
             raise SystemExit("source_mix_jsonl conflicts with labeled_jsonl")
-        if args.bullet_data:
-            raise SystemExit("source_mix_jsonl conflicts with bullet_data")
-        if args.bullet_source_jsonl:
-            raise SystemExit("source_mix_jsonl conflicts with bullet_source_jsonl")
+        if args.backend == "bullet":
+            if args.bullet_data:
+                raise SystemExit("source_mix_jsonl conflicts with bullet_data")
+            if args.bullet_source_jsonl:
+                raise SystemExit("source_mix_jsonl conflicts with bullet_source_jsonl")
 
     if args.labeled_jsonl:
         if args.backend not in {"pytorch", "pairwise"}:
@@ -754,7 +782,12 @@ def create_config(args: argparse.Namespace) -> dict:
     engine_static_done = False
 
     if args.backend == "pytorch":
-        if args.labeled_jsonl:
+        if args.source_mix_jsonl:
+            labeled_jsonl = append_source_mix_step(steps, args)
+            rows_file = ""
+            if not args.engine_static_jsonl:
+                args.engine_static_jsonl = labeled_jsonl
+        elif args.labeled_jsonl:
             labeled_jsonl = templated_path_arg(args.labeled_jsonl)
             rows_file = sibling_rows_file_arg(args.labeled_jsonl)
             if not args.engine_static_jsonl:
@@ -811,6 +844,15 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             },
         ])
+        if args.require_clean_enyo_owned:
+            steps.append({
+                "name": "validate_provenance",
+                "command": [
+                    python, tool("validate/net_provenance.py"),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--require-clean-enyo-owned",
+                ],
+            })
     elif args.backend == "pairwise":
         if args.pairwise_data:
             pairwise_data = templated_path_arg(args.pairwise_data)
@@ -936,19 +978,7 @@ def create_config(args: argparse.Namespace) -> dict:
             })
     elif args.backend == "bullet":
         if args.source_mix_jsonl:
-            mix_output = "{score}/mixed.jsonl"
-            command = [
-                python, tool("posgen/mix_jsonl.py"),
-                "--output", mix_output,
-                "--seed", str(args.source_mix_seed),
-                "--progress", str(args.source_mix_progress),
-            ]
-            for spec in args.source_mix_jsonl:
-                command.extend(["--source", templated_source_spec_arg(spec)])
-            steps.append({
-                "name": "source_mix",
-                "command": command,
-            })
+            mix_output = append_source_mix_step(steps, args)
             args.bullet_source_jsonl = mix_output
             if not args.engine_static_jsonl:
                 args.engine_static_jsonl = mix_output

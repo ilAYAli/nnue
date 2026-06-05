@@ -84,11 +84,20 @@ Current clean-native lineage names:
 
 Current build intent:
 
-- No active training build is configured. `build.json` is intentionally
-  disabled after the `native-1.12.0` replay-pair smoke rejection, so
-  `build.py create` cannot accidentally rerun a closed lane.
-- The next training run requires one new written hypothesis in this file before
-  `build.json` is re-enabled.
+- `build.json` is `native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606`.
+- Hypothesis: a balanced mix of existing clean Enyo-native SF16-labeled broad
+  datasets can add useful data diversity without replay-pair overfit or another
+  architecture change.
+- Sources:
+  - `1,000,000` rows from `native-1.5.0-rc1`;
+  - `1,000,000` rows from `native-1.8.0-rc1`;
+  - `1,000,000` rows from `native-1.9.1-rc1`;
+  - up to `480,024` rescued rows from `native-1.10.0 score_rescore96`.
+- Every source is filtered by `abs(score) <= 800` before sampling. The run
+  starts from `native-1.5.0-rc1` and keeps the proven `16 x 12` scalar
+  architecture.
+- Stop before promotion unless source mixing, provenance, engine-static, and a
+  256-game distributed smoke versus `native-1.5.0-rc1` are neutral-positive.
 
 Closed build intent:
 
