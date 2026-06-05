@@ -109,6 +109,12 @@ Current build intent:
 - If the rescue run passes, consider a larger same-lane data run. If it fails,
   do not start the 10M run; inspect whether the failure is data quality, label
   quality, or training overshoot.
+- Result: rejected by the 256-game distributed smoke versus `native-1.5.0-rc1`.
+  The rescue run passed dataset integrity, provenance, and engine-static: on the
+  same 2000 rescued rows, candidate MAE/sign was `139.338` / `84.34%` versus
+  baseline `141.079` / `83.89%`. The game smoke finished `94-100-62`, score
+  `0.4883`, about `-8.14 +/- 37.13 Elo`, LOS `33.4%`. Do not scale this exact
+  rescued-480k setup to 10M; static improvement did not transfer to games.
 - First promotion threshold is "not worse than Berserk", not merely "close".
 - Closed lanes remain closed unless their representation or objective changes:
   output buckets, scalar replay-pair mixing, sidecar root override, and the
