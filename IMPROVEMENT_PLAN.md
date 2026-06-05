@@ -706,6 +706,16 @@ If this architecture branch fails gates or SPRT:
 
 Important failed signals:
 
+- Native 1.11.0 d10/d18 Stockfish instability slice did not produce a game
+  improvement. Crucible scanned 48 shards from the native 1.10 source file and
+  merged `21,716` clean rows with no task failures. A low-dose Bullet
+  fine-tune from native 1.5 improved engine-static MAE on that selected slice
+  from `177.748` to `164.960`, but the distributed 256-game smoke versus
+  native 1.5 was `91 - 97 - 68`, score `0.4883`, about `-8.1 Elo`. Treat the
+  d10/d18 instability slice as a static-overfit/rejection result. Do not scale
+  it without a broader mixed source and a move-choice or game gate that explains
+  why this selected slice should transfer.
+
 - Native 1.9.1 checkpoint screen did not produce a promotion candidate.
   The best 256-game checkpoint smokes were only ck128 and ck256 at about
   +5.4 Elo versus native 1.5.0, and both failed the move-choice gate:
