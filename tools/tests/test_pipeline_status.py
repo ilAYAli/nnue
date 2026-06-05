@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -61,6 +63,61 @@ class PipelineStatusTests(unittest.TestCase):
             self.assertEqual(7, written)
             self.assertEqual(10, source_rows)
             self.assertEqual(1, completed)
+
+    def test_launch_streams_output_to_stdout_and_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            run = tmp_path / "run"
+            config_path = tmp_path / "config.json"
+            config = {
+                "run": str(run),
+                "repo": str(REPO),
+                "steps": [
+                    {
+                        "name": "visible_test",
+                        "why": "Prove command output is visible.",
+                        "command": [
+                            sys.executable,
+                            "-c",
+                            "print('visible-output')",
+                        ],
+                    }
+                ],
+            }
+            config_path.write_text(json.dumps(config) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(PIPELINE_PATH), "launch", str(config_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("phase: visible_test", result.stdout)
+            self.assertIn("why: Prove command output is visible.", result.stdout)
+            self.assertIn("command:", result.stdout)
+            self.assertIn("visible-output", result.stdout)
+
+            log = (run / "runs.log").read_text(encoding="utf-8")
+            self.assertIn("why visible_test: Prove command output is visible.", log)
+            self.assertIn("visible-output", log)
+
+            events = pipeline.read_events(run)
+            phase_done = [
+                event for event in events if event.get("event") == "phase_done"
+            ][0]
+            self.assertEqual(
+                "Prove command output is visible.",
+                phase_done.get("why"),
+            )
+
+    def test_step_reason_has_known_defaults(self) -> None:
+        self.assertEqual(
+            "Train and export the candidate network with Bullet.",
+            pipeline.step_reason({"name": "bullet_train"}, "bullet_train"),
+        )
 
 
 if __name__ == "__main__":

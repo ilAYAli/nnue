@@ -5,16 +5,49 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import shlex
 import subprocess
 import sys
 import time
 import signal
+import threading
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib.events import emit_event, hook_from_config
+
+
+STEP_REASON_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("selfplay_crucible_plan", "Create the distributed self-play task manifest."),
+    ("selfplay_crucible_add_input", "Record fixed self-play inputs before workers run."),
+    ("selfplay_crucible_doctor", "Verify self-play worker prerequisites before launch."),
+    ("selfplay_crucible_deploy", "Start distributed self-play workers."),
+    ("selfplay_crucible_wait", "Wait for distributed self-play workers to finish."),
+    ("selfplay_crucible_merge", "Merge distributed self-play outputs into one PGN."),
+    ("posgen_selfplay", "Generate self-play games for training data."),
+    ("posgen_extract", "Extract training positions from generated games."),
+    ("posgen_sample", "Sample positions for scoring and training."),
+    ("score_crucible_plan", "Create the distributed scoring task manifest."),
+    ("score_crucible_add_input", "Record fixed scoring inputs before workers run."),
+    ("score_crucible_doctor", "Verify scoring worker prerequisites before launch."),
+    ("score_crucible_deploy", "Start distributed scoring workers."),
+    ("score_crucible_wait", "Wait for distributed scoring workers to finish."),
+    ("score_crucible_merge", "Merge distributed scoring outputs into labeled data."),
+    ("score_merge", "Merge score shards into one labeled dataset."),
+    ("score_", "Score one shard with the configured oracle engine."),
+    ("source_mix", "Build the requested source-data mix."),
+    ("pack", "Pack labeled JSONL into the binary training format."),
+    ("bullet_text", "Convert labeled data to Bullet text format."),
+    ("bullet_format", "Convert Bullet text to Bullet training data."),
+    ("bullet_train", "Train and export the candidate network with Bullet."),
+    ("train", "Train and export the candidate network."),
+    ("validate_provenance", "Verify the net provenance before trusting results."),
+    ("validate_engine_static", "Run engine-side static validation."),
+    ("validate_bullet_static", "Run Bullet-side static validation."),
+    ("validate_sprt", "Run the game-strength gate."),
+)
 
 
 def expand_path(value: str | Path) -> Path:
@@ -48,6 +81,96 @@ def load_config(path: Path) -> dict[str, Any]:
 
 def format_command(command: list[str], variables: dict[str, str]) -> list[str]:
     return [part.format(**variables) for part in command]
+
+
+def command_text(command: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in command)
+
+
+def step_reason(step: dict[str, Any], name: str) -> str:
+    for key in ("why", "reason", "description"):
+        value = step.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    for prefix, reason in STEP_REASON_PREFIXES:
+        if name.startswith(prefix):
+            return reason
+    return "Run this pipeline phase."
+
+
+def write_log(
+    log: Any,
+    log_lock: threading.Lock,
+    line: str,
+) -> None:
+    with log_lock:
+        log.write(line)
+        log.flush()
+
+
+def print_step_start(
+    log: Any,
+    log_lock: threading.Lock,
+    name: str,
+    why: str,
+    command: list[str],
+) -> None:
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+    text = command_text(command)
+    with log_lock:
+        print(f"phase: {name}", flush=True)
+        print(f"why: {why}", flush=True)
+        print(f"command: {text}", flush=True)
+        log.write(f"{now} start {name}: {text}\n")
+        log.write(f"{now} why {name}: {why}\n")
+        log.flush()
+
+
+def stream_process_output(
+    name: str,
+    proc: subprocess.Popen[str],
+    log: Any,
+    log_lock: threading.Lock,
+    *,
+    prefix_output: bool,
+) -> None:
+    if proc.stdout is None:
+        return
+    for line in proc.stdout:
+        visible = f"[{name}] {line}" if prefix_output else line
+        with log_lock:
+            print(visible, end="", flush=True)
+            log.write(visible)
+            log.flush()
+
+
+def start_logged_process(
+    name: str,
+    command: list[str],
+    repo: str,
+    log: Any,
+    log_lock: threading.Lock,
+    active_procs: list[subprocess.Popen[str]],
+    *,
+    prefix_output: bool,
+) -> tuple[subprocess.Popen[str], threading.Thread]:
+    proc = subprocess.Popen(
+        command,
+        cwd=repo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    active_procs.append(proc)
+    thread = threading.Thread(
+        target=stream_process_output,
+        args=(name, proc, log, log_lock),
+        kwargs={"prefix_output": prefix_output},
+        daemon=True,
+    )
+    thread.start()
+    return proc, thread
 
 
 def count_lines(path: Path) -> int:
@@ -259,6 +382,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
 
     batches = _group_steps(steps)
 
+    log_lock = threading.Lock()
     with log_path.open("a", encoding="utf-8") as log:
         for batch in batches:
             if len(batch) == 1:
@@ -270,6 +394,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                 if not isinstance(command, list) or not all(isinstance(x, str) for x in command):
                     raise SystemExit(f"step {name}: command must be a string list")
                 formatted = format_command(command, variables)
+                why = step_reason(step, name)
                 marker = run_dir / f"{name}.done"
                 if marker.exists() and not args.force:
                     print(f"skip {name}: {marker} exists", flush=True)
@@ -281,11 +406,10 @@ def cmd_launch(args: argparse.Namespace) -> int:
                         log=log_path,
                         command=formatted,
                         hook_command=hook_command,
+                        extra={"why": why},
                     )
                     continue
-                print(f"start {name}: {' '.join(formatted)}", flush=True)
-                log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} start {name}: {' '.join(formatted)}\n")
-                log.flush()
+                print_step_start(log, log_lock, name, why, formatted)
                 emit_event(
                     run_dir,
                     "phase_start",
@@ -294,19 +418,25 @@ def cmd_launch(args: argparse.Namespace) -> int:
                     log=log_path,
                     command=formatted,
                     hook_command=hook_command,
+                    extra={"why": why},
                 )
-                proc = subprocess.Popen(
+                proc, stream_thread = start_logged_process(
+                    name,
                     formatted,
-                    cwd=variables["repo"],
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
-                    text=True,
+                    variables["repo"],
+                    log,
+                    log_lock,
+                    active_procs,
+                    prefix_output=False,
                 )
-                active_procs.append(proc)
                 rc = proc.wait()
+                stream_thread.join()
                 active_procs.remove(proc)
-                log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} done {name} rc={rc}\n")
-                log.flush()
+                write_log(
+                    log,
+                    log_lock,
+                    f"{time.strftime('%Y-%m-%dT%H:%M:%S')} done {name} rc={rc}\n",
+                )
                 if rc != 0:
                     print(f"failed {name}: rc={rc}; log={log_path}", flush=True)
                     emit_event(
@@ -318,6 +448,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                         log=log_path,
                         command=formatted,
                         hook_command=hook_command,
+                        extra={"why": why},
                     )
                     return rc
                 marker.write_text("rc=0\n", encoding="utf-8")
@@ -331,11 +462,14 @@ def cmd_launch(args: argparse.Namespace) -> int:
                     log=log_path,
                     command=formatted,
                     hook_command=hook_command,
+                    extra={"why": why},
                 )
             else:
                 # Parallel batch: launch all steps concurrently, wait for all.
                 group_name = batch[0].get("parallel_group", "parallel")
-                pending: list[tuple[str, list[str], Path, subprocess.Popen[str]]] = []
+                pending: list[
+                    tuple[str, list[str], str, Path, subprocess.Popen[str], threading.Thread]
+                ] = []
                 skipped_all = True
 
                 for step in batch:
@@ -348,6 +482,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                     ):
                         raise SystemExit(f"step {name}: command must be a string list")
                     formatted = format_command(command, variables)
+                    why = step_reason(step, name)
                     marker = run_dir / f"{name}.done"
                     if marker.exists() and not args.force:
                         print(f"skip {name}: {marker} exists", flush=True)
@@ -359,15 +494,11 @@ def cmd_launch(args: argparse.Namespace) -> int:
                             log=log_path,
                             command=formatted,
                             hook_command=hook_command,
+                            extra={"why": why},
                         )
                         continue
                     skipped_all = False
-                    print(f"start {name}: {' '.join(formatted)}", flush=True)
-                    log.write(
-                        f"{time.strftime('%Y-%m-%dT%H:%M:%S')} start {name}:"
-                        f" {' '.join(formatted)}\n"
-                    )
-                    log.flush()
+                    print_step_start(log, log_lock, name, why, formatted)
                     emit_event(
                         run_dir,
                         "phase_start",
@@ -376,16 +507,18 @@ def cmd_launch(args: argparse.Namespace) -> int:
                         log=log_path,
                         command=formatted,
                         hook_command=hook_command,
+                        extra={"why": why},
                     )
-                    proc = subprocess.Popen(
+                    proc, stream_thread = start_logged_process(
+                        name,
                         formatted,
-                        cwd=variables["repo"],
-                        stdout=log,
-                        stderr=subprocess.STDOUT,
-                        text=True,
+                        variables["repo"],
+                        log,
+                        log_lock,
+                        active_procs,
+                        prefix_output=True,
                     )
-                    active_procs.append(proc)
-                    pending.append((name, formatted, marker, proc))
+                    pending.append((name, formatted, why, marker, proc, stream_thread))
 
                 if skipped_all:
                     continue
@@ -395,16 +528,20 @@ def cmd_launch(args: argparse.Namespace) -> int:
                 remaining = list(pending)
                 while remaining:
                     still_running = []
-                    for name, formatted, marker, proc in remaining:
+                    for name, formatted, why, marker, proc, stream_thread in remaining:
                         rc = proc.poll()
                         if rc is None:
-                            still_running.append((name, formatted, marker, proc))
+                            still_running.append(
+                                (name, formatted, why, marker, proc, stream_thread)
+                            )
                             continue
+                        stream_thread.join()
                         active_procs.remove(proc)
-                        log.write(
-                            f"{time.strftime('%Y-%m-%dT%H:%M:%S')} done {name} rc={rc}\n"
+                        write_log(
+                            log,
+                            log_lock,
+                            f"{time.strftime('%Y-%m-%dT%H:%M:%S')} done {name} rc={rc}\n",
                         )
-                        log.flush()
                         if rc != 0:
                             print(f"failed {name}: rc={rc}; log={log_path}", flush=True)
                             emit_event(
@@ -416,6 +553,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                                 log=log_path,
                                 command=formatted,
                                 hook_command=hook_command,
+                                extra={"why": why},
                             )
                             if failed_rc is None:
                                 failed_rc = rc
@@ -436,6 +574,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                                 log=log_path,
                                 command=formatted,
                                 hook_command=hook_command,
+                                extra={"why": why},
                             )
                     remaining = still_running
                     if remaining:

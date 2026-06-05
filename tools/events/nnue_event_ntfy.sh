@@ -127,6 +127,7 @@ event_name = event.get("event", "unknown")
 stage = event.get("stage", "")
 status = event.get("status", "")
 log = event.get("log", "")
+why = str(event.get("why", "") or "")
 run_dir = Path(event.get("run", "")).expanduser()
 
 
@@ -251,6 +252,8 @@ if "rc" in event:
 
 lines.append("")
 lines.append("What ran")
+if why:
+    lines.append(f"  • Why: {why}")
 if source != "unknown":
     lines.append(f"  • Source: {source}")
 if label != "unknown":
