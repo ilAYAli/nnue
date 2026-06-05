@@ -96,6 +96,46 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_bullet_can_train_from_existing_source_jsonl(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": False,
+                    "bullet_source_jsonl": "runs/rescued/labeled.jsonl",
+                    "bullet_data": "",
+                    "bullet_limit": 1000,
+                    "bullet_static_data": "",
+                    "engine_static_jsonl": "runs/rescued/labeled.jsonl",
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertNotIn("selfplay_crucible_plan", names)
+            self.assertNotIn("score_crucible_plan", names)
+            self.assertNotIn("score_merge", names)
+            self.assertIn("bullet_text", names)
+            self.assertIn("validate_engine_static", names)
+
+            bullet_text = next(
+                step for step in config["steps"] if step["name"] == "bullet_text"
+            )
+            input_index = bullet_text["command"].index("--input")
+            self.assertTrue(
+                bullet_text["command"][input_index + 1].endswith(
+                    "/runs/rescued/labeled.jsonl"
+                )
+            )
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_clean_owned_generation_rejects_empty_nnue_file(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

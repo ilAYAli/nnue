@@ -1,8 +1,8 @@
 {
-  "description": "Same-architecture native data-scale preflight: generate clean Enyo self-play, score the first 500k rows with Stockfish d16, and continue native-1.5.0 with a small low-LR Bullet run before deciding whether a 10M scored-row run is worth launching.",
-  "experiment": "native-1.10.0-preflight-500k",
+  "description": "Rescue the completed native-1.10 score_rescore96 Stockfish d16 labels and continue native-1.5.0 with the same 16x12 scalar architecture. This run does not generate new self-play or scoring data.",
+  "experiment": "native-1.10.1-rescued480k",
   "create": {
-    "name": "native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604",
+    "name": "native-1.10.1-rc1-rescued480k-sf-d16-lr3e7-sb128-20260605",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "backend": "bullet",
     "engine": "~/assets/engines/reference",
@@ -18,7 +18,7 @@
     "selfplay_use_nnue": true,
     "selfplay_depth": 8,
     "selfplay_seed": 2026060410,
-    "selfplay_crucible": true,
+    "selfplay_crucible": false,
     "selfplay_crucible_tool": "~/.local/bin/crucible",
     "selfplay_crucible_lease_seconds": 600,
     "selfplay_crucible_path_map": [
@@ -41,7 +41,7 @@
     "score_limit": 500000,
     "score_max_abs_cp": 1600,
     "score_progress": 10000,
-    "score_crucible": true,
+    "score_crucible": false,
     "score_crucible_tool": "~/.local/bin/crucible",
     "score_crucible_lease_seconds": 600,
     "score_crucible_path_map": [
@@ -54,8 +54,8 @@
     "score_crucible_jobs": 4,
     "score_crucible_remote_timeout_seconds": 21600,
     "pack_progress": 250000,
-    "bullet_source_jsonl": "{score}/labeled.jsonl",
-    "bullet_generate_source": true,
+    "bullet_source_jsonl": "runs/native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604/score_rescore96/labeled.jsonl",
+    "bullet_generate_source": false,
     "bullet_data": "",
     "bullet_manifest": "~/source/bullet/Cargo.toml",
     "bullet_loader": "direct",
@@ -85,21 +85,21 @@
     "bullet_weight_decay": 0.0,
     "bullet_static_data": "",
     "bullet_static_rows": 100000,
-    "engine_static_jsonl": "{score}/labeled.jsonl",
+    "engine_static_jsonl": "runs/native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604/score_rescore96/labeled.jsonl",
     "engine_static_rows": 2000,
     "engine_static_engine": "~/assets/engines/reference",
     "require_clean_enyo_owned": true
   },
   "validation": {
     "baseline": "native-1.5.0-rc1",
-    "hypothesis": "More clean Enyo self-play plus Stockfish d16 labels may be enough to move the existing 16x12 scalar net if the run is large and distributed enough. The 500k preflight tests data quality, worker setup, provenance, engine-static behavior, and a small game smoke before committing to 10M scored rows.",
+    "hypothesis": "The failed native-1.10 orchestration still produced a valid completed score_rescore96 label set. Reusing those 480024 Stockfish d16 labels should test the larger-data same-architecture lane without regenerating labels.",
     "gates": [
-      "Crucible self-play and scoring use all ready workers or record an explicit exclusion reason",
-      "no fatal/disconnect task failures in self-play or scoring",
+      "rescued labeled JSONL has 480024 rows and the recorded SHA-256",
+      "rescued labeled JSONL parses cleanly",
       "provenance is clean Enyo-owned",
       "engine-static broad metrics do not collapse versus native-1.5.0 on the same scored rows",
       "200-300 game smoke versus native-1.5.0 is neutral-positive before scaling to 10M"
     ],
-    "stop_criteria": "Do not start the 10M run if the preflight fails provenance, engine-static, worker reliability, or the smoke gate."
+    "stop_criteria": "Do not start the 10M run if the rescue run fails dataset integrity, provenance, engine-static, or the smoke gate."
   }
 }

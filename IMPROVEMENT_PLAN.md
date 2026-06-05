@@ -79,31 +79,36 @@ Current clean-native lineage names:
 
 Current build intent:
 
-- Current `build.json` is `native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128`.
-  It keeps the proven `16 x 12` scalar architecture and starts from
-  `native-1.5.0-rc1`.
-- Hypothesis: previous same-architecture candidates were too small, noisy, or
-  overfit. Crucible now makes a controlled larger-data test cheap enough. A
-  500k-label preflight should show whether scaling fresh clean Enyo self-play
-  with Stockfish d16 labels improves engine-side gates before spending time on
-  a full 10M-label run.
-- Generate positions from Enyo self-play/replay only. Self-play generated with
-  Berserk, `default.net`, or an empty NNUE fallback is contaminated and rejected.
+- Current `build.json` is
+  `native-1.10.1-rc1-rescued480k-sf-d16-lr3e7-sb128-20260605`. It keeps the
+  proven `16 x 12` scalar architecture and starts from `native-1.5.0-rc1`.
+- Hypothesis: the failed `native-1.10.0` orchestration still produced a valid
+  broad clean-native label set. Reusing the completed `score_rescore96` output
+  should test the larger-data lane without spending another 2-3 hours
+  regenerating the same Stockfish d16 labels.
+- Rescued dataset: `datasets/native-1.10-preflight-480k-sf-d16.json` records
+  `480024` rows, SHA-256
+  `aa596a0832d5885d3cbf32d17b18afc2f933a6d91efe99a8f6662420e74edcad`, and the
+  source file
+  `runs/native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604/score_rescore96/labeled.jsonl`.
+- Do not resume the old Crucible wrapper
+  `score-native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604`; it was a
+  failed control job. Reuse only the completed `score_rescore96/labeled.jsonl`.
+- Positions remain Enyo self-play/replay only. Self-play generated with Berserk,
+  `default.net`, or an empty NNUE fallback is contaminated and rejected.
 - Allow Stockfish only as a fixed oracle labeler, not as a position source.
 - Require `net_provenance.py --require-clean-enyo-owned` before static
   validation or SPRT.
-- Preflight gates:
-  - all Crucible workers must pass setup and contribute or be explicitly
-    excluded with a reason;
-  - self-play and scoring must finish with no fatal/disconnect shards;
+- Rescue gates:
+  - rescued JSONL row count and SHA-256 must match the dataset manifest;
+  - JSONL parsing must succeed on the full file;
   - provenance must remain clean Enyo-owned;
-  - engine-static on the scored rows must not collapse versus
+  - engine-static on the rescued rows must not collapse versus
     `native-1.5.0-rc1`;
   - a 200-300 game smoke versus `native-1.5.0-rc1` must be neutral-positive.
-- If the preflight passes, update `build.json` to a full 10M scored-row run and
-  keep the same architecture/objective. If it fails, do not start the 10M run;
-  inspect whether the failure is data quality, label quality, or training
-  overshoot.
+- If the rescue run passes, consider a larger same-lane data run. If it fails,
+  do not start the 10M run; inspect whether the failure is data quality, label
+  quality, or training overshoot.
 - First promotion threshold is "not worse than Berserk", not merely "close".
 - Closed lanes remain closed unless their representation or objective changes:
   output buckets, scalar replay-pair mixing, sidecar root override, and the
