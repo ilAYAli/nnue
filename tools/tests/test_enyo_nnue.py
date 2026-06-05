@@ -127,6 +127,21 @@ def test_pytorch_model_load_and_export_preserve_bucket_count(tmp_path: Path) -> 
     assert nn2.load_net(exported).input_buckets == 32
 
 
+def test_export_model_does_not_move_module_to_cpu(tmp_path: Path) -> None:
+    source = tmp_path / "source.nn"
+    exported = tmp_path / "exported.nn"
+    nn2.write_net(_zero_net(16), source)
+    model = load_model_from_nn(source)
+
+    def fail_cpu():
+        raise AssertionError("export_model should copy tensors, not move module")
+
+    model.cpu = fail_cpu  # type: ignore[method-assign]
+    export_model(model, exported)
+
+    assert nn2.load_net(exported).input_buckets == 16
+
+
 def test_pytorch_model_expands_legacy_net_to_zero_material_head(
         tmp_path: Path) -> None:
     source = tmp_path / "legacy.nn"

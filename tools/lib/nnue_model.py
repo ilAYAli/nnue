@@ -184,25 +184,28 @@ def _clip_round(arr: np.ndarray, lo: int, hi: int, name: str) -> np.ndarray:
     return clipped
 
 
+def _tensor_numpy(tensor: torch.Tensor) -> np.ndarray:
+    return tensor.detach().cpu().numpy()
+
+
 def export_model(model: EnyoNNUE, path: str | Path) -> None:
-    m = model.cpu()
     iw = _clip_round(
-        m.embed.weight.detach().numpy(),
+        _tensor_numpy(model.embed.weight),
         np.iinfo(np.int16).min,
         np.iinfo(np.int16).max,
         "input_weights").astype(np.int16)
     ib = _clip_round(
-        m.input_bias.detach().numpy(),
+        _tensor_numpy(model.input_bias),
         np.iinfo(np.int16).min,
         np.iinfo(np.int16).max,
         "input_biases").astype(np.int16)
     l1w = _clip_round(
-        m.l1_weight.detach().numpy(),
+        _tensor_numpy(model.l1_weight),
         np.iinfo(np.int8).min,
         np.iinfo(np.int8).max,
         "l1_weights").astype(np.int8)
     l1b = _clip_round(
-        m.l1_bias.detach().numpy(),
+        _tensor_numpy(model.l1_bias),
         np.iinfo(np.int32).min,
         np.iinfo(np.int32).max,
         "l1_biases").astype(np.int32)
@@ -211,13 +214,13 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         input_biases=ib,
         l1_weights=l1w,
         l1_biases=l1b,
-        l2_weights=m.l2.weight.detach().numpy().astype(np.float32),
-        l2_biases=m.l2.bias.detach().numpy().astype(np.float32),
-        output_weights=m.output.weight.detach().numpy().astype(np.float32),
-        output_biases=m.output.bias.detach().numpy().astype(np.float32),
-        input_buckets=m.input_buckets,
-        feature_channels=m.feature_channels,
-        output_buckets=m.output_buckets,
-        output_head_features=m.output_head_features,
+        l2_weights=_tensor_numpy(model.l2.weight).astype(np.float32),
+        l2_biases=_tensor_numpy(model.l2.bias).astype(np.float32),
+        output_weights=_tensor_numpy(model.output.weight).astype(np.float32),
+        output_biases=_tensor_numpy(model.output.bias).astype(np.float32),
+        input_buckets=model.input_buckets,
+        feature_channels=model.feature_channels,
+        output_buckets=model.output_buckets,
+        output_head_features=model.output_head_features,
     )
     nn2.write_net(net, path)

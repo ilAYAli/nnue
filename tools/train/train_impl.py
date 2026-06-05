@@ -132,6 +132,13 @@ def maybe_compile_model(model: EnyoNNUE, args: argparse.Namespace):
     return model
 
 
+def detached_cpu_state_dict(model: EnyoNNUE) -> dict[str, torch.Tensor]:
+    return {
+        key: value.detach().cpu().clone()
+        for key, value in model.state_dict().items()
+    }
+
+
 @torch.no_grad()
 def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
                  ) -> dict[str, float]:
@@ -384,7 +391,7 @@ def main() -> None:
     model = train(args)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(model.cpu().state_dict(), out)
+    torch.save(detached_cpu_state_dict(model), out)
     print(f"wrote {out}")
 
     if args.out_nn:
