@@ -19,11 +19,28 @@ class NnueEventNtfyTests(unittest.TestCase):
             tmp = Path(tmp_name)
             run = tmp / "run"
             run.mkdir()
+            validate = run / "validate"
+            validate.mkdir()
             log_path = run / "deploy.log"
             log_path.write_text(
                 "2026-06-04 Enyo NNUE SPRT finished diagnostic rc=0 "
                 "[64/64] Elo 1.0 +/- 10.0 | LLR 0.10/2.94 ( 3%) "
                 "| LOS 55.0% | draw 25.0% | ETA 0s\n",
+                encoding="utf-8",
+            )
+            (validate / "move_gate.summary.json").write_text(
+                json.dumps({
+                    "baseline_prefers_best": 1137,
+                    "candidate_prefers_best": 1144,
+                    "cases": [],
+                    "delta_avg_margin": 2.078,
+                    "delta_loss_weighted_margin": 1.515,
+                    "fixed": 25,
+                    "regressed": 18,
+                    "by_source": {
+                        "loss": {"cases": 2487},
+                    },
+                }),
                 encoding="utf-8",
             )
             hook_log = tmp / "hook.log"
@@ -74,6 +91,11 @@ class NnueEventNtfyTests(unittest.TestCase):
 
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("NNUE status", proc.stdout)
+        self.assertIn(
+            "Move gate: candidate=1144/2487 baseline=1137/2487 "
+            "fixed=25 regressed=18 delta_avg=+2.1cp weighted=+1.5cp",
+            proc.stdout,
+        )
         self.assertNotIn("nnue_sent", log)
         self.assertIn("ai_stdout_sent", log)
 

@@ -169,6 +169,54 @@ def compact_metric_line(line):
     return " ".join(out) if out else line
 
 
+def fmt_cp(value):
+    try:
+        return f"{float(value):+.1f}cp"
+    except (TypeError, ValueError):
+        return ""
+
+
+def move_gate_line(summary):
+    if not isinstance(summary, dict):
+        return ""
+    cases = summary.get("cases")
+    if isinstance(cases, list):
+        cases_count = len(cases)
+    elif isinstance(cases, int):
+        cases_count = cases
+    else:
+        cases_count = 0
+    if cases_count <= 0:
+        by_source = summary.get("by_source")
+        if isinstance(by_source, dict) and by_source:
+            cases_count = sum(
+                int(item.get("cases", 0))
+                for item in by_source.values()
+                if isinstance(item, dict)
+            )
+    if cases_count <= 0:
+        return ""
+    baseline = summary.get("baseline_prefers_best")
+    candidate = summary.get("candidate_prefers_best")
+    fixed = summary.get("fixed")
+    regressed = summary.get("regressed")
+    delta_avg = fmt_cp(summary.get("delta_avg_margin"))
+    delta_weighted = fmt_cp(summary.get("delta_loss_weighted_margin"))
+    parts = []
+    if candidate is not None and baseline is not None:
+        parts.append(f"candidate={candidate}/{cases_count}")
+        parts.append(f"baseline={baseline}/{cases_count}")
+    if fixed is not None:
+        parts.append(f"fixed={fixed}")
+    if regressed is not None:
+        parts.append(f"regressed={regressed}")
+    if delta_avg:
+        parts.append(f"delta_avg={delta_avg}")
+    if delta_weighted:
+        parts.append(f"weighted={delta_weighted}")
+    return " ".join(parts)
+
+
 def count_rows(path):
     p = Path(path)
     if not p.exists():
@@ -232,6 +280,7 @@ provenance = last_matching(log_text, r"clean_enyo_owned=(yes|no)")
 static_all = compact_metric_line(last_matching(log_text, r"^all rows="))
 bucket_0_50 = compact_metric_line(last_matching(log_text, r"^bucket:0-50 "))
 bucket_50_100 = compact_metric_line(last_matching(log_text, r"^bucket:50-100 "))
+move_gate = move_gate_line(read_json(run_dir / "validate" / "move_gate.summary.json"))
 train_time = last_matching(log_text, r"Total Training Time:")
 sprt_done = last_matching(log_text, r"Enyo NNUE SPRT finished")
 sprt_line = last_matching(log_text, r"^\[\s*\d+/\d+\]")
@@ -275,6 +324,8 @@ if bucket_0_50:
     lines.append(f"  • Near-zero 0-50: {bucket_0_50}")
 if bucket_50_100:
     lines.append(f"  • Near-zero 50-100: {bucket_50_100}")
+if move_gate:
+    lines.append(f"  • Move gate: {move_gate}")
 if sprt_done:
     lines.append(f"  • SPRT: {sprt_done}")
 elif sprt_line:
