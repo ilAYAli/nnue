@@ -160,6 +160,29 @@ class CandidateDefaults:
     engine_static_engine: str = "~/code/cpp/chess/assets/engines/reference"
     require_clean_enyo_owned: bool = False
 
+    pairwise_data: str = ""
+    pairwise_pairs_jsonl: str = ""
+    pairwise_init_from_nn: str = ""
+    pairwise_pair_batch_size: int = 64
+    pairwise_pair_weight: float = 1.0
+    pairwise_broad_weight: float = 1.0
+    pairwise_pair_beta: float = 100.0
+    pairwise_max_target_margin: float = 800.0
+    pairwise_min_target_margin: float = 1.0
+    pairwise_loss_weight_by_cp: bool = False
+    pairwise_steps_per_epoch: int = 0
+    pairwise_max_rows: int = 0
+    pairwise_skip_rows: int = 0
+    pairwise_checkpoint_every: int = 1
+    pairwise_move_gate_cases: str = ""
+    pairwise_move_gate_baseline_net: str = ""
+    pairwise_move_gate_limit: int = 0
+    pairwise_move_gate_fail_candidate_below_baseline: bool = True
+    pairwise_move_gate_fail_regressed_above: int = -1
+    pairwise_move_gate_fail_fixed_below: int = -1
+    pairwise_move_gate_fail_delta_below: float = 0.0
+    pairwise_move_gate_fail_loss_weighted_delta_below: float = 0.0
+
     sprt_games: int = 1000
     sprt_tc: str = "2+0.02"
     sprt_concurrency: int = 10

@@ -526,10 +526,17 @@ Priority order:
 
 ## Next Concrete Experiment
 
-No candidate build is currently selected.
+Current `build.json` is
+`native-1.12.0-rc1-fullbroad-replaypair-pw3-lr1e6-e8-20260605`.
 
-The next experiment must be a preserved or separated move-choice/ranking proof,
-not another scalar eval calibration:
+Hypothesis: replay child-pair supervision is a real local ranking signal, but
+the previous preserved scalar probes used too little broad preservation and
+then selected a checkpoint from a manual screen. Repacking and training against
+the full `native-1.5.0-rc1` broad label set should make the pairwise pressure a
+small correction instead of a broad-eval rewrite.
+
+This is still a scalar proof, so it is a gate-only experiment until it proves
+that the signal transfers cleanly:
 
 1. Use the fixed replay-loss move gate as the first target suite.
 2. Preserve the current clean-native baseline:
@@ -549,6 +556,34 @@ not another scalar eval calibration:
 7. Only after both gates pass, decide whether the signal belongs in a scalar
    `.nn` fine-tune, a separate sidecar/ranking path, or a new representation.
 
+Concrete run settings:
+
+- broad data:
+  `runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl`
+  (`2,943,810` rows);
+- pair data:
+  `runs/rc1-replay-fullpair-r2-20260531/replay_full_pairs.jsonl`
+  (`27,814` child rows);
+- baseline/init net:
+  `native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602`;
+- training: `backend=pairwise`, `pair_weight=3`, `broad_weight=1`,
+  `lr=1e-6`, `epochs=8`, checkpoint every epoch;
+- gates before any games:
+  - `net_provenance.py --require-clean-enyo-owned`;
+  - baseline and candidate `eval_jsonl_engine.py` on the same 5000 broad rows;
+  - `eval_move_gate.py` on
+    `runs/gate-baseline-native18-vs-native15-20260603/move_gate.jsonl`.
+
+Stop criteria:
+
+- reject before SPRT if provenance fails;
+- reject before SPRT if broad engine-static clearly regresses versus baseline;
+- reject before SPRT if the move gate has candidate below baseline or negative
+  average / loss-weighted margin deltas;
+- if the final epoch fails but checkpoints contain a materially better
+  broad-vs-ranking tradeoff, screen only the best checkpoint. Do not run a
+  matrix of replay-pair variants.
+
 Pass criteria for continuing a lane:
 
 - a smoke against the previous clean-owned baseline should be positive;
@@ -565,9 +600,10 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- disabled on purpose. `./build.py create -c build.json` should fail until the
-  next preserved/separated move-choice proof is written into a reviewable
-  config.
+- enabled for
+  `native-1.12.0-rc1-fullbroad-replaypair-pw3-lr1e6-e8-20260605`.
+  Run it with `./build.py create -c build.json`; do not start games unless the
+  configured gates pass.
 - rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`,
   `native-2.1.0-rc2`, and all scalar pairwise repair nets.
 

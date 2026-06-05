@@ -412,6 +412,82 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_pairwise_backend_packs_trains_and_gates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            labeled = root / "broad.jsonl"
+            pairs = root / "pairs.jsonl"
+            gate = root / "gate.jsonl"
+            baseline = root / "baseline.nn"
+            labeled.write_text("", encoding="utf-8")
+            labeled.with_suffix(".wc").write_text("0 broad.jsonl\n", encoding="utf-8")
+            pairs.write_text("", encoding="utf-8")
+            gate.write_text("", encoding="utf-8")
+            baseline.write_text("", encoding="utf-8")
+            config_path = root / "config.json"
+            config_path.write_text(json.dumps({
+                "create": {
+                    "backend": "pairwise",
+                    "labeled_jsonl": str(labeled),
+                    "pairwise_pairs_jsonl": str(pairs),
+                    "pairwise_init_from_nn": str(baseline),
+                    "pairwise_pair_weight": 3.0,
+                    "pairwise_checkpoint_every": 2,
+                    "pairwise_move_gate_cases": str(gate),
+                    "engine_static_jsonl": str(labeled),
+                    "engine_static_rows": 10,
+                    "require_clean_enyo_owned": True,
+                }
+            }), encoding="utf-8")
+
+            defaults = build.load_create_arg_defaults(str(config_path))
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", str(config_path), "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertEqual("pack", names[0])
+            self.assertLess(names.index("train_pairwise"), names.index("validate_provenance"))
+            self.assertLess(
+                names.index("validate_provenance"),
+                names.index("validate_engine_static_baseline"),
+            )
+            self.assertLess(
+                names.index("validate_engine_static_baseline"),
+                names.index("validate_engine_static"),
+            )
+            self.assertLess(names.index("validate_engine_static"), names.index("validate_move_gate"))
+
+            train = next(step for step in config["steps"] if step["name"] == "train_pairwise")
+            self.assertIn("--checkpoint-dir", train["command"])
+            self.assertEqual(
+                "2",
+                train["command"][train["command"].index("--checkpoint-every") + 1],
+            )
+            self.assertEqual(
+                "3.0",
+                train["command"][train["command"].index("--pair-weight") + 1],
+            )
+
+            baseline_static = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_engine_static_baseline"
+            )
+            self.assertEqual(
+                str(baseline.resolve()),
+                baseline_static["command"][baseline_static["command"].index("--net") + 1],
+            )
+
+            move_gate = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_move_gate"
+            )
+            self.assertIn("--fail-if-candidate-below-baseline", move_gate["command"])
+            self.assertEqual(
+                str(gate.resolve()),
+                move_gate["command"][move_gate["command"].index("--cases") + 1],
+            )
+
     def test_bullet_init_net_converts_to_layout_weights(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

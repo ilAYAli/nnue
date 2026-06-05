@@ -1,14 +1,50 @@
 {
-  "description": "No active NNUE build is configured. The previous native-1.10.1 rescue run is rejected and must not be rerun accidentally.",
-  "experiment": "no-active-native-build",
+  "description": "Preserved replay-pair proof: full native-1.5 broad labels plus replay child-pair supervision, with baseline/candidate broad static and move gate before any games.",
+  "experiment": "native-1.12.0-rc1-fullbroad-replaypair-pw3",
   "create": {
-    "disabled": true,
-    "disabled_reason": "No active NNUE training run. native-1.10.1 rescued480k passed static checks but failed the 256-game smoke versus native-1.5.0; write a new hypothesis in IMPROVEMENT_PLAN.md before starting another run."
+    "name": "native-1.12.0-rc1-fullbroad-replaypair-pw3-lr1e6-e8-20260605",
+    "backend": "pairwise",
+    "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
+    "python": "~/.venv/bin/python",
+    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl",
+    "pairwise_pairs_jsonl": "~/code/cpp/chess/nnue/runs/rc1-replay-fullpair-r2-20260531/replay_full_pairs.jsonl",
+    "pairwise_init_from_nn": "~/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
+    "pairwise_move_gate_cases": "~/code/cpp/chess/nnue/runs/gate-baseline-native18-vs-native15-20260603/move_gate.jsonl",
+    "pairwise_move_gate_baseline_net": "~/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
+    "engine_static_jsonl": "~/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl",
+    "engine_static_rows": 5000,
+    "engine_static_engine": "~/code/cpp/chess/assets/engines/reference",
+    "require_clean_enyo_owned": true,
+    "epochs": 8,
+    "batch_size": 8192,
+    "pairwise_pair_batch_size": 64,
+    "lr": 0.000001,
+    "weight_decay": 0.000001,
+    "huber_beta": 200,
+    "pairwise_pair_beta": 100,
+    "pairwise_pair_weight": 3.0,
+    "pairwise_broad_weight": 1.0,
+    "pairwise_checkpoint_every": 1,
+    "pairwise_loss_weight_by_cp": true,
+    "target_clamp": 800,
+    "pairwise_max_target_margin": 800,
+    "pairwise_min_target_margin": 1,
+    "device": "cuda",
+    "workers": 4,
+    "max_features": 32,
+    "pack_progress": 250000,
+    "pairwise_move_gate_fail_candidate_below_baseline": true,
+    "pairwise_move_gate_fail_delta_below": 0.0,
+    "pairwise_move_gate_fail_loss_weighted_delta_below": 0.0
   },
   "validation": {
-    "state": "paused",
-    "last_rejected_run": "native-1.10.1-rc1-rescued480k-sf-d16-lr3e7-sb128-20260605",
-    "rejection": "256-game distributed smoke versus native-1.5.0 finished 94-100-62, score 0.4883, about -8.14 +/- 37.13 Elo, LOS 33.4%.",
-    "next_required_action": "Choose one new hypothesis in IMPROVEMENT_PLAN.md before enabling build.py create again."
+    "baseline": "native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602",
+    "hypothesis": "Using all native-1.5 broad labels as the preservation term should reduce scalar replay-pair overfit while still moving the fixed replay-loss move gate.",
+    "stop_before_sprt_unless": [
+      "provenance is clean Enyo-native",
+      "candidate broad engine-static is near baseline on the same 5000 rows",
+      "move gate candidate_prefers_best is at least baseline",
+      "move gate delta_avg_margin and delta_loss_weighted_margin are non-negative"
+    ]
   }
 }

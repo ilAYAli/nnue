@@ -218,10 +218,18 @@ def validate_create_args(args: argparse.Namespace) -> None:
             raise SystemExit("source_mix_jsonl conflicts with bullet_source_jsonl")
 
     if args.labeled_jsonl:
-        if args.backend != "pytorch":
-            raise SystemExit("labeled_jsonl currently requires backend=pytorch")
+        if args.backend not in {"pytorch", "pairwise"}:
+            raise SystemExit("labeled_jsonl currently requires backend=pytorch or pairwise")
         if args.score_source_jsonl:
             raise SystemExit("labeled_jsonl conflicts with score_source_jsonl")
+
+    if args.backend == "pairwise":
+        if not args.pairwise_pairs_jsonl:
+            raise SystemExit("backend=pairwise requires pairwise_pairs_jsonl")
+        if not (args.pairwise_data or args.labeled_jsonl):
+            raise SystemExit("backend=pairwise requires pairwise_data or labeled_jsonl")
+        if not (args.pairwise_init_from_nn or args.init_net):
+            raise SystemExit("backend=pairwise requires pairwise_init_from_nn or init_net")
 
     if not (args.require_clean_enyo_owned and args.bullet_generate_source):
         return
@@ -709,6 +717,29 @@ def append_source_generation_steps(
     append_score_steps(steps, args, input_jsonl="{posgen}/source.jsonl")
 
 
+def append_engine_static_step(
+    steps: list[dict],
+    args: argparse.Namespace,
+    *,
+    name: str,
+    net: str,
+    jsonl: str,
+) -> None:
+    python = str(expand_user(args.python))
+    steps.append({
+        "name": name,
+        "command": [
+            python, tool("validate/eval_jsonl_engine.py"),
+            "--engine", str(expand_path(args.engine_static_engine)),
+            "--net", net,
+            "--jsonl", templated_path_arg(jsonl),
+            "--rows", str(args.engine_static_rows),
+            "--buckets",
+            "--sources",
+        ],
+    })
+
+
 def create_config(args: argparse.Namespace) -> dict:
     if args.disabled:
         reason = str(args.disabled_reason or "no candidate build is selected")
@@ -720,6 +751,7 @@ def create_config(args: argparse.Namespace) -> dict:
     candidate_dir = f"{{train}}/{name}"
     python = str(expand_user(args.python))
     steps: list[dict] = []
+    engine_static_done = False
 
     if args.backend == "pytorch":
         if args.labeled_jsonl:
@@ -779,6 +811,129 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             },
         ])
+    elif args.backend == "pairwise":
+        if args.pairwise_data:
+            pairwise_data = templated_path_arg(args.pairwise_data)
+        else:
+            labeled_jsonl = templated_path_arg(args.labeled_jsonl)
+            rows_file = sibling_rows_file_arg(args.labeled_jsonl)
+            pack_command = [
+                python, tool("pack/pack.py"), "build",
+                "--input", labeled_jsonl,
+                "--out-dir", "{pack}/train",
+                "--max-features", str(args.max_features),
+                "--progress", str(args.pack_progress),
+                "--python", python,
+            ]
+            if rows_file:
+                pack_command.extend(["--rows-file", rows_file])
+            steps.append({
+                "name": "pack",
+                "command": pack_command,
+            })
+            pairwise_data = "{pack}/train"
+            if not args.engine_static_jsonl:
+                args.engine_static_jsonl = labeled_jsonl
+
+        init_from_nn = templated_path_arg(args.pairwise_init_from_nn or args.init_net)
+        steps.append({
+            "name": "train_pairwise",
+            "command": [
+                python, tool("train/train_pairwise.py"),
+                "--data", pairwise_data,
+                "--pairs", templated_path_arg(args.pairwise_pairs_jsonl),
+                "--out", f"{candidate_dir}/model.pt",
+                "--out-nn", f"{candidate_dir}/model.nn",
+                "--checkpoint-dir", f"{candidate_dir}/checkpoints",
+                "--checkpoint-every", str(args.pairwise_checkpoint_every),
+                "--init-from-nn", init_from_nn,
+                "--epochs", str(args.epochs),
+                "--batch-size", str(args.batch_size),
+                "--pair-batch-size", str(args.pairwise_pair_batch_size),
+                "--lr", str(args.lr),
+                "--weight-decay", str(args.weight_decay),
+                "--huber-beta", str(args.huber_beta),
+                "--pair-beta", str(args.pairwise_pair_beta),
+                "--pair-weight", str(args.pairwise_pair_weight),
+                "--broad-weight", str(args.pairwise_broad_weight),
+                "--steps-per-epoch", str(args.pairwise_steps_per_epoch),
+                "--target-clamp", str(args.target_clamp),
+                "--max-target-margin", str(args.pairwise_max_target_margin),
+                "--min-target-margin", str(args.pairwise_min_target_margin),
+                *(["--loss-weight-by-cp"] if args.pairwise_loss_weight_by_cp else []),
+                "--device", args.device,
+                "--workers", str(args.workers),
+                "--max-rows", str(args.pairwise_max_rows),
+                "--skip-rows", str(args.pairwise_skip_rows),
+            ],
+        })
+        if args.require_clean_enyo_owned:
+            steps.append({
+                "name": "validate_provenance",
+                "command": [
+                    python, tool("validate/net_provenance.py"),
+                    "--net", f"{candidate_dir}/model.nn",
+                    "--require-clean-enyo-owned",
+                ],
+            })
+        if args.engine_static_jsonl:
+            baseline_net = templated_path_arg(
+                args.pairwise_move_gate_baseline_net
+                or args.pairwise_init_from_nn
+                or args.init_net
+            )
+            append_engine_static_step(
+                steps,
+                args,
+                name="validate_engine_static_baseline",
+                net=baseline_net,
+                jsonl=args.engine_static_jsonl,
+            )
+            append_engine_static_step(
+                steps,
+                args,
+                name="validate_engine_static",
+                net=f"{candidate_dir}/model.nn",
+                jsonl=args.engine_static_jsonl,
+            )
+            engine_static_done = True
+        if args.pairwise_move_gate_cases:
+            move_gate_command = [
+                python, tool("validate/eval_move_gate.py"),
+                "--cases", templated_path_arg(args.pairwise_move_gate_cases),
+                "--engine", str(expand_path(args.engine_static_engine)),
+                "--baseline-net", templated_path_arg(
+                    args.pairwise_move_gate_baseline_net
+                    or args.pairwise_init_from_nn
+                    or args.init_net
+                ),
+                "--candidate-net", f"{candidate_dir}/model.nn",
+                "--limit", str(args.pairwise_move_gate_limit),
+                "--output", "{validate}/move_gate.jsonl",
+                "--summary-json", "{validate}/move_gate.summary.json",
+            ]
+            if args.pairwise_move_gate_fail_candidate_below_baseline:
+                move_gate_command.append("--fail-if-candidate-below-baseline")
+            if args.pairwise_move_gate_fail_regressed_above >= 0:
+                move_gate_command.extend([
+                    "--fail-if-regressed-above",
+                    str(args.pairwise_move_gate_fail_regressed_above),
+                ])
+            if args.pairwise_move_gate_fail_fixed_below >= 0:
+                move_gate_command.extend([
+                    "--fail-if-fixed-below",
+                    str(args.pairwise_move_gate_fail_fixed_below),
+                ])
+            move_gate_command.extend([
+                "--fail-if-delta-below",
+                str(args.pairwise_move_gate_fail_delta_below),
+                "--fail-if-loss-weighted-delta-below",
+                str(args.pairwise_move_gate_fail_loss_weighted_delta_below),
+            ])
+            steps.append({
+                "name": "validate_move_gate",
+                "command": move_gate_command,
+            })
     elif args.backend == "bullet":
         if args.source_mix_jsonl:
             mix_output = "{score}/mixed.jsonl"
@@ -974,19 +1129,14 @@ def create_config(args: argparse.Namespace) -> dict:
     else:
         raise SystemExit(f"unsupported backend={args.backend}")
 
-    if args.engine_static_jsonl:
-        steps.append({
-            "name": "validate_engine_static",
-            "command": [
-                python, tool("validate/eval_jsonl_engine.py"),
-                "--engine", str(expand_path(args.engine_static_engine)),
-                "--net", f"{candidate_dir}/model.nn",
-                "--jsonl", templated_path_arg(args.engine_static_jsonl),
-                "--rows", str(args.engine_static_rows),
-                "--buckets",
-                "--sources",
-            ],
-        })
+    if args.engine_static_jsonl and not engine_static_done:
+        append_engine_static_step(
+            steps,
+            args,
+            name="validate_engine_static",
+            net=f"{candidate_dir}/model.nn",
+            jsonl=args.engine_static_jsonl,
+        )
 
     config = {
         "name": name,
@@ -1087,7 +1237,7 @@ def add_create_args(
     parser.add_argument("--runner", default=value("runner", d.runner))
     parser.add_argument("--python", default=value("python", d.python))
     parser.add_argument("--backend", default=value("backend", d.backend),
-                        choices=["pytorch", "bullet"])
+                        choices=["pytorch", "bullet", "pairwise"])
 
     parser.add_argument("--selfplay-games", type=int, default=value("selfplay_games", d.selfplay_games))
     parser.add_argument("--selfplay-shard-games", type=int, default=value("selfplay_shard_games", d.selfplay_shard_games))
@@ -1269,6 +1419,59 @@ def add_create_args(
     parser.add_argument("--engine-static-engine", default=value("engine_static_engine", d.engine_static_engine))
     parser.add_argument("--require-clean-enyo-owned", action=argparse.BooleanOptionalAction,
                         default=value("require_clean_enyo_owned", d.require_clean_enyo_owned))
+    parser.add_argument("--pairwise-data", default=value("pairwise_data", d.pairwise_data))
+    parser.add_argument("--pairwise-pairs-jsonl", default=value("pairwise_pairs_jsonl", d.pairwise_pairs_jsonl))
+    parser.add_argument("--pairwise-init-from-nn", default=value("pairwise_init_from_nn", d.pairwise_init_from_nn))
+    parser.add_argument("--pairwise-pair-batch-size", type=int,
+                        default=value("pairwise_pair_batch_size", d.pairwise_pair_batch_size))
+    parser.add_argument("--pairwise-pair-weight", type=float,
+                        default=value("pairwise_pair_weight", d.pairwise_pair_weight))
+    parser.add_argument("--pairwise-broad-weight", type=float,
+                        default=value("pairwise_broad_weight", d.pairwise_broad_weight))
+    parser.add_argument("--pairwise-pair-beta", type=float,
+                        default=value("pairwise_pair_beta", d.pairwise_pair_beta))
+    parser.add_argument("--pairwise-max-target-margin", type=float,
+                        default=value("pairwise_max_target_margin", d.pairwise_max_target_margin))
+    parser.add_argument("--pairwise-min-target-margin", type=float,
+                        default=value("pairwise_min_target_margin", d.pairwise_min_target_margin))
+    parser.add_argument("--pairwise-loss-weight-by-cp",
+                        action=argparse.BooleanOptionalAction,
+                        default=value("pairwise_loss_weight_by_cp", d.pairwise_loss_weight_by_cp))
+    parser.add_argument("--pairwise-steps-per-epoch", type=int,
+                        default=value("pairwise_steps_per_epoch", d.pairwise_steps_per_epoch))
+    parser.add_argument("--pairwise-max-rows", type=int,
+                        default=value("pairwise_max_rows", d.pairwise_max_rows))
+    parser.add_argument("--pairwise-skip-rows", type=int,
+                        default=value("pairwise_skip_rows", d.pairwise_skip_rows))
+    parser.add_argument("--pairwise-checkpoint-every", type=int,
+                        default=value("pairwise_checkpoint_every", d.pairwise_checkpoint_every))
+    parser.add_argument("--pairwise-move-gate-cases",
+                        default=value("pairwise_move_gate_cases", d.pairwise_move_gate_cases))
+    parser.add_argument("--pairwise-move-gate-baseline-net",
+                        default=value("pairwise_move_gate_baseline_net", d.pairwise_move_gate_baseline_net))
+    parser.add_argument("--pairwise-move-gate-limit", type=int,
+                        default=value("pairwise_move_gate_limit", d.pairwise_move_gate_limit))
+    parser.add_argument("--pairwise-move-gate-fail-candidate-below-baseline",
+                        action=argparse.BooleanOptionalAction,
+                        default=value(
+                            "pairwise_move_gate_fail_candidate_below_baseline",
+                            d.pairwise_move_gate_fail_candidate_below_baseline))
+    parser.add_argument("--pairwise-move-gate-fail-regressed-above", type=int,
+                        default=value(
+                            "pairwise_move_gate_fail_regressed_above",
+                            d.pairwise_move_gate_fail_regressed_above))
+    parser.add_argument("--pairwise-move-gate-fail-fixed-below", type=int,
+                        default=value(
+                            "pairwise_move_gate_fail_fixed_below",
+                            d.pairwise_move_gate_fail_fixed_below))
+    parser.add_argument("--pairwise-move-gate-fail-delta-below", type=float,
+                        default=value(
+                            "pairwise_move_gate_fail_delta_below",
+                            d.pairwise_move_gate_fail_delta_below))
+    parser.add_argument("--pairwise-move-gate-fail-loss-weighted-delta-below", type=float,
+                        default=value(
+                            "pairwise_move_gate_fail_loss_weighted_delta_below",
+                            d.pairwise_move_gate_fail_loss_weighted_delta_below))
 
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
