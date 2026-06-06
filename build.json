@@ -39,19 +39,20 @@
     "bullet_init_net": "~/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
     "bullet_trainable": "all",
     "bullet_weight_decay": 0.0,
-    "require_clean_enyo_owned": true,
+    "require_clean_enyo_owned": false,
     "bullet_static_data": "~/code/cpp/chess/nnue/runs/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/pack/train",
     "bullet_static_rows": 100000,
     "engine_static_jsonl": "~/code/cpp/chess/nnue/runs/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/score/mixed.jsonl",
     "engine_static_rows": 5000,
-    "engine_static_engine": "~/code/cpp/chess/assets/engines/reference"
+    "engine_static_engine": "~/code/cpp/chess/assets/engines/reference",
+    "validate_provenance": true
   },
   "validation": {
     "baseline": "native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602",
     "hypothesis": "A small public Stockfish/binpack dose may add broad positional coverage that the Enyo self-play/replay mixes lack, while preserving the proven native-1.5 16x12 scalar architecture.",
     "only_change": "data family: public test80 sfbinpack rows filtered to quiet abs(cp)<=800 positions; architecture, init, scalar output, and runtime stay fixed.",
     "stop_before_sprt_unless": [
-      "provenance is clean Enyo-native",
+      "provenance records a random/no-borrowed init chain and expected public Stockfish/test80 data",
       "Bullet static validation does not regress sharply on native-1.13 broad packed rows",
       "engine-static MAE/sign/scale on native-1.13 mixed rows stays close to native-1.13 and does not collapse like native-4.0.x"
     ],

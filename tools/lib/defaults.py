@@ -158,6 +158,7 @@ class CandidateDefaults:
     engine_static_jsonl: str = ""
     engine_static_rows: int = 1000
     engine_static_engine: str = "~/code/cpp/chess/assets/engines/reference"
+    validate_provenance: bool = False
     require_clean_enyo_owned: bool = False
 
     pairwise_data: str = ""

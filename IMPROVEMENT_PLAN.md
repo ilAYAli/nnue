@@ -188,7 +188,7 @@ Current build intent:
   `batch_size=4096`, `superbatches=512`, `save_rate=128`, all weights
   trainable, `eval_scale=300`.
 - Static gates before games:
-  - provenance must remain clean Enyo-native;
+  - provenance must show the expected public test80 data and no borrowed/Berserk init chain;
   - Bullet static validation on native-1.13 broad packed rows must not show a
     sharp regression;
   - engine-static on native-1.13 mixed rows must not collapse in MAE, sign, or

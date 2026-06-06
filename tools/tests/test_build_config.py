@@ -554,6 +554,31 @@ class BuildConfigTests(unittest.TestCase):
                 move_gate["command"][move_gate["command"].index("--cases") + 1],
             )
 
+    def test_public_provenance_gate_does_not_require_clean_owned(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_source_jsonl": "/runs/source/labeled.jsonl",
+                    "validate_provenance": True,
+                    "require_clean_enyo_owned": False,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            provenance = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_provenance"
+            )
+            self.assertNotIn("--require-clean-enyo-owned", provenance["command"])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_bullet_init_net_converts_to_layout_weights(self) -> None:
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
             json.dump({

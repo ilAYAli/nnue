@@ -745,6 +745,27 @@ def append_source_generation_steps(
     append_score_steps(steps, args, input_jsonl="{posgen}/source.jsonl")
 
 
+def append_provenance_step(
+    steps: list[dict],
+    *,
+    args: argparse.Namespace,
+    python: str,
+    net: str,
+) -> None:
+    if not (args.validate_provenance or args.require_clean_enyo_owned):
+        return
+    command = [
+        python, tool("validate/net_provenance.py"),
+        "--net", net,
+    ]
+    if args.require_clean_enyo_owned:
+        command.append("--require-clean-enyo-owned")
+    steps.append({
+        "name": "validate_provenance",
+        "command": command,
+    })
+
+
 def append_engine_static_step(
     steps: list[dict],
     args: argparse.Namespace,
@@ -844,15 +865,12 @@ def create_config(args: argparse.Namespace) -> dict:
                 ],
             },
         ])
-        if args.require_clean_enyo_owned:
-            steps.append({
-                "name": "validate_provenance",
-                "command": [
-                    python, tool("validate/net_provenance.py"),
-                    "--net", f"{candidate_dir}/model.nn",
-                    "--require-clean-enyo-owned",
-                ],
-            })
+        append_provenance_step(
+            steps,
+            args=args,
+            python=python,
+            net=f"{candidate_dir}/model.nn",
+        )
     elif args.backend == "pairwise":
         if args.pairwise_data:
             pairwise_data = templated_path_arg(args.pairwise_data)
@@ -909,15 +927,12 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--skip-rows", str(args.pairwise_skip_rows),
             ],
         })
-        if args.require_clean_enyo_owned:
-            steps.append({
-                "name": "validate_provenance",
-                "command": [
-                    python, tool("validate/net_provenance.py"),
-                    "--net", f"{candidate_dir}/model.nn",
-                    "--require-clean-enyo-owned",
-                ],
-            })
+        append_provenance_step(
+            steps,
+            args=args,
+            python=python,
+            net=f"{candidate_dir}/model.nn",
+        )
         if args.engine_static_jsonl:
             baseline_net = templated_path_arg(
                 args.pairwise_move_gate_baseline_net
@@ -1134,15 +1149,12 @@ def create_config(args: argparse.Namespace) -> dict:
                 *(["--export-init-only"] if args.bullet_export_init_only else []),
             ],
         })
-        if args.require_clean_enyo_owned:
-            steps.append({
-                "name": "validate_provenance",
-                "command": [
-                    python, tool("validate/net_provenance.py"),
-                    "--net", f"{candidate_dir}/model.nn",
-                    "--require-clean-enyo-owned",
-                ],
-            })
+        append_provenance_step(
+            steps,
+            args=args,
+            python=python,
+            net=f"{candidate_dir}/model.nn",
+        )
         if args.bullet_static_data:
             steps.append({
                 "name": "validate_bullet_static",
@@ -1447,6 +1459,9 @@ def add_create_args(
     parser.add_argument("--engine-static-jsonl", default=value("engine_static_jsonl", d.engine_static_jsonl))
     parser.add_argument("--engine-static-rows", type=int, default=value("engine_static_rows", d.engine_static_rows))
     parser.add_argument("--engine-static-engine", default=value("engine_static_engine", d.engine_static_engine))
+    parser.add_argument("--validate-provenance", action=argparse.BooleanOptionalAction,
+                        default=value("validate_provenance", d.validate_provenance),
+                        help="Run net_provenance.py without requiring Enyo-only position sources.")
     parser.add_argument("--require-clean-enyo-owned", action=argparse.BooleanOptionalAction,
                         default=value("require_clean_enyo_owned", d.require_clean_enyo_owned))
     parser.add_argument("--pairwise-data", default=value("pairwise_data", d.pairwise_data))
