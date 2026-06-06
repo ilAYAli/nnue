@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import struct
 from collections.abc import Callable
 from pathlib import Path
 from typing import Iterable
@@ -10,7 +11,12 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from . import bullet_format
 from . import enyo_nnue as nn2
+
+
+BULLET_CHESSBOARD_STRUCT = struct.Struct("<Q16shBBB3s")
+assert BULLET_CHESSBOARD_STRUCT.size == bullet_format.RECORD_BYTES
 
 
 class FenScoreDataset(Dataset):
@@ -113,6 +119,74 @@ class PackedFenScoreDataset(Dataset):
         )
 
 
+class BulletDataScoreDataset(Dataset):
+    def __init__(self, path: str | Path, *,
+                 limit: int = 0, skip: int = 0) -> None:
+        self.path = Path(path)
+        size = self.path.stat().st_size
+        if size % bullet_format.RECORD_BYTES:
+            raise ValueError(
+                f"{self.path}: size {size} is not a multiple of "
+                f"{bullet_format.RECORD_BYTES}")
+        rows = size // bullet_format.RECORD_BYTES
+        self.start = min(skip, rows)
+        self.end = rows if limit <= 0 else min(rows, self.start + limit)
+        self._data = np.memmap(self.path, dtype=np.uint8, mode="r")
+
+    def __len__(self) -> int:
+        return self.end - self.start
+
+    @staticmethod
+    def _trailing_zeros(value: int) -> int:
+        if value == 0:
+            raise ValueError("missing bit in BulletFormat record")
+        return (value & -value).bit_length() - 1
+
+    @staticmethod
+    def _result_to_wdl(value: int) -> float:
+        if value == 2:
+            return 1.0
+        if value == 1:
+            return 0.5
+        return 0.0
+
+    def __getitem__(self, idx: int):
+        real_idx = self.start + idx
+        offset = real_idx * bullet_format.RECORD_BYTES
+        raw = self._data[offset:offset + bullet_format.RECORD_BYTES].tobytes()
+        occ, pieces_raw, score, result, _ksq, _opp_ksq, _extra = (
+            BULLET_CHESSBOARD_STRUCT.unpack(raw))
+
+        pieces: list[tuple[int, int, int]] = []
+        remaining = int(occ)
+        piece_idx = 0
+        while remaining:
+            square = self._trailing_zeros(remaining)
+            remaining &= remaining - 1
+            code = pieces_raw[piece_idx // 2]
+            code = (code >> (4 * (piece_idx & 1))) & 0x0f
+            color = nn2.BLACK if (code & 8) else nn2.WHITE
+            piece_type = (code & 7) + 1
+            # BulletFormat stores A1=0. Enyo uses h1=0, so mirror files.
+            pieces.append((piece_type, color, square ^ 7))
+            piece_idx += 1
+
+        pieces.sort(key=lambda item: item[2])
+        w_feats = nn2.features_from_pieces(pieces, nn2.WHITE)
+        b_feats = nn2.features_from_pieces(pieces, nn2.BLACK)
+        phase_scale = nn2.phase_scale_from_pieces(pieces)
+        return (
+            torch.tensor(w_feats, dtype=torch.long),
+            torch.tensor(b_feats, dtype=torch.long),
+            torch.tensor(len(pieces), dtype=torch.long),
+            torch.tensor(nn2.WHITE, dtype=torch.long),
+            torch.tensor(float(score), dtype=torch.float32),
+            torch.tensor(self._result_to_wdl(int(result)), dtype=torch.float32),
+            torch.tensor(phase_scale, dtype=torch.float32),
+            torch.tensor(0, dtype=torch.long),
+        )
+
+
 def collate(batch):
     w_all, b_all = [], []
     w_offsets, b_offsets = [0], [0]
@@ -175,6 +249,8 @@ def count_rows(path: str | Path) -> int:
     if p.is_dir():
         counts = np.load(p / "counts.npy", mmap_mode="r")
         return len(counts)
+    if p.suffix == ".data":
+        return bullet_format.record_count(p)
 
     n = 0
     with p.open() as handle:
@@ -191,4 +267,6 @@ def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
     if p.is_dir():
         return PackedFenScoreDataset(
             p, limit=limit, skip=skip, in_memory=in_memory), collate_packed
+    if p.suffix == ".data":
+        return BulletDataScoreDataset(p, limit=limit, skip=skip), collate
     return FenScoreDataset.from_jsonl(p, limit=limit, skip=skip), collate
