@@ -168,18 +168,16 @@ Rejected build intent:
 - Conclusion: close the MPE25 objective branch for now. Both the direct MPE25
   run and output-only scale repair failed the static gate before SPRT.
 
-Current build intent:
+Rejected build intent:
 
-- `build.json` is `native-5.0.0-rc1-test80-sfbinpack-lowdose-lr2e7-sb4096-20260606`.
-- This is a major-lane preflight because the data family changes from
+- `build.json` was `native-5.0.0-rc1-test80-sfbinpack-lowdose-lr2e7-sb4096-20260606`.
+- This was a major-lane preflight because the data family changed from
   Enyo-generated Stockfish-labeled positions to public Stockfish/binpack
-  positions. It keeps the proven Enyo-native `16 x 12` scalar architecture and
-  starts from `native-1.5.0-rc1`.
-- Hypothesis: a small public test80 dose may add broad coverage that the
+  positions. It kept the proven Enyo-native `16 x 12` scalar architecture and
+  started from `native-1.5.0-rc1`.
+- Hypothesis: a small public test80 dose might add broad coverage that the
   self-play/replay mixes lack, without the cost of a new distributed self-play
-  and Stockfish-labeling cycle. This is a transfer test: improvement on public
-  Stockfish/binpack rows only matters if it also preserves native engine-static
-  behavior and survives a game smoke.
+  and Stockfish-labeling cycle.
 - Data: `20,000,000` rows from
   `test80-2024-01-jan-2tb7p.min-v2.v6.binpack`, converted through Bullet
   `sfbinpack`, filtered to `min_ply=16`, quiet positions only, and
@@ -187,16 +185,40 @@ Current build intent:
 - Training: Bullet, `lr=2e-7`, `final_lr=5e-8`, `wdl=0.25`,
   `batch_size=4096`, `superbatches=512`, `save_rate=128`, all weights
   trainable, `eval_scale=300`.
+- Result: rejected before games. The run was operationally useful because it
+  proved the public `sfbinpack` conversion/training path is very fast
+  (`20,000,000` converted rows in about `4.9s`, `512` superbatches in about
+  `68s`), but the trained net failed transfer badly on native validation rows.
+  Engine-static on the native-1.13 mixed gate regressed from `native-1.13.0`
+  `mae=130.797`, `sign=83.35%`, `slope=0.599` to `mae=165.199`,
+  `sign=80.62%`, `slope=0.320`. This is worse than the already rejected
+  `native-4.0.1` MPE repair (`mae=150.205`, `sign=83.02%`, `slope=0.423`).
+- Checkpoint screen: checkpoint 0 matched the native-1.5 init
+  (`mae=129.814`, `sign=83.35%`, `slope=0.624`), but checkpoint 128 was
+  already damaged (`mae=149.037`, `sign=81.33%`, `slope=0.434`) and later
+  checkpoints degraded further. Do not SPRT this lane. Do not scale public
+  test80 all-layer low-dose unless the trainable scope or objective changes.
+
+Current build intent:
+
+- `build.json` is `native-1.14.0-rc1-broadmix-instability-lowdose-sf-d16-lr2e7-sb512-20260606`.
+- Hypothesis: the neutral-positive `native-1.13.0-rc1` broad mix is the best
+  recent same-lane baseline, but it may lack hard tactical/static correction
+  rows. A small weighted dose of clean Enyo d10/d18 instability rows may patch
+  unstable cases while preserving broad native behavior.
+- This is not an architecture, objective, or public-data change. Architecture
+  remains `16 x 12` scalar, objective remains Huber/WDL, and Stockfish is only
+  an oracle labeler.
+- Init is fixed to `native-1.13.0-rc1`. Data is about `3,000,000` rows sampled
+  from the existing native-1.13 broad mix plus four repeated passes over the
+  `21,716` clean d10/d18 instability rows, for about `87k` hard rows.
 - Static gates before games:
-  - provenance must show the expected public test80 data and no borrowed/Berserk init chain;
-  - Bullet static validation on native-1.13 broad packed rows must not show a
-    sharp regression;
-  - engine-static on native-1.13 mixed rows must not collapse in MAE, sign, or
-    CP scale like the rejected `native-4.0.x` MPE lane.
+  - provenance must remain clean Enyo-owned;
+  - engine-static on the mixed rows must stay close to `native-1.13.0` and must
+    not show the `native-4.0.x` / `native-5.0.0` CP-scale collapse;
+  - if static is weak or negative, reject before SPRT.
 - If static passes, run a 200-300 game distributed Crucible smoke versus
-  `native-1.5.0-rc1`. Extend only if the smoke is neutral-positive. If static
-  or smoke is negative, reject this public-binpack low-dose lane rather than
-  scaling it up blindly.
+  `native-1.5.0-rc1`. Extend only if the smoke is neutral-positive.
 
 
 Closed build intent:
