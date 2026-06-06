@@ -298,7 +298,7 @@ def task_command(
 
 
 def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
-    validate_even_game_counts(args)
+    validate_game_counts(args)
     run_name = safe_name(args.tag)
     chunk_count = (args.games + args.chunk_games - 1) // args.chunk_games
     if chunk_count <= 0:
@@ -691,7 +691,7 @@ def positive_int(value: str) -> int:
     return parsed
 
 
-def validate_even_game_counts(args: argparse.Namespace) -> None:
+def validate_game_counts(args: argparse.Namespace) -> None:
     for attr in ("games", "chunk_games"):
         value = int(getattr(args, attr))
         if value % 2 != 0:
@@ -699,6 +699,13 @@ def validate_even_game_counts(args: argparse.Namespace) -> None:
             raise SystemExit(
                 f"{option} must be even because SPRT plays paired openings"
             )
+    if args.chunk_games < 50:
+        raise SystemExit(
+            "--chunk-games must be at least 50; smaller chunks do not "
+            "produce reliable exact game counts"
+        )
+    if args.games % args.chunk_games != 0:
+        raise SystemExit("--games must be divisible by --chunk-games")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -727,7 +734,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--chunk-games",
         type=positive_int,
         default=100,
-        help="Games per Crucible task. Must be even because SPRT pairs openings.",
+        help=(
+            "Games per Crucible task. Must be even, at least 50, and divide --games."
+        ),
     )
     parser.add_argument("--chunk-concurrency", type=positive_int, default=4)
     parser.add_argument("--threads", type=positive_int, default=1)
@@ -760,7 +769,7 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     args.crucible_notify_command = str(expand_path(args.crucible_notify_command))
-    validate_even_game_counts(args)
+    validate_game_counts(args)
     args.task_count = (args.games + args.chunk_games - 1) // args.chunk_games
     if args.resume and args.replace:
         parser.error("--resume and --replace are mutually exclusive")
