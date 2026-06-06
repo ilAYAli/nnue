@@ -96,8 +96,18 @@ Current build intent:
 - Every source is filtered by `abs(score) <= 800` before sampling. The run
   starts from `native-1.5.0-rc1` and keeps the proven `16 x 12` scalar
   architecture.
-- Stop before promotion unless source mixing, provenance, engine-static, and a
-  256-game distributed smoke versus `native-1.5.0-rc1` are neutral-positive.
+- Result: neutral-positive, not a clear replacement yet. The run passed
+  source mixing, provenance, and engine-static. A 300-game distributed smoke
+  versus `native-1.5.0-rc1` finished `114-109-76`, about `+4.6 Elo`. The
+  corrected 1000-game distributed confirm finished `375-361-264`, score
+  `0.5070`, about `+4.86 +/- 18.48 Elo`, LOS `69.7%`.
+- Conclusion: broad existing-data mixing is the first recent same-lane setup
+  that did not fail game validation, but the signal is still too weak for a
+  release replacement. Keep the `16 x 12` scalar architecture for the next
+  same-lane follow-up and change only one training/data knob.
+- Next useful action: test a slightly longer/lower-rate continuation from
+  `native-1.13.0-rc1` on the same broad mix, with stronger checkpoint
+  selection against `native-1.5.0-rc1`, before generating more data.
 
 Closed build intent:
 
