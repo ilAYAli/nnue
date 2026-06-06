@@ -2,12 +2,17 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from lib import bullet_format, bullet_text, packed_labels
 
 
 SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
@@ -99,6 +104,10 @@ def main() -> None:
     )
     ap.add_argument("--max-abs-cp", type=int, default=1600)
     ap.add_argument("--progress", type=int, default=1000)
+    ap.add_argument("--output-format", default="jsonl",
+                    choices=["jsonl", "packed", "bullet-text", "bullet-data"])
+    ap.add_argument("--max-features", type=int, default=32)
+    ap.add_argument("--enyo-runtime-target", action="store_true")
     args = ap.parse_args()
 
     if not (0 <= args.shard_index < args.shard_count):
@@ -123,12 +132,23 @@ def main() -> None:
         "skipped_mate": 0,
         "skipped_no_score": 0,
         "skipped_cp": 0,
+        "output_format": args.output_format,
     }
 
     engine = UciEngine(args.engine, threads=args.threads, hash_mb=args.hash)
     start = time.monotonic()
+    rows: list[dict] = []
+    text_output = args.output_format in {"jsonl", "bullet-text"}
+    binary_output = args.output_format == "bullet-data"
+    output_context = (
+        out.open("w")
+        if text_output else
+        out.open("wb")
+        if binary_output else
+        nullcontext()
+    )
     try:
-        with Path(args.input).open() as src, out.open("w") as dst:
+        with Path(args.input).open() as src, output_context as dst:
             for idx, line in enumerate(src):
                 if args.limit > 0 and idx >= args.limit:
                     break
@@ -147,7 +167,11 @@ def main() -> None:
                 if score is None:
                     stats["skipped_no_score"] += 1
                     continue
-                if args.max_abs_cp > 0 and abs(score) > args.max_abs_cp:
+                if (
+                    args.output_format not in {"bullet-text", "bullet-data"}
+                    and args.max_abs_cp > 0
+                    and abs(score) > args.max_abs_cp
+                ):
                     stats["skipped_cp"] += 1
                     continue
 
@@ -156,8 +180,40 @@ def main() -> None:
                 row["score"] = score
                 row["teacher"] = Path(args.engine).name
                 row["teacher_depth"] = args.depth
-                dst.write(json.dumps(row, separators=(",", ":")))
-                dst.write("\n")
+                if args.output_format == "jsonl":
+                    assert dst is not None
+                    dst.write(json.dumps(row, separators=(",", ":")))
+                    dst.write("\n")
+                elif args.output_format == "bullet-text":
+                    assert dst is not None
+                    white_score = bullet_text.white_score_from_row(
+                        row,
+                        enyo_runtime_target=args.enyo_runtime_target,
+                    )
+                    if args.max_abs_cp > 0 and abs(white_score) > args.max_abs_cp:
+                        stats["skipped_cp"] += 1
+                        continue
+                    dst.write(bullet_text.row_to_text(
+                        row,
+                        enyo_runtime_target=args.enyo_runtime_target,
+                    ))
+                    dst.write("\n")
+                elif args.output_format == "bullet-data":
+                    assert dst is not None
+                    white_score = bullet_text.white_score_from_row(
+                        row,
+                        enyo_runtime_target=args.enyo_runtime_target,
+                    )
+                    if args.max_abs_cp > 0 and abs(white_score) > args.max_abs_cp:
+                        stats["skipped_cp"] += 1
+                        continue
+                    bullet_format.write_row(
+                        dst,
+                        row,
+                        enyo_runtime_target=args.enyo_runtime_target,
+                    )
+                else:
+                    rows.append(row)
                 stats["written"] += 1
 
                 if args.progress > 0 and stats["selected"] % args.progress == 0:
@@ -171,6 +227,20 @@ def main() -> None:
                     )
     finally:
         engine.close()
+
+    if args.output_format == "packed":
+        packed = packed_labels.write_shard(
+            out,
+            rows,
+            max_features=args.max_features,
+        )
+        stats["packed"] = packed
+    elif args.output_format == "bullet-data":
+        stats["bullet_format"] = {
+            "format": bullet_format.FORMAT,
+            "record_bytes": bullet_format.RECORD_BYTES,
+            "records": bullet_format.record_count(out),
+        }
 
     stats["elapsed_s"] = round(time.monotonic() - start, 3)
     stats_path = out.with_suffix(out.suffix + ".stats.json")

@@ -316,6 +316,165 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_bullet_score_can_emit_bullet_text_directly(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": False,
+                    "score_source_jsonl": "/runs/source/source.jsonl",
+                    "score_output_format": "bullet-text",
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "bullet_static_data": "",
+                    "score_shards": 2,
+                    "score_limit": 1000,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertIn("score_merge", names)
+            self.assertNotIn("bullet_text", names)
+            self.assertNotIn("validate_engine_static", names)
+            score_steps = [
+                step for step in config["steps"]
+                if str(step["name"]).startswith("score_")
+                and step["name"] != "score_merge"
+            ]
+            self.assertEqual(2, len(score_steps))
+            for step in score_steps:
+                output_index = step["command"].index("--output")
+                self.assertTrue(step["command"][output_index + 1].endswith(".txt"))
+                self.assertIn("--output-format", step["command"])
+                self.assertEqual(
+                    "bullet-text",
+                    step["command"][step["command"].index("--output-format") + 1],
+                )
+                self.assertIn("--enyo-runtime-target", step["command"])
+
+            merge = next(step for step in config["steps"] if step["name"] == "score_merge")
+            self.assertEqual("{score}/labeled.txt", merge["command"][6])
+
+            bullet_format = next(
+                step for step in config["steps"]
+                if step["name"] == "bullet_format"
+            )
+            input_index = bullet_format["command"].index("--input")
+            self.assertEqual("{score}/labeled.txt", bullet_format["command"][input_index + 1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_bullet_score_can_emit_bullet_data_directly(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": False,
+                    "score_source_jsonl": "/runs/source/source.jsonl",
+                    "score_output_format": "bullet-data",
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "bullet_static_data": "",
+                    "score_shards": 2,
+                    "score_limit": 1000,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertIn("score_merge", names)
+            self.assertNotIn("bullet_text", names)
+            self.assertNotIn("bullet_format", names)
+            self.assertNotIn("validate_engine_static", names)
+            score_steps = [
+                step for step in config["steps"]
+                if str(step["name"]).startswith("score_")
+                and step["name"] != "score_merge"
+            ]
+            self.assertEqual(2, len(score_steps))
+            for step in score_steps:
+                output_index = step["command"].index("--output")
+                self.assertTrue(step["command"][output_index + 1].endswith(".data"))
+                self.assertIn("--output-format", step["command"])
+                self.assertEqual(
+                    "bullet-data",
+                    step["command"][step["command"].index("--output-format") + 1],
+                )
+                self.assertIn("--enyo-runtime-target", step["command"])
+
+            merge = next(step for step in config["steps"] if step["name"] == "score_merge")
+            self.assertEqual("{score}/labeled.data", merge["command"][6])
+
+            train = next(step for step in config["steps"] if step["name"] == "bullet_train")
+            data_index = train["command"].index("--data")
+            self.assertEqual("{score}/labeled.data", train["command"][data_index + 1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_stockfish_static_score_backend_emits_bullet_data(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": False,
+                    "score_source_jsonl": "/runs/source/source.jsonl",
+                    "score_backend": "stockfish-static",
+                    "score_static_datagen_tool": "/enyo/datagen",
+                    "score_stockfish_net": "/sf/nn.nnue",
+                    "score_enyo_net": "/enyo/model.nn",
+                    "score_min_delta_cp": 75,
+                    "score_output_format": "bullet-data",
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "bullet_static_data": "",
+                    "score_shards": 2,
+                    "score_limit": 1000,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            score_steps = [
+                step for step in config["steps"]
+                if str(step["name"]).startswith("score_")
+                and step["name"] != "score_merge"
+            ]
+            self.assertEqual(2, len(score_steps))
+            for step in score_steps:
+                command = step["command"]
+                self.assertEqual("/enyo/datagen", command[0])
+                self.assertIn("--stockfish-net", command)
+                self.assertEqual("/sf/nn.nnue", command[command.index("--stockfish-net") + 1])
+                self.assertIn("--enyo-net", command)
+                self.assertEqual("/enyo/model.nn", command[command.index("--enyo-net") + 1])
+                self.assertIn("--min-delta-cp", command)
+                self.assertEqual("75", command[command.index("--min-delta-cp") + 1])
+                self.assertIn("--shard-count", command)
+                self.assertIn("--shard-index", command)
+                self.assertNotIn("--output-format", command)
+
+            merge = next(step for step in config["steps"] if step["name"] == "score_merge")
+            self.assertEqual("{score}/labeled.data", merge["command"][6])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
     def test_pytorch_can_train_from_existing_labeled_jsonl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -360,6 +519,78 @@ class BuildConfigTests(unittest.TestCase):
                 str(labeled.resolve()),
                 engine_static["command"][engine_static["command"].index("--jsonl") + 1],
             )
+
+    def test_pytorch_generated_source_can_merge_packed_score_shards(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "pytorch",
+                    "score_output_format": "packed",
+                    "score_shards": 2,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertNotIn("score_merge", names)
+            self.assertIn("pack", names)
+            score_steps = [
+                step for step in config["steps"]
+                if str(step["name"]).startswith("score_")
+            ]
+            self.assertEqual(2, len(score_steps))
+            for step in score_steps:
+                output_index = step["command"].index("--output")
+                self.assertTrue(step["command"][output_index + 1].endswith(".npz"))
+                self.assertIn("--output-format", step["command"])
+                self.assertEqual(
+                    "packed",
+                    step["command"][step["command"].index("--output-format") + 1],
+                )
+
+            pack = next(step for step in config["steps"] if step["name"] == "pack")
+            self.assertIn("merge-shards", pack["command"])
+            self.assertIn("--input-dir", pack["command"])
+            self.assertIn("{score}/shards", pack["command"])
+            self.assertLess(names.index("score_01"), names.index("pack"))
+            self.assertLess(names.index("pack"), names.index("train"))
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_score_output_formats_are_backend_specific(self) -> None:
+        parser = build.build_parser()
+        args = parser.parse_args([
+            "create",
+            "--dry-run",
+            "--backend", "pytorch",
+            "--score-output-format", "bullet-text",
+        ])
+        with self.assertRaises(SystemExit):
+            build.create_config(args)
+
+        args = parser.parse_args([
+            "create",
+            "--dry-run",
+            "--backend", "pytorch",
+            "--score-output-format", "bullet-data",
+        ])
+        with self.assertRaises(SystemExit):
+            build.create_config(args)
+
+        args = parser.parse_args([
+            "create",
+            "--dry-run",
+            "--backend", "bullet",
+            "--score-output-format", "packed",
+        ])
+        with self.assertRaises(SystemExit):
+            build.create_config(args)
 
     def test_pytorch_source_mix_feeds_pack_and_static_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -746,6 +977,60 @@ class BuildConfigTests(unittest.TestCase):
             )
             input_index = bullet_text["command"].index("--input")
             self.assertEqual("{score}/labeled.jsonl", bullet_text["command"][input_index + 1])
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_crucible_score_plan_can_use_stockfish_static_backend(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "create": {
+                    "backend": "bullet",
+                    "bullet_generate_source": True,
+                    "bullet_source_jsonl": "",
+                    "bullet_data": "",
+                    "score_crucible": True,
+                    "score_crucible_python": "/coord/python",
+                    "score_crucible_require_notify": False,
+                    "score_backend": "stockfish-static",
+                    "score_static_datagen_tool": "/enyo/datagen",
+                    "score_stockfish_net": "/sf/nn.nnue",
+                    "score_output_format": "bullet-data",
+                    "score_shards": 4,
+                    "score_limit": 123,
+                    "engine_static_rows": 10,
+                }
+            }, handle)
+            path = handle.name
+        try:
+            defaults = build.load_create_arg_defaults(path)
+            parser = build.build_parser(defaults)
+            args = parser.parse_args(["create", "-c", path, "--dry-run"])
+            config = build.create_config(args)
+            plan = next(
+                step for step in config["steps"]
+                if step["name"] == "score_crucible_plan"
+            )
+
+            self.assertEqual(
+                "score:stockfish-static",
+                plan["command"][plan["command"].index("--task-label") + 1],
+            )
+            template = plan["command"][plan["command"].index("--command-template") + 1]
+            self.assertTrue(template.startswith("/enyo/datagen "))
+            self.assertIn("--stockfish-net /sf/nn.nnue", template)
+            self.assertIn("--input '{{source}}'", template)
+            self.assertIn("--output '{{output}}'", template)
+            self.assertIn("--shard-count '{{shards}}'", template)
+            self.assertIn("--shard-index '{{index}}'", template)
+
+            merge = next(
+                step for step in config["steps"]
+                if step["name"] == "score_crucible_merge"
+            )
+            self.assertEqual("{score}/labeled.data", merge["command"][7])
+            train = next(step for step in config["steps"] if step["name"] == "bullet_train")
+            data_index = train["command"].index("--data")
+            self.assertEqual("{score}/labeled.data", train["command"][data_index + 1])
         finally:
             Path(path).unlink(missing_ok=True)
 

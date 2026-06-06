@@ -220,6 +220,24 @@ def validate_create_args(args: argparse.Namespace) -> None:
             raise SystemExit("score_crucible requires score_shards > 0")
         if args.score_crucible_local_slots < 0:
             raise SystemExit("score_crucible_local_slots must be >= 0")
+    if args.score_backend == "stockfish-static":
+        if args.score_output_format != "bullet-data":
+            raise SystemExit("score_backend=stockfish-static requires score_output_format=bullet-data")
+        if not args.score_stockfish_net:
+            raise SystemExit("score_backend=stockfish-static requires score_stockfish_net")
+        if args.score_min_delta_cp and not args.score_enyo_net:
+            raise SystemExit("score_min_delta_cp requires score_enyo_net")
+    if args.score_output_format == "packed" and args.backend != "pytorch":
+        raise SystemExit("score_output_format=packed currently requires backend=pytorch")
+    if args.score_output_format in {"bullet-text", "bullet-data"}:
+        if args.backend != "bullet":
+            raise SystemExit(
+                f"score_output_format={args.score_output_format} requires backend=bullet"
+            )
+        if args.bullet_loader != "direct":
+            raise SystemExit(
+                f"score_output_format={args.score_output_format} requires bullet_loader=direct"
+            )
 
     if args.bullet_init_net and args.bullet_init_weights:
         raise SystemExit("bullet_init_net conflicts with bullet_init_weights")
@@ -283,19 +301,47 @@ def append_score_steps(
         append_local_score_steps(steps, args, input_jsonl=input_jsonl)
 
 
+def score_output_extension(args: argparse.Namespace) -> str:
+    if args.score_output_format == "packed":
+        return "npz"
+    if args.score_output_format == "bullet-text":
+        return "txt"
+    if args.score_output_format == "bullet-data":
+        return "data"
+    return "jsonl"
+
+
 def score_command(
     args: argparse.Namespace,
     *,
     input_jsonl: str,
-    output_jsonl: str,
+    output: str,
     shard_count: str,
     shard_index: str,
 ) -> list[str]:
+    if args.score_backend == "stockfish-static":
+        command = [
+            str(expand_user(args.score_static_datagen_tool)),
+            "--stockfish-net", str(expand_user(args.score_stockfish_net)),
+            "--input", input_jsonl,
+            "--output", output,
+            "--shard-count", shard_count,
+            "--shard-index", shard_index,
+            "--limit", str(args.score_limit),
+            "--max-abs-cp", str(args.score_max_abs_cp),
+            "--progress", str(args.score_progress),
+        ]
+        if args.score_enyo_net:
+            command.extend(["--enyo-net", str(expand_user(args.score_enyo_net))])
+        if args.score_min_delta_cp:
+            command.extend(["--min-delta-cp", str(args.score_min_delta_cp)])
+        return command
+
     python = str(expand_user(args.python))
-    return [
+    command = [
         python, tool("score/score.py"), "uci",
         "--input", input_jsonl,
-        "--output", output_jsonl,
+        "--output", output,
         "--engine", str(expand_user(args.score_engine)),
         "--depth", str(args.score_depth),
         "--threads", str(args.score_threads),
@@ -305,7 +351,38 @@ def score_command(
         "--limit", str(args.score_limit),
         "--max-abs-cp", str(args.score_max_abs_cp),
         "--progress", str(args.score_progress),
+        "--output-format", args.score_output_format,
+        "--max-features", str(args.max_features),
     ]
+    if (
+        args.score_output_format in {"bullet-text", "bullet-data"}
+        and args.bullet_enyo_runtime_target
+    ):
+        command.append("--enyo-runtime-target")
+    return command
+
+
+def append_packed_score_pack_step(
+    steps: list[dict],
+    args: argparse.Namespace,
+    *,
+    python: str,
+    prefix_command: list[str] | None = None,
+) -> None:
+    command = [*(prefix_command if prefix_command is not None else [python])]
+    command.extend([
+        tool("pack/pack.py"), "merge-shards",
+        "--input-dir", "{score}/shards",
+        "--out-dir", "{pack}/train",
+        "--pattern", "label.*.npz",
+        "--max-features", str(args.max_features),
+        "--progress", str(args.pack_progress),
+        "--python", python,
+    ])
+    steps.append({
+        "name": "pack",
+        "command": command,
+    })
 
 
 def append_local_score_steps(
@@ -314,6 +391,7 @@ def append_local_score_steps(
     *,
     input_jsonl: str,
 ) -> None:
+    extension = score_output_extension(args)
     for shard in range(args.score_shards):
         steps.append({
             "name": f"score_{shard:02d}",
@@ -321,18 +399,38 @@ def append_local_score_steps(
             "command": score_command(
                 args,
                 input_jsonl=input_jsonl,
-                output_jsonl=f"{{score}}/shards/label.{shard}.jsonl",
+                output=f"{{score}}/shards/label.{shard}.{extension}",
                 shard_count=str(args.score_shards),
                 shard_index=str(shard),
             ),
         })
 
+    if args.score_output_format == "packed":
+        append_packed_score_pack_step(
+            steps,
+            args,
+            python=str(expand_user(args.python)),
+        )
+        return
+
+    if args.score_output_format == "bullet-text":
+        merged = "{score}/labeled.txt"
+    elif args.score_output_format == "bullet-data":
+        merged = "{score}/labeled.data"
+    else:
+        merged = "{score}/labeled.jsonl"
     steps.append({
         "name": "score_merge",
         "command": [
             "bash", "-lc",
-            "cat \"$1\"/shards/label.*.jsonl > \"$1\"/labeled.jsonl && wc -l \"$1\"/labeled.jsonl > \"$1\"/labeled.wc",
-            "merge-score", "{score}",
+            (
+                "cat \"$1\"/shards/label.*.\"$2\" > \"$3\" && "
+                "if [ \"$2\" = data ]; then "
+                "\"$5\" \"$6\" \"$3\" > \"$4\"; "
+                "else wc -l \"$3\" > \"$4\"; fi"
+            ),
+            "merge-score", "{score}", extension, merged, "{score}/labeled.wc",
+            str(expand_user(args.python)), tool("bullet/count_bullet_data.py"),
         ],
     })
 
@@ -397,16 +495,18 @@ def append_crucible_score_steps(
     score_command_template = shell_join(score_command(
         args,
         input_jsonl="{{source}}",
-        output_jsonl="{{output}}",
+        output="{{output}}",
         shard_count="{{shards}}",
         shard_index="{{index}}",
     ))
+    extension = score_output_extension(args)
+    task_label = "score:stockfish-static" if args.score_backend == "stockfish-static" else "score:uci"
     plan_command = [
         crucible_python, crucible, "plan",
         "--name", "score-{candidate}",
         "--kind", "label",
         "--description", "NNUE source scoring",
-        "--task-label", "score:uci",
+        "--task-label", task_label,
         "--shards", str(args.score_shards),
         "--work-dir", "{repo}",
         "--out", manifest,
@@ -414,7 +514,7 @@ def append_crucible_score_steps(
         "--log-dir", "{score}/crucible/logs",
         "--command-template", score_command_template,
         "--var", f"source={input_jsonl}",
-        "--output-template", "{score}/shards/label.{{index}}.jsonl",
+        "--output-template", f"{{score}}/shards/label.{{{{index}}}}.{extension}",
         "--progress-unit", "rows",
         "--progress-total-lines", input_jsonl,
         "--progress-log-regex", r"selected=(?P<done>\d+)\s+written=(?P<output>\d+)\s+rate=(?P<rate>[0-9.]+)/s",
@@ -488,24 +588,55 @@ def append_crucible_score_steps(
             ],
         })
 
-    steps.append({
-        "name": "score_crucible_merge",
-        "command": [
-            "bash", "-lc",
-            (
-                "python=\"$1\" crucible=\"$2\" run=\"$3\" output=\"$4\" rows=\"$5\"; "
-                "\"$python\" \"$crucible\" verify \"$run\" && "
-                "\"$python\" \"$crucible\" merge \"$run\" --output \"$output\" --force && "
-                "wc -l \"$output\" > \"$rows\""
-            ),
-            "merge-crucible-score",
-            crucible_python,
-            crucible,
-            merge_run,
-            "{score}/labeled.jsonl",
-            "{score}/labeled.wc",
-        ],
-    })
+    if args.score_output_format == "packed":
+        append_packed_score_pack_step(
+            steps,
+            args,
+            python=crucible_python,
+            prefix_command=[
+                "bash", "-lc",
+                (
+                    "python=\"$1\" crucible=\"$2\" run=\"$3\" pack_py=\"$4\"; "
+                    "\"$python\" \"$crucible\" verify \"$run\" && "
+                    "shift 4 && \"$python\" \"$pack_py\" \"$@\""
+                ),
+                "pack-crucible-score",
+                crucible_python,
+                crucible,
+                merge_run,
+            ],
+        )
+    else:
+        merged = (
+            "{score}/labeled.txt"
+            if args.score_output_format == "bullet-text"
+            else "{score}/labeled.data"
+            if args.score_output_format == "bullet-data"
+            else "{score}/labeled.jsonl"
+        )
+        steps.append({
+            "name": "score_crucible_merge",
+            "command": [
+                "bash", "-lc",
+                (
+                    "python=\"$1\" crucible=\"$2\" run=\"$3\" output=\"$4\" rows=\"$5\" "
+                    "format=\"$6\"; "
+                    "\"$python\" \"$crucible\" verify \"$run\" && "
+                    "\"$python\" \"$crucible\" merge \"$run\" --output \"$output\" --force && "
+                    "if [ \"$format\" = data ]; then "
+                    "\"$python\" \"$7\" \"$output\" > \"$rows\"; "
+                    "else wc -l \"$output\" > \"$rows\"; fi"
+                ),
+                "merge-crucible-score",
+                crucible_python,
+                crucible,
+                merge_run,
+                merged,
+                "{score}/labeled.wc",
+                extension,
+                tool("bullet/count_bullet_data.py"),
+            ],
+        })
 
 
 def selfplay_shard_count(args: argparse.Namespace) -> int:
@@ -795,6 +926,26 @@ def append_engine_static_step(
     })
 
 
+def append_bullet_format_step(
+    steps: list[dict],
+    args: argparse.Namespace,
+    *,
+    python: str,
+    input_text: str,
+    output_data: str,
+) -> None:
+    steps.append({
+        "name": "bullet_format",
+        "command": [
+            python, tool("bullet/bullet.py"), "format",
+            "--input", input_text,
+            "--output", output_data,
+            "--bullet-manifest", str(expand_path(args.bullet_manifest)),
+            "--validate",
+        ],
+    })
+
+
 def create_config(args: argparse.Namespace) -> dict:
     if args.disabled:
         reason = str(args.disabled_reason or "no candidate build is selected")
@@ -809,6 +960,7 @@ def create_config(args: argparse.Namespace) -> dict:
     engine_static_done = False
 
     if args.backend == "pytorch":
+        packed_score_data = False
         if args.source_mix_jsonl:
             labeled_jsonl = append_source_mix_step(steps, args)
             rows_file = ""
@@ -821,25 +973,31 @@ def create_config(args: argparse.Namespace) -> dict:
                 args.engine_static_jsonl = labeled_jsonl
         else:
             append_source_generation_steps(steps, args)
-            labeled_jsonl = "{score}/labeled.jsonl"
-            rows_file = "{score}/labeled.wc"
+            if args.score_output_format == "packed":
+                packed_score_data = True
+                labeled_jsonl = ""
+                rows_file = ""
+            else:
+                labeled_jsonl = "{score}/labeled.jsonl"
+                rows_file = "{score}/labeled.wc"
 
-        pack_command = [
-            python, tool("pack/pack.py"), "build",
-            "--input", labeled_jsonl,
-            "--out-dir", "{pack}/train",
-            "--max-features", str(args.max_features),
-            "--progress", str(args.pack_progress),
-            "--python", python,
-        ]
-        if rows_file:
-            pack_command.extend(["--rows-file", rows_file])
-
-        steps.extend([
-            {
+        if not packed_score_data:
+            pack_command = [
+                python, tool("pack/pack.py"), "build",
+                "--input", labeled_jsonl,
+                "--out-dir", "{pack}/train",
+                "--max-features", str(args.max_features),
+                "--progress", str(args.pack_progress),
+                "--python", python,
+            ]
+            if rows_file:
+                pack_command.extend(["--rows-file", rows_file])
+            steps.append({
                 "name": "pack",
                 "command": pack_command,
-            },
+            })
+
+        steps.extend([
             {
                 "name": "train",
                 "command": [
@@ -998,6 +1156,8 @@ def create_config(args: argparse.Namespace) -> dict:
                 "command": move_gate_command,
             })
     elif args.backend == "bullet":
+        bullet_source_text = ""
+        bullet_source_data = ""
         if args.source_mix_jsonl:
             mix_output = append_source_mix_step(steps, args)
             args.bullet_source_jsonl = mix_output
@@ -1009,51 +1169,73 @@ def create_config(args: argparse.Namespace) -> dict:
                 args,
                 input_jsonl=templated_path_arg(args.score_source_jsonl),
             )
-            args.bullet_source_jsonl = "{score}/labeled.jsonl"
-            if not args.engine_static_jsonl:
-                args.engine_static_jsonl = "{score}/labeled.jsonl"
+            if args.score_output_format == "bullet-text":
+                bullet_source_text = "{score}/labeled.txt"
+            elif args.score_output_format == "bullet-data":
+                bullet_source_data = "{score}/labeled.data"
+            else:
+                args.bullet_source_jsonl = "{score}/labeled.jsonl"
+                if not args.engine_static_jsonl:
+                    args.engine_static_jsonl = "{score}/labeled.jsonl"
         elif args.bullet_generate_source:
             append_source_generation_steps(steps, args)
-            args.bullet_source_jsonl = "{score}/labeled.jsonl"
-            if not args.engine_static_jsonl:
+            if args.score_output_format == "bullet-text":
+                bullet_source_text = "{score}/labeled.txt"
+            elif args.score_output_format == "bullet-data":
+                bullet_source_data = "{score}/labeled.data"
+            else:
+                args.bullet_source_jsonl = "{score}/labeled.jsonl"
+            if (
+                not args.engine_static_jsonl
+                and args.score_output_format not in {"bullet-text", "bullet-data"}
+            ):
                 args.engine_static_jsonl = "{score}/labeled.jsonl"
 
         if args.bullet_loader == "direct":
             if args.bullet_data:
                 bullet_data = str(expand_user(args.bullet_data))
             else:
-                if not args.bullet_source_jsonl:
+                if not (bullet_source_text or bullet_source_data or args.bullet_source_jsonl):
                     raise SystemExit(
-                        "backend=bullet direct loader requires bullet_source_jsonl or bullet_data"
+                        "backend=bullet direct loader requires scored source data or bullet_data"
                     )
                 bullet_text = "{assets}/bullet.txt"
                 bullet_data = "{assets}/bullet.data"
-                steps.extend([
-                    {
-                        "name": "bullet_text",
-                        "command": [
-                            python, tool("bullet/jsonl_to_bullet_text.py"),
-                            "--input", templated_path_arg(args.bullet_source_jsonl),
-                            "--output", bullet_text,
-                            "--limit", str(args.bullet_limit),
-                            "--max-abs-cp", str(args.bullet_max_abs_cp),
-                            *(
-                                ["--enyo-runtime-target"]
-                                if args.bullet_enyo_runtime_target else []
-                            ),
-                        ],
-                    },
-                    {
-                        "name": "bullet_format",
-                        "command": [
-                            python, tool("bullet/bullet.py"), "format",
-                            "--input", bullet_text,
-                            "--output", bullet_data,
-                            "--bullet-manifest", str(expand_path(args.bullet_manifest)),
-                            "--validate",
-                        ],
-                    },
-                ])
+                if bullet_source_data:
+                    bullet_data = bullet_source_data
+                elif bullet_source_text:
+                    bullet_text = bullet_source_text
+                    append_bullet_format_step(
+                        steps,
+                        args,
+                        python=python,
+                        input_text=bullet_text,
+                        output_data=bullet_data,
+                    )
+                else:
+                    steps.extend([
+                        {
+                            "name": "bullet_text",
+                            "command": [
+                                python, tool("bullet/jsonl_to_bullet_text.py"),
+                                "--input", templated_path_arg(args.bullet_source_jsonl),
+                                "--output", bullet_text,
+                                "--limit", str(args.bullet_limit),
+                                "--max-abs-cp", str(args.bullet_max_abs_cp),
+                                *(
+                                    ["--enyo-runtime-target"]
+                                    if args.bullet_enyo_runtime_target else []
+                                ),
+                            ],
+                        },
+                    ])
+                    append_bullet_format_step(
+                        steps,
+                        args,
+                        python=python,
+                        input_text=bullet_text,
+                        output_data=bullet_data,
+                    )
         elif args.bullet_loader == "sfbinpack":
             if not args.bullet_data:
                 raise SystemExit("backend=bullet sfbinpack loader requires bullet_data")
@@ -1338,8 +1520,22 @@ def add_create_args(
     parser.add_argument("--score-source-jsonl", default=value("score_source_jsonl", d.score_source_jsonl))
     parser.add_argument("--labeled-jsonl", default=value("labeled_jsonl", d.labeled_jsonl),
                         help="Pre-scored JSONL for backend=pytorch; skips source generation and scoring.")
+    parser.add_argument("--score-backend",
+                        choices=["uci", "stockfish-static"],
+                        default=value("score_backend", d.score_backend))
+    parser.add_argument("--score-static-datagen-tool",
+                        default=value("score_static_datagen_tool", d.score_static_datagen_tool))
+    parser.add_argument("--score-stockfish-net",
+                        default=value("score_stockfish_net", d.score_stockfish_net))
+    parser.add_argument("--score-enyo-net",
+                        default=value("score_enyo_net", d.score_enyo_net))
+    parser.add_argument("--score-min-delta-cp", type=int,
+                        default=value("score_min_delta_cp", d.score_min_delta_cp))
     parser.add_argument("--score-max-abs-cp", type=int, default=value("score_max_abs_cp", d.score_max_abs_cp))
     parser.add_argument("--score-progress", type=int, default=value("score_progress", d.score_progress))
+    parser.add_argument("--score-output-format",
+                        choices=["jsonl", "packed", "bullet-text", "bullet-data"],
+                        default=value("score_output_format", d.score_output_format))
     parser.add_argument("--score-crucible", action=argparse.BooleanOptionalAction,
                         default=value("score_crucible", d.score_crucible))
     parser.add_argument("--score-crucible-tool",

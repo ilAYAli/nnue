@@ -72,6 +72,12 @@ class CandidateDefaults:
     score_limit: int = 0
     score_source_jsonl: str = ""
     labeled_jsonl: str = ""
+    score_backend: str = "uci"
+    score_static_datagen_tool: str = "~/code/cpp/chess/enyo/build-sf-static/enyo_sf_static_datagen"
+    score_stockfish_net: str = ""
+    score_enyo_net: str = ""
+    score_min_delta_cp: int = 0
+    score_output_format: str = "jsonl"
     score_max_abs_cp: int = 1600
     score_progress: int = 10000
     score_crucible: bool = False

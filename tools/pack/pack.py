@@ -50,6 +50,20 @@ def cmd_build(args: argparse.Namespace) -> int:
     return run(command)
 
 
+def cmd_merge_shards(args: argparse.Namespace) -> int:
+    script = tools_root() / "pack" / "pack_dataset.py"
+    command = [
+        str(expand_user(args.python)),
+        str(script),
+        "--packed-shard-dir", str(expand_path(args.input_dir)),
+        "--packed-shard-pattern", args.pattern,
+        "--out-dir", str(expand_path(args.out_dir)),
+        "--max-features", str(args.max_features),
+        "--progress", str(args.progress),
+    ]
+    return run(command)
+
+
 def cmd_inspect(args: argparse.Namespace) -> int:
     path = expand_path(args.path)
     meta_path = path / "meta.json"
@@ -79,6 +93,18 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--progress", type=int, default=250000)
     build.add_argument("--python", default=sys.executable)
     build.set_defaults(func=cmd_build)
+
+    merge = subparsers.add_parser(
+        "merge-shards",
+        help="Merge compact packed label shards into a training dataset.",
+    )
+    merge.add_argument("--input-dir", required=True)
+    merge.add_argument("--out-dir", required=True)
+    merge.add_argument("--pattern", default="label.*.npz")
+    merge.add_argument("--max-features", type=int, default=32)
+    merge.add_argument("--progress", type=int, default=250000)
+    merge.add_argument("--python", default=sys.executable)
+    merge.set_defaults(func=cmd_merge_shards)
 
     inspect = subparsers.add_parser("inspect", help="Print packed dataset metadata.")
     inspect.add_argument("path")

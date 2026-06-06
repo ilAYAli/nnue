@@ -12,6 +12,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib import enyo_nnue as nn2
+from lib import packed_labels
 
 
 def count_rows(path: Path, *, skip: int, limit: int) -> int:
@@ -38,6 +39,22 @@ def read_rows_file(path: Path) -> int:
     return rows
 
 
+def load_shard_paths(input_dir: Path, pattern: str) -> list[Path]:
+    paths = sorted(input_dir.glob(pattern))
+    if not paths:
+        raise ValueError(f"no packed shards found in {input_dir} matching {pattern}")
+    return paths
+
+
+def count_shard_rows(paths: list[Path]) -> int:
+    rows = 0
+    for path in paths:
+        with np.load(path, allow_pickle=False) as shard:
+            packed_labels.assert_format(shard, path)
+            rows += int(len(shard["counts"]))
+    return rows
+
+
 def shrink_memmap(path: Path, *, dtype: Any, shape: tuple[int, ...],
                   rows: int, chunk_rows: int = 100000) -> None:
     if shape[0] == rows:
@@ -55,9 +72,107 @@ def shrink_memmap(path: Path, *, dtype: Any, shape: tuple[int, ...],
     tmp.replace(path)
 
 
+def merge_packed_shards(args: argparse.Namespace) -> None:
+    input_dir = Path(args.packed_shard_dir)
+    paths = load_shard_paths(input_dir, args.packed_shard_pattern)
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    rows = count_shard_rows(paths)
+    print(f"merging packed shards={len(paths)} rows={rows} from {input_dir}",
+          flush=True)
+    print(f"out={out}", flush=True)
+
+    shape = (rows, args.max_features)
+    w_features = np.lib.format.open_memmap(
+        out / "white_features.npy", mode="w+", dtype=np.uint16, shape=shape)
+    b_features = np.lib.format.open_memmap(
+        out / "black_features.npy", mode="w+", dtype=np.uint16, shape=shape)
+    counts = np.lib.format.open_memmap(
+        out / "counts.npy", mode="w+", dtype=np.uint8, shape=(rows,))
+    stms = np.lib.format.open_memmap(
+        out / "stm.npy", mode="w+", dtype=np.uint8, shape=(rows,))
+    scores = np.lib.format.open_memmap(
+        out / "score.npy", mode="w+", dtype=np.float32, shape=(rows,))
+    wdls = np.lib.format.open_memmap(
+        out / "wdl.npy", mode="w+", dtype=np.float32, shape=(rows,))
+    phase_scales = np.lib.format.open_memmap(
+        out / "phase_scale.npy", mode="w+", dtype=np.float32, shape=(rows,))
+    source_ids = np.lib.format.open_memmap(
+        out / "source_id.npy", mode="w+", dtype=np.uint16, shape=(rows,))
+
+    source_map: dict[str, int] = {}
+    written = 0
+    max_seen = 0
+    for shard_index, path in enumerate(paths):
+        with np.load(path, allow_pickle=False) as shard:
+            packed_labels.assert_format(shard, path)
+            shard_counts = shard["counts"]
+            shard_rows = int(len(shard_counts))
+            end = written + shard_rows
+            if shard["white_features"].shape[1] > args.max_features:
+                raise ValueError(
+                    f"{path}: {shard['white_features'].shape[1]} features > "
+                    f"max {args.max_features}"
+                )
+            width = shard["white_features"].shape[1]
+            w_features[written:end, :width] = shard["white_features"]
+            b_features[written:end, :width] = shard["black_features"]
+            if width < args.max_features:
+                w_features[written:end, width:] = 0
+                b_features[written:end, width:] = 0
+            counts[written:end] = shard_counts
+            stms[written:end] = shard["stm"]
+            scores[written:end] = shard["score"]
+            wdls[written:end] = shard["wdl"]
+            phase_scales[written:end] = shard["phase_scale"]
+
+            local_map = packed_labels.load_source_map(shard)
+            names_by_local = {
+                source_id: name for name, source_id in local_map.items()
+            }
+            local_source_ids = shard["source_id"]
+            remapped = np.zeros(shard_rows, dtype=np.uint16)
+            for local_id in np.unique(local_source_ids):
+                name = names_by_local[int(local_id)]
+                if name not in source_map:
+                    source_map[name] = len(source_map)
+                remapped[local_source_ids == local_id] = source_map[name]
+            source_ids[written:end] = remapped
+
+            if shard_rows:
+                max_seen = max(max_seen, int(np.max(shard_counts)))
+            written = end
+            if args.progress > 0 and (
+                written % args.progress == 0 or shard_index + 1 == len(paths)
+            ):
+                print(f"merged {written}/{rows}", flush=True)
+
+    for array in (
+            w_features, b_features, counts, stms, scores, wdls,
+            phase_scales, source_ids):
+        array.flush()
+
+    meta = {
+        "source": str(input_dir),
+        "format": packed_labels.FORMAT,
+        "rows": written,
+        "shards": len(paths),
+        "max_features": args.max_features,
+        "max_features_seen": max_seen,
+        "source_map": source_map,
+    }
+    (out / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
+    (out / "source_map.json").write_text(
+        json.dumps(source_map, indent=2) + "\n")
+    print(json.dumps(meta, indent=2), flush=True)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", required=True, help="Source self-play JSONL.")
+    ap.add_argument("--input", default="", help="Source self-play JSONL.")
+    ap.add_argument("--packed-shard-dir", default="",
+                    help="Directory containing compact .npz label shards.")
+    ap.add_argument("--packed-shard-pattern", default="label.*.npz")
     ap.add_argument("--out-dir", required=True,
                     help="Output directory containing .npy arrays.")
     ap.add_argument("--skip", type=int, default=0)
@@ -73,6 +188,16 @@ def main() -> None:
         raise SystemExit("--rows must be non-negative")
     if args.rows > 0 and args.rows_file:
         raise SystemExit("--rows and --rows-file are mutually exclusive")
+    if args.packed_shard_dir:
+        if args.input:
+            raise SystemExit("--input conflicts with --packed-shard-dir")
+        if args.skip or args.limit or args.rows or args.rows_file:
+            raise SystemExit(
+                "--packed-shard-dir cannot be combined with skip/limit/rows")
+        merge_packed_shards(args)
+        return
+    if not args.input:
+        raise SystemExit("--input or --packed-shard-dir is required")
 
     src = Path(args.input)
     out = Path(args.out_dir)

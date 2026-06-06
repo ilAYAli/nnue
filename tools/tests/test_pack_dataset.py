@@ -14,6 +14,9 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[2]
 PACK = REPO / "tools" / "pack" / "pack_dataset.py"
 FEN = "8/8/8/8/8/8/8/K6k w - - 0 1"
+sys.path.insert(0, str(REPO / "tools"))
+
+from lib import packed_labels  # noqa: E402
 
 
 def write_rows(path: Path) -> None:
@@ -70,6 +73,37 @@ class PackDatasetTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("row count exceeded", result.stderr)
+
+    def test_merges_packed_label_shards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shards = root / "shards"
+            out = root / "pack"
+            packed_labels.write_shard(
+                shards / "label.0.npz",
+                [{"fen": FEN, "score": 10, "wdl": 0.5, "source_type": "a"}],
+                max_features=32,
+            )
+            packed_labels.write_shard(
+                shards / "label.1.npz",
+                [{"fen": FEN, "score": -20, "wdl": 0.25, "source_type": "b"}],
+                max_features=32,
+            )
+
+            subprocess.run([
+                sys.executable, str(PACK),
+                "--packed-shard-dir", str(shards),
+                "--out-dir", str(out),
+                "--progress", "0",
+            ], check=True, cwd=REPO)
+
+            meta = json.loads((out / "meta.json").read_text())
+            self.assertEqual(meta["format"], "enyo-packed-label-shard-v1")
+            self.assertEqual(meta["rows"], 2)
+            self.assertEqual(meta["source_map"], {"a": 0, "b": 1})
+            self.assertEqual(np.load(out / "counts.npy").tolist(), [2, 2])
+            self.assertEqual(np.load(out / "score.npy").tolist(), [10.0, -20.0])
+            self.assertEqual(np.load(out / "source_id.npy").tolist(), [0, 1])
 
 
 if __name__ == "__main__":

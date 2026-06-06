@@ -39,7 +39,11 @@ def cmd_uci(args: argparse.Namespace) -> int:
         "--limit", str(args.limit),
         "--max-abs-cp", str(args.max_abs_cp),
         "--progress", str(args.progress),
+        "--output-format", args.output_format,
+        "--max-features", str(args.max_features),
     ]
+    if args.enyo_runtime_target:
+        forwarded.append("--enyo-runtime-target")
     old_argv = sys.argv
     try:
         sys.argv = forwarded
@@ -67,6 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
     uci.add_argument("--limit", type=int, default=0)
     uci.add_argument("--max-abs-cp", type=int, default=1600)
     uci.add_argument("--progress", type=int, default=1000)
+    uci.add_argument("--output-format", default="jsonl",
+                     choices=["jsonl", "packed", "bullet-text", "bullet-data"])
+    uci.add_argument("--max-features", type=int, default=32)
+    uci.add_argument("--enyo-runtime-target", action="store_true")
     uci.set_defaults(func=cmd_uci)
 
     return parser
