@@ -149,7 +149,7 @@ Rejected build intent:
   clear CP-scale collapse: `mae=152.193`, `sign=83.24%`, `corr=0.811`,
   `slope=0.405`. Do not run SPRT for `native-4.0.0-rc1`.
 
-Current build intent:
+Rejected build intent:
 
 - `build.json` is `native-4.0.1-rc1-mpe25-outputcal-huber-lr3e4-e24-sb512-20260606`.
 - This is a patch-level corrective calibration for the `native-4.0.0` MPE25
@@ -160,9 +160,21 @@ Current build intent:
 - Data is fixed to the already mixed
   `native-1.13.0-rc1/score/mixed.jsonl`. Init is fixed to the rejected
   `native-4.0.0-rc1` net. Architecture remains `16 x 12` scalar.
-- Stop before games unless engine-static scale recovers from `native-4.0.0`
-  and is close to `native-1.13.0` / `native-1.13.1` on the same 5000-row
-  mixed validation gate.
+- Result: rejected before games. Provenance passed, but output-only Huber
+  calibration did not repair the MPE25 scale compression. Engine-static was
+  still `mae=150.205`, `sign=83.02%`, `corr=0.811`, `slope=0.423`.
+- Conclusion: close the MPE25 objective branch for now. Both the direct MPE25
+  run and output-only scale repair failed the static gate before SPRT.
+
+Current build intent:
+
+- Do not start another NNUE training run until the next hypothesis is written
+  here.
+- The next useful action should use the evidence from the rejected 1.13.1 and
+  4.0.x runs: lower MAE and MPE probability loss did not transfer to games.
+  Prefer either a game/replay move-choice objective with an explicit game gate,
+  or a new data-generation step, rather than another broad-mix scalar loss
+  tweak.
 
 Closed build intent:
 
