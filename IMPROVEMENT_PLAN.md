@@ -80,7 +80,9 @@ Current clean-native lineage names:
   replay child-pair supervision passed provenance and the replay move gate, but
   lost the 256-game distributed smoke versus `native-1.5.0-rc1`:
   `89-104-63`, score `0.4707`, about `-20.38 +/- 37.07 Elo`, LOS `14.0%`.
-  Do not promote or extend this scalar replay-pair setup.
+  A later checkpoint-5 retest finished neutral over 300 distributed games
+  (`112-112-76`, score `0.5000`, about `0.0 +/- 34.0 Elo`, LOS `50%`), so
+  there is still no reason to extend this scalar replay-pair setup.
 
 Previous build intent:
 
@@ -168,13 +170,34 @@ Rejected build intent:
 
 Current build intent:
 
-- Do not start another NNUE training run until the next hypothesis is written
-  here.
-- The next useful action should use the evidence from the rejected 1.13.1 and
-  4.0.x runs: lower MAE and MPE probability loss did not transfer to games.
-  Prefer either a game/replay move-choice objective with an explicit game gate,
-  or a new data-generation step, rather than another broad-mix scalar loss
-  tweak.
+- `build.json` is `native-5.0.0-rc1-test80-sfbinpack-lowdose-lr2e7-sb4096-20260606`.
+- This is a major-lane preflight because the data family changes from
+  Enyo-generated Stockfish-labeled positions to public Stockfish/binpack
+  positions. It keeps the proven Enyo-native `16 x 12` scalar architecture and
+  starts from `native-1.5.0-rc1`.
+- Hypothesis: a small public test80 dose may add broad coverage that the
+  self-play/replay mixes lack, without the cost of a new distributed self-play
+  and Stockfish-labeling cycle. This is a transfer test: improvement on public
+  Stockfish/binpack rows only matters if it also preserves native engine-static
+  behavior and survives a game smoke.
+- Data: `20,000,000` rows from
+  `test80-2024-01-jan-2tb7p.min-v2.v6.binpack`, converted through Bullet
+  `sfbinpack`, filtered to `min_ply=16`, quiet positions only, and
+  `abs(cp) <= 800`.
+- Training: Bullet, `lr=2e-7`, `final_lr=5e-8`, `wdl=0.25`,
+  `batch_size=4096`, `superbatches=512`, `save_rate=128`, all weights
+  trainable, `eval_scale=300`.
+- Static gates before games:
+  - provenance must remain clean Enyo-native;
+  - Bullet static validation on native-1.13 broad packed rows must not show a
+    sharp regression;
+  - engine-static on native-1.13 mixed rows must not collapse in MAE, sign, or
+    CP scale like the rejected `native-4.0.x` MPE lane.
+- If static passes, run a 200-300 game distributed Crucible smoke versus
+  `native-1.5.0-rc1`. Extend only if the smoke is neutral-positive. If static
+  or smoke is negative, reject this public-binpack low-dose lane rather than
+  scaling it up blindly.
+
 
 Closed build intent:
 
