@@ -342,6 +342,28 @@ Current build intent:
 - Gate: provenance and Bullet static must pass, then run a distributed 300-game
   Crucible smoke versus `native-1.13.0-rc1`. Extend only if neutral-positive.
 
+2026-06-07 update 2:
+
+- `native-1.16.2-rc1-sfstatic-direct500k-v16src-lr3e7-sb128-20260607`
+  passed provenance and Bullet static validation on `449,990` rows. Static
+  validation reported MAE `172.204`, sign `81.27%`, corr `0.879180`, and
+  slope `1.359375`.
+- The 300-game distributed smoke versus `native-1.13.0-rc1` finished
+  `117-106-77`, about `+12.75 +/- 33.97 Elo`, LOS `76.9%`. The 1000-game
+  confirm finished `370-359-271`, about `+3.82 +/- 18.40 Elo`, LOS `65.8%`.
+- Interpretation: weak-positive, not a promotion result. This is enough to
+  keep the direct Stockfish-static Bullet-data lane alive, but not enough to
+  promote or claim clear improvement.
+- Current `build.json` is
+  `native-1.16.3-rc1-sfstatic-direct2m-v16src-lr3e7-sb256-20260607`.
+  It changes only data scale and training exposure: target up to 2M direct
+  static source rows, 256 Bullet superbatches, same `16 x 12` scalar
+  architecture, same Huber/WDL objective, same source family, and same
+  `native-1.13.0` init.
+- Gate: provenance and Bullet static must pass, then run a distributed
+  300-game Crucible smoke versus `native-1.13.0-rc1`. Extend only if the
+  game signal is at least neutral-positive.
+
 
 Closed build intent:
 
