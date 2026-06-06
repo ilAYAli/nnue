@@ -256,30 +256,50 @@ Rejected build intent:
   not spend SPRT or more public-test80 scalar variants unless the representation
   or objective changes materially.
 
+Rejected build intent:
+
+- `build.json` was `native-1.15.0-rc1-expanded-broad-existing-sf-d16-lr15e8-sb512-20260606`.
+- Hypothesis: `native-1.13.0-rc1` was still the best same-lane reference, and
+  a broader clean-native existing-data mix might improve game strength by adding
+  ordinary position coverage/diversity without hard-example overfit or public-data
+  transfer damage.
+- This changed only existing-label source scale/distribution. Architecture stayed
+  `16 x 12` scalar, objective stayed Huber/WDL, and init stayed fixed to
+  `native-1.13.0-rc1`.
+- Result: neutral, not a parent improvement. Training, provenance, and
+  engine-static completed. A 300-game distributed smoke versus `native-1.13.0`
+  finished `112-110-78`, score `0.5033`, about `+2.32 +/- 33.88 Elo`, LOS
+  `55.3%`. The 1000-game distributed confirm finished `378-376-246`, score
+  `0.5010`, about `+0.69 +/- 18.71 Elo`, LOS `52.9%`.
+- Conclusion: existing-label broad resampling has flattened out. Keep
+  `native-1.13.0-rc1` as the same-lane reference and change the data freshness
+  instead of promoting `native-1.15.0-rc1`.
+
 Current build intent:
 
-- `build.json` is `native-1.15.0-rc1-expanded-broad-existing-sf-d16-lr15e8-sb512-20260606`.
-- Hypothesis: `native-1.13.0-rc1` is still the best same-lane reference, and
-  hard-slice/public-data follow-ups failed. A broader clean-native existing-data
-  mix may improve game strength by adding ordinary position coverage/diversity
-  without hard-example overfit or public-data transfer damage.
-- This changes only data scale/distribution. Architecture remains `16 x 12`
-  scalar, objective remains Huber/WDL, and init is fixed to
-  `native-1.13.0-rc1`.
-- Source mix uses existing clean-native labeled pools filtered by
-  `abs(score) <= 800`: `500k` from native-1.3, `750k` from native-1.4,
-  `1.25M` from native-1.5.0, `750k` from native-1.5.1, `1.25M` from
-  native-1.8, `1.25M` from native-1.9.1, and all `480,024` rescued
-  native-1.10 rows.
-- Training uses `lr=1.5e-7`, `epochs=8`, `patience=2`, all weights trainable.
+- `build.json` is `native-1.16.0-rc1-fresh40k-v13self-sf-d16-lr3e7-sb512-20260606`.
+- Hypothesis: fresh self-play from the current same-lane reference
+  `native-1.13.0-rc1` may add useful position coverage that repeated training
+  on existing labeled pools did not provide.
+- This changes only data freshness. Architecture remains `16 x 12` scalar,
+  objective remains Huber/WDL, Stockfish remains only an oracle labeler, and init
+  is fixed to `native-1.13.0-rc1`.
+- Source generation: `40,000` Enyo self-play games with the clean
+  `native-1.13.0` net, depth `8`, seed `2026060616`, `skip_plies=8`, and
+  `signed-balanced-v1` sampling. Self-play is distributed through Crucible as
+  `80` tasks of `500` games.
+- Labeling: Stockfish d16, `hash=128`, `max_abs_cp=1600`, distributed through
+  Crucible as `96` scoring tasks.
+- Training: PyTorch from the `native-1.13.0` `.nn`, `lr=3e-7`, `epochs=8`,
+  `batch_size=8192`, `patience=2`, all weights trainable.
 - Static gates before games:
+  - self-play, extraction, and Stockfish d16 scoring must complete with sane row
+    counts;
   - provenance must remain clean Enyo-owned;
-  - source-mix stats must show no unexpected source collapse after filtering;
-  - engine-static on mixed rows must stay close to `native-1.13.0` with no
-    CP-scale collapse.
+  - engine-static on fresh labeled rows must stay close to `native-1.13.0` and
+    must not show CP-scale collapse.
 - If static passes, run a distributed 300-game Crucible smoke versus
-  `native-1.13.0-rc1` directly. Extend only if the parent smoke is
-  neutral-positive.
+  `native-1.13.0-rc1`. Extend only if the parent smoke is neutral-positive.
 
 
 Closed build intent:
@@ -723,37 +743,22 @@ Priority order:
 
 ## Next Concrete Experiment
 
-No active training experiment is selected.
+Run `native-1.16.0-rc1-fresh40k-v13self-sf-d16-lr3e7-sb512-20260606`.
 
-The last concrete experiment was
-`native-1.12.0-rc1-fullbroad-replaypair-pw3-lr1e6-e8-20260605`.
-It passed the local replay move gate but failed the 256-game smoke:
+Purpose: test whether fresh current-parent Enyo self-play provides stronger
+signal than resampling existing labels. This is deliberately not an architecture,
+objective, or public-data change.
 
-- broad engine-static on the same 5000 rows regressed from baseline
-  `mae=129.570`, `sign=82.71%` to candidate `mae=133.833`,
-  `sign=82.50%`;
-- replay move gate improved only slightly:
-  candidate `1144/2487`, baseline `1137/2487`, fixed `25`,
-  regressed `18`, `delta_avg=+2.1cp`, weighted `+1.5cp`;
-- distributed smoke versus `native-1.5.0-rc1` finished `89-104-63`,
-  score `0.4707`, about `-20.38 +/- 37.07 Elo`, LOS `14.0%`.
+Initial gates:
 
-Conclusion: the replay child-pair signal is real enough to move the local gate,
-but the scalar `.nn` path still does not transfer to game strength. Do not run
-more scalar replay-pair variants unless the mechanism changes, for example a
-separate ranking/policy path or a different representation that first passes
-broad engine-static.
+- Crucible self-play must use the synchronized `native-1.13.0` self-play net on
+  every worker.
+- Crucible scoring must complete without failed or stale tasks.
+- Provenance must pass `--require-clean-enyo-owned`.
+- Engine-static must stay close to `native-1.13.0` before any SPRT.
 
-Next useful work should choose one new hypothesis, then enable `build.json` in
-the same commit. Good candidates are:
-
-- data-scale lane: generate and label a larger clean-native dataset, but only
-  after writing explicit data-quality gates that predict game strength better
-  than broad MAE alone;
-- objective lane: add a gate that measures search move choice on non-replay
-  positions, so a local replay repair cannot overfit one suite;
-- representation lane: revisit architecture only with an initialization or
-  projection that does not collapse broad engine-static before games.
+If those pass, validate with a 300-game distributed smoke versus
+`native-1.13.0-rc1`, then extend only if the smoke is neutral-positive.
 
 ## Candidate Workflow
 
@@ -765,9 +770,9 @@ Normal candidate creation:
 
 Current `build.json` intent:
 
-- disabled after the `native-1.12.0` replay-pair smoke rejection. Do not run
-  `./build.py create -c build.json` until the next hypothesis is written here
-  and committed with the matching `build.json` change.
+- `native-1.16.0-rc1-fresh40k-v13self-sf-d16-lr3e7-sb512-20260606` is
+  enabled. It tests fresh current-parent self-play while keeping architecture,
+  objective, and init fixed.
 - rejected near-RC nets: `d16-continue-latest20m-huber-sign-*`,
   `native-2.1.0-rc2`, `native-1.12.0-rc1`, and all scalar pairwise repair nets.
 
