@@ -1,8 +1,8 @@
 {
-  "description": "native-1.13.1 lower-rate continuation from neutral-positive native-1.13.0 on the fixed broad existing-data mix.",
-  "experiment": "native-1.13.1-broadmix-continuation",
+  "description": "native-4.0.0 objective probe: MPE25 on the fixed native-1.13.0 broad mix, initialized from native-1.13.0.",
+  "experiment": "native-4.0.0-broadmix-mpe25",
   "create": {
-    "name": "native-1.13.1-rc1-broadmix-cont-sf-d16-lr2e7-e16-sb512-20260606",
+    "name": "native-4.0.0-rc1-broadmix-mpe25-sf-d16-lr1e4-e24-sb512-20260606",
     "backend": "pytorch",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "python": "~/.venv/bin/python",
@@ -11,10 +11,10 @@
     "engine_static_rows": 5000,
     "engine_static_engine": "~/code/cpp/chess/assets/engines/reference",
     "require_clean_enyo_owned": true,
-    "objective": "huber",
-    "epochs": 16,
+    "objective": "mpe25",
+    "epochs": 24,
     "batch_size": 8192,
-    "lr": 0.0000002,
+    "lr": 0.0001,
     "weight_decay": 0.000001,
     "huber_beta": 200,
     "wdl_lambda": 0.75,
@@ -26,14 +26,14 @@
     "torch_compile": true,
     "dataset_in_memory": true,
     "val_rows": 100000,
-    "patience": 4,
-    "select_metric": "mae",
+    "patience": 5,
+    "select_metric": "loss",
     "max_features": 32,
     "pack_progress": 250000
   },
   "validation": {
     "baseline": "native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602",
-    "hypothesis": "Continuing the neutral-positive native-1.13.0 net at a lower learning rate on the exact same broad mixed data can turn a weak +5 Elo signal into a clearer candidate without changing architecture or data.",
+    "hypothesis": "MPE25 may align the scalar net with win-probability/game outcome better than Huber CP MAE on the same broad native data. Keep data, architecture, and init fixed; change only the objective.",
     "stop_before_sprt_unless": [
       "provenance is clean Enyo-native",
       "candidate engine-static does not collapse on the fixed mixed validation rows",

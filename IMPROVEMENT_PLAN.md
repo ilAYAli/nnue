@@ -105,11 +105,12 @@ Previous build intent:
   that did not fail game validation, but the signal is still too weak for a
   release replacement. Keep the `16 x 12` scalar architecture for the next
   same-lane follow-up and change only one training/data knob.
-- Next useful action: test a slightly longer/lower-rate continuation from
-  `native-1.13.0-rc1` on the same broad mix, with stronger checkpoint
-  selection against `native-1.5.0-rc1`, before generating more data.
+- Follow-up: `native-1.13.1-rc1` tested the slightly longer/lower-rate
+  continuation from `native-1.13.0-rc1` on the same broad mix. It improved the
+  validation MAE but failed the distributed 300-game smoke, so do not continue
+  this exact Huber/MAE optimization path.
 
-Current build intent:
+Rejected follow-up:
 
 - `build.json` is `native-1.13.1-rc1-broadmix-cont-sf-d16-lr2e7-e16-sb512-20260606`.
 - Hypothesis: continuing the neutral-positive `native-1.13.0-rc1` net at a
@@ -122,9 +123,31 @@ Current build intent:
 - Only the continuation schedule changes: init from `native-1.13.0-rc1`,
   `lr=2e-7`, `epochs=16`, `patience=4`, same `16 x 12` scalar architecture,
   same Huber/WDL objective.
+- Result: rejected by smoke. The run passed provenance and engine-static.
+  Engine-static on the fixed mixed rows was nearly flat versus `native-1.13.0`
+  (`mae=130.894`, `sign=83.33%`, `corr=0.813`), but the distributed 300-game
+  smoke versus `native-1.5.0-rc1` finished `106-121-73`, score `0.4750`, about
+  `-17.4 Elo`.
+- Conclusion: lower validation MAE did not transfer to games. Do not run a
+  1000-game confirm for `native-1.13.1-rc1`.
+
+Current build intent:
+
+- `build.json` is `native-4.0.0-rc1-broadmix-mpe25-sf-d16-lr1e4-e24-sb512-20260606`.
+- This is a major-lane probe because the objective changes from Huber CP loss
+  to MPE25 probability loss.
+- Hypothesis: MPE25 may align the scalar net with win-probability/game outcome
+  better than Huber CP MAE on the same broad native data. Keep data,
+  architecture, and init fixed; change only the objective.
+- Data is fixed to the already mixed
+  `native-1.13.0-rc1/score/mixed.jsonl`; do not resample the source mix for
+  this run.
+- Init is fixed to `native-1.13.0-rc1`. Architecture remains `16 x 12` scalar.
+  Training uses `objective=mpe25`, `lr=1e-4`, `epochs=24`, `patience=5`, and
+  `select_metric=loss`.
 - Stop before promotion unless provenance passes, engine-static does not
-  collapse, and the distributed smoke/confirm versus `native-1.5.0-rc1` is
-  clearly better than the `native-1.13.0-rc1` result.
+  collapse, and the distributed smoke versus `native-1.5.0-rc1` is
+  neutral-positive.
 
 Closed build intent:
 
