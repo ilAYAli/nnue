@@ -1,27 +1,20 @@
 {
-  "description": "native-1.13.0 broad existing-data mix preflight from clean native-1.5.0.",
-  "experiment": "native-1.13.0-broadmix-existing",
+  "description": "native-1.13.1 lower-rate continuation from neutral-positive native-1.13.0 on the fixed broad existing-data mix.",
+  "experiment": "native-1.13.1-broadmix-continuation",
   "create": {
-    "name": "native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606",
+    "name": "native-1.13.1-rc1-broadmix-cont-sf-d16-lr2e7-e16-sb512-20260606",
     "backend": "pytorch",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "python": "~/.venv/bin/python",
-    "source_mix_jsonl": [
-      "~/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/score/labeled.jsonl:1000000:800",
-      "~/code/cpp/chess/nnue/runs/native-1.8.0-rc1-n16fresh40k-sf-d16-lr5e7-sb256-20260603/score/labeled.jsonl:1000000:800",
-      "~/code/cpp/chess/nnue/runs/native-1.9.1-rc1-n18self80k-sf-d16-lr3e7-sb384-20260604/score/labeled.jsonl:1000000:800",
-      "~/code/cpp/chess/nnue/runs/native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604/score_rescore96/labeled.jsonl:480024:800"
-    ],
-    "source_mix_seed": 2026060601,
-    "source_mix_progress": 250000,
-    "init_net": "~/code/cpp/chess/nnue/runs/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/train/native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602/model.nn",
+    "labeled_jsonl": "~/code/cpp/chess/nnue/runs/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/score/mixed.jsonl",
+    "init_net": "~/code/cpp/chess/nnue/runs/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/train/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/model.nn",
     "engine_static_rows": 5000,
     "engine_static_engine": "~/code/cpp/chess/assets/engines/reference",
     "require_clean_enyo_owned": true,
     "objective": "huber",
-    "epochs": 8,
+    "epochs": 16,
     "batch_size": 8192,
-    "lr": 0.0000005,
+    "lr": 0.0000002,
     "weight_decay": 0.000001,
     "huber_beta": 200,
     "wdl_lambda": 0.75,
@@ -33,19 +26,18 @@
     "torch_compile": true,
     "dataset_in_memory": true,
     "val_rows": 100000,
-    "patience": 2,
+    "patience": 4,
     "select_metric": "mae",
     "max_features": 32,
     "pack_progress": 250000
   },
   "validation": {
     "baseline": "native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602",
-    "hypothesis": "A balanced mix of existing clean Enyo-native SF16-labeled broad datasets can add useful data diversity without replay-pair overfit or another architecture change.",
+    "hypothesis": "Continuing the neutral-positive native-1.13.0 net at a lower learning rate on the exact same broad mixed data can turn a weak +5 Elo signal into a clearer candidate without changing architecture or data.",
     "stop_before_sprt_unless": [
-      "source_mix completes with the expected selected rows and abs(score) <= 800 filtering",
       "provenance is clean Enyo-native",
-      "candidate engine-static does not collapse on the mixed validation rows",
-      "the 256-game distributed smoke versus native-1.5.0-rc1 is neutral-positive"
+      "candidate engine-static does not collapse on the fixed mixed validation rows",
+      "the distributed smoke versus native-1.5.0-rc1 is neutral-positive"
     ]
   }
 }

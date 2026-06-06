@@ -82,7 +82,7 @@ Current clean-native lineage names:
   `89-104-63`, score `0.4707`, about `-20.38 +/- 37.07 Elo`, LOS `14.0%`.
   Do not promote or extend this scalar replay-pair setup.
 
-Current build intent:
+Previous build intent:
 
 - `build.json` is `native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606`.
 - Hypothesis: a balanced mix of existing clean Enyo-native SF16-labeled broad
@@ -108,6 +108,23 @@ Current build intent:
 - Next useful action: test a slightly longer/lower-rate continuation from
   `native-1.13.0-rc1` on the same broad mix, with stronger checkpoint
   selection against `native-1.5.0-rc1`, before generating more data.
+
+Current build intent:
+
+- `build.json` is `native-1.13.1-rc1-broadmix-cont-sf-d16-lr2e7-e16-sb512-20260606`.
+- Hypothesis: continuing the neutral-positive `native-1.13.0-rc1` net at a
+  lower learning rate on the exact same broad mixed data can turn a weak
+  `+5 Elo` signal into a clearer candidate without changing architecture or
+  data.
+- Data is fixed to the already mixed
+  `native-1.13.0-rc1/score/mixed.jsonl`; do not resample the source mix for
+  this run.
+- Only the continuation schedule changes: init from `native-1.13.0-rc1`,
+  `lr=2e-7`, `epochs=16`, `patience=4`, same `16 x 12` scalar architecture,
+  same Huber/WDL objective.
+- Stop before promotion unless provenance passes, engine-static does not
+  collapse, and the distributed smoke/confirm versus `native-1.5.0-rc1` is
+  clearly better than the `native-1.13.0-rc1` result.
 
 Closed build intent:
 
