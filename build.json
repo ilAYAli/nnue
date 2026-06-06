@@ -20,7 +20,7 @@
     "selfplay_seed": 2026060616,
     "selfplay_crucible": true,
     "selfplay_crucible_workers": "/home/petter/code/cpp/chess/crucible/runs/workers.json",
-    "selfplay_crucible_jobs": 5,
+    "selfplay_crucible_jobs": 6,
     "selfplay_crucible_remote_timeout_seconds": 10800,
     "selfplay_crucible_path_map": [
       "pwa-wsl:/home/petter/code/cpp/chess=/mnt/d/home/petter/code/cpp/chess",
@@ -49,7 +49,7 @@
     "score_progress": 10000,
     "score_crucible": true,
     "score_crucible_workers": "/home/petter/code/cpp/chess/crucible/runs/workers.json",
-    "score_crucible_jobs": 5,
+    "score_crucible_jobs": 6,
     "score_crucible_remote_timeout_seconds": 21600,
     "score_crucible_path_map": [
       "pwa-wsl:/home/petter/code/cpp/chess=/mnt/d/home/petter/code/cpp/chess",
