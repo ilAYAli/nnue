@@ -386,6 +386,31 @@ Current build intent:
   against `native-1.13.0-rc1`; if neutral-positive, compare directly against
   `native-1.16.2` to determine whether the continuation helped.
 
+2026-06-07 update 4:
+
+- `native-1.16.4-rc1-sfstatic-500k-v162cont-lr1e7-sb64-20260607`
+  is rejected. It passed provenance and Bullet static validation, but the
+  300-game distributed smoke versus `native-1.13.0-rc1` finished
+  `106-109-85`, about `-3.47 +/- 33.34 Elo`, LOS `41.9%`.
+- Direct-static exposure now has a consistent shape: `native-1.16.2` at
+  500k rows was weak-positive, the 2M scale-up failed confirmation, and the
+  low-dose continuation from `native-1.16.2` also failed. Do not continue the
+  exact 1.16.2 net on the same direct-static rows.
+- New checkpoint-screen hypothesis: less exposure may be the useful part of
+  the 500k direct-static lane. Export and screen `native-1.16.2` checkpoint 64
+  before generating new data. Its direct-static validation is better-shaped
+  than the final 1.16.2 net on the same `449,990` rows: ck64 MAE `154.850`,
+  slope `1.262523`; final 1.16.2 MAE `172.204`, slope `1.359375`; 1.16.4
+  MAE `184.594`, slope `1.421814`.
+- Gate: put the checkpoint export under a provenance-aware run directory,
+  pass clean provenance and static validation, then run a distributed
+  300-game smoke versus `native-1.13.0-rc1`. Extend only if the smoke is
+  neutral-positive.
+- Smoke result: checkpoint 64 passed the screen. The distributed 300-game
+  smoke versus `native-1.13.0-rc1` finished `118-101-81`, score `0.5283`,
+  about `+19.71 +/- 33.68 Elo`, LOS `87.5%`, with all Crucible tasks clean.
+  Start a 1000-game distributed confirm versus `native-1.13.0-rc1`.
+
 
 Closed build intent:
 
