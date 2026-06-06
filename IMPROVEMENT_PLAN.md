@@ -221,6 +221,38 @@ Current build intent:
   `native-1.5.0-rc1`. Extend only if the smoke is neutral-positive.
 
 
+
+2026-06-06 native 1.14.0 hardmix update:
+
+- `native-1.14.0-rc1` is rejected as a parent improvement. It passed source
+  mixing, clean provenance, and engine-static without scale collapse. It also
+  beat the older `native-1.5.0-rc1` baseline in distributed game tests:
+  300-game smoke `110-100-90`, `+11.59 +/- 32.96 Elo`, LOS `75.5%`; 1000-game
+  confirm `387-351-262`, `+12.51 +/- 18.52 Elo`, LOS `90.8%`.
+- The direct parent gate versus `native-1.13.0-rc1` failed: `352-380-268`,
+  score `0.4860`, about `-9.73 +/- 18.44 Elo`, LOS `15.0%`.
+- Conclusion: the low-dose d10/d18 instability rows did not improve the current
+  best broadmix lineage. Do not extend this exact hardmix dose. Keep
+  `native-1.13.0-rc1` as the same-lane reference for now.
+
+Current build intent:
+
+- `build.json` is `native-5.1.0-rc1-test80-floathead-v13init-lr5e7-sb256-20260606`.
+- This stays in the public test80/binpack data family, so it is a native-5
+  lane follow-up, not a clean Enyo-only data run.
+- Hypothesis: `native-5.0.0` failed because all-layer public-data training
+  damaged the native hidden/input representation. Reusing the same converted
+  `20M` public Bullet data while freezing input/L1 and training only the
+  float-head layers may test whether public data can help calibration without
+  broad native collapse.
+- Init is fixed to `native-1.13.0-rc1`; architecture remains `16 x 12` scalar;
+  trainable scope is `float-head`; `lr=5e-7 -> 1e-7`, `256` superbatches,
+  save every `64` superbatches.
+- Static gate before games: provenance must show public external data but no
+  borrowed Berserk/default init, and engine-static on native-1.13 mixed rows
+  must be neutral-positive versus `native-1.13.0` without the `native-5.0.0`
+  slope/MAE collapse. Reject before SPRT if this static gate fails.
+
 Closed build intent:
 
 - Previous `build.json` was
