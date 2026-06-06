@@ -235,23 +235,52 @@ Current build intent:
   best broadmix lineage. Do not extend this exact hardmix dose. Keep
   `native-1.13.0-rc1` as the same-lane reference for now.
 
+Rejected build intent:
+
+- `build.json` was `native-5.1.0-rc1-test80-floathead-v13init-lr5e7-sb256-20260606`.
+- This stayed in the public test80/binpack data family, but froze input/L1 and
+  trained only the float-head layers from `native-1.13.0-rc1`.
+- Result: rejected before games. Provenance correctly reported public external
+  data and no borrowed Berserk/default init, but static transfer to native rows
+  collapsed anyway. Final Bullet static on native-1.13 mixed rows was
+  `mae=164.336`, `sign=79.50%`, `slope=0.340`; engine-static was
+  `mae=168.231`, `sign=80.57%`, `slope=0.300`.
+- Checkpoint screen on 100k native rows showed the damage was already present
+  at checkpoint 64: ck0 `mae=128.714`, `sign=82.33%`, `slope=0.679`;
+  ck64 `mae=152.815`, `sign=80.34%`, `slope=0.419`; ck128
+  `mae=161.269`, `sign=79.89%`, `slope=0.360`; ck192
+  `mae=163.396`, `sign=79.68%`, `slope=0.346`; ck256
+  `mae=164.336`, `sign=79.50%`, `slope=0.340`.
+- Conclusion: close the public test80 scalar-eval lane for now. Freezing the
+  lower representation did not prevent CP-scale/sign transfer damage, so do
+  not spend SPRT or more public-test80 scalar variants unless the representation
+  or objective changes materially.
+
 Current build intent:
 
-- `build.json` is `native-5.1.0-rc1-test80-floathead-v13init-lr5e7-sb256-20260606`.
-- This stays in the public test80/binpack data family, so it is a native-5
-  lane follow-up, not a clean Enyo-only data run.
-- Hypothesis: `native-5.0.0` failed because all-layer public-data training
-  damaged the native hidden/input representation. Reusing the same converted
-  `20M` public Bullet data while freezing input/L1 and training only the
-  float-head layers may test whether public data can help calibration without
-  broad native collapse.
-- Init is fixed to `native-1.13.0-rc1`; architecture remains `16 x 12` scalar;
-  trainable scope is `float-head`; `lr=5e-7 -> 1e-7`, `256` superbatches,
-  save every `64` superbatches.
-- Static gate before games: provenance must show public external data but no
-  borrowed Berserk/default init, and engine-static on native-1.13 mixed rows
-  must be neutral-positive versus `native-1.13.0` without the `native-5.0.0`
-  slope/MAE collapse. Reject before SPRT if this static gate fails.
+- `build.json` is `native-1.15.0-rc1-expanded-broad-existing-sf-d16-lr15e8-sb512-20260606`.
+- Hypothesis: `native-1.13.0-rc1` is still the best same-lane reference, and
+  hard-slice/public-data follow-ups failed. A broader clean-native existing-data
+  mix may improve game strength by adding ordinary position coverage/diversity
+  without hard-example overfit or public-data transfer damage.
+- This changes only data scale/distribution. Architecture remains `16 x 12`
+  scalar, objective remains Huber/WDL, and init is fixed to
+  `native-1.13.0-rc1`.
+- Source mix uses existing clean-native labeled pools filtered by
+  `abs(score) <= 800`: `500k` from native-1.3, `750k` from native-1.4,
+  `1.25M` from native-1.5.0, `750k` from native-1.5.1, `1.25M` from
+  native-1.8, `1.25M` from native-1.9.1, and all `480,024` rescued
+  native-1.10 rows.
+- Training uses `lr=1.5e-7`, `epochs=8`, `patience=2`, all weights trainable.
+- Static gates before games:
+  - provenance must remain clean Enyo-owned;
+  - source-mix stats must show no unexpected source collapse after filtering;
+  - engine-static on mixed rows must stay close to `native-1.13.0` with no
+    CP-scale collapse.
+- If static passes, run a distributed 300-game Crucible smoke versus
+  `native-1.13.0-rc1` directly. Extend only if the parent smoke is
+  neutral-positive.
+
 
 Closed build intent:
 
