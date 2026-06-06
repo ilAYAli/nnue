@@ -326,6 +326,22 @@ Current build intent:
   run using the same source family, then game validation only after static
   gates remain sane.
 
+2026-06-07 update:
+
+- `native-1.16.1-rc1-sfstatic-direct50k-v16src-lr3e7-sb64-20260606`
+  passed the direct Bullet data chain after fixing Bullet `.data` static
+  validation. The 300-game distributed smoke versus `native-1.13.0-rc1`
+  finished `106-105-89`, about `+1.16 +/- 33.03 Elo`, LOS `52.7%`.
+- This is neutral, not a promotion result, but it validates the pipeline enough
+  to scale the same hypothesis.
+- Current `build.json` is
+  `native-1.16.2-rc1-sfstatic-direct500k-v16src-lr3e7-sb128-20260607`.
+  It changes only data scale and training duration: 500k direct static source
+  rows, 8 static scoring shards, 128 Bullet superbatches, same `16 x 12`
+  architecture, same Huber/WDL objective, and same `native-1.13.0` init.
+- Gate: provenance and Bullet static must pass, then run a distributed 300-game
+  Crucible smoke versus `native-1.13.0-rc1`. Extend only if neutral-positive.
+
 
 Closed build intent:
 
