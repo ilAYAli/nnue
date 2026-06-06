@@ -301,6 +301,31 @@ Current build intent:
 - If static passes, run a distributed 300-game Crucible smoke versus
   `native-1.13.0-rc1`. Extend only if the parent smoke is neutral-positive.
 
+Current build intent:
+
+- `build.json` is
+  `native-1.16.1-rc1-sfstatic-direct50k-v16src-lr3e7-sb64-20260606`.
+- Hypothesis: direct Stockfish static evaluation to Bullet `.data` can remove
+  UCI labeling and JSONL conversion overhead while preserving the useful part
+  of the current native workflow: Enyo-generated fresh positions and
+  Stockfish as a fixed oracle labeler.
+- This is a tooling/data-pipeline preflight, not a release candidate. It
+  changes only the scoring/export path. Source positions, scalar `16 x 12`
+  architecture, Huber/WDL objective, and `native-1.13.0` initialization remain
+  fixed.
+- Source: first `50,000` rows from the completed `native-1.16.0` fresh-position
+  source. The new Enyo datagen tool evaluates each accepted row with Stockfish
+  static NNUE, optionally also evaluates the Enyo net for diagnostics, and
+  writes Bullet records directly.
+- Stop before scaling unless:
+  - direct datagen writes the expected Bullet record count;
+  - Bullet training accepts the direct `.data` file;
+  - provenance remains clean Enyo-owned;
+  - measured throughput is clearly better than UCI scoring.
+- If the chain passes, the next useful action is a larger direct-Bullet data
+  run using the same source family, then game validation only after static
+  gates remain sane.
+
 
 Closed build intent:
 
