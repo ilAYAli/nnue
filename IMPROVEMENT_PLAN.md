@@ -131,7 +131,7 @@ Rejected follow-up:
 - Conclusion: lower validation MAE did not transfer to games. Do not run a
   1000-game confirm for `native-1.13.1-rc1`.
 
-Current build intent:
+Rejected build intent:
 
 - `build.json` is `native-4.0.0-rc1-broadmix-mpe25-sf-d16-lr1e4-e24-sb512-20260606`.
 - This is a major-lane probe because the objective changes from Huber CP loss
@@ -145,9 +145,24 @@ Current build intent:
 - Init is fixed to `native-1.13.0-rc1`. Architecture remains `16 x 12` scalar.
   Training uses `objective=mpe25`, `lr=1e-4`, `epochs=24`, `patience=5`, and
   `select_metric=loss`.
-- Stop before promotion unless provenance passes, engine-static does not
-  collapse, and the distributed smoke versus `native-1.5.0-rc1` is
-  neutral-positive.
+- Result: rejected before games. Provenance passed, but engine-static showed a
+  clear CP-scale collapse: `mae=152.193`, `sign=83.24%`, `corr=0.811`,
+  `slope=0.405`. Do not run SPRT for `native-4.0.0-rc1`.
+
+Current build intent:
+
+- `build.json` is `native-4.0.1-rc1-mpe25-outputcal-huber-lr3e4-e24-sb512-20260606`.
+- This is a patch-level corrective calibration for the `native-4.0.0` MPE25
+  lane, not a new data or architecture run.
+- Hypothesis: the MPE25 net preserved sign but compressed CP scale. Training
+  only the output layer with Huber may restore scale while preserving any
+  useful MPE-shaped hidden representation.
+- Data is fixed to the already mixed
+  `native-1.13.0-rc1/score/mixed.jsonl`. Init is fixed to the rejected
+  `native-4.0.0-rc1` net. Architecture remains `16 x 12` scalar.
+- Stop before games unless engine-static scale recovers from `native-4.0.0`
+  and is close to `native-1.13.0` / `native-1.13.1` on the same 5000-row
+  mixed validation gate.
 
 Closed build intent:
 

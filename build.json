@@ -1,20 +1,20 @@
 {
-  "description": "native-4.0.0 objective probe: MPE25 on the fixed native-1.13.0 broad mix, initialized from native-1.13.0.",
-  "experiment": "native-4.0.0-broadmix-mpe25",
+  "description": "native-4.0.1 output-only Huber calibration for the native-4.0.0 MPE25 net.",
+  "experiment": "native-4.0.1-mpe25-output-calibration",
   "create": {
-    "name": "native-4.0.0-rc1-broadmix-mpe25-sf-d16-lr1e4-e24-sb512-20260606",
+    "name": "native-4.0.1-rc1-mpe25-outputcal-huber-lr3e4-e24-sb512-20260606",
     "backend": "pytorch",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "python": "~/.venv/bin/python",
     "labeled_jsonl": "~/code/cpp/chess/nnue/runs/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/score/mixed.jsonl",
-    "init_net": "~/code/cpp/chess/nnue/runs/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/train/native-1.13.0-rc1-broadmix-existing-sf-d16-lr5e7-sb512-20260606/model.nn",
+    "init_net": "~/code/cpp/chess/nnue/runs/native-4.0.0-rc1-broadmix-mpe25-sf-d16-lr1e4-e24-sb512-20260606/train/native-4.0.0-rc1-broadmix-mpe25-sf-d16-lr1e4-e24-sb512-20260606/model.nn",
     "engine_static_rows": 5000,
     "engine_static_engine": "~/code/cpp/chess/assets/engines/reference",
     "require_clean_enyo_owned": true,
-    "objective": "mpe25",
+    "objective": "huber",
     "epochs": 24,
     "batch_size": 8192,
-    "lr": 0.0001,
+    "lr": 0.0003,
     "weight_decay": 0.000001,
     "huber_beta": 200,
     "wdl_lambda": 0.75,
@@ -27,16 +27,17 @@
     "dataset_in_memory": true,
     "val_rows": 100000,
     "patience": 5,
-    "select_metric": "loss",
+    "select_metric": "mae",
+    "trainable": "output",
     "max_features": 32,
     "pack_progress": 250000
   },
   "validation": {
     "baseline": "native-1.5.0-rc1-n14dist60k-c8-sf-d14-lr2e6-sb512-20260602",
-    "hypothesis": "MPE25 may align the scalar net with win-probability/game outcome better than Huber CP MAE on the same broad native data. Keep data, architecture, and init fixed; change only the objective.",
+    "hypothesis": "The native-4.0.0 MPE25 net preserved sign but compressed CP scale. Output-only Huber calibration may restore scale while preserving any useful MPE-shaped hidden representation.",
     "stop_before_sprt_unless": [
       "provenance is clean Enyo-native",
-      "candidate engine-static does not collapse on the fixed mixed validation rows",
+      "engine-static scale recovers from native-4.0.0 and is close to native-1.13.0/1.13.1",
       "the distributed smoke versus native-1.5.0-rc1 is neutral-positive"
     ]
   }
