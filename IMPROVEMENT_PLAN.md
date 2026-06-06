@@ -364,6 +364,28 @@ Current build intent:
   300-game Crucible smoke versus `native-1.13.0-rc1`. Extend only if the
   game signal is at least neutral-positive.
 
+2026-06-07 update 3:
+
+- `native-1.16.3-rc1-sfstatic-direct2m-v16src-lr3e7-sb256-20260607`
+  passed provenance and Bullet static validation on `1,800,510` rows, but the
+  static shape worsened: MAE `205.867`, sign `81.26%`, corr `0.880152`, and
+  slope `1.510046`.
+- The 300-game smoke versus `native-1.13.0-rc1` was positive
+  (`119-106-75`, about `+15.06 +/- 34.13 Elo`, LOS `80.7%`), but the
+  1000-game confirm failed (`349-368-283`, about `-6.60 +/- 18.25 Elo`,
+  LOS `23.9%`).
+- Interpretation: reject the 2M direct-static scale-up. Do not scale this exact
+  setup further. The likely failure mode is too much direct static exposure or
+  data distribution shift, not a lack of raw rows.
+- Current `build.json` is
+  `native-1.16.4-rc1-sfstatic-500k-v162cont-lr1e7-sb64-20260607`.
+  It reuses the existing 1.16.2 `449,990` direct-static Bullet rows, starts
+  from the weak-positive `native-1.16.2` model, lowers LR to `1e-7`, and limits
+  exposure to `64` Bullet superbatches. No rescoring is performed.
+- Gate: provenance and Bullet static must pass, then run a distributed smoke
+  against `native-1.13.0-rc1`; if neutral-positive, compare directly against
+  `native-1.16.2` to determine whether the continuation helped.
+
 
 Closed build intent:
 
