@@ -346,6 +346,7 @@ def append_crucible_deploy_step(
     workers: str,
     manifest: str,
     jobs: int,
+    coordinator_host: str,
     remote_timeout_seconds: int,
     verbose: bool,
 ) -> None:
@@ -353,10 +354,12 @@ def append_crucible_deploy_step(
         "bash", "-lc",
         (
             "python=\"$1\" crucible=\"$2\" workers=\"$3\" manifest=\"$4\" "
-            "jobs=\"$5\" timeout=\"$6\" verbose=\"$7\"; "
+            "jobs=\"$5\" coordinator_host=\"$6\" timeout=\"$7\" verbose=\"$8\"; "
             "tmp=$(mktemp); "
             "cmd=(\"$python\" \"$crucible\" deploy \"$workers\" \"$manifest\" "
             "--jobs \"$jobs\" --remote-timeout-seconds \"$timeout\"); "
+            "if [ -n \"$coordinator_host\" ]; then "
+            "cmd+=(--coordinator-host \"$coordinator_host\"); fi; "
             "if [ \"$verbose\" = 1 ]; then cmd+=(--verbose); fi; "
             "\"${{cmd[@]}}\" 2>&1 | tee \"$tmp\"; "
             "rc=${{PIPESTATUS[0]}}; "
@@ -371,6 +374,7 @@ def append_crucible_deploy_step(
         str(expand_path(workers)),
         manifest,
         str(jobs),
+        str(coordinator_host),
         str(remote_timeout_seconds),
         "1" if verbose else "0",
     ]
@@ -457,6 +461,7 @@ def append_crucible_score_steps(
             workers=args.score_crucible_workers,
             manifest=manifest,
             jobs=args.score_crucible_jobs,
+            coordinator_host=args.score_crucible_coordinator_host,
             remote_timeout_seconds=args.score_crucible_remote_timeout_seconds,
             verbose=args.score_crucible_verbose,
         )
@@ -650,6 +655,7 @@ def append_crucible_selfplay_steps(steps: list[dict], args: argparse.Namespace) 
             workers=args.selfplay_crucible_workers,
             manifest=manifest,
             jobs=args.selfplay_crucible_jobs,
+            coordinator_host=args.selfplay_crucible_coordinator_host,
             remote_timeout_seconds=args.selfplay_crucible_remote_timeout_seconds,
             verbose=args.selfplay_crucible_verbose,
         )
@@ -1311,6 +1317,8 @@ def add_create_args(
                         default=value("selfplay_crucible_workers", d.selfplay_crucible_workers))
     parser.add_argument("--selfplay-crucible-jobs", type=int,
                         default=value("selfplay_crucible_jobs", d.selfplay_crucible_jobs))
+    parser.add_argument("--selfplay-crucible-coordinator-host",
+                        default=value("selfplay_crucible_coordinator_host", d.selfplay_crucible_coordinator_host))
     parser.add_argument("--selfplay-crucible-remote-timeout-seconds", type=int,
                         default=value("selfplay_crucible_remote_timeout_seconds", d.selfplay_crucible_remote_timeout_seconds))
     parser.add_argument("--selfplay-crucible-verbose",
@@ -1353,6 +1361,8 @@ def add_create_args(
                         default=value("score_crucible_workers", d.score_crucible_workers))
     parser.add_argument("--score-crucible-jobs", type=int,
                         default=value("score_crucible_jobs", d.score_crucible_jobs))
+    parser.add_argument("--score-crucible-coordinator-host",
+                        default=value("score_crucible_coordinator_host", d.score_crucible_coordinator_host))
     parser.add_argument("--score-crucible-remote-timeout-seconds", type=int,
                         default=value("score_crucible_remote_timeout_seconds", d.score_crucible_remote_timeout_seconds))
     parser.add_argument("--score-crucible-verbose",

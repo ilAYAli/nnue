@@ -917,6 +917,7 @@ class BuildConfigTests(unittest.TestCase):
                     "score_crucible": True,
                     "score_crucible_workers": "~/workers.json",
                     "score_crucible_jobs": 3,
+                    "score_crucible_coordinator_host": "coordinator.example.net",
                     "score_crucible_remote_timeout_seconds": 42,
                     "score_crucible_verbose": True,
                     "score_crucible_local_slots": 2,
@@ -945,6 +946,7 @@ class BuildConfigTests(unittest.TestCase):
             self.assertIn("pass --resume or --replace", deploy["command"][2])
             self.assertIn("--resume", deploy["command"][2])
             self.assertIn("--jobs", deploy["command"][2])
+            self.assertIn("--coordinator-host", deploy["command"][2])
             self.assertIn("--remote-timeout-seconds", deploy["command"][2])
             self.assertIn("--verbose", deploy["command"][2])
             self.assertIn("${cmd[@]}", deploy["command"][2].format())
@@ -953,8 +955,9 @@ class BuildConfigTests(unittest.TestCase):
             self.assertNotIn('if "${cmd[@]}" 2>&1 | tee "$tmp"; then', deploy["command"][2].format())
             self.assertEqual(str(Path("~/workers.json").expanduser()), deploy["command"][6])
             self.assertEqual("3", deploy["command"][8])
-            self.assertEqual("42", deploy["command"][9])
-            self.assertEqual("1", deploy["command"][10])
+            self.assertEqual("coordinator.example.net", deploy["command"][9])
+            self.assertEqual("42", deploy["command"][10])
+            self.assertEqual("1", deploy["command"][11])
 
             merge = next(
                 step for step in config["steps"]
@@ -976,6 +979,7 @@ class BuildConfigTests(unittest.TestCase):
                     "selfplay_crucible": True,
                     "selfplay_crucible_workers": "~/workers.json",
                     "selfplay_crucible_jobs": 3,
+                    "selfplay_crucible_coordinator_host": "coordinator.example.net",
                     "selfplay_crucible_remote_timeout_seconds": 42,
                     "selfplay_crucible_verbose": True,
                     "selfplay_crucible_local_slots": 2,
@@ -1005,14 +1009,16 @@ class BuildConfigTests(unittest.TestCase):
             self.assertIn("pass --resume or --replace", deploy["command"][2])
             self.assertIn("--resume", deploy["command"][2])
             self.assertIn("--jobs", deploy["command"][2])
+            self.assertIn("--coordinator-host", deploy["command"][2])
             self.assertIn("--remote-timeout-seconds", deploy["command"][2])
             self.assertIn("--verbose", deploy["command"][2])
             self.assertIn("${cmd[@]}", deploy["command"][2].format())
             self.assertIn("${PIPESTATUS[0]}", deploy["command"][2].format())
             self.assertEqual(str(Path("~/workers.json").expanduser()), deploy["command"][6])
             self.assertEqual("3", deploy["command"][8])
-            self.assertEqual("42", deploy["command"][9])
-            self.assertEqual("1", deploy["command"][10])
+            self.assertEqual("coordinator.example.net", deploy["command"][9])
+            self.assertEqual("42", deploy["command"][10])
+            self.assertEqual("1", deploy["command"][11])
 
             merge = next(
                 step for step in config["steps"]

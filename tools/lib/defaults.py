@@ -57,6 +57,7 @@ class CandidateDefaults:
     selfplay_crucible_notify_command: str = "/home/petter/scripts/notifai.sh"
     selfplay_crucible_workers: str = ""
     selfplay_crucible_jobs: int = 4
+    selfplay_crucible_coordinator_host: str = ""
     selfplay_crucible_remote_timeout_seconds: int = 1800
     selfplay_crucible_verbose: bool = False
 
@@ -83,6 +84,7 @@ class CandidateDefaults:
     score_crucible_notify_command: str = "/home/petter/scripts/notifai.sh"
     score_crucible_workers: str = ""
     score_crucible_jobs: int = 4
+    score_crucible_coordinator_host: str = ""
     score_crucible_remote_timeout_seconds: int = 1800
     score_crucible_verbose: bool = False
 
