@@ -298,6 +298,7 @@ def task_command(
 
 
 def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
+    validate_even_game_counts(args)
     run_name = safe_name(args.tag)
     chunk_count = (args.games + args.chunk_games - 1) // args.chunk_games
     if chunk_count <= 0:
@@ -690,6 +691,16 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def validate_even_game_counts(args: argparse.Namespace) -> None:
+    for attr in ("games", "chunk_games"):
+        value = int(getattr(args, attr))
+        if value % 2 != 0:
+            option = "--" + attr.replace("_", "-")
+            raise SystemExit(
+                f"{option} must be even because SPRT plays paired openings"
+            )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run a distributed NNUE SPRT through Crucible."
@@ -712,7 +723,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cache-dir", default="~/.cache/crucible")
     parser.add_argument("--book", default="~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd")
     parser.add_argument("--games", type=positive_int, default=4000)
-    parser.add_argument("--chunk-games", type=positive_int, default=100)
+    parser.add_argument(
+        "--chunk-games",
+        type=positive_int,
+        default=100,
+        help="Games per Crucible task. Must be even because SPRT pairs openings.",
+    )
     parser.add_argument("--chunk-concurrency", type=positive_int, default=4)
     parser.add_argument("--threads", type=positive_int, default=1)
     parser.add_argument("--hash", type=positive_int, default=512)
@@ -744,6 +760,7 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     args.crucible_notify_command = str(expand_path(args.crucible_notify_command))
+    validate_even_game_counts(args)
     args.task_count = (args.games + args.chunk_games - 1) // args.chunk_games
     if args.resume and args.replace:
         parser.error("--resume and --replace are mutually exclusive")

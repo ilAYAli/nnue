@@ -68,6 +68,21 @@ class RunCrucibleSprtTests(unittest.TestCase):
             task_count=2,
         )
 
+    def test_manifest_rejects_odd_game_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            args = self.args(root)
+            args.chunk_games = 25
+            with self.assertRaises(SystemExit) as caught:
+                run_crucible_sprt.build_manifest(args, root / "manifest-out")
+            self.assertIn("--chunk-games must be even", str(caught.exception))
+
+            args = self.args(root)
+            args.games = 201
+            with self.assertRaises(SystemExit) as caught:
+                run_crucible_sprt.build_manifest(args, root / "manifest-out")
+            self.assertIn("--games must be even", str(caught.exception))
+
     def test_manifest_uses_restart_off_and_progress_labels(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             root = Path(tmp_name)
