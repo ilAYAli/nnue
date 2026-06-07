@@ -301,6 +301,23 @@ Current build intent:
 - If static passes, run a distributed 300-game Crucible smoke versus
   `native-1.13.0-rc1`. Extend only if the parent smoke is neutral-positive.
 
+2026-06-07 update:
+
+- `native-1.16.0-rc1` is the first fresh current-parent self-play candidate
+  with a clean positive parent confirm. The original game validation was
+  invalidated by worker failure, so it was retested with the healthy Crucible
+  worker set.
+- Clean distributed smoke versus `native-1.13.0-rc1`: `116-108-76`, score
+  `0.5133`, about `+9.27 +/- 34.04 Elo`, LOS `70.3%`, with `6/6` tasks done
+  and no failures or stale claims.
+- Clean distributed 1000-game confirm versus `native-1.13.0-rc1`:
+  `382-347-271`, score `0.5175`, about `+12.17 +/- 18.40 Elo`, LOS `90.3%`,
+  with `20/20` tasks done and no failures or stale claims.
+- Interpretation: fresh current-parent self-play is live again and is currently
+  the best same-lane parent candidate. It is not yet proven tightly enough for
+  promotion. Run a longer distributed screen versus `native-1.13.0-rc1`; if
+  it remains positive, use `native-1.16.0-rc1` as the next same-lane parent.
+
 Current build intent:
 
 - `build.json` is
@@ -935,22 +952,22 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run `native-1.16.0-rc1-fresh40k-v13self-sf-d16-lr3e7-sb512-20260606`.
+Run `native-1.16.0-vs-native-1.13.0-screen4000-20260607`.
 
-Purpose: test whether fresh current-parent Enyo self-play provides stronger
-signal than resampling existing labels. This is deliberately not an architecture,
-objective, or public-data change.
+Purpose: tighten the clean positive `native-1.16.0-rc1` signal before changing
+the training parent. This is validation only; no architecture, objective, or
+data source changes.
 
 Initial gates:
 
-- Crucible self-play must use the synchronized `native-1.13.0` self-play net on
-  every worker.
-- Crucible scoring must complete without failed or stale tasks.
-- Provenance must pass `--require-clean-enyo-owned`.
-- Engine-static must stay close to `native-1.13.0` before any SPRT.
+- Use distributed Crucible SPRT with aggregate AI_stdout and SPRT ntfy enabled.
+- Exclude pwa-wsl while SSH resets during key exchange; send the ping blocker
+  notice if it is still unavailable for all-worker work.
+- All Crucible tasks must finish with `fail=0` and `stale=0`.
 
-If those pass, validate with a 300-game distributed smoke versus
-`native-1.13.0-rc1`, then extend only if the smoke is neutral-positive.
+If the 4000-game screen stays positive versus `native-1.13.0-rc1`, make
+`native-1.16.0-rc1` the next same-lane parent. If it is neutral or negative,
+close the fresh40k lane and change the failure theory.
 
 ## Candidate Workflow
 
