@@ -445,8 +445,16 @@ Current build intent:
 - The distributed 300-game smoke versus `native-1.13.0-rc1` passed strongly for
   a smoke: `119-94-87`, score `0.5417`, about `+29.02 +/- 33.25 Elo`,
   LOS `95.7%`, with all Crucible tasks clean.
-- Start a distributed 1000-game confirm versus `native-1.13.0-rc1`. Treat this
-  candidate as unproven until the confirm finishes neutral-positive.
+- The distributed 1000-game confirm rejected the final checkpoint:
+  `358-375-267`, score `0.4915`, about `-5.91 +/- 18.45 Elo`, LOS `26.5%`.
+  Crucible completed cleanly: `20/20` tasks, `fail=0`, `stale=0`.
+- Conclusion: close the final `native-1.18.0` replay-pair candidate. The
+  300-game smoke was a statistical mirage, and the weak move-gate gain was not
+  enough to transfer to games.
+- Next action: screen the exported `native-1.18.0` epoch checkpoints with the
+  same broad engine-static and replay move-choice gates. Only launch games for a
+  checkpoint if it shows a materially better broad-vs-ranking tradeoff than the
+  rejected final checkpoint.
 
 
 Closed build intent:
