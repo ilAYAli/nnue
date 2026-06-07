@@ -413,21 +413,33 @@ Current build intent:
   `0.4920`, about `-5.56 +/- 18.18 Elo`, LOS `27.4%`. Close this checkpoint
   as a candidate.
 
+Rejected build intent:
+
+- `native-1.17.0-rc1-broadmix-freshdose-sf-d16-lr3e7-sb512-20260607` is
+  rejected. It passed source mixing, training, clean provenance, and
+  engine-static (`mae=130.669`, sign `83.41%`, corr `0.809017`, slope
+  `0.595812`), but the distributed 300-game smoke versus `native-1.13.0-rc1`
+  finished `103-114-83`, score `0.4817`, about `-12.75 +/- 33.51 Elo`,
+  LOS `22.8%`.
+- Conclusion: adding a small dose of `native-1.16.0` fresh UCI-labeled rows to
+  the broad `native-1.13.0` mix did not transfer. Do not extend the fresh
+  self-play/fresh-dose lane without a new gate that explains why it should
+  help.
+
 Current build intent:
 
 - `build.json` is
-  `native-1.17.0-rc1-broadmix-freshdose-sf-d16-lr3e7-sb512-20260607`.
-- Hypothesis: pure fresh self-play training (`native-1.16.0`) failed, but the
-  fresh native-1.16.0 UCI-labeled rows may still help as a small dose inside
-  the proven native-1.13 broad mix. This changes only data distribution.
-- Data: sample `3,000,000` rows from the native-1.13 broad mix and `500,000`
-  rows from native-1.16.0 fresh SF16 labels, both filtered to
-  `abs(score) <= 800`.
-- Init is fixed to `native-1.13.0-rc1`. Architecture remains `16 x 12` scalar
-  and objective remains Huber/WDL.
-- Gate: clean provenance and engine-static without scale collapse, then a
-  distributed 300-game smoke versus `native-1.13.0-rc1`. Extend only if
-  neutral-positive.
+  `native-1.18.0-rc1-v13replaypair-pw2-lr5e7-e4-sb8192-20260607`.
+- Hypothesis: Enyo replay loss-pair rows contain a real move-choice signal,
+  but prior scalar pairwise runs used the older `native-1.5.0` parent. Retest
+  the signal from the current `native-1.13.0` parent with conservative
+  `pair_weight=2`, low LR, and only four epochs.
+- This changes objective family to pairwise replay supervision. Architecture
+  and runtime net format remain scalar `16 x 12`; broad data and init are fixed
+  to `native-1.13.0-rc1`.
+- Gate: clean provenance, broad engine-static close to `native-1.13.0`, and
+  move-gate improvement versus `native-1.13.0`. Run games only if those gates
+  pass.
 
 
 Closed build intent:
