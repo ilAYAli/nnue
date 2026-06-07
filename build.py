@@ -6,11 +6,13 @@ import argparse
 from dataclasses import fields
 import json
 import os
+import signal
 import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "tools"))
 
@@ -134,6 +136,350 @@ def write_config(run_dir: Path, config: dict) -> Path:
     path = run_dir / "config.json"
     path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def read_json(path: Path) -> dict[str, Any]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"{path}: expected a JSON object")
+    return data
+
+
+def default_event_command() -> str:
+    path = repo_root() / "tools" / "events" / "nnue_event_ntfy.sh"
+    return str(path) if path.exists() else ""
+
+
+def recipe_value(
+    recipe: dict[str, Any],
+    *keys: str,
+    required: bool = False,
+    default: Any = "",
+) -> Any:
+    for key in keys:
+        value = recipe.get(key)
+        if value not in (None, ""):
+            return value
+    if required:
+        names = ", ".join(keys)
+        raise SystemExit(f"recipe is missing required field: {names}")
+    return default
+
+
+def require_mapping(value: Any, *, name: str) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise SystemExit(f"recipe field '{name}' must be an object")
+    return value
+
+
+def recipe_to_create_defaults(
+    recipe: dict[str, Any],
+    *,
+    recipe_path: Path,
+) -> dict[str, object]:
+    allowed = {
+        "name",
+        "desc",
+        "description",
+        "source",
+        "source_jsonl",
+        "stockfish_net",
+        "init_net",
+        "run_dir",
+        "workers",
+        "score",
+        "train",
+        "event_command",
+        "validate",
+    }
+    unknown = sorted(str(key) for key in recipe if key not in allowed)
+    if unknown:
+        raise SystemExit(f"{recipe_path}: unknown recipe field(s): {', '.join(unknown)}")
+
+    score = require_mapping(recipe.get("score"), name="score")
+    train = require_mapping(recipe.get("train"), name="train")
+    validate = require_mapping(recipe.get("validate"), name="validate")
+
+    name = str(recipe_value(recipe, "name", required=True))
+    source = templated_path_arg(recipe_value(recipe, "source", "source_jsonl", required=True))
+    stockfish_net = templated_path_arg(recipe_value(recipe, "stockfish_net", required=True))
+    init_net = templated_path_arg(recipe_value(recipe, "init_net", required=True))
+    workers_file = str(recipe_value(recipe, "workers", default=""))
+    event_command = str(recipe_value(
+        recipe,
+        "event_command",
+        default=default_event_command(),
+    ))
+
+    score_shards = int(score.get("shards", 24))
+    score_jobs = int(score.get("jobs", 4))
+    score_limit = int(score.get("limit", 0))
+    score_progress = int(score.get("progress", 10000))
+
+    defaults: dict[str, object] = {
+        "config": str(recipe_path),
+        "name": name,
+        "run_dir": str(recipe_value(recipe, "run_dir", default=expand_path(DEFAULTS.run_base) / name)),
+        "backend": "bullet",
+        "init_net": init_net,
+        "event_command": event_command,
+        "bullet_generate_source": False,
+        "bullet_source_jsonl": "",
+        "bullet_data": "",
+        "bullet_loader": "direct",
+        "bullet_static_data": "",
+        "score_source_jsonl": source,
+        "score_backend": "stockfish-static",
+        "score_output_format": "bullet-data",
+        "score_stockfish_net": stockfish_net,
+        "score_static_datagen_tool": str(score.get(
+            "tool",
+            score.get("static_datagen_tool", DEFAULTS.score_static_datagen_tool),
+        )),
+        "score_shards": score_shards,
+        "score_limit": score_limit,
+        "score_max_abs_cp": int(score.get("max_abs_cp", DEFAULTS.score_max_abs_cp)),
+        "score_progress": score_progress,
+        "score_crucible": bool(workers_file),
+        "score_crucible_workers": workers_file,
+        "score_crucible_jobs": score_jobs,
+        "score_crucible_verbose": bool(score.get("verbose", False)),
+        "score_enyo_net": str(score.get("enyo_net", "")),
+        "score_min_delta_cp": int(score.get("min_delta_cp", 0)),
+        "bullet_init_net": init_net,
+        "bullet_init_weights": "",
+        "bullet_superbatches": int(train.get("superbatches", DEFAULTS.bullet_superbatches)),
+        "bullet_batches": int(train.get("batches", DEFAULTS.bullet_batches)),
+        "bullet_batch_size": int(train.get("batch_size", DEFAULTS.bullet_batch_size)),
+        "bullet_threads": int(train.get("threads", DEFAULTS.bullet_threads)),
+        "bullet_lr": float(train.get("lr", DEFAULTS.bullet_lr)),
+        "bullet_final_lr": float(train.get("final_lr", DEFAULTS.bullet_final_lr)),
+        "bullet_save_rate": int(train.get("save_rate", DEFAULTS.bullet_save_rate)),
+        "bullet_trainable": str(train.get("trainable", DEFAULTS.bullet_trainable)),
+        "bullet_weight_decay": float(train.get("weight_decay", DEFAULTS.bullet_weight_decay)),
+        "device": str(train.get("device", DEFAULTS.device)),
+        "validate_provenance": bool(validate.get("provenance", True)),
+        "engine_static_jsonl": "",
+        "bullet_static_data": "{score}/labeled.bullet"
+        if int(validate.get("static_rows", DEFAULTS.bullet_static_rows)) > 0
+        else "",
+        "bullet_static_rows": int(validate.get("static_rows", DEFAULTS.bullet_static_rows)),
+    }
+    return defaults
+
+
+def namespace_from_create_defaults(defaults: dict[str, object]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(add_help=False)
+    add_create_args(parser, defaults)
+    return parser.parse_args([])
+
+
+def load_recipe(path: Path) -> dict[str, Any]:
+    recipe = read_json(path)
+    if not recipe.get("name"):
+        raise SystemExit(f"{path}: recipe must set 'name'")
+    return recipe
+
+
+def read_events(run_dir: Path) -> list[dict[str, Any]]:
+    path = run_dir / "events.jsonl"
+    if not path.exists():
+        return []
+    events: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+    return events
+
+
+def latest_event(run_dir: Path) -> dict[str, Any]:
+    events = read_events(run_dir)
+    return events[-1] if events else {}
+
+
+def active_step(run_dir: Path) -> dict[str, Any]:
+    path = run_dir / "active_step.json"
+    if not path.exists():
+        return {}
+    try:
+        return read_json(path)
+    except (OSError, json.JSONDecodeError, SystemExit):
+        return {}
+
+
+def run_config(run_dir: Path) -> dict[str, Any]:
+    path = run_dir / "config.json"
+    if not path.exists():
+        return {}
+    try:
+        return read_json(path)
+    except (OSError, json.JSONDecodeError, SystemExit):
+        return {}
+
+
+def run_state(run_dir: Path) -> str:
+    if (run_dir / "stop.json").exists():
+        return "stopped"
+    latest = latest_event(run_dir)
+    event = str(latest.get("event", ""))
+    status = str(latest.get("status", ""))
+    if event == "done":
+        return "done"
+    if event == "fail" or status == "failed":
+        return "failed"
+    if event == "stop":
+        return "stopped"
+    if (run_dir / "active_step.json").exists():
+        return "running"
+    if (run_dir / "config.json").exists():
+        return "current"
+    return "unknown"
+
+
+def discover_runs(*, include_done: bool = False) -> list[Path]:
+    base = expand_path(DEFAULTS.run_base)
+    if not base.exists():
+        return []
+    runs = [
+        path for path in base.iterdir()
+        if path.is_dir() and (path / "config.json").exists()
+    ]
+    if not include_done:
+        runs = [path for path in runs if run_state(path) != "done"]
+    return sorted(runs, key=lambda path: path.stat().st_mtime, reverse=True)
+
+
+def select_run(run: str | None, *, failed: bool = False) -> Path:
+    if run:
+        path = expand_path(run)
+        if not path.exists():
+            named = expand_path(DEFAULTS.run_base) / run
+            path = named if named.exists() else path
+        return path
+    candidates = discover_runs(include_done=False)
+    if failed:
+        candidates = [path for path in candidates if run_state(path) == "failed"]
+    if not candidates:
+        kind = "failed " if failed else ""
+        raise SystemExit(f"no {kind}NNUE runs found in {expand_path(DEFAULTS.run_base)}")
+    if len(candidates) == 1:
+        return candidates[0]
+    print("multiple runs match; specify one:", file=sys.stderr)
+    for path in candidates:
+        print(f"  {path.name}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def format_count(value: int) -> str:
+    sign = "-" if value < 0 else ""
+    value = abs(value)
+    if value >= 1_000_000:
+        return f"{sign}{value // 1_000_000}m"
+    if value >= 1_000:
+        return f"{sign}{value // 1_000}k"
+    return f"{sign}{value}"
+
+
+def count_lines(path: Path) -> int:
+    try:
+        with path.open(encoding="utf-8", errors="replace") as handle:
+            return sum(1 for line in handle if line.strip())
+    except OSError:
+        return 0
+
+
+def score_source_rows(run_dir: Path, config: dict[str, Any]) -> int:
+    create_args = config.get("create_args", {})
+    source = ""
+    limit = 0
+    if isinstance(create_args, dict):
+        source = str(create_args.get("score_source_jsonl", "") or "")
+        limit = int(create_args.get("score_limit", 0) or 0)
+    source_path = expand_user(source) if source else run_dir / "posgen" / "source.jsonl"
+    rows = count_lines(source_path)
+    if limit > 0 and (rows <= 0 or limit < rows):
+        return limit
+    return rows
+
+
+def score_progress(run_dir: Path, config: dict[str, Any]) -> tuple[int, int, int]:
+    create_args = config.get("create_args", {})
+    shards = 0
+    if isinstance(create_args, dict):
+        shards = int(create_args.get("score_shards", 0) or 0)
+    shard_dir = run_dir / "score" / "shards"
+    if shards <= 0:
+        indexes: list[int] = []
+        for path in shard_dir.glob("label.*.*"):
+            parts = path.name.split(".")
+            if len(parts) >= 3 and parts[1].isdigit():
+                indexes.append(int(parts[1]))
+        shards = max(indexes or [-1]) + 1
+
+    written = 0
+    completed = 0
+    for shard in range(shards):
+        stats_paths = sorted(shard_dir.glob(f"label.{shard}.*.stats.json"))
+        if stats_paths:
+            try:
+                stats = json.loads(stats_paths[-1].read_text(encoding="utf-8"))
+                written += int(stats.get("written", 0) or 0)
+                completed += 1
+                continue
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                pass
+        jsonl = shard_dir / f"label.{shard}.jsonl"
+        if jsonl.exists():
+            written += count_lines(jsonl)
+    return written, score_source_rows(run_dir, config), completed
+
+
+def print_run_status(run_dir: Path, *, verbose: bool = False) -> None:
+    config = run_config(run_dir)
+    latest = latest_event(run_dir)
+    active = active_step(run_dir)
+    title = str(config.get("name") or run_dir.name)
+    desc = str(config.get("description") or "").strip()
+    state = run_state(run_dir)
+    stage = str(active.get("stage") or latest.get("stage") or "n/a")
+    status = str(latest.get("status") or state)
+
+    print(f'"{title}"')
+    if desc:
+        print(f'  desc="{desc}"')
+    print(f"  state={state} phase=\"{stage}\" status=\"{status}\"")
+    if latest.get("log"):
+        print(f'  log="{latest["log"]}"')
+    written, source_rows, completed = score_progress(run_dir, config)
+    if source_rows or written:
+        progress = f"{format_count(written)}/{format_count(source_rows)}" if source_rows else f"{format_count(written)}/unknown"
+        print(f"  score={progress} shards_done={completed}")
+    why = active.get("why") or latest.get("why")
+    if isinstance(why, str) and why.strip():
+        print(f'  why="{why.strip()}"')
+    command = active.get("command") or latest.get("command")
+    if verbose and isinstance(command, list):
+        print(f"  command={shell_join([str(part) for part in command])}")
+    elif verbose and isinstance(command, str) and command.strip():
+        print(f"  command={command.strip()}")
+
+
+def launch_pipeline(config_path: Path, *, force: bool = False) -> int:
+    command = [sys.executable, tool("pipeline/pipeline.py"), "launch", str(config_path)]
+    if force:
+        command.append("--force")
+    return run(command)
 
 
 def templated_path_arg(value: str | Path) -> str:
@@ -534,6 +880,18 @@ def append_crucible_score_steps(
             crucible_python, crucible, "add-input",
             "--manifest", manifest,
             "--path", input_jsonl,
+            *(
+                [
+                    "--path", str(expand_user(args.score_stockfish_net)),
+                    "--path", str(expand_user(args.score_static_datagen_tool)),
+                    *(
+                        ["--path", str(expand_user(args.score_enyo_net))]
+                        if args.score_enyo_net else []
+                    ),
+                ]
+                if args.score_backend == "stockfish-static"
+                else ["--path", str(expand_user(args.score_engine))]
+            ),
         ],
     })
 
@@ -1396,18 +1754,90 @@ def cmd_create(args: argparse.Namespace) -> int:
     run_dir = expand_path(config["run"])
     config_path = write_config(run_dir, config)
     print(f"wrote {config_path}")
-    command = [sys.executable, tool("pipeline/pipeline.py"), "launch", str(config_path)]
-    if args.force:
-        command.append("--force")
-    return run(command)
+    return launch_pipeline(config_path, force=args.force)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
-    return run([
-        sys.executable, tool("pipeline/pipeline.py"), "status",
-        str(expand_path(args.run)),
-        "--tail", str(args.tail),
-    ])
+    if args.run:
+        print_run_status(select_run(args.run), verbose=args.verbose)
+        return 0
+    runs = discover_runs(include_done=args.done)
+    if args.failed:
+        runs = [path for path in runs if run_state(path) == "failed"]
+    if not runs:
+        print(f"no active NNUE runs found in {expand_path(DEFAULTS.run_base)}")
+        return 0
+    for index, run_dir in enumerate(runs):
+        if index:
+            print()
+        print_run_status(run_dir, verbose=args.verbose)
+    return 0
+
+
+def cmd_start(args: argparse.Namespace) -> int:
+    recipe_path = expand_path(args.recipe)
+    recipe = load_recipe(recipe_path)
+    defaults = recipe_to_create_defaults(recipe, recipe_path=recipe_path)
+    config = create_config(namespace_from_create_defaults(defaults))
+    desc = str(recipe.get("desc") or recipe.get("description") or "").strip()
+    if desc:
+        config["description"] = desc
+    config["recipe"] = str(recipe_path)
+    if args.dry_run:
+        print(json.dumps(config, indent=2))
+        return 0
+    run_dir = expand_path(config["run"])
+    if (run_dir / "config.json").exists():
+        raise SystemExit(f"{run_dir}: run exists; use resume or retry")
+    config_path = write_config(run_dir, config)
+    write_json(run_dir / "recipe.json", recipe)
+    print(f"start: {run_dir.name}")
+    return launch_pipeline(config_path)
+
+
+def cmd_resume(args: argparse.Namespace) -> int:
+    run_dir = select_run(args.run)
+    config_path = run_dir / "config.json"
+    if not config_path.exists():
+        raise SystemExit(f"{run_dir}: missing config.json")
+    (run_dir / "stop.json").unlink(missing_ok=True)
+    print(f"resume: {run_dir.name}")
+    return launch_pipeline(config_path)
+
+
+def cmd_retry(args: argparse.Namespace) -> int:
+    run_dir = select_run(args.run, failed=args.run is None)
+    config_path = run_dir / "config.json"
+    if not config_path.exists():
+        raise SystemExit(f"{run_dir}: missing config.json")
+    latest = latest_event(run_dir)
+    stage = str(latest.get("stage") or "").strip()
+    if stage:
+        (run_dir / f"{stage}.done").unlink(missing_ok=True)
+    (run_dir / "stop.json").unlink(missing_ok=True)
+    print(f"retry: {run_dir.name}")
+    return launch_pipeline(config_path)
+
+
+def cmd_stop(args: argparse.Namespace) -> int:
+    run_dir = select_run(args.run)
+    write_json(run_dir / "stop.json", {
+        "requested_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "run": str(run_dir),
+    })
+    pid_path = run_dir / "pipeline.pid"
+    if pid_path.exists():
+        try:
+            pid = int(pid_path.read_text(encoding="utf-8").strip())
+            os.kill(pid, signal.SIGTERM)
+            print(f"stop: {run_dir.name} pid={pid}")
+            return 0
+        except ProcessLookupError:
+            pass
+        except (OSError, ValueError):
+            pass
+    print(f"stop requested: {run_dir.name}")
+    return 0
 
 
 def cmd_report(args: argparse.Namespace) -> int:
@@ -1727,23 +2157,51 @@ def add_create_args(
 
 def build_parser(create_defaults: dict[str, object] | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create and inspect Enyo NNUE candidate runs."
+        description="Start, inspect, and resume Enyo NNUE candidate runs."
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(
+        dest="command",
+        metavar="{start,stop,resume,retry,status}",
+        required=True,
+    )
 
-    create = subparsers.add_parser("create", help="Create/train a candidate.")
+    start = subparsers.add_parser("start", help="Start a recipe-defined candidate run.")
+    start.add_argument("recipe", help="Recipe JSON file.")
+    start.add_argument("--dry-run", action="store_true", help="Print the generated run config.")
+    start.set_defaults(func=cmd_start)
+
+    stop = subparsers.add_parser("stop", help="Stop a running candidate run.")
+    stop.add_argument("run", nargs="?", help="Run name or path. Defaults to the active run.")
+    stop.set_defaults(func=cmd_stop)
+
+    resume = subparsers.add_parser("resume", help="Resume stopped or incomplete work.")
+    resume.add_argument("run", nargs="?", help="Run name or path. Defaults to the active run.")
+    resume.set_defaults(func=cmd_resume)
+
+    retry = subparsers.add_parser("retry", help="Retry failed work.")
+    retry.add_argument("run", nargs="?", help="Run name or path. Defaults to the failed run if unique.")
+    retry.set_defaults(func=cmd_retry)
+
+    status = subparsers.add_parser("status", help="Show candidate run status.")
+    status.add_argument("run", nargs="?", help="Run name or path. Defaults to active runs.")
+    status.add_argument("--verbose", action="store_true")
+    status.add_argument("--done", action="store_true", help="Include completed runs.")
+    status.add_argument("--failed", action="store_true", help="Only show failed runs.")
+    status.set_defaults(func=cmd_status)
+
+    create = subparsers.add_parser("create", help=argparse.SUPPRESS)
     add_create_args(create, create_defaults)
     create.set_defaults(func=cmd_create)
 
-    status = subparsers.add_parser("status", help="Show candidate run status.")
-    status.add_argument("run")
-    status.add_argument("--tail", type=int, default=0)
-    status.set_defaults(func=cmd_status)
-
-    report = subparsers.add_parser("report", help="Print candidate run report.")
+    report = subparsers.add_parser("report", help=argparse.SUPPRESS)
     report.add_argument("run")
     report.add_argument("--tail", type=int, default=20)
     report.set_defaults(func=cmd_report)
+
+    subparsers._choices_actions = [
+        action for action in subparsers._choices_actions
+        if action.dest not in {"create", "report"}
+    ]
 
     return parser
 
@@ -1752,6 +2210,9 @@ def main() -> int:
     argv = normalize_argv(sys.argv)
     create_defaults = load_create_arg_defaults(create_config_path(argv))
     parser = build_parser(create_defaults)
+    if len(argv) == 1:
+        parser.print_help()
+        return 0
     args = parser.parse_args(argv[1:])
     return args.func(args)
 

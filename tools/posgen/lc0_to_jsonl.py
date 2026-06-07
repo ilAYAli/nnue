@@ -367,7 +367,7 @@ def record_to_row(
 
     values = {
         key: clean_float(value)
-        for key, value in zip(VALUE_FIELDS, record.values, strict=True)
+        for key, value in zip(VALUE_FIELDS, record.values)
     }
     side = "b" if record.meta[4] else "w"
     tags = [

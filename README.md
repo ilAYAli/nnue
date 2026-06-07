@@ -54,121 +54,69 @@ usually a longer SPRT against the current reference net.
 
 ## Build A Net
 
-Current reviewed improvement run:
+Use the lifecycle command first:
 
 ```sh
-./build.py -c build.json
+./build.py --help
+./build.py start recipes/static-bullet.example.json
+./build.py status
+watch ./build.py status
+./build.py status --verbose
 ```
 
-`build.json` is the committed active candidate recipe. Update it when the next
-experiment changes, so the intended run is visible in one diff. Command-line
-arguments override values from the file:
+Stop and continue work:
 
 ```sh
-./build.py -c build.json --name local-smoke --selfplay-games 1000 --device cpu
+./build.py stop
+./build.py resume
+./build.py retry
 ```
 
-Re-running the same `-c build.json` command resumes the same run by
-skipping phases with existing `.done` markers. Use `--force` to rerun phases.
-Generated run configs can also be relaunched the same way:
+`start` reads a recipe, materializes `runs/<name>/config.json`, and launches the
+pipeline. `status` without a run name shows active or incomplete runs. `resume`
+continues a stopped or incomplete run by skipping phases with `.done` markers.
+`retry` relaunches the failed run when there is exactly one failed run.
 
-```sh
-./build.py -c runs/d12-d16-huber-cp800/config.json
+The simple recipe path is:
+
+```text
+source positions -> Stockfish-static labels -> .bullet data -> Bullet training -> static gates
 ```
 
-Small smoke run:
+Minimal recipe:
 
-```sh
-./build.py create \
-  --name smoke-d8-d12 \
-  --selfplay-games 1000 \
-  --score-depth 12 \
-  --score-shards 4 \
-  --epochs 1 \
-  --device cpu
+```json
+{
+  "name": "native-static-smoke",
+  "desc": "Stockfish-static labels written directly to Bullet training data",
+  "source": "runs/source/source.jsonl",
+  "stockfish_net": "nets/stockfish.nnue",
+  "init_net": "runs/parent/train/parent/model.nn",
+  "workers": "workers.json",
+  "score": {
+    "shards": 8,
+    "jobs": 4,
+    "limit": 200000
+  },
+  "train": {
+    "superbatches": 64,
+    "batch_size": 512,
+    "lr": 3e-7
+  }
+}
 ```
-
-Depth-12 self-play candidate with event notifications:
-
-```sh
-./build.py create \
-  --name d12-d16-huber-cp800 \
-  --selfplay-depth 12 \
-  --selfplay-games 120000 \
-  --event-command "$HOME/scripts/nnue_event_ntfy.sh"
-```
-
-`--event-command` must point to a script that exists on the machine running the
-build command. The repo emits generic JSON events; ntfy and personal
-routing stay outside the repo.
 
 Dry-run the generated pipeline without starting work:
 
 ```sh
-./build.py create \
-  --name inspect-config \
-  --selfplay-depth 12 \
-  --dry-run
+./build.py start recipes/static-bullet.example.json --dry-run
 ```
 
-Inspect a run:
+The event hook defaults to `tools/events/nnue_event_ntfy.sh` when it exists.
+The repo emits generic JSON events; notification routing stays outside the repo.
 
-```sh
-./build.py status runs/d12-d16-huber-cp800
-./build.py status runs/d12-d16-huber-cp800 --tail 20
-./build.py report runs/d12-d16-huber-cp800
-```
-
-## Common Candidate Arguments
-
-```text
---name NAME
---run-dir DIR
--c, --config FILE
---dry-run
---force
---event-command COMMAND
-
---engine PATH
---nnue-file PATH
---book PATH
---runner PATH
---python PATH
-
---selfplay-games N
---selfplay-shard-games N
---selfplay-concurrency N
---selfplay-threads N
---selfplay-hash MB
---selfplay-depth N
---selfplay-seed N
-
---skip-plies N
---source-max-abs-cp CP
---sample-preset NAME
-
---score-engine PATH
---score-depth N
---score-shards N
---score-threads N
---score-hash MB
---score-max-abs-cp CP
-
---init-net PATH
---objective mse|huber|mpe25
---target-clamp CP
---huber-beta CP
---wdl-lambda X
---lr X
---epochs N
---batch-size N
---device cpu|cuda
---workers N
---val-rows N
---patience N
---select-metric loss|mse|mae|sign
---trainable all|float-head|output
-```
+Low-level `create` and `report` commands still exist for old configs and
+diagnostics, but they are not the normal interface.
 
 Defaults live in `tools/lib/defaults.py`. Phase-specific behavior is documented
 in each tool subdirectory.

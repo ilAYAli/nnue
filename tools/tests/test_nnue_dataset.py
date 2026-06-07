@@ -53,12 +53,12 @@ class NNueDatasetTests(unittest.TestCase):
         torch.testing.assert_close(b, torch.tensor([5, 6, 7]))
 
 
-    def test_loads_bullet_data_records(self) -> None:
+    def test_loads_bullet_records(self) -> None:
         from tools.lib import bullet_format
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            data = root / "rows.data"
+            data = root / "rows.bullet"
             row = {
                 "fen": "8/8/8/8/8/8/8/K6k b - - 0 1",
                 "score": 42,

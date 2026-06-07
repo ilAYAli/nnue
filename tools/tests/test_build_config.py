@@ -1334,6 +1334,76 @@ class BuildConfigTests(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+    def test_status_run_argument_is_optional(self) -> None:
+        parser = build.build_parser({})
+
+        args = parser.parse_args(["status"])
+
+        self.assertIsNone(args.run)
+        self.assertFalse(args.verbose)
+
+    def test_recipe_start_builds_direct_bullet_static_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            recipe_path = tmp_path / "recipe.json"
+            recipe = {
+                "name": "recipe-smoke",
+                "desc": "direct static scoring smoke",
+                "source": "runs/source/source.jsonl",
+                "stockfish_net": "nets/stockfish.nnue",
+                "init_net": "runs/base/model.nn",
+                "workers": "runs/workers.json",
+                "score": {
+                    "shards": 8,
+                    "jobs": 3,
+                    "limit": 1000,
+                },
+                "train": {
+                    "superbatches": 4,
+                    "lr": 3e-7,
+                    "batch_size": 64,
+                },
+            }
+            recipe_path.write_text(json.dumps(recipe) + "\n", encoding="utf-8")
+
+            defaults = build.recipe_to_create_defaults(
+                build.load_recipe(recipe_path),
+                recipe_path=recipe_path,
+            )
+            config = build.create_config(build.namespace_from_create_defaults(defaults))
+            names = [step["name"] for step in config["steps"]]
+
+            self.assertEqual("recipe-smoke", config["name"])
+            self.assertIn("score_crucible_deploy", names)
+            self.assertIn("score_crucible_merge", names)
+            self.assertIn("bullet_train", names)
+            self.assertNotIn("bullet_text", names)
+            self.assertNotIn("bullet_format", names)
+            train = next(step for step in config["steps"] if step["name"] == "bullet_train")
+            self.assertIn("{score}/labeled.bullet", train["command"])
+            static = next(
+                step for step in config["steps"]
+                if step["name"] == "validate_bullet_static"
+            )
+            self.assertIn("{score}/labeled.bullet", static["command"])
+
+    def test_recipe_rejects_unknown_fields(self) -> None:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            json.dump({
+                "name": "bad",
+                "source": "source.jsonl",
+                "stockfish_net": "sf.nnue",
+                "init_net": "base.nn",
+                "nonsense": True,
+            }, handle)
+            path = Path(handle.name)
+        try:
+            with self.assertRaises(SystemExit) as ctx:
+                build.recipe_to_create_defaults(build.load_recipe(path), recipe_path=path)
+            self.assertIn("unknown recipe field", str(ctx.exception))
+        finally:
+            path.unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()

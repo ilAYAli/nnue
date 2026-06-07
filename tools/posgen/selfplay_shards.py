@@ -255,7 +255,7 @@ def validate_merge_inputs(metadata_paths: list[Path]) -> list[dict[str, Any]]:
     payloads = [load_metadata(path) for path in metadata_paths]
     first_key = compatibility_key(payloads[0])
     seen_seeds: set[Any] = set()
-    for path, payload in zip(metadata_paths, payloads, strict=True):
+    for path, payload in zip(metadata_paths, payloads):
         key = compatibility_key(payload)
         if key != first_key:
             raise ValueError(f"{path}: incompatible shard metadata")
@@ -302,7 +302,7 @@ def cmd_merge(args: argparse.Namespace) -> int:
 
     total_games = 0
     shards: list[dict[str, Any]] = []
-    for metadata_path, payload in zip(metadata_paths, payloads, strict=True):
+    for metadata_path, payload in zip(metadata_paths, payloads):
         pgn = expand_path(str(payload["pgn"]))
         append_file(pgn, output_pgn)
         games = int(payload["games_written"])

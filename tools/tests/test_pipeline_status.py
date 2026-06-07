@@ -64,6 +64,31 @@ class PipelineStatusTests(unittest.TestCase):
             self.assertEqual(10, source_rows)
             self.assertEqual(1, completed)
 
+    def test_score_progress_reads_bullet_shard_stats(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "source.jsonl"
+            source.write_text("x\n" * 20)
+            run = tmp_path / "run"
+            (run / "score" / "shards").mkdir(parents=True)
+            (run / "score" / "shards" / "label.0.bullet.stats.json").write_text(
+                json.dumps({"written": 11}) + "\n",
+                encoding="utf-8",
+            )
+            config = {
+                "create_args": {
+                    "score_shards": 1,
+                    "score_limit": 0,
+                    "score_source_jsonl": str(source),
+                }
+            }
+
+            written, source_rows, completed = pipeline.score_progress(run, config)
+
+            self.assertEqual(11, written)
+            self.assertEqual(20, source_rows)
+            self.assertEqual(1, completed)
+
     def test_launch_streams_output_to_stdout_and_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -112,6 +137,43 @@ class PipelineStatusTests(unittest.TestCase):
                 "Prove command output is visible.",
                 phase_done.get("why"),
             )
+
+    def test_launch_honors_existing_stop_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            run = tmp_path / "run"
+            run.mkdir()
+            (run / "stop.json").write_text("{}\n", encoding="utf-8")
+            config_path = tmp_path / "config.json"
+            output = tmp_path / "should-not-exist"
+            config = {
+                "run": str(run),
+                "repo": str(REPO),
+                "steps": [
+                    {
+                        "name": "blocked",
+                        "command": [
+                            sys.executable,
+                            "-c",
+                            f"from pathlib import Path; Path({str(output)!r}).write_text('bad')",
+                        ],
+                    }
+                ],
+            }
+            config_path.write_text(json.dumps(config) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(PIPELINE_PATH), "launch", str(config_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertFalse(output.exists())
+            events = pipeline.read_events(run)
+            self.assertIn("stop", [event.get("event") for event in events])
 
     def test_step_reason_has_known_defaults(self) -> None:
         self.assertEqual(

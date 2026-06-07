@@ -139,7 +139,7 @@ def main() -> None:
     select_rngs = [random.Random(rng.randrange(1 << 63)) for _ in sources]
     iterators = [
         selected_lines(source, source_rng)
-        for source, source_rng in zip(sources, select_rngs, strict=True)
+        for source, source_rng in zip(sources, select_rngs)
     ]
     remaining = [source.selected_rows for source in sources]
     total_remaining = sum(remaining)
@@ -166,7 +166,7 @@ def main() -> None:
             if args.progress > 0 and written % args.progress == 0:
                 print(f"mixed {written}", flush=True)
 
-    for source, item in zip(sources, stats["sources"], strict=True):
+    for source, item in zip(sources, stats["sources"]):
         item["written"] = source.written
 
     stats["written_rows"] = written

@@ -1,0 +1,26 @@
+{
+  "name": "native-static-smoke",
+  "desc": "Stockfish-static labels written directly to Bullet training data",
+  "source": "runs/source/source.jsonl",
+  "stockfish_net": "nets/stockfish.nnue",
+  "init_net": "runs/parent/train/parent/model.nn",
+  "workers": "workers.json",
+  "score": {
+    "shards": 8,
+    "jobs": 4,
+    "limit": 200000,
+    "max_abs_cp": 1600
+  },
+  "train": {
+    "superbatches": 64,
+    "batches": 64,
+    "batch_size": 512,
+    "threads": 8,
+    "lr": 3e-7,
+    "final_lr": 1e-7
+  },
+  "validate": {
+    "static_rows": 100000,
+    "provenance": true
+  }
+}

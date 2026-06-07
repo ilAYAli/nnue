@@ -249,7 +249,7 @@ def count_rows(path: str | Path) -> int:
     if p.is_dir():
         counts = np.load(p / "counts.npy", mmap_mode="r")
         return len(counts)
-    if p.suffix == ".data":
+    if p.suffix in {".bullet", ".data"}:
         return bullet_format.record_count(p)
 
     n = 0
@@ -267,6 +267,6 @@ def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
     if p.is_dir():
         return PackedFenScoreDataset(
             p, limit=limit, skip=skip, in_memory=in_memory), collate_packed
-    if p.suffix == ".data":
+    if p.suffix in {".bullet", ".data"}:
         return BulletDataScoreDataset(p, limit=limit, skip=skip), collate
     return FenScoreDataset.from_jsonl(p, limit=limit, skip=skip), collate

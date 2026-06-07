@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import itertools
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -77,6 +79,11 @@ def load_config(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise SystemExit("run config must be an object")
     return data
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def format_command(command: list[str], variables: dict[str, str]) -> list[str]:
@@ -181,6 +188,14 @@ def count_lines(path: Path) -> int:
         return 0
 
 
+def count_bullet_records(path: Path) -> int:
+    try:
+        from lib import bullet_format
+        return bullet_format.record_count(path)
+    except (OSError, ValueError):
+        return 0
+
+
 def read_events(run_dir: Path) -> list[dict[str, Any]]:
     path = run_dir / "events.jsonl"
     events: list[dict[str, Any]] = []
@@ -204,13 +219,16 @@ def score_progress(run_dir: Path, config: dict[str, Any] | None) -> tuple[int, i
         if isinstance(create_args, dict):
             shards = int(create_args.get("score_shards", 0) or 0)
             limit = int(create_args.get("score_limit", 0) or 0)
+            score_source = str(create_args.get("score_source_jsonl", "") or "")
+            if score_source:
+                source_rows = count_lines(Path(score_source).expanduser())
             if limit > 0 and (source_rows <= 0 or limit < source_rows):
                 source_rows = limit
     if shards <= 0:
         shards = max(
             [
                 int(path.name.split(".")[1])
-                for path in (run_dir / "score" / "shards").glob("label.*.jsonl")
+                for path in (run_dir / "score" / "shards").glob("label.*.*")
                 if path.name.split(".")[1].isdigit()
             ] or [-1]
         ) + 1
@@ -218,17 +236,22 @@ def score_progress(run_dir: Path, config: dict[str, Any] | None) -> tuple[int, i
     written = 0
     completed = 0
     for shard in range(shards):
-        stats_path = run_dir / "score" / "shards" / f"label.{shard}.jsonl.stats.json"
-        if stats_path.exists():
+        stats_paths = sorted((run_dir / "score" / "shards").glob(f"label.{shard}.*.stats.json"))
+        if stats_paths:
             try:
-                stats = json.loads(stats_path.read_text(encoding="utf-8"))
+                stats = json.loads(stats_paths[-1].read_text(encoding="utf-8"))
                 shard_written = int(stats.get("written", 0))
                 written += shard_written
                 completed += 1
                 continue
             except (OSError, ValueError, TypeError, json.JSONDecodeError):
                 pass
-        written += count_lines(run_dir / "score" / "shards" / f"label.{shard}.jsonl")
+        jsonl = run_dir / "score" / "shards" / f"label.{shard}.jsonl"
+        bullet = run_dir / "score" / "shards" / f"label.{shard}.bullet"
+        if jsonl.exists():
+            written += count_lines(jsonl)
+        elif bullet.exists():
+            written += count_bullet_records(bullet)
     return written, source_rows, completed
 
 
@@ -349,23 +372,56 @@ def cmd_launch(args: argparse.Namespace) -> int:
     variables.update({str(k): str(v) for k, v in config.get("vars", {}).items()})
 
     log_path = run_dir / "runs.log"
+    pid_path = run_dir / "pipeline.pid"
+    stop_path = run_dir / "stop.json"
+    active_step_path = run_dir / "active_step.json"
+    pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    atexit.register(lambda: pid_path.unlink(missing_ok=True))
     # Mutable list so the signal handler always sees the current running procs.
     active_procs: list[subprocess.Popen[str]] = []
+
+    def record_active_step(name: str, why: str, command: list[str]) -> None:
+        write_json(active_step_path, {
+            "command": command,
+            "stage": name,
+            "started_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "why": why,
+        })
+
+    def clear_active_step() -> None:
+        active_step_path.unlink(missing_ok=True)
+
+    def stop_requested(stage: str = "n/a") -> bool:
+        if not stop_path.exists():
+            return False
+        clear_active_step()
+        emit_event(
+            run_dir,
+            "stop",
+            stage=stage,
+            status="stopped",
+            rc=0,
+            message="stop requested",
+            log=log_path,
+            hook_command=hook_command,
+        )
+        return True
 
     def handle_signal(signum: int, _frame: object) -> None:
         for p in active_procs:
             if p.poll() is None:
                 p.terminate()
+        stopped = stop_path.exists()
         emit_event(
             run_dir,
-            "fail",
-            status=f"signal={signum}",
-            rc=128 + signum,
-            message="run launcher interrupted",
+            "stop" if stopped else "fail",
+            status="stopped" if stopped else f"signal={signum}",
+            rc=0 if stopped else 128 + signum,
+            message="stop requested" if stopped else "run launcher interrupted",
             log=log_path,
             hook_command=hook_command,
         )
-        raise SystemExit(128 + signum)
+        raise SystemExit(0 if stopped else 128 + signum)
 
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
@@ -395,6 +451,8 @@ def cmd_launch(args: argparse.Namespace) -> int:
                     raise SystemExit(f"step {name}: command must be a string list")
                 formatted = format_command(command, variables)
                 why = step_reason(step, name)
+                if stop_requested(name):
+                    return 0
                 marker = run_dir / f"{name}.done"
                 if marker.exists() and not args.force:
                     print(f"skip {name}: {marker} exists", flush=True)
@@ -409,6 +467,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                         extra={"why": why},
                     )
                     continue
+                record_active_step(name, why, formatted)
                 print_step_start(log, log_lock, name, why, formatted)
                 emit_event(
                     run_dir,
@@ -452,6 +511,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                     )
                     return rc
                 marker.write_text("rc=0\n", encoding="utf-8")
+                clear_active_step()
                 print(f"done {name}", flush=True)
                 emit_event(
                     run_dir,
@@ -467,6 +527,8 @@ def cmd_launch(args: argparse.Namespace) -> int:
             else:
                 # Parallel batch: launch all steps concurrently, wait for all.
                 group_name = batch[0].get("parallel_group", "parallel")
+                if stop_requested(str(group_name)):
+                    return 0
                 pending: list[
                     tuple[str, list[str], str, Path, subprocess.Popen[str], threading.Thread]
                 ] = []
@@ -498,6 +560,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                         )
                         continue
                     skipped_all = False
+                    record_active_step(name, why, formatted)
                     print_step_start(log, log_lock, name, why, formatted)
                     emit_event(
                         run_dir,
@@ -559,7 +622,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                                 failed_rc = rc
                                 # Terminate all siblings in this batch, not just
                                 # the ones already visited in this poll pass.
-                                for _, _, _, sibling in pending:
+                                for _, _, _, _, sibling, _ in pending:
                                     if sibling.poll() is None:
                                         sibling.terminate()
                         else:
@@ -591,6 +654,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
                         hook_command=hook_command,
                     )
                     return failed_rc
+                clear_active_step()
 
     extra = completion_extra(run_dir)
     print(f"run complete: {run_dir}", flush=True)
@@ -611,6 +675,7 @@ def cmd_launch(args: argparse.Namespace) -> int:
         hook_command=hook_command,
         extra=extra,
     )
+    clear_active_step()
     return 0
 
 
