@@ -437,9 +437,16 @@ Current build intent:
 - This changes objective family to pairwise replay supervision. Architecture
   and runtime net format remain scalar `16 x 12`; broad data and init are fixed
   to `native-1.13.0-rc1`.
-- Gate: clean provenance, broad engine-static close to `native-1.13.0`, and
-  move-gate improvement versus `native-1.13.0`. Run games only if those gates
-  pass.
+- Gate result: clean provenance passed. Broad engine-static got slightly worse
+  versus `native-1.13.0` (`mae 130.797 -> 132.029`, sign `83.35% ->
+  83.30%`, slope `0.598541 -> 0.580537`), but the move gate was weak-positive:
+  preferred-best `1135 -> 1137`, fixed `6`, regressed `4`,
+  `delta_avg_margin=+0.7cp`, `delta_loss_weighted_margin=+0.6cp`.
+- The distributed 300-game smoke versus `native-1.13.0-rc1` passed strongly for
+  a smoke: `119-94-87`, score `0.5417`, about `+29.02 +/- 33.25 Elo`,
+  LOS `95.7%`, with all Crucible tasks clean.
+- Start a distributed 1000-game confirm versus `native-1.13.0-rc1`. Treat this
+  candidate as unproven until the confirm finishes neutral-positive.
 
 
 Closed build intent:
