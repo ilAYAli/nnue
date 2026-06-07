@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lib import bullet_format, bullet_text, packed_labels
+from lib import bullet_format, bullet_text
 
 
 SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
@@ -288,6 +288,8 @@ def main() -> None:
         engine.close()
 
     if args.output_format == "packed":
+        from lib import packed_labels
+
         packed = packed_labels.write_shard(
             out,
             rows,

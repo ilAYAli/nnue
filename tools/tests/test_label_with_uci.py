@@ -8,7 +8,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError:
+    np = None
 
 
 REPO = Path(__file__).resolve().parents[2]
@@ -51,7 +54,7 @@ class LabelWithUciTests(unittest.TestCase):
             src = root / "in.jsonl"
             suffix = {
                 "packed": ".npz",
-                "bullet-data": ".data",
+                "bullet-data": ".bullet",
             }.get(output_format, ".txt")
             dst = root / f"out{suffix}"
             src.write_text(json.dumps(row) + "\n", encoding="utf-8")
@@ -136,6 +139,8 @@ class LabelWithUciTests(unittest.TestCase):
             stats_path.unlink(missing_ok=True)
 
     def test_writes_packed_label_shard(self) -> None:
+        if np is None:
+            self.skipTest("numpy is not installed")
         path, stats_path = self.run_labeler({
             "fen": "8/8/8/8/8/8/8/K6k w - - 0 1",
             "source_type": "selfplay",
