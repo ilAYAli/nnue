@@ -5,6 +5,7 @@ import argparse
 from contextlib import nullcontext
 import json
 import re
+import select
 import subprocess
 import sys
 import time
@@ -18,10 +19,20 @@ from lib import bullet_format, bullet_text, packed_labels
 SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
 
 
+class EngineTimeout(RuntimeError):
+    pass
+
+
 class UciEngine:
     def __init__(self, path: str, *, threads: int, hash_mb: int) -> None:
+        self.path = path
+        self.threads = threads
+        self.hash_mb = hash_mb
+        self.start()
+
+    def start(self) -> None:
         self.proc = subprocess.Popen(
-            [path],
+            [self.path],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -29,15 +40,18 @@ class UciEngine:
             bufsize=1,
         )
         self.send("uci")
-        self.wait_for("uciok")
-        self.setoption("Threads", str(threads))
-        self.setoption("Hash", str(hash_mb))
+        self.wait_for("uciok", timeout_s=10.0)
+        self.setoption("Threads", str(self.threads))
+        self.setoption("Hash", str(self.hash_mb))
         self.send("isready")
-        self.wait_for("readyok")
+        self.wait_for("readyok", timeout_s=10.0)
 
     def close(self) -> None:
         try:
-            self.send("quit")
+            if self.proc.poll() is None:
+                self.send("quit")
+        except (BrokenPipeError, OSError):
+            pass
         finally:
             try:
                 self.proc.wait(timeout=5)
@@ -45,35 +59,51 @@ class UciEngine:
                 self.proc.kill()
                 self.proc.wait()
 
+    def restart(self) -> None:
+        self.close()
+        self.start()
+
     def send(self, command: str) -> None:
         if self.proc.stdin is None:
             raise RuntimeError("engine stdin closed")
         self.proc.stdin.write(command + "\n")
         self.proc.stdin.flush()
 
-    def readline(self) -> str:
+    def readline(self, *, timeout_s: float | None = None) -> str:
         if self.proc.stdout is None:
             raise RuntimeError("engine stdout closed")
+        if timeout_s is not None:
+            ready, _, _ = select.select([self.proc.stdout], [], [], max(0.0, timeout_s))
+            if not ready:
+                raise EngineTimeout(f"engine timed out after {timeout_s:.1f}s")
         line = self.proc.stdout.readline()
         if line == "":
             raise RuntimeError("engine exited")
         return line.strip()
 
-    def wait_for(self, token: str) -> None:
+    def wait_for(self, token: str, *, timeout_s: float | None = None) -> None:
+        deadline = time.monotonic() + timeout_s if timeout_s is not None else None
         while True:
-            if self.readline() == token:
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise EngineTimeout(f"engine did not send {token!r}")
+            if self.readline(timeout_s=remaining) == token:
                 return
 
     def setoption(self, name: str, value: str) -> None:
         self.send(f"setoption name {name} value {value}")
 
-    def label(self, fen: str, *, depth: int) -> tuple[int | None, str | None]:
+    def label(self, fen: str, *, depth: int, timeout_s: float) -> tuple[int | None, str | None]:
         self.send(f"position fen {fen}")
         self.send(f"go depth {depth}")
+        deadline = time.monotonic() + timeout_s if timeout_s > 0 else None
         score_cp: int | None = None
         mate: str | None = None
         while True:
-            line = self.readline()
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise EngineTimeout(f"engine timed out labeling {fen}")
+            line = self.readline(timeout_s=remaining)
             match = SCORE_RE.search(line)
             if match:
                 kind, value = match.groups()
@@ -94,6 +124,7 @@ def main() -> None:
     ap.add_argument("--depth", type=int, default=12)
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--hash", type=int, default=128)
+    ap.add_argument("--engine-timeout-s", type=float, default=30.0)
     ap.add_argument("--shard-count", type=int, default=1)
     ap.add_argument("--shard-index", type=int, default=0)
     ap.add_argument(
@@ -123,6 +154,7 @@ def main() -> None:
         "depth": args.depth,
         "threads": args.threads,
         "hash": args.hash,
+        "engine_timeout_s": args.engine_timeout_s,
         "shard_count": args.shard_count,
         "shard_index": args.shard_index,
         "limit": args.limit,
@@ -131,6 +163,7 @@ def main() -> None:
         "written": 0,
         "skipped_mate": 0,
         "skipped_no_score": 0,
+        "skipped_timeout": 0,
         "skipped_cp": 0,
         "output_format": args.output_format,
     }
@@ -160,7 +193,22 @@ def main() -> None:
                     continue
                 stats["selected"] += 1
                 row = json.loads(line)
-                score, mate = engine.label(row["fen"], depth=args.depth)
+                try:
+                    score, mate = engine.label(
+                        row["fen"],
+                        depth=args.depth,
+                        timeout_s=args.engine_timeout_s,
+                    )
+                except EngineTimeout as exc:
+                    stats["skipped_timeout"] += 1
+                    print(
+                        f"timeout shard {args.shard_index}/{args.shard_count}: "
+                        f"selected={stats['selected']} {exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    engine.restart()
+                    continue
                 if mate is not None:
                     stats["skipped_mate"] += 1
                     continue

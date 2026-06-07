@@ -34,6 +34,7 @@ def cmd_uci(args: argparse.Namespace) -> int:
         "--depth", str(args.depth),
         "--threads", str(args.threads),
         "--hash", str(args.hash),
+        "--engine-timeout-s", str(args.engine_timeout_s),
         "--shard-count", str(args.shard_count),
         "--shard-index", str(args.shard_index),
         "--limit", str(args.limit),
@@ -66,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     uci.add_argument("--depth", type=int, default=12)
     uci.add_argument("--threads", type=int, default=1)
     uci.add_argument("--hash", type=int, default=128)
+    uci.add_argument("--engine-timeout-s", type=float, default=30.0)
     uci.add_argument("--shard-count", type=int, default=1)
     uci.add_argument("--shard-index", type=int, default=0)
     uci.add_argument("--limit", type=int, default=0)

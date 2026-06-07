@@ -21,15 +21,31 @@ class FakeEngine:
     def __init__(self, path: str, *, threads: int, hash_mb: int) -> None:
         self.path = path
 
-    def label(self, fen: str, *, depth: int) -> tuple[int | None, str | None]:
+    def label(self, fen: str, *, depth: int, timeout_s: float) -> tuple[int | None, str | None]:
         return 42, None
 
     def close(self) -> None:
         pass
 
 
+class TimeoutEngine(FakeEngine):
+    restarts = 0
+
+    def label(self, fen: str, *, depth: int, timeout_s: float) -> tuple[int | None, str | None]:
+        raise label_with_uci.EngineTimeout("test timeout")
+
+    def restart(self) -> None:
+        type(self).restarts += 1
+
+
 class LabelWithUciTests(unittest.TestCase):
-    def run_labeler(self, row: dict, *, output_format: str = "jsonl") -> tuple[Path, Path]:
+    def run_labeler(
+        self,
+        row: dict,
+        *,
+        output_format: str = "jsonl",
+        engine_type: type = FakeEngine,
+    ) -> tuple[Path, Path]:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             src = root / "in.jsonl"
@@ -43,13 +59,14 @@ class LabelWithUciTests(unittest.TestCase):
             old_argv = sys.argv
             old_engine = label_with_uci.UciEngine
             try:
-                label_with_uci.UciEngine = FakeEngine  # type: ignore[assignment]
+                label_with_uci.UciEngine = engine_type  # type: ignore[assignment]
                 sys.argv = [
                     "label_with_uci.py",
                     "--input", str(src),
                     "--output", str(dst),
                     "--engine", "/tmp/stockfish",
                     "--depth", "12",
+                    "--engine-timeout-s", "0.5",
                     "--progress", "0",
                     "--output-format", output_format,
                 ]
@@ -100,6 +117,23 @@ class LabelWithUciTests(unittest.TestCase):
 
         self.assertEqual(row["score"], 42)
         self.assertEqual(row["source_score"], -17)
+
+    def test_skips_and_restarts_on_engine_timeout(self) -> None:
+        TimeoutEngine.restarts = 0
+        path, stats_path = self.run_labeler({
+            "fen": "8/8/8/8/8/8/8/K6k w - - 0 1",
+            "source": "timeout",
+        }, engine_type=TimeoutEngine)
+        try:
+            self.assertEqual("", path.read_text(encoding="utf-8"))
+            stats = json.loads(stats_path.read_text(encoding="utf-8"))
+            self.assertEqual(1, stats["selected"])
+            self.assertEqual(0, stats["written"])
+            self.assertEqual(1, stats["skipped_timeout"])
+            self.assertEqual(1, TimeoutEngine.restarts)
+        finally:
+            path.unlink(missing_ok=True)
+            stats_path.unlink(missing_ok=True)
 
     def test_writes_packed_label_shard(self) -> None:
         path, stats_path = self.run_labeler({
