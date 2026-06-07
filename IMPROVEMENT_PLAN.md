@@ -313,10 +313,12 @@ Current build intent:
 - Clean distributed 1000-game confirm versus `native-1.13.0-rc1`:
   `382-347-271`, score `0.5175`, about `+12.17 +/- 18.40 Elo`, LOS `90.3%`,
   with `20/20` tasks done and no failures or stale claims.
-- Interpretation: fresh current-parent self-play is live again and is currently
-  the best same-lane parent candidate. It is not yet proven tightly enough for
-  promotion. Run a longer distributed screen versus `native-1.13.0-rc1`; if
-  it remains positive, use `native-1.16.0-rc1` as the next same-lane parent.
+- Clean distributed 4000-game screen versus `native-1.13.0-rc1` confirmed the
+  signal: `1546-1405-1049`, score `0.5176`, about `+12.25 +/- 9.25 Elo`,
+  LOS `99.5%`, with `40/40` tasks done and no failures or stale claims.
+- Interpretation: fresh current-parent self-play is live again. Treat
+  `native-1.16.0-rc1` as the new same-lane parent for follow-up training and
+  validation.
 
 Current build intent:
 
@@ -952,22 +954,21 @@ Priority order:
 
 ## Next Concrete Experiment
 
-Run `native-1.16.0-vs-native-1.13.0-screen4000-20260607`.
+Configure the next same-lane follow-up from `native-1.16.0-rc1`.
 
-Purpose: tighten the clean positive `native-1.16.0-rc1` signal before changing
-the training parent. This is validation only; no architecture, objective, or
-data source changes.
+Purpose: use the confirmed fresh40k parent as the baseline for one controlled
+follow-up. Change one knob only. Preferred next knob is data freshness/scale
+from the same source family, not a new architecture or objective.
 
 Initial gates:
 
-- Use distributed Crucible SPRT with aggregate AI_stdout and SPRT ntfy enabled.
+- Update `build.json` and this plan in the same commit before launch.
+- Keep the `16 x 12` scalar architecture and Huber/WDL objective fixed.
+- Init from the confirmed `native-1.16.0-rc1` model.
+- Use Crucible for CPU-heavy self-play/scoring and aggregate AI_stdout/SPRT
+  notifications for game validation.
 - Exclude pwa-wsl while SSH resets during key exchange; send the ping blocker
   notice if it is still unavailable for all-worker work.
-- All Crucible tasks must finish with `fail=0` and `stale=0`.
-
-If the 4000-game screen stays positive versus `native-1.13.0-rc1`, make
-`native-1.16.0-rc1` the next same-lane parent. If it is neutral or negative,
-close the fresh40k lane and change the failure theory.
 
 ## Candidate Workflow
 
