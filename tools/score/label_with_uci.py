@@ -40,11 +40,11 @@ class UciEngine:
             bufsize=1,
         )
         self.send("uci")
-        self.wait_for("uciok", timeout_s=10.0)
+        self.wait_for("uciok", timeout_s=60.0)
         self.setoption("Threads", str(self.threads))
         self.setoption("Hash", str(self.hash_mb))
         self.send("isready")
-        self.wait_for("readyok", timeout_s=10.0)
+        self.wait_for("readyok", timeout_s=60.0)
 
     def close(self) -> None:
         try:
