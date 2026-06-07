@@ -409,7 +409,25 @@ Current build intent:
 - Smoke result: checkpoint 64 passed the screen. The distributed 300-game
   smoke versus `native-1.13.0-rc1` finished `118-101-81`, score `0.5283`,
   about `+19.71 +/- 33.68 Elo`, LOS `87.5%`, with all Crucible tasks clean.
-  Start a 1000-game distributed confirm versus `native-1.13.0-rc1`.
+  The 1000-game confirm rejected the checkpoint: `348-364-288`, score
+  `0.4920`, about `-5.56 +/- 18.18 Elo`, LOS `27.4%`. Close this checkpoint
+  as a candidate.
+
+Current build intent:
+
+- `build.json` is
+  `native-1.17.0-rc1-broadmix-freshdose-sf-d16-lr3e7-sb512-20260607`.
+- Hypothesis: pure fresh self-play training (`native-1.16.0`) failed, but the
+  fresh native-1.16.0 UCI-labeled rows may still help as a small dose inside
+  the proven native-1.13 broad mix. This changes only data distribution.
+- Data: sample `3,000,000` rows from the native-1.13 broad mix and `500,000`
+  rows from native-1.16.0 fresh SF16 labels, both filtered to
+  `abs(score) <= 800`.
+- Init is fixed to `native-1.13.0-rc1`. Architecture remains `16 x 12` scalar
+  and objective remains Huber/WDL.
+- Gate: clean provenance and engine-static without scale collapse, then a
+  distributed 300-game smoke versus `native-1.13.0-rc1`. Extend only if
+  neutral-positive.
 
 
 Closed build intent:
