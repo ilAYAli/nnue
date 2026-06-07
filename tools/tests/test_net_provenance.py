@@ -97,7 +97,7 @@ class NetProvenanceTests(unittest.TestCase):
                 "start bullet_train\n"
                 "enyo_l0_stdev=8 enyo_l1_stdev=1\n"
                 "Training Preamble\n"
-                "data=/runs/mix/assets/bullet.data\n",
+                "data=/runs/mix/assets/bullet.bullet\n",
                 encoding="utf-8",
             )
             run.joinpath("config.json").write_text(

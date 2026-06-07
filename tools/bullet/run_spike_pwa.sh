@@ -11,7 +11,7 @@ RUN_DIR="$ROOT/runs/$RUN"
 DATA_DIR="$RUN_DIR/data"
 OUT_DIR="$RUN_DIR/checkpoints"
 TEXT="$DATA_DIR/enyo_${ROWS}.txt"
-BULLET_DATA="$DATA_DIR/enyo_${ROWS}.data"
+BULLET_DATA="$DATA_DIR/enyo_${ROWS}.bullet"
 LOG="$RUN_DIR/bullet.log"
 CURRENT_STAGE="setup"
 

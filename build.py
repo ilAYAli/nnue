@@ -307,7 +307,7 @@ def score_output_extension(args: argparse.Namespace) -> str:
     if args.score_output_format == "bullet-text":
         return "txt"
     if args.score_output_format == "bullet-data":
-        return "data"
+        return "bullet"
     return "jsonl"
 
 
@@ -416,7 +416,7 @@ def append_local_score_steps(
     if args.score_output_format == "bullet-text":
         merged = "{score}/labeled.txt"
     elif args.score_output_format == "bullet-data":
-        merged = "{score}/labeled.data"
+        merged = "{score}/labeled.bullet"
     else:
         merged = "{score}/labeled.jsonl"
     steps.append({
@@ -425,7 +425,7 @@ def append_local_score_steps(
             "bash", "-lc",
             (
                 "cat \"$1\"/shards/label.*.\"$2\" > \"$3\" && "
-                "if [ \"$2\" = data ]; then "
+                "if [ \"$2\" = bullet ]; then "
                 "\"$5\" \"$6\" \"$3\" > \"$4\"; "
                 "else wc -l \"$3\" > \"$4\"; fi"
             ),
@@ -610,7 +610,7 @@ def append_crucible_score_steps(
         merged = (
             "{score}/labeled.txt"
             if args.score_output_format == "bullet-text"
-            else "{score}/labeled.data"
+            else "{score}/labeled.bullet"
             if args.score_output_format == "bullet-data"
             else "{score}/labeled.jsonl"
         )
@@ -623,7 +623,7 @@ def append_crucible_score_steps(
                     "format=\"$6\"; "
                     "\"$python\" \"$crucible\" verify \"$run\" && "
                     "\"$python\" \"$crucible\" merge \"$run\" --output \"$output\" --force && "
-                    "if [ \"$format\" = data ]; then "
+                    "if [ \"$format\" = bullet ]; then "
                     "\"$python\" \"$7\" \"$output\" > \"$rows\"; "
                     "else wc -l \"$output\" > \"$rows\"; fi"
                 ),
@@ -1172,7 +1172,7 @@ def create_config(args: argparse.Namespace) -> dict:
             if args.score_output_format == "bullet-text":
                 bullet_source_text = "{score}/labeled.txt"
             elif args.score_output_format == "bullet-data":
-                bullet_source_data = "{score}/labeled.data"
+                bullet_source_data = "{score}/labeled.bullet"
             else:
                 args.bullet_source_jsonl = "{score}/labeled.jsonl"
                 if not args.engine_static_jsonl:
@@ -1182,7 +1182,7 @@ def create_config(args: argparse.Namespace) -> dict:
             if args.score_output_format == "bullet-text":
                 bullet_source_text = "{score}/labeled.txt"
             elif args.score_output_format == "bullet-data":
-                bullet_source_data = "{score}/labeled.data"
+                bullet_source_data = "{score}/labeled.bullet"
             else:
                 args.bullet_source_jsonl = "{score}/labeled.jsonl"
             if (
@@ -1200,7 +1200,7 @@ def create_config(args: argparse.Namespace) -> dict:
                         "backend=bullet direct loader requires scored source data or bullet_data"
                     )
                 bullet_text = "{assets}/bullet.txt"
-                bullet_data = "{assets}/bullet.data"
+                bullet_data = "{assets}/bullet.bullet"
                 if bullet_source_data:
                     bullet_data = bullet_source_data
                 elif bullet_source_text:
@@ -1239,7 +1239,7 @@ def create_config(args: argparse.Namespace) -> dict:
         elif args.bullet_loader == "sfbinpack":
             if not args.bullet_data:
                 raise SystemExit("backend=bullet sfbinpack loader requires bullet_data")
-            converted_data = "{assets}/bullet.data"
+            converted_data = "{assets}/bullet.bullet"
             steps.append({
                 "name": "bullet_convert",
                 "command": [

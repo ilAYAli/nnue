@@ -407,7 +407,7 @@ class BuildConfigTests(unittest.TestCase):
             self.assertEqual(2, len(score_steps))
             for step in score_steps:
                 output_index = step["command"].index("--output")
-                self.assertTrue(step["command"][output_index + 1].endswith(".data"))
+                self.assertTrue(step["command"][output_index + 1].endswith(".bullet"))
                 self.assertIn("--output-format", step["command"])
                 self.assertEqual(
                     "bullet-data",
@@ -416,11 +416,11 @@ class BuildConfigTests(unittest.TestCase):
                 self.assertIn("--enyo-runtime-target", step["command"])
 
             merge = next(step for step in config["steps"] if step["name"] == "score_merge")
-            self.assertEqual("{score}/labeled.data", merge["command"][6])
+            self.assertEqual("{score}/labeled.bullet", merge["command"][6])
 
             train = next(step for step in config["steps"] if step["name"] == "bullet_train")
             data_index = train["command"].index("--data")
-            self.assertEqual("{score}/labeled.data", train["command"][data_index + 1])
+            self.assertEqual("{score}/labeled.bullet", train["command"][data_index + 1])
         finally:
             Path(path).unlink(missing_ok=True)
 
@@ -471,7 +471,7 @@ class BuildConfigTests(unittest.TestCase):
                 self.assertNotIn("--output-format", command)
 
             merge = next(step for step in config["steps"] if step["name"] == "score_merge")
-            self.assertEqual("{score}/labeled.data", merge["command"][6])
+            self.assertEqual("{score}/labeled.bullet", merge["command"][6])
         finally:
             Path(path).unlink(missing_ok=True)
 
@@ -1027,10 +1027,10 @@ class BuildConfigTests(unittest.TestCase):
                 step for step in config["steps"]
                 if step["name"] == "score_crucible_merge"
             )
-            self.assertEqual("{score}/labeled.data", merge["command"][7])
+            self.assertEqual("{score}/labeled.bullet", merge["command"][7])
             train = next(step for step in config["steps"] if step["name"] == "bullet_train")
             data_index = train["command"].index("--data")
-            self.assertEqual("{score}/labeled.data", train["command"][data_index + 1])
+            self.assertEqual("{score}/labeled.bullet", train["command"][data_index + 1])
         finally:
             Path(path).unlink(missing_ok=True)
 

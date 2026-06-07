@@ -10,6 +10,9 @@ from . import bullet_text
 
 RECORD_BYTES = 32
 FORMAT = "bulletformat-chessboard-v1"
+PREFERRED_SUFFIX = ".bullet"
+LEGACY_SUFFIX = ".data"
+SUFFIXES = {PREFERRED_SUFFIX, LEGACY_SUFFIX}
 STRUCT = struct.Struct("<Q16shBBB3s")
 
 PIECE_TYPE = {

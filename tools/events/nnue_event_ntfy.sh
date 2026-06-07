@@ -242,7 +242,7 @@ if args.get("backend") == "bullet":
     elif args.get("bullet_source_jsonl"):
         source = f"pre-scored JSONL: {Path(str(args['bullet_source_jsonl'])).name}"
     elif args.get("bullet_data"):
-        source = f"Bullet data: {Path(str(args['bullet_data'])).name}"
+        source = f"BulletFormat: {Path(str(args['bullet_data'])).name}"
 
 label = "unknown"
 if args.get("score_engine"):

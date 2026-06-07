@@ -495,7 +495,7 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
 
 fn main() {
     let mode = env_string("ENYO_BULLET_MODE", "reckless");
-    let dataset = env_string("ENYO_BULLET_DATA", "data/baseline.data");
+    let dataset = env_string("ENYO_BULLET_DATA", "data/baseline.bullet");
     let output = env_string("ENYO_BULLET_OUT", "checkpoints");
     let net_id = env_string("ENYO_BULLET_NET_ID", "enyo_bullet_spike");
     let hidden = env_parse("ENYO_BULLET_HIDDEN", 1024usize);

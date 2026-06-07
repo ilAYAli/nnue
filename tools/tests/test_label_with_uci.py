@@ -51,7 +51,7 @@ class LabelWithUciTests(unittest.TestCase):
             src = root / "in.jsonl"
             suffix = {
                 "packed": ".npz",
-                "bullet-data": ".data",
+                "bullet-data": ".bullet",
             }.get(output_format, ".txt")
             dst = root / f"out{suffix}"
             src.write_text(json.dumps(row) + "\n", encoding="utf-8")

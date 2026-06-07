@@ -15,6 +15,9 @@ Pipeline shape:
 posgen -> score -> Bullet text -> BulletFormat -> Bullet trainer
 ```
 
+BulletFormat training files use the `.bullet` extension. Older `.data` files
+remain readable as legacy artifacts.
+
 This path currently writes Bullet checkpoints under:
 
 ```text

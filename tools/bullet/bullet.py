@@ -491,7 +491,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--loader",
         choices=["direct", "sfbinpack"],
         default="direct",
-        help="Training data loader. direct expects BulletFormat .data; sfbinpack reads Stockfish binpack directly.",
+        help="Training data loader. direct expects BulletFormat .bullet; legacy .data is also accepted. sfbinpack reads Stockfish binpack directly.",
     )
     train.add_argument("--sfbinpack-buffer-mb", type=int, default=1024)
     train.add_argument("--sfbinpack-min-ply", type=int, default=16)
@@ -568,10 +568,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     convert = subparsers.add_parser(
         "convert",
-        help="Convert sfbinpack to BulletFormat .data (run once, train with direct loader).",
+        help="Convert sfbinpack to BulletFormat .bullet (run once, train with direct loader).",
     )
     convert.add_argument("--data", required=True, help="Source sfbinpack path(s), semicolon-separated.")
-    convert.add_argument("--output", required=True, help="Destination .data file.")
+    convert.add_argument("--output", required=True, help="Destination .bullet file.")
     convert.add_argument("--cargo-target-dir", required=True)
     convert.add_argument("--buffer-mb", type=int, default=1024)
     convert.add_argument("--threads", type=int, default=4)

@@ -58,7 +58,7 @@ class NNueDatasetTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            data = root / "rows.data"
+            data = root / "rows.bullet"
             row = {
                 "fen": "8/8/8/8/8/8/8/K6k b - - 0 1",
                 "score": 42,
@@ -84,6 +84,27 @@ class NNueDatasetTests(unittest.TestCase):
             self.assertEqual(wdls.tolist(), [0.0])
             self.assertEqual(source_ids.tolist(), [0])
 
+    def test_loads_legacy_bullet_data_suffix(self) -> None:
+        from tools.lib import bullet_format
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data = root / "rows.data"
+            row = {
+                "fen": "8/8/8/8/8/8/8/K6k w - - 0 1",
+                "score": 17,
+                "wdl": 0.5,
+            }
+            with data.open("wb") as handle:
+                bullet_format.write_row(
+                    handle,
+                    row,
+                    enyo_runtime_target=False,
+                )
+
+            dataset, _collate = load_score_dataset(data)
+            self.assertIsInstance(dataset, BulletDataScoreDataset)
+            self.assertEqual(count_rows(data), 1)
 
 
 if __name__ == "__main__":
