@@ -480,6 +480,18 @@ Current build intent:
   `native-1.13.0` as `native-1.16.2`; reject before games if MAE/sign/slope
   indicate another scale-collapse or no useful calibration. If static passes,
   run a distributed 300-game Crucible smoke versus `native-1.13.0-rc1`.
+- Result: rejected. The run passed clean provenance and broad engine-static was
+  only slightly better than `native-1.16.2` on the same 5000 broad rows
+  (`mae 140.126 -> 139.697`, sign `82.93% -> 82.97%`, slope
+  `0.842 -> 0.839`), but still much worse than `native-1.13.0`
+  (`mae=130.797`, sign `83.35%`, slope `0.599`). The 300-game smoke was
+  weak-positive (`110-105-85`, `+5.79 +/- 33.34 Elo`, LOS `63.3%`), but
+  the 1000-game confirm failed: `361-396-243`, score `0.4825`, about
+  `-12.17 +/- 18.75 Elo`, LOS `10.2%`.
+- Conclusion: close output-only broad calibration from `native-1.16.2`. The
+  slight broad-static repair did not preserve the weak-positive game signal.
+  Do not extend or confirm more checkpoints from this exact output-calibration
+  lane.
 
 
 Closed build intent:
