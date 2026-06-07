@@ -4,10 +4,11 @@ from __future__ import annotations
 import argparse
 from contextlib import nullcontext
 import json
+import queue
 import re
-import select
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -39,6 +40,9 @@ class UciEngine:
             text=True,
             bufsize=1,
         )
+        self.lines: queue.Queue[str | None] = queue.Queue()
+        self.reader = threading.Thread(target=self.read_stdout, daemon=True)
+        self.reader.start()
         self.send("uci")
         self.wait_for("uciok", timeout_s=60.0)
         self.setoption("Threads", str(self.threads))
@@ -63,6 +67,14 @@ class UciEngine:
         self.close()
         self.start()
 
+    def read_stdout(self) -> None:
+        if self.proc.stdout is None:
+            self.lines.put(None)
+            return
+        for line in self.proc.stdout:
+            self.lines.put(line.strip())
+        self.lines.put(None)
+
     def send(self, command: str) -> None:
         if self.proc.stdin is None:
             raise RuntimeError("engine stdin closed")
@@ -70,16 +82,15 @@ class UciEngine:
         self.proc.stdin.flush()
 
     def readline(self, *, timeout_s: float | None = None) -> str:
-        if self.proc.stdout is None:
-            raise RuntimeError("engine stdout closed")
-        if timeout_s is not None:
-            ready, _, _ = select.select([self.proc.stdout], [], [], max(0.0, timeout_s))
-            if not ready:
-                raise EngineTimeout(f"engine timed out after {timeout_s:.1f}s")
-        line = self.proc.stdout.readline()
-        if line == "":
+        try:
+            line = self.lines.get(
+                timeout=max(0.0, timeout_s) if timeout_s is not None else None,
+            )
+        except queue.Empty:
+            raise EngineTimeout(f"engine timed out after {timeout_s:.1f}s") from None
+        if line is None:
             raise RuntimeError("engine exited")
-        return line.strip()
+        return line
 
     def wait_for(self, token: str, *, timeout_s: float | None = None) -> None:
         deadline = time.monotonic() + timeout_s if timeout_s is not None else None
