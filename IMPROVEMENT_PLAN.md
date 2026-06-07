@@ -455,6 +455,14 @@ Current build intent:
   same broad engine-static and replay move-choice gates. Only launch games for a
   checkpoint if it shows a materially better broad-vs-ranking tradeoff than the
   rejected final checkpoint.
+- Checkpoint screen result: epoch `0000` had the best broad-vs-ranking tradeoff
+  on gates (`mae=131.157`, sign `83.30%`, slope `0.592659`, move gate
+  `1138/2487`, fixed `3`, regressed `0`, `delta_avg_margin=+0.17cp`). Its
+  distributed 300-game smoke still failed badly versus `native-1.13.0-rc1`:
+  `99-120-81`, score `0.4650`, about `-24.36 +/- 33.70 Elo`, LOS `7.8%`.
+- Conclusion: close scalar replay-pair checkpoint rescue. The replay ranking
+  signal does not transfer through the current scalar net path strongly enough
+  to justify more game tests.
 
 
 Closed build intent:
