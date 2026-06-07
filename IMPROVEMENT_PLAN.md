@@ -464,6 +464,23 @@ Current build intent:
   signal does not transfer through the current scalar net path strongly enough
   to justify more game tests.
 
+Current build intent:
+
+- `build.json` is
+  `native-1.19.0-rc1-v162-outputcal-broad-lr1e4-e12-sb512-20260607`.
+- Hypothesis: `native-1.16.2` had the only still-live direct-static signal
+  (`+3.8 +/- 18.4 Elo` versus `native-1.13.0` after 1000 games) but its
+  static shape was over-amplified. Train only the output layer on the broad
+  `native-1.13.0` mixed rows to restore broad CP scale while preserving any
+  useful hidden representation learned from direct-static labels.
+- This changes only calibration scope/data. Architecture remains scalar
+  `16 x 12`; no new self-play, Stockfish scoring, public data, replay-pair
+  objective, or 32-bucket representation is introduced.
+- Gate: clean provenance and broad engine-static must be at least as close to
+  `native-1.13.0` as `native-1.16.2`; reject before games if MAE/sign/slope
+  indicate another scale-collapse or no useful calibration. If static passes,
+  run a distributed 300-game Crucible smoke versus `native-1.13.0-rc1`.
+
 
 Closed build intent:
 
