@@ -51,6 +51,7 @@ elif any(event.get(key) for key in (
         "critical", "critical_failure")):
     print("1")
 elif name == "done":
+    message = str(event.get("message") or "")
     log = event.get("log", "")
     try:
         path = Path(str(log)).expanduser()
@@ -61,15 +62,20 @@ elif name == "done":
             text = handle.read().decode("utf-8", errors="replace")
     except OSError:
         text = ""
+    text = text + "\n" + message
     sprt_lines = [
         line.strip()
         for line in text.splitlines()
-        if "Enyo NNUE SPRT finished" in line or re.match(r"^\[\s*\d+/\d+\]", line)
+        if (
+            "Enyo NNUE SPRT finished" in line
+            or re.match(r"^\[\s*\d+/\d+\]", line)
+            or re.search(r"\bElo(?: difference|:)?\s+[+-]?\d", line)
+        )
     ]
     worthy = False
     if sprt_lines:
         line = sprt_lines[-1]
-        elo_match = re.search(r"Elo\s+([+-]?\d+(?:\.\d+)?)", line)
+        elo_match = re.search(r"Elo(?: difference|:)?\s+([+-]?\d+(?:\.\d+)?)", line)
         llr_match = re.search(r"LLR\s+([+-]?\d+(?:\.\d+)?)/", line)
         los_match = re.search(r"LOS\s+([0-9.]+)%", line)
         if elo_match:
@@ -231,6 +237,18 @@ def count_rows(path):
 config = read_json(run_dir / "config.json")
 args = config.get("create_args", {}) if isinstance(config, dict) else {}
 log_text = tail_text(log)
+message_text = str(event.get("message") or "")
+
+
+def message_result_line(message, prefixes):
+    for line in reversed(message.splitlines()):
+        stripped = line.strip()
+        if stripped.startswith("• "):
+            stripped = stripped[2:].strip()
+        for prefix in prefixes:
+            if stripped.startswith(prefix):
+                return stripped
+    return ""
 
 source = "unknown"
 if args.get("backend") == "bullet":
@@ -284,6 +302,9 @@ move_gate = move_gate_line(read_json(run_dir / "validate" / "move_gate.summary.j
 train_time = last_matching(log_text, r"Total Training Time:")
 sprt_done = last_matching(log_text, r"Enyo NNUE SPRT finished")
 sprt_line = last_matching(log_text, r"^\[\s*\d+/\d+\]")
+message_score = message_result_line(message_text, ("Score:",))
+message_elo = message_result_line(message_text, ("Elo:",))
+message_sprt = message_result_line(message_text, ("SPRT:",))
 failure_line = last_matching(log_text, r"^(failed .*|.*CUDA_ERROR.*|.*Traceback.*|.*ValueError:.*)")
 
 lines = ["NNUE status"]
@@ -326,7 +347,14 @@ if bucket_50_100:
     lines.append(f"  • Near-zero 50-100: {bucket_50_100}")
 if move_gate:
     lines.append(f"  • Move gate: {move_gate}")
-if sprt_done:
+if message_score or message_elo or message_sprt:
+    if message_score:
+        lines.append(f"  • {message_score}")
+    if message_elo:
+        lines.append(f"  • {message_elo}")
+    if message_sprt:
+        lines.append(f"  • {message_sprt}")
+elif sprt_done:
     lines.append(f"  • SPRT: {sprt_done}")
 elif sprt_line:
     lines.append(f"  • SPRT: {sprt_line}")
@@ -342,7 +370,7 @@ lines.append("Next")
 if event_name == "fail":
     lines.append("  • Inspect the failing phase and fix the blocker.")
 elif event_name == "done":
-    if sprt_done or sprt_line:
+    if message_score or message_elo or message_sprt or sprt_done or sprt_line:
         lines.append("  • Decide from the SPRT result.")
     elif static_all:
         lines.append("  • Run a game smoke if static/provenance are sane.")
@@ -427,6 +455,7 @@ publish_ai() {
     local title="$2"
     local priority="$3"
     local rc=0
+    local notifai_delivered=0
 
     if [ "$DRY_RUN" = "1" ]; then
         printf '%s\n' "$prompt"
@@ -439,6 +468,7 @@ publish_ai() {
             "$NOTIFAI_TARGET" >>"$LOG"
     elif [ -x "$NOTIFAI" ]; then
         if "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1; then
+            notifai_delivered=1
             printf '%s event=%s notifai_ok target=%s\n' \
                 "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" \
                 "$NOTIFAI_TARGET" >>"$LOG"
@@ -456,6 +486,12 @@ publish_ai() {
 
     if [ "$AI_STDIN_NTFY_ENABLE" != "1" ]; then
         printf '%s event=%s ai_stdin_ntfy_skipped\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+        return 0
+    fi
+
+    if [ "$notifai_delivered" = "1" ]; then
+        printf '%s event=%s ai_stdin_ntfy_skipped_notifai_ok\n' \
             "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         return 0
     fi

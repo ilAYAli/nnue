@@ -1198,3 +1198,74 @@ Legacy/manual runs:
 - Do not return to fresh self-play as the main lever unless paired with a new
   architecture, stronger teacher source, or a gate showing it solves a concrete
   failure mode.
+
+## 2026-06-08 native 1.24.0 hard-disagreement duplicate-eval static labels
+
+Hypothesis:
+
+- The embedded Enyo+Stockfish duplicate-eval scorer can target positions where
+  the current `native-1.16.0` parent and Stockfish static NNUE materially
+  disagree, producing a cleaner correction signal than broad Stockfish-static
+  labels.
+- This changes only data selection and teacher target construction. Source
+  positions stay the completed `native-1.16.0` fresh source, architecture stays
+  scalar `16 x 12`, objective stays Bullet Huber/WDL, and init stays
+  `native-1.16.0`.
+
+Result:
+
+- `native-1.24.0-rc1-sfstatic-harddelta300k-v16src-lr3e7-sb512-20260608`
+  completed with the intended direct `.bullet` chain:
+  `positions -> enyo_sf_static_datagen -> .bullet -> Bullet`.
+- Crucible scoring produced `96/96` verified shards and `149,445` hard-delta
+  rows. The deploy wrapper returned nonzero twice because pwa-5090 self-SSH
+  sync/heartbeat sessions reset after the run state was already complete; the
+  phase was recovered only after `crucible verify` returned `ok`.
+- Static validation on the hard-delta `.bullet` set: `mae=205.051`,
+  sign `89.09%`, corr `0.862608`.
+- 300-game smoke versus `native-1.16.0`: `112-105-83`, Elo `+8.11 +/- 33.50`,
+  LOS `68.2%`.
+- 1000-game confirmation versus `native-1.16.0`: `357-375-268`,
+  Elo `-6.25 +/- 18.44`, LOS `25.3%`.
+
+Conclusion:
+
+- Do not promote or extend `native-1.24.0`.
+- The hard-disagreement slice was too small/narrow to transfer in games.
+  Avoid another direct Stockfish-static-only variant unless it changes a real
+  failure theory, not just the threshold or row count.
+- Next useful action: validate the already-built `native-1.23.0`
+  searched-label candidate with a clean 300-game smoke before starting new
+  training.
+
+## 2026-06-08 native 1.29.0 v23 self-play plus Stockfish-static mix
+
+Hypothesis:
+
+- A small fresh self-play source from the current `native-1.23.0` parent,
+  labeled through the direct Stockfish-static `.bullet` path, may add useful
+  local correction signal without abandoning the stronger searched-label
+  lineage.
+- This changes the data source and target mix only. Architecture remains
+  scalar `16 x 12`, objective remains Bullet Huber/WDL, and init stays
+  `native-1.23.0`.
+
+Result:
+
+- `native-1.29.0-rc1-v23self20k-sfstatic300k-v23init-lr1e7-sb512-20260608`
+  completed training and provenance/static validation.
+- Bullet static gate on 100k rows: `mae=151.717`, sign `81.18%`,
+  corr `0.867304`, slope `1.226959`.
+- 300-game smoke versus `native-1.23.0`: `113-100-87`, Elo
+  `+15.06 +/- 33.20`, LOS `81.3%`.
+- 1000-game confirmation versus `native-1.23.0`: `368-352-280`, Elo
+  `+5.56 +/- 18.28`, LOS `72.4%`.
+- 4000-game screen versus `native-1.23.0`: `1449-1516-1035`, Elo
+  `-5.82 +/- 9.27`, LOS `10.9%`.
+
+Conclusion:
+
+- Do not promote or extend `native-1.29.0`.
+- The short smoke/confirm result did not hold at 4000 games. Close this
+  fresh-selfplay/static-label mix and switch failure theory instead of tuning
+  the same recipe.

@@ -325,9 +325,20 @@ def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
             "label": f"sprt:{games}",
             "timeout_s": args.task_timeout_seconds,
             "progress": {
-                "log_regex": r"\[\s*(?P<done>\d+)\/(?P<total>\d+)\]",
+                "log_regex": (
+                    r"\[\s*(?P<done>\d+)\s*/\s*(?P<total>\d+)\]\s+"
+                    r"Elo\s+(?P<elo>[+-]?(?:\d+(?:\.\d+)?|inf))\s+"
+                    r"\+/-\s+[+-]?(?:\d+(?:\.\d+)?|nan|-nan)\s+\|\s+"
+                    r"LLR\s+[^\|]*\|\s+LOS\s+(?P<los>[0-9.]+%)\s+\|\s+"
+                    r"draw\s+(?P<draw>[0-9.]+%)"
+                ),
                 "total": games,
                 "unit": "games",
+                "display_fields": {
+                    "elo": "elo~",
+                    "los": "los",
+                    "draw": "draw",
+                },
             },
             "command": task_command(
                 index=index,
