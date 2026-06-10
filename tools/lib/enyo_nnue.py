@@ -28,6 +28,10 @@ SUPPORTED_N_OUTPUT_HEAD_FEATURES = (0, N_HEAD_FEATURES)
 N_KING_BUCKETS = DEFAULT_N_KING_BUCKETS
 N_PIECE_TYPES = 12
 N_SQUARES = 64
+N_THREAT_CHANNELS = 12
+N_THREAT_FEATURES = N_THREAT_CHANNELS * N_THREAT_CHANNELS * N_SQUARES
+N_THREAT_HIDDEN = 128
+SUPPORTED_N_THREAT_INPUTS = (0, 1)
 N_HIDDEN = 1024
 N_L1 = 2 * N_HIDDEN
 N_L2 = 16
@@ -55,6 +59,7 @@ def network_size(
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS,
     output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES,
     feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
+    threat_inputs: int = 0,
 ) -> int:
     features = feature_count(input_buckets, feature_channels)
     if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
@@ -62,6 +67,8 @@ def network_size(
     if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
         raise ValueError(
             f"unsupported output head feature count {output_head_features}")
+    if threat_inputs not in SUPPORTED_N_THREAT_INPUTS:
+        raise ValueError(f"unsupported threat input count {threat_inputs}")
     output_width = N_L3 + output_head_features
     return (
         features * N_HIDDEN * np.dtype(np.int16).itemsize
@@ -72,6 +79,12 @@ def network_size(
         + N_L3 * np.dtype(np.float32).itemsize
         + output_buckets * output_width * N_OUTPUT * np.dtype(np.float32).itemsize
         + output_buckets * N_OUTPUT * np.dtype(np.float32).itemsize
+        + threat_inputs * (
+            N_THREAT_FEATURES * N_THREAT_HIDDEN * np.dtype(np.int16).itemsize
+            + N_THREAT_HIDDEN * np.dtype(np.int16).itemsize
+            + 2 * N_THREAT_HIDDEN * np.dtype(np.float32).itemsize
+            + np.dtype(np.float32).itemsize
+        )
     )
 
 
@@ -111,25 +124,28 @@ def king_buckets(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> tuple[int, ...]
     raise ValueError(f"unsupported input bucket count {input_buckets}")
 
 
-def detect_network_layout(size: int) -> tuple[int, int, int, int]:
+def detect_network_layout(size: int) -> tuple[int, int, int, int, int]:
     for input_buckets, feature_channels in SUPPORTED_N_FEATURE_LAYOUTS:
         for output_buckets in SUPPORTED_N_OUTPUT_BUCKETS:
             for output_head_features in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
-                if size == network_size(
-                    input_buckets, output_buckets, output_head_features,
-                    feature_channels
-                ):
-                    return (
-                        input_buckets,
-                        feature_channels,
-                        output_buckets,
-                        output_head_features)
+                for threat_inputs in SUPPORTED_N_THREAT_INPUTS:
+                    if size == network_size(
+                        input_buckets, output_buckets, output_head_features,
+                        feature_channels, threat_inputs
+                    ):
+                        return (
+                            input_buckets,
+                            feature_channels,
+                            output_buckets,
+                            output_head_features,
+                            threat_inputs)
     expected = ", ".join(
-        f"{network_size(i, o, h, c)} "
-        f"({i} input, {c} channels, {o} output, {h} head)"
+        f"{network_size(i, o, h, c, t)} "
+        f"({i} input, {c} channels, {o} output, {h} head, {t} threat)"
         for i, c in SUPPORTED_N_FEATURE_LAYOUTS
         for o in SUPPORTED_N_OUTPUT_BUCKETS
-        for h in SUPPORTED_N_OUTPUT_HEAD_FEATURES)
+        for h in SUPPORTED_N_OUTPUT_HEAD_FEATURES
+        for t in SUPPORTED_N_THREAT_INPUTS)
     raise ValueError(f"size {size} does not match supported net sizes: {expected}")
 
 
@@ -147,6 +163,10 @@ def detect_output_buckets(size: int) -> int:
 
 def detect_output_head_features(size: int) -> int:
     return detect_network_layout(size)[3]
+
+
+def detect_threat_inputs(size: int) -> int:
+    return detect_network_layout(size)[4]
 
 
 def detect_feature_layout_from_count(feature_count_value: int) -> tuple[int, int]:
@@ -183,6 +203,11 @@ class Net:
     feature_channels: int = DEFAULT_N_FEATURE_CHANNELS
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS
     output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES
+    threat_inputs: int = 0
+    threat_weights: np.ndarray | None = None
+    threat_biases: np.ndarray | None = None
+    threat_output_weights: np.ndarray | None = None
+    threat_output_bias: np.float32 | None = None
 
     @property
     def output_bias(self) -> float:
@@ -229,6 +254,123 @@ def feature_index(piece_type: int, piece_color: int, enyo_sq: int,
     osq = (7 * (0 if (kingsq & 4) else 1)) ^ (56 * view) ^ sq
 
     return king_buckets(input_buckets)[ok] * feature_channels * 64 + op * 64 + osq
+
+
+def piece_code(piece_type: int, piece_color: int) -> int:
+    return ((piece_type - 1) << 1) | piece_color
+
+
+def threat_index(
+    attacker_code: int,
+    victim_code: int,
+    victim_enyo_sq: int,
+    view: int,
+) -> int:
+    att_ch = 6 * ((attacker_code ^ view) & 1) + (attacker_code >> 1)
+    vic_ch = 6 * ((victim_code ^ view) & 1) + (victim_code >> 1)
+    osq = to_berserk_sq(victim_enyo_sq) ^ (56 * view)
+    return (att_ch * N_THREAT_CHANNELS + vic_ch) * N_SQUARES + osq
+
+
+def _file_rank(enyo_sq: int) -> tuple[int, int]:
+    return 7 - (enyo_sq & 7), enyo_sq >> 3
+
+
+def _enyo_sq(file_idx: int, rank: int) -> int:
+    return rank * 8 + (7 - file_idx)
+
+
+def _inside(file_idx: int, rank: int) -> bool:
+    return 0 <= file_idx < 8 and 0 <= rank < 8
+
+
+def _step_attacks(enyo_sq: int, deltas: Sequence[tuple[int, int]]) -> list[int]:
+    file_idx, rank = _file_rank(enyo_sq)
+    out: list[int] = []
+    for df, dr in deltas:
+        f1, r1 = file_idx + df, rank + dr
+        if _inside(f1, r1):
+            out.append(_enyo_sq(f1, r1))
+    return out
+
+
+def _slider_attacks(
+    enyo_sq: int,
+    deltas: Sequence[tuple[int, int]],
+    occupied: set[int],
+) -> list[int]:
+    file_idx, rank = _file_rank(enyo_sq)
+    out: list[int] = []
+    for df, dr in deltas:
+        f1, r1 = file_idx + df, rank + dr
+        while _inside(f1, r1):
+            sq = _enyo_sq(f1, r1)
+            out.append(sq)
+            if sq in occupied:
+                break
+            f1 += df
+            r1 += dr
+    return out
+
+
+def _attacks_from(
+    piece_type: int,
+    piece_color: int,
+    enyo_sq: int,
+    occupied: set[int],
+) -> list[int]:
+    if piece_type == PAWN:
+        rank_delta = 1 if piece_color == WHITE else -1
+        return _step_attacks(enyo_sq, ((-1, rank_delta), (1, rank_delta)))
+    if piece_type == KNIGHT:
+        return _step_attacks(
+            enyo_sq,
+            ((-2, -1), (-2, 1), (-1, -2), (-1, 2),
+             (1, -2), (1, 2), (2, -1), (2, 1)))
+    if piece_type == BISHOP:
+        return _slider_attacks(enyo_sq, ((-1, -1), (-1, 1), (1, -1), (1, 1)),
+                               occupied)
+    if piece_type == ROOK:
+        return _slider_attacks(enyo_sq, ((-1, 0), (1, 0), (0, -1), (0, 1)),
+                               occupied)
+    if piece_type == QUEEN:
+        return _slider_attacks(
+            enyo_sq,
+            ((-1, -1), (-1, 1), (1, -1), (1, 1),
+             (-1, 0), (1, 0), (0, -1), (0, 1)),
+            occupied)
+    if piece_type == KING:
+        return _step_attacks(
+            enyo_sq,
+            ((-1, -1), (-1, 0), (-1, 1), (0, -1),
+             (0, 1), (1, -1), (1, 0), (1, 1)))
+    return []
+
+
+def threat_features_from_pieces(
+    pieces: Sequence[tuple[int, int, int]],
+    view: int,
+) -> list[int]:
+    by_square = {sq: (pt, color) for pt, color, sq in pieces}
+    occupied = set(by_square)
+    out: list[int] = []
+    for attacker_pt, attacker_color, attacker_sq in pieces:
+        attacker_code = piece_code(attacker_pt, attacker_color)
+        for victim_sq in _attacks_from(
+            attacker_pt, attacker_color, attacker_sq, occupied
+        ):
+            victim = by_square.get(victim_sq)
+            if victim is None:
+                continue
+            victim_pt, victim_color = victim
+            out.append(
+                threat_index(
+                    attacker_code,
+                    piece_code(victim_pt, victim_color),
+                    victim_sq,
+                    view))
+    out.sort()
+    return out
 
 
 def parse_fen(fen: str) -> tuple[list[tuple[int, int, int]], int]:
@@ -303,7 +445,13 @@ def material_head_features_from_pieces(
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
     try:
-        input_buckets, feature_channels, output_buckets, output_head_features = detect_network_layout(
+        (
+            input_buckets,
+            feature_channels,
+            output_buckets,
+            output_head_features,
+            threat_inputs,
+        ) = detect_network_layout(
             len(data))
     except ValueError as exc:
         raise ValueError(f"{path}: {exc}") from exc
@@ -327,6 +475,13 @@ def load_net(path: str | Path) -> Net:
     ow = take(np.float32, output_buckets * output_width).reshape(
         output_buckets, output_width)
     ob = take(np.float32, output_buckets)
+    tw = tb = tow = tob = None
+    if threat_inputs:
+        tw = take(np.int16, N_THREAT_FEATURES * N_THREAT_HIDDEN).reshape(
+            N_THREAT_FEATURES, N_THREAT_HIDDEN)
+        tb = take(np.int16, N_THREAT_HIDDEN)
+        tow = take(np.float32, 2 * N_THREAT_HIDDEN)
+        tob = take(np.float32, 1)[0]
     assert off == len(data)
     return Net(
         input_weights=iw,
@@ -340,7 +495,12 @@ def load_net(path: str | Path) -> Net:
         input_buckets=input_buckets,
         feature_channels=feature_channels,
         output_buckets=output_buckets,
-        output_head_features=output_head_features)
+        output_head_features=output_head_features,
+        threat_inputs=threat_inputs,
+        threat_weights=tw,
+        threat_biases=tb,
+        threat_output_weights=tow,
+        threat_output_bias=tob)
 
 
 def write_net(net: Net, path: str | Path) -> None:
@@ -368,6 +528,34 @@ def write_net(net: Net, path: str | Path) -> None:
         raise ValueError(
             f"output_biases shape {output_biases.shape} does not match "
             f"{net.output_buckets} output buckets")
+    if net.threat_inputs not in SUPPORTED_N_THREAT_INPUTS:
+        raise ValueError(f"unsupported threat input count {net.threat_inputs}")
+    if net.threat_inputs:
+        if net.threat_weights is None:
+            raise ValueError("threat_weights are required when threat_inputs=1")
+        if net.threat_biases is None:
+            raise ValueError("threat_biases are required when threat_inputs=1")
+        if net.threat_output_weights is None:
+            raise ValueError("threat_output_weights are required when threat_inputs=1")
+        if net.threat_output_bias is None:
+            raise ValueError("threat_output_bias is required when threat_inputs=1")
+        threat_weights = np.asarray(net.threat_weights, dtype=np.int16)
+        if threat_weights.shape != (N_THREAT_FEATURES, N_THREAT_HIDDEN):
+            raise ValueError(
+                f"threat_weights shape {threat_weights.shape} does not match "
+                f"({N_THREAT_FEATURES}, {N_THREAT_HIDDEN})")
+        threat_biases = np.asarray(net.threat_biases, dtype=np.int16)
+        if threat_biases.shape != (N_THREAT_HIDDEN,):
+            raise ValueError(
+                f"threat_biases shape {threat_biases.shape} does not match "
+                f"({N_THREAT_HIDDEN},)")
+        threat_output_weights = np.asarray(net.threat_output_weights, dtype=np.float32)
+        if threat_output_weights.shape != (2 * N_THREAT_HIDDEN,):
+            raise ValueError(
+                f"threat_output_weights shape {threat_output_weights.shape} "
+                f"does not match ({2 * N_THREAT_HIDDEN},)")
+        threat_output_bias = np.asarray(
+            [net.threat_output_bias], dtype=np.float32)
     out = Path(path)
     with out.open("wb") as f:
         f.write(np.asarray(net.input_weights, dtype=np.int16).tobytes(order="C"))
@@ -378,9 +566,14 @@ def write_net(net: Net, path: str | Path) -> None:
         f.write(np.asarray(net.l2_biases, dtype=np.float32).tobytes(order="C"))
         f.write(output_weights.tobytes(order="C"))
         f.write(output_biases.tobytes(order="C"))
+        if net.threat_inputs:
+            f.write(threat_weights.tobytes(order="C"))
+            f.write(threat_biases.tobytes(order="C"))
+            f.write(threat_output_weights.tobytes(order="C"))
+            f.write(threat_output_bias.tobytes(order="C"))
     size = out.stat().st_size
     expected = network_size(
         net.input_buckets, net.output_buckets, net.output_head_features,
-        net.feature_channels)
+        net.feature_channels, net.threat_inputs)
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")
