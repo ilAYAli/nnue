@@ -28,6 +28,36 @@ Versioning rule for clean Enyo-native nets:
 
 Current clean-native lineage names:
 
+Threat-input probe status, 2026-06-10:
+
+- Enyo branch `feature/nnue-threat-inputs` remains an unmerged research
+  reference for optional appended threat-block loading, `evalnet` diagnostic
+  evaluation, `evalnet dumpthreats` parity output, and the measured runtime
+  correction probe. It must not be promoted into normal search/eval without a
+  cheaper runtime design.
+- Correctness gates passed locally: Enyo full tests `108/108`,
+  network-model/audit subset `30/30`, NNUE tool tests `127/127`,
+  evalnet/nnuecheck/search parity for the zero-correction threat net, and
+  Python/C++ threat-index parity.
+- Runtime threat correction failed the shippable-NPS gate. The optimized
+  recompute path is better than the diff-memo version but still measured about
+  `-29.7%` NPS at depth 12 versus native-1.23. Keep it off `main`; the current
+  committed NNUE work is offline tooling only and has no engine NPS impact.
+- NNUE trainer/export plumbing now supports the optional threat block,
+  threat-aware JSONL/Bullet/packed datasets, `--threat-inputs`, and
+  `--trainable threat`. A trainer init bug was fixed: threat embeddings must
+  use int-accumulator scale, not float Kaiming scale, otherwise quantized ReLU
+  activations are zero and the zero-initialized correction output receives no
+  useful gradient.
+- Low-dose diagnostic from `enyo-native-1.23.0-rc1.nn` on 45,354 existing
+  native-1.23 d20 Bullet rows showed only a small static signal. Held-out
+  `5,000` rows improved from `mae=154.498`, `sign=82.63%` to
+  `mae=154.035`, `sign=82.86%` after 32 threat-only MSE epochs.
+- A local 64-game smoke at `1+0.01` using the same threat-capable engine lost
+  to native-1.23: `14-28-22`, about `-77 +/- 71 Elo`, `LOS=1.2%`, warnings
+  none. Do not promote this diagnostic net. If the lane continues, use either
+  a much stronger threat-specific training setup or first solve the NPS cost.
+
 - `native-1.0.0`: clean Enyo-native baseline from the current lane.
 - `native-1.1.0`: v2-cont continuation that beat `native-1.0.0` by
   `+99.0 +/- 40.3 Elo` over 256 games.
