@@ -577,6 +577,12 @@ Closed build intent:
   engine-static on the same 2000 native-1.9.1 SF18-labeled rows regressed from
   `native-1.5.0-rc1` MAE `146.057`, sign `82.98%` to candidate MAE `190.988`,
   sign `82.92%`. No SPRT was launched.
+- 2026-06-11 preservation retest: `native-1.31.2-rc1` mapped the stronger
+  `native-1.23.0` into the HalfKAv2-hm `32 x 11` layout and preserved broad
+  static reasonably well, but the 300-game smoke versus `native-1.23.0` lost
+  `108-120-72`, about `-13.90 +/- 34.35 Elo`, LOS `21.4%`. Close this
+  projection lane unless a materially different initialization/projection is
+  designed first.
 - Required gates before games:
   - C++ and Python feature-layout tests pass.
   - A converted init-only `32 x 11` `.nn` loads in Enyo and reports
