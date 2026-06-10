@@ -1382,6 +1382,66 @@ Stop criteria:
 - Reject before games unless it passes the frozen move gate with
   `regressed <= 40` and broad engine-static does not collapse.
 
+Result:
+
+- Rejected before games. Filtering to baseline-wrong cases did not remove the
+  destructive scalar tradeoff.
+- Broad engine-static collapsed versus the native-1.23 baseline: candidate
+  `mae=176.259`, sign `81.73%`, corr `0.792`, slope `0.354`; baseline
+  `mae=147.001`, sign `83.14%`, corr `0.831`, slope `0.843`.
+- Final move gate: candidate `1186/2487` versus baseline `1141/2487`,
+  `fixed=173`, `regressed=128`, `delta_avg_margin=+1.8cp`,
+  `delta_loss_weighted_margin=-4.3cp`. It failed the regression, average
+  margin, and loss-weighted margin thresholds.
+- Checkpoint sweep also found no rescue point:
+  `epoch-0003` was `fixed=9`, `regressed=7`,
+  `delta_loss_weighted_margin=-0.9cp`; `epoch-0015` was the closest on
+  regressions at `fixed=65`, `regressed=40`, but still had only
+  `delta_avg_margin=+0.1cp` and `delta_loss_weighted_margin=-3.8cp`; later
+  checkpoints fixed more cases only by creating a much worse bad tail.
+
+Conclusion:
+
+- Close the scalar replay-loss/move-gate pairwise repair lane. The four tests
+  now cover the useful variants: broad-preserved CP fitting did not move the
+  gate (`native-1.39.0`), target-only fitting proved the signal is learnable
+  but destroys broad eval (`native-1.39.1`), small-margin ranking still
+  regressed too many cases (`native-1.39.2`), and baseline-wrong-only ranking
+  still created a worse loss-weighted tail (`native-1.39.3`).
+- Do not run games for `native-1.39.x`, and do not spend another run on scalar
+  replay-loss pair fitting without a materially different representation. If
+  this signal is revisited, it should be a separate policy/ranking path or a
+  new non-scalar feature path with its own parity and NPS gates.
+
+## 2026-06-11 hard-delta scalar continuation check
+
+Purpose:
+
+- Decide whether the hard-delta d20 scalar lane had enough gate movement to
+  justify more games or continuation runs.
+
+Results:
+
+- `native-1.37.0-rc1-harddelta-d20-v29src-v23init-lr1e7-sb64-20260610` passed
+  static validation but its completed 300-game smoke versus native-1.23.0 was
+  neutral-negative: `elo=-1.2`, `ci=34.7`, draw `25.7%`. The frozen move gate
+  was essentially unchanged: `fixed=2`, `regressed=3`,
+  `delta_avg_margin=+0.4cp`, `delta_loss_weighted_margin=+1.2cp`.
+- `native-1.38.0-rc1-harddelta-cont-v137-lr3e8-sb64-20260610` worsened the
+  hard-delta static set and did not improve the move gate enough: `fixed=2`,
+  `regressed=4`, `delta_loss_weighted_margin=+1.6cp`.
+- `native-1.38.1-rc1-harddelta-output-v137-lr1e6-sb64-20260610` moved the
+  margin more (`fixed=10`, `regressed=11`, `delta_loss_weighted_margin=+6.5cp`),
+  but broad engine-static degraded heavily to `mae=162.797` versus the usual
+  native-1.23 baseline around `147`, so it is not a game candidate.
+
+Conclusion:
+
+- Do not extend the hard-delta scalar continuation lane. It improves selected
+  static or margin metrics without producing a convincing move gate or smoke
+  result. Future hard-case work needs a stronger pre-game gate or a different
+  representation, not more same-lane scalar continuation.
+
 ## 2026-06-10 guarded move-policy sidecar rejection
 
 Hypothesis:
