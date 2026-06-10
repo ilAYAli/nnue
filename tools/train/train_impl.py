@@ -119,6 +119,17 @@ def move_batch(batch, device: str):
     )
 
 
+def unpack_batch(batch, args: argparse.Namespace):
+    if args.threat_inputs:
+        return (*batch,)
+    w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids = batch
+    return (
+        w, b, w_off, b_off,
+        None, None, None, None,
+        counts, stm, y, wdl, phase_scale, source_ids,
+    )
+
+
 def autocast_context(args: argparse.Namespace):
     if args.amp == "bf16" and args.device.startswith("cuda"):
         return torch.autocast("cuda", dtype=torch.bfloat16)
@@ -149,15 +160,16 @@ def eval_metrics(model: EnyoNNUE, loader: DataLoader, args: argparse.Namespace
     sign_sum = 0
     sign_n = 0
     n = 0
-    for w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids in loader:
-        w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids = move_batch(
-            (w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids),
-            args.device,
-        )
+    for batch in loader:
+        (w, b, w_off, b_off, wt, bt, wt_off, bt_off, counts, stm, y, wdl,
+         phase_scale, source_ids) = unpack_batch(move_batch(batch, args.device), args)
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
         with autocast_context(args):
-            pred = model(w, b, w_off, b_off, stm, phase_scale, piece_count=counts)
+            pred = model(
+                w, b, w_off, b_off, stm, phase_scale, piece_count=counts,
+                w_threat_feats=wt, b_threat_feats=bt,
+                w_threat_offsets=wt_off, b_threat_offsets=bt_off)
             loss = score_loss(pred.float(), y, wdl, source_ids, args)
         err = pred - y
         sign_mask = y != 0
@@ -193,20 +205,23 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     train_set, collate_fn = load_score_dataset(
         args.data, limit=train_limit, skip=args.skip_rows,
-        in_memory=args.dataset_in_memory)
+        in_memory=args.dataset_in_memory,
+        with_threats=bool(args.threat_inputs))
     print(f"train rows: {len(train_set)}", flush=True)
     val_set = None
     if args.val:
         print(f"loading val rows from {args.val}", flush=True)
         val_set, val_collate_fn = load_score_dataset(
             args.val, limit=args.val_rows,
-            in_memory=args.dataset_in_memory)
+            in_memory=args.dataset_in_memory,
+            with_threats=bool(args.threat_inputs))
     elif args.val_rows > 0:
         print(f"loading val rows from {args.data} at skip={val_skip}",
               flush=True)
         val_set, val_collate_fn = load_score_dataset(
             args.data, limit=args.val_rows, skip=val_skip,
-            in_memory=args.dataset_in_memory)
+            in_memory=args.dataset_in_memory,
+            with_threats=bool(args.threat_inputs))
     if val_set is not None:
         print(f"val rows: {len(val_set)}", flush=True)
 
@@ -218,14 +233,16 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         model = load_model_from_nn(
             args.init_from_nn,
             device=args.device,
-            output_head_features=output_head_features)
+            output_head_features=output_head_features,
+            threat_inputs=args.threat_inputs)
     else:
         output_head_features = (
             nn2.N_HEAD_FEATURES if args.output_head_features == "material-phase"
             else 0)
         model = EnyoNNUE(
             init=args.init,
-            output_head_features=output_head_features).to(args.device)
+            output_head_features=output_head_features,
+            threat_inputs=args.threat_inputs).to(args.device)
 
     if args.trainable != "all":
         for param in model.parameters():
@@ -235,6 +252,17 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
                 param.requires_grad_(True)
         if args.trainable == "float-head":
             for param in model.l2.parameters():
+                param.requires_grad_(True)
+        if args.trainable == "threat":
+            if not model.threat_inputs:
+                raise SystemExit("trainable=threat requires --threat-inputs")
+            assert model.threat_embed is not None
+            assert model.threat_bias is not None
+            assert model.threat_output is not None
+            for param in model.threat_embed.parameters():
+                param.requires_grad_(True)
+            model.threat_bias.requires_grad_(True)
+            for param in model.threat_output.parameters():
                 param.requires_grad_(True)
         trainable_params = sum(
             p.numel() for p in model.parameters() if p.requires_grad)
@@ -262,17 +290,18 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
         mae_sum = 0.0
         mse_sum = 0.0
         n = 0
-        for w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids in train_loader:
-            w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids = move_batch(
-                (w, b, w_off, b_off, counts, stm, y, wdl, phase_scale, source_ids),
-                args.device,
-            )
+        for batch in train_loader:
+            (w, b, w_off, b_off, wt, bt, wt_off, bt_off, counts, stm, y, wdl,
+             phase_scale, source_ids) = unpack_batch(
+                 move_batch(batch, args.device), args)
             if args.target_clamp > 0:
                 y = torch.clamp(y, -args.target_clamp, args.target_clamp)
 
             with autocast_context(args):
                 pred = forward_model(
-                    w, b, w_off, b_off, stm, phase_scale, piece_count=counts)
+                    w, b, w_off, b_off, stm, phase_scale, piece_count=counts,
+                    w_threat_feats=wt, b_threat_feats=bt,
+                    w_threat_offsets=wt_off, b_threat_offsets=bt_off)
                 loss = score_loss(pred.float(), y, wdl, source_ids, args)
 
             opt.zero_grad()
@@ -364,15 +393,18 @@ def main() -> None:
     ap.add_argument("--skip-rows", type=int, default=0)
     ap.add_argument("--val-rows", type=int, default=0)
     ap.add_argument("--trainable", default="all",
-                    choices=["all", "float-head", "output"],
+                    choices=["all", "float-head", "output", "threat"],
                     help="'all' trains every weight. 'float-head' freezes "
                          "the quantized input/L1 layers and trains only "
                          "L2+output floats. 'output' trains only the final "
-                         "linear layer.")
+                         "linear layer. 'threat' trains only the optional "
+                         "threat correction path.")
     ap.add_argument("--output-head-features", default="none",
                     choices=["none", "material-phase"],
                     help="Append material/phase scalar features to the final "
                          "output layer.")
+    ap.add_argument("--threat-inputs", type=int, default=0, choices=[0, 1],
+                    help="Enable optional threat-feature correction inputs.")
     args = ap.parse_args()
     source_map = load_source_map(args.data)
     args.source_wdl_lambdas = parse_source_values(

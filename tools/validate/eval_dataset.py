@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "train"))
 from lib.nnue_dataset import load_score_dataset
 from lib.nnue_model import load_model_from_nn
 from train_impl import MPE_EXPONENT, MPE_SCALE
+from train_impl import move_batch, unpack_batch
 
 
 BUCKETS = (
@@ -117,12 +118,14 @@ def main() -> None:
                     help="Print metrics grouped by source id/name.")
     args = ap.parse_args()
 
-    ds, collate_fn = load_score_dataset(
-        args.data, limit=args.rows, skip=args.skip)
-    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
-                        collate_fn=collate_fn)
     model = load_model_from_nn(args.net, device=args.device)
     model.eval()
+    args.threat_inputs = model.threat_inputs
+    ds, collate_fn = load_score_dataset(
+        args.data, limit=args.rows, skip=args.skip,
+        with_threats=bool(model.threat_inputs))
+    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
+                        collate_fn=collate_fn)
 
     overall = empty_stats()
     by_source: dict[int, dict[str, float]] = {}
@@ -132,19 +135,16 @@ def main() -> None:
          "pred": 0.0, "target": 0.0}
         for _ in BUCKETS
     ]
-    for w, b, w_off, b_off, counts, stm, y, _wdl, phase_scale, source_ids in loader:
-        w = w.to(args.device)
-        b = b.to(args.device)
-        w_off = w_off.to(args.device)
-        b_off = b_off.to(args.device)
-        counts = counts.to(args.device)
-        stm = stm.to(args.device)
-        y = y.to(args.device)
-        phase_scale = phase_scale.to(args.device)
-        source_ids = source_ids.to(args.device)
+    for batch in loader:
+        (w, b, w_off, b_off, wt, bt, wt_off, bt_off, counts, stm, y, _wdl,
+         phase_scale, source_ids) = unpack_batch(
+             move_batch(batch, args.device), args)
         if args.target_clamp > 0:
             y = torch.clamp(y, -args.target_clamp, args.target_clamp)
-        pred = model(w, b, w_off, b_off, stm, phase_scale, piece_count=counts)
+        pred = model(
+            w, b, w_off, b_off, stm, phase_scale, piece_count=counts,
+            w_threat_feats=wt, b_threat_feats=bt,
+            w_threat_offsets=wt_off, b_threat_offsets=bt_off)
         err = pred - y
         sign_mask = y != 0
         update_stats(overall, pred, y)
