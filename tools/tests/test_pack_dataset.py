@@ -17,6 +17,7 @@ FEN = "8/8/8/8/8/8/8/K6k w - - 0 1"
 sys.path.insert(0, str(REPO / "tools"))
 
 from lib import packed_labels  # noqa: E402
+from lib.nnue_dataset import load_score_dataset  # noqa: E402
 
 
 def write_rows(path: Path) -> None:
@@ -104,6 +105,44 @@ class PackDatasetTests(unittest.TestCase):
             self.assertEqual(np.load(out / "counts.npy").tolist(), [2, 2])
             self.assertEqual(np.load(out / "score.npy").tolist(), [10.0, -20.0])
             self.assertEqual(np.load(out / "source_id.npy").tolist(), [0, 1])
+
+    def test_packs_jsonl_threat_features(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            src = root / "rows.jsonl"
+            out = root / "pack"
+            src.write_text(json.dumps({
+                "fen": "k7/8/8/8/4p3/3P4/8/K7 w - - 0 1",
+                "score": 10,
+                "wdl": 0.5,
+                "source_type": "test",
+            }) + "\n")
+
+            subprocess.run([
+                sys.executable, str(PACK),
+                "--input", str(src),
+                "--out-dir", str(out),
+                "--threats",
+                "--progress", "0",
+            ], check=True, cwd=REPO)
+
+            meta = json.loads((out / "meta.json").read_text())
+            self.assertTrue(meta["threats"])
+            self.assertEqual(meta["max_threat_features_seen"], 2)
+            self.assertEqual(np.load(out / "threat_counts.npy").tolist(), [2])
+            self.assertEqual(
+                np.load(out / "white_threat_features.npy")[0, :2].tolist(),
+                [420, 4651])
+            self.assertEqual(
+                np.load(out / "black_threat_features.npy")[0, :2].tolist(),
+                [403, 4636])
+
+            dataset, collate = load_score_dataset(out, with_threats=True)
+            batch = collate([dataset[0]])
+            (_w, _b, _w_off, _b_off, wt, bt, _wt_off, _bt_off,
+             *_rest) = batch
+            self.assertEqual(wt.tolist(), [420, 4651])
+            self.assertEqual(bt.tolist(), [403, 4636])
 
 
 if __name__ == "__main__":

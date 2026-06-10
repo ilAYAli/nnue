@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO))
 from tools.lib.nnue_dataset import (
     BulletDataScoreDataset,
     collate_packed,
+    collate_packed_with_threats,
     count_rows,
     load_score_dataset,
 )
@@ -52,6 +53,64 @@ class NNueDatasetTests(unittest.TestCase):
         torch.testing.assert_close(w, torch.tensor([1, 2, 3]))
         torch.testing.assert_close(b, torch.tensor([5, 6, 7]))
 
+    def test_collate_packed_with_threats_reuses_shared_offsets(self) -> None:
+        batch = [
+            (
+                np.array([1, 2, 0, 0], dtype=np.uint16),
+                np.array([5, 6, 0, 0], dtype=np.uint16),
+                np.array([420, 4651, 0], dtype=np.uint16),
+                np.array([403, 4636, 0], dtype=np.uint16),
+                np.uint8(2),
+                np.uint8(2),
+                np.uint8(0),
+                np.float32(10.0),
+                np.float32(0.5),
+                np.float32(1.0),
+                np.uint16(0),
+            ),
+            (
+                np.array([3, 0, 0, 0], dtype=np.uint16),
+                np.array([7, 0, 0, 0], dtype=np.uint16),
+                np.array([5419, 5419, 0], dtype=np.uint16),
+                np.array([0, 0, 0], dtype=np.uint16),
+                np.uint8(1),
+                np.uint8(2),
+                np.uint8(1),
+                np.float32(-20.0),
+                np.float32(0.25),
+                np.float32(1.1),
+                np.uint16(2),
+            ),
+        ]
+
+        (w, b, w_offsets, b_offsets, wt, bt, wt_offsets, bt_offsets,
+         *_rest) = collate_packed_with_threats(batch)
+
+        self.assertIs(w_offsets, b_offsets)
+        self.assertIs(wt_offsets, bt_offsets)
+        torch.testing.assert_close(w_offsets, torch.tensor([0, 2]))
+        torch.testing.assert_close(wt_offsets, torch.tensor([0, 2]))
+        torch.testing.assert_close(w, torch.tensor([1, 2, 3]))
+        torch.testing.assert_close(b, torch.tensor([5, 6, 7]))
+        torch.testing.assert_close(wt, torch.tensor([420, 4651, 5419, 5419]))
+        torch.testing.assert_close(bt, torch.tensor([403, 4636, 0, 0]))
+
+    def test_jsonl_dataset_can_collate_threat_features(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "rows.jsonl"
+            path.write_text(
+                '{"fen":"k7/8/8/8/4p3/3P4/8/K7 w - - 0 1",'
+                '"score":0,"wdl":0.5}\n')
+
+            dataset, collate = load_score_dataset(path, with_threats=True)
+            batch = collate([dataset[0]])
+            (_w, _b, _w_off, _b_off, wt, bt, wt_offsets, bt_offsets,
+             _counts, _stm, _scores, _wdls, _phase, _source_ids) = batch
+
+            torch.testing.assert_close(wt, torch.tensor([420, 4651]))
+            torch.testing.assert_close(bt, torch.tensor([403, 4636]))
+            torch.testing.assert_close(wt_offsets, torch.tensor([0]))
+            torch.testing.assert_close(bt_offsets, torch.tensor([0]))
 
     def test_loads_bullet_records(self) -> None:
         from tools.lib import bullet_format

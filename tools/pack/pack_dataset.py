@@ -182,6 +182,10 @@ def main() -> None:
     ap.add_argument("--rows-file", default="",
                     help="File containing a precomputed row count. Accepts wc output.")
     ap.add_argument("--max-features", type=int, default=32)
+    ap.add_argument("--threats", default=False,
+                    action=argparse.BooleanOptionalAction,
+                    help="Also pack optional threat-feature arrays.")
+    ap.add_argument("--max-threat-features", type=int, default=256)
     ap.add_argument("--progress", type=int, default=250000)
     args = ap.parse_args()
     if args.rows < 0:
@@ -231,9 +235,22 @@ def main() -> None:
         out / "phase_scale.npy", mode="w+", dtype=np.float32, shape=(rows,))
     source_ids = np.lib.format.open_memmap(
         out / "source_id.npy", mode="w+", dtype=np.uint16, shape=(rows,))
+    threat_shape = (rows, args.max_threat_features)
+    w_threat_features = b_threat_features = threat_counts = None
+    if args.threats:
+        w_threat_features = np.lib.format.open_memmap(
+            out / "white_threat_features.npy", mode="w+",
+            dtype=np.uint16, shape=threat_shape)
+        b_threat_features = np.lib.format.open_memmap(
+            out / "black_threat_features.npy", mode="w+",
+            dtype=np.uint16, shape=threat_shape)
+        threat_counts = np.lib.format.open_memmap(
+            out / "threat_counts.npy", mode="w+", dtype=np.uint16,
+            shape=(rows,))
 
     source_map: dict[str, int] = {}
     max_seen = 0
+    max_threat_seen = 0
     written = 0
     with src.open() as handle:
         for i, line in enumerate(handle):
@@ -262,6 +279,26 @@ def main() -> None:
                 w_features[written, n:] = 0
                 b_features[written, n:] = 0
             counts[written] = n
+            if args.threats:
+                assert w_threat_features is not None
+                assert b_threat_features is not None
+                assert threat_counts is not None
+                w_threats = nn2.threat_features_from_pieces(pieces, nn2.WHITE)
+                b_threats = nn2.threat_features_from_pieces(pieces, nn2.BLACK)
+                if len(w_threats) > args.max_threat_features:
+                    raise ValueError(
+                        f"row {i}: {len(w_threats)} threat features > max "
+                        f"{args.max_threat_features}")
+                nt = len(w_threats)
+                max_threat_seen = max(max_threat_seen, nt)
+                w_threat_features[written, :nt] = np.asarray(
+                    w_threats, dtype=np.uint16)
+                b_threat_features[written, :nt] = np.asarray(
+                    b_threats, dtype=np.uint16)
+                if nt < args.max_threat_features:
+                    w_threat_features[written, nt:] = 0
+                    b_threat_features[written, nt:] = 0
+                threat_counts[written] = nt
             stms[written] = stm
             scores[written] = float(row["score"])
             wdls[written] = float(row.get("wdl", 0.5))
@@ -281,6 +318,12 @@ def main() -> None:
             w_features, b_features, counts, stms, scores, wdls,
             phase_scales, source_ids):
         array.flush()
+    if args.threats:
+        assert w_threat_features is not None
+        assert b_threat_features is not None
+        assert threat_counts is not None
+        for array in (w_threat_features, b_threat_features, threat_counts):
+            array.flush()
 
     if written < rows and rows_file_used:
         shrink_memmap(out / "white_features.npy", dtype=np.uint16,
@@ -299,6 +342,13 @@ def main() -> None:
                       shape=(rows,), rows=written)
         shrink_memmap(out / "source_id.npy", dtype=np.uint16, shape=(rows,),
                       rows=written)
+        if args.threats:
+            shrink_memmap(out / "white_threat_features.npy", dtype=np.uint16,
+                          shape=threat_shape, rows=written)
+            shrink_memmap(out / "black_threat_features.npy", dtype=np.uint16,
+                          shape=threat_shape, rows=written)
+            shrink_memmap(out / "threat_counts.npy", dtype=np.uint16,
+                          shape=(rows,), rows=written)
     elif written != rows:
         raise ValueError(f"packed {written} rows, expected {rows}")
 
@@ -309,6 +359,9 @@ def main() -> None:
         "limit": args.limit,
         "max_features": args.max_features,
         "max_features_seen": max_seen,
+        "threats": args.threats,
+        "max_threat_features": args.max_threat_features if args.threats else 0,
+        "max_threat_features_seen": max_threat_seen if args.threats else 0,
         "source_map": source_map,
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
