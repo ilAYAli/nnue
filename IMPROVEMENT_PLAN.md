@@ -1142,6 +1142,49 @@ If this architecture branch fails gates or SPRT:
 - If two independent architecture branches fail, stop spending bulk GPU/search
   time and reassess base net, architecture family, and teacher source.
 
+
+## 2026-06-10 public Stockfish master-binpack scale rejection
+
+Hypothesis:
+
+- The public Stockfish master binpacks might improve native-1.23.0 if the
+  earlier 100k probes were simply too small. Test larger filtered `.bullet`
+  slices from `farseerT75.binpack` and `nodes5000pv2_UHO.binpack`, initialized
+  from `native-1.23.0`, with a low Bullet learning rate.
+
+Results:
+
+- `native-7.2.0-rc1-sfmaster-nativeblend-v23init-lr1e8-sb128-20260610`
+  used native-1.23 rows plus 100k farseerT75 and 100k UHO rows. The final net
+  failed confirmation versus native-1.23.0: `353-360-287/1000`, Elo
+  `-2.43 +/- 18.19`, LOS `39.7%`.
+- Its checkpoint `sb64` looked better in short tests:
+  `111-95-94/300`, Elo `+18.55 +/- 32.66`, then
+  `372-353-275/1000`, Elo `+6.60 +/- 18.35`, LOS `76.0%`. A 4000-game
+  screen invalidated the signal and was stopped at about 2000 games:
+  `690-732-578/2000`, Elo `-7.30 +/- 12.84`, LOS `13.3%`, LLR sum `-1.59`.
+- `native-7.3.0-rc1-sfmaster2m-v23init-lr5e9-sb256-20260610` scaled the same
+  idea to 1M filtered farseerT75 rows plus 1M filtered UHO rows, keeping the
+  native-1.23 baseline rows and lowering LR to `5e-9 -> 1e-9`. Static improved
+  only marginally: Bullet `mae=149.312`, sign `82.97%`; engine static
+  `mae=138.522`, sign `83.00%`.
+- 7.3.0 failed its 300-game smoke versus native-1.23.0:
+  `108-112-80/300`, Elo `-4.63 +/- 33.73`, LOS `39.4%`, LLR sum `-0.19`.
+- 7.3.0 checkpoint sweep did not reveal a real rescue candidate. `sb64` was
+  best static (`Bullet mae=149.000`, engine `mae=138.315`) but the improvement
+  was tiny and repeats the failed 7.2 checkpoint-rescue pattern.
+
+Conclusion:
+
+- Close the public Stockfish master-binpack scalar fine-tune lane for now.
+  Scaling 100k to 2M rows did not transfer to games.
+- Do not spend more SPRT time on same-lane 7.x binpack mixes or checkpoint
+  rescues unless the objective/trainable scope changes and a separate gate shows
+  a concrete failure-mode improvement.
+- Next work should focus on a new signal path or gate: replay/move-ranking as
+  a separate policy/ranking path, threat/attack features with acceptable NPS, or
+  a failure-suite source that passes a move-choice gate before training.
+
 ## Historical Notes
 
 Important failed signals:
