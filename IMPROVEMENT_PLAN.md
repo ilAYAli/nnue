@@ -1346,6 +1346,42 @@ Stop criteria:
 - Reject before games unless the frozen move gate passes the same hard criteria
   as `native-1.39.0` and broad engine-static does not collapse.
 
+
+Result:
+
+- Rejected before games. The small-margin ranking target was less destructive
+  than target-only training, but still failed the gate and compressed broad
+  static too much.
+- Broad static: candidate `mae=175.025`, sign `81.91%`, corr `0.797`, slope
+  `0.360` versus baseline `mae=147.001`, sign `83.14%`, corr `0.831`, slope
+  `0.843`.
+- Move gate: candidate `1175/2487` versus baseline `1141/2487`, `fixed=153`,
+  `regressed=119`, `delta_avg_margin=+0.9cp`,
+  `delta_loss_weighted_margin=-5.2cp`.
+- Conclusion: small-margin ranking still over-trains already-correct cases.
+  If this lane gets one last scalar test, train only on the baseline-wrong gate
+  pairs and keep broad preservation.
+
+## 2026-06-11 native-1.39.3 baseline-wrong-only move-gate ranking
+
+Hypothesis:
+
+- `native-1.39.2` damaged too many already-correct gate cases. Restricting the
+  pairwise rows to baseline-wrong cases should reduce regression pressure while
+  broad preservation protects normal static behavior.
+
+Run:
+
+- `native-1.39.3-rc1-v23-movegate-wrongonly-rank30-pw64-lr1e5-e24-sb8192-20260611`.
+- Pair rows: `runs/move-policy-loss-full-gate-20260531/pairs_baseline_wrong_rank30.jsonl`.
+- Filtered rows: `1346` baseline-wrong gate cases, `2692` child rows.
+- Same rank30 objective and broad preservation as `native-1.39.2`.
+
+Stop criteria:
+
+- Reject before games unless it passes the frozen move gate with
+  `regressed <= 40` and broad engine-static does not collapse.
+
 ## 2026-06-10 guarded move-policy sidecar rejection
 
 Hypothesis:
