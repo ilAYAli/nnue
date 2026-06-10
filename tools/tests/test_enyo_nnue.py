@@ -12,7 +12,16 @@ def _zero_net(
     feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
     output_buckets: int = 1,
     output_head_features: int = 0,
+    threat_inputs: int = 0,
 ) -> nn2.Net:
+    threat_weights = threat_biases = threat_output_weights = threat_output_bias = None
+    if threat_inputs:
+        threat_weights = np.zeros(
+            (nn2.N_THREAT_FEATURES, nn2.N_THREAT_HIDDEN), dtype=np.int16)
+        threat_biases = np.arange(nn2.N_THREAT_HIDDEN, dtype=np.int16)
+        threat_output_weights = np.linspace(
+            -1.0, 1.0, 2 * nn2.N_THREAT_HIDDEN, dtype=np.float32)
+        threat_output_bias = np.float32(-3.5)
     return nn2.Net(
         input_weights=np.zeros(
             (nn2.feature_count(input_buckets, feature_channels), nn2.N_HIDDEN),
@@ -30,6 +39,11 @@ def _zero_net(
         feature_channels=feature_channels,
         output_buckets=output_buckets,
         output_head_features=output_head_features,
+        threat_inputs=threat_inputs,
+        threat_weights=threat_weights,
+        threat_biases=threat_biases,
+        threat_output_weights=threat_output_weights,
+        threat_output_bias=threat_output_bias,
     )
 
 
@@ -45,6 +59,10 @@ def test_network_size_supports_16_and_32_buckets() -> None:
     assert nn2.detect_output_head_features(
         nn2.network_size(16, 4, nn2.N_HEAD_FEATURES)
     ) == nn2.N_HEAD_FEATURES
+    assert nn2.detect_threat_inputs(nn2.network_size(16)) == 0
+    assert nn2.detect_threat_inputs(
+        nn2.network_size(16, 4, nn2.N_HEAD_FEATURES, 12, 1)
+    ) == 1
 
 
 def test_32_bucket_net_round_trip(tmp_path: Path) -> None:
@@ -113,6 +131,28 @@ def test_feature_index_uses_horizontal_mirroring() -> None:
                         input_buckets, feature_channels)
 
 
+def test_threat_index_matches_enyo_golden_values() -> None:
+    assert nn2.threat_index(0, 1, 27, nn2.WHITE) == (0 * 12 + 6) * 64 + 36
+    assert nn2.threat_index(0, 1, 27, nn2.BLACK) == (6 * 12 + 0) * 64 + 28
+    assert nn2.threat_index(1, 0, 20, nn2.WHITE) == (6 * 12 + 0) * 64 + 43
+    assert nn2.threat_index(1, 0, 20, nn2.BLACK) == (0 * 12 + 6) * 64 + 19
+    assert nn2.threat_index(3, 0, 11, nn2.WHITE) == (7 * 12 + 0) * 64 + 52
+    assert nn2.threat_index(3, 0, 11, nn2.BLACK) == (1 * 12 + 6) * 64 + 12
+
+
+def test_threat_features_from_pieces_match_enyo_goldens() -> None:
+    pieces, _stm = nn2.parse_fen("k7/8/8/8/4p3/3P4/8/K7 w - - 0 1")
+    assert nn2.threat_features_from_pieces(pieces, nn2.WHITE) == [420, 4651]
+    assert nn2.threat_features_from_pieces(pieces, nn2.BLACK) == [403, 4636]
+
+    pieces, _stm = nn2.parse_fen("k7/8/8/8/8/2n5/4P3/K7 w - - 0 1")
+    assert nn2.threat_features_from_pieces(pieces, nn2.WHITE) == [5428]
+    assert nn2.threat_features_from_pieces(pieces, nn2.BLACK) == [1164]
+
+    pieces, _stm = nn2.parse_fen("k7/8/8/2n1n3/8/3P4/8/K7 b - - 0 1")
+    assert nn2.threat_features_from_pieces(pieces, nn2.WHITE) == [5419, 5419]
+
+
 def test_pytorch_model_load_and_export_preserve_bucket_count(tmp_path: Path) -> None:
     source = tmp_path / "source32.nn"
     exported = tmp_path / "exported32.nn"
@@ -140,6 +180,103 @@ def test_export_model_does_not_move_module_to_cpu(tmp_path: Path) -> None:
     export_model(model, exported)
 
     assert nn2.load_net(exported).input_buckets == 16
+
+
+def test_pytorch_model_load_and_export_preserve_threat_block(
+        tmp_path: Path) -> None:
+    source = tmp_path / "threat-source.nn"
+    exported = tmp_path / "threat-exported.nn"
+    nn2.write_net(_zero_net(16, threat_inputs=1), source)
+
+    model = load_model_from_nn(source)
+    export_model(model, exported)
+    loaded = nn2.load_net(exported)
+
+    assert model.threat_inputs == 1
+    assert loaded.threat_inputs == 1
+    assert loaded.threat_biases is not None
+    assert loaded.threat_output_weights is not None
+    assert loaded.threat_output_bias is not None
+    np.testing.assert_array_equal(
+        loaded.threat_biases,
+        np.arange(nn2.N_THREAT_HIDDEN, dtype=np.int16))
+    np.testing.assert_allclose(
+        loaded.threat_output_weights,
+        np.linspace(-1.0, 1.0, 2 * nn2.N_THREAT_HIDDEN, dtype=np.float32))
+    np.testing.assert_allclose(float(loaded.threat_output_bias), -3.5)
+
+
+def test_pytorch_model_expands_legacy_net_to_zero_threat_output(
+        tmp_path: Path) -> None:
+    source = tmp_path / "legacy.nn"
+    exported = tmp_path / "threat-expanded.nn"
+    nn2.write_net(_zero_net(16), source)
+
+    legacy = load_model_from_nn(source)
+    model = load_model_from_nn(source, threat_inputs=1)
+    counts = [32]
+    offsets = np.asarray([0])
+    feats = np.zeros(sum(counts), dtype=np.int64)
+    args = (
+        torch.from_numpy(feats),
+        torch.from_numpy(feats),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.zeros(len(counts), dtype=torch.long),
+        torch.ones(len(counts), dtype=torch.float32),
+    )
+
+    np.testing.assert_allclose(
+        model(*args).detach().numpy(),
+        legacy(*args).detach().numpy(),
+    )
+    export_model(model, exported)
+    loaded = nn2.load_net(exported)
+
+    assert model.threat_inputs == 1
+    assert loaded.threat_inputs == 1
+    assert loaded.threat_weights is not None
+    assert loaded.threat_output_weights is not None
+    assert loaded.threat_output_bias is not None
+    assert np.any(loaded.threat_weights != 0)
+    assert model.threat_embed is not None
+    assert model.threat_bias is not None
+    with torch.no_grad():
+        threat_feats = torch.tensor([420, 4651], dtype=torch.long)
+        threat_offsets = torch.tensor([0], dtype=torch.long)
+        threat_acc = model.threat_embed(threat_feats, threat_offsets) + model.threat_bias
+        assert torch.any(model._quantized_input_relu(threat_acc) != 0)
+    np.testing.assert_array_equal(
+        loaded.threat_output_weights,
+        np.zeros(2 * nn2.N_THREAT_HIDDEN, dtype=np.float32))
+    np.testing.assert_allclose(float(loaded.threat_output_bias), 0.0)
+
+
+def test_pytorch_model_adds_active_threat_correction() -> None:
+    model = EnyoNNUE(init="kaiming", threat_inputs=1)
+    with torch.no_grad():
+        for param in model.parameters():
+            param.zero_()
+        assert model.threat_output is not None
+        model.threat_output.bias.fill_(nn2.EVAL_DIVISOR)
+
+    feats = torch.tensor([0], dtype=torch.long)
+    offsets = torch.tensor([0], dtype=torch.long)
+    pred = model(
+        feats,
+        feats,
+        offsets,
+        offsets,
+        torch.tensor([nn2.WHITE], dtype=torch.long),
+        torch.ones(1, dtype=torch.float32),
+        piece_count=torch.tensor([1], dtype=torch.long),
+        w_threat_feats=feats,
+        b_threat_feats=feats,
+        w_threat_offsets=offsets,
+        b_threat_offsets=offsets,
+    )
+
+    np.testing.assert_allclose(pred.detach().numpy(), np.asarray([1.0]))
 
 
 def test_pytorch_model_expands_legacy_net_to_zero_material_head(
