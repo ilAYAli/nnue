@@ -43,6 +43,14 @@ Threat-input probe status, 2026-06-10:
   recompute path is better than the diff-memo version but still measured about
   `-29.7%` NPS at depth 12 versus native-1.23. Keep it off `main`; the current
   committed NNUE work is offline tooling only and has no engine NPS impact.
+- 2026-06-11 follow-up: zero-output threat blocks now have a loader-time
+  inactive fast path, so zero-expanded nets are free in search. A fixed-FEN
+  depth-12 check measured native-1.23 baseline at about `1.10M` NPS and the
+  zero-output threat net at about `1.11M` NPS on identical nodes. An active
+  threat block with zero correction still measured about `0.74M` NPS on
+  identical nodes, roughly `-33%`, so trained runtime threat correction remains
+  rejected unless redesigned around incremental threat deltas or a much smaller
+  active path.
 - NNUE trainer/export plumbing now supports the optional threat block,
   threat-aware JSONL/Bullet/packed datasets, `--threat-inputs`, and
   `--trainable threat`. A trainer init bug was fixed: threat embeddings must
@@ -75,6 +83,23 @@ Threat-input probe status, 2026-06-10:
   failed game validation. Checkpoint 96 looked good in 128 games
   (`+19.0 +/- 51.7`) but contradicted itself in the 1000-game confirm and was
   stopped at 354 games around `-23.6 +/- 32.0`, LOS `7.3%`.
+- `native-7.3.0-rc1`: rejected. The 2M Stockfish-master scaled-blend probe
+  passed static validation but lost the 300-game smoke versus `native-1.23.0`
+  at about `-4.6 +/- 34.7 Elo`. The Stockfish-master binpack lane has not
+  produced a positive candidate so far.
+- `native-8.0.0-rc1`: rejected. The material-shape output-head probe looked
+  strong in a 300-game smoke (`+37.2 +/- 34.6 Elo`) but failed the 1000-game
+  confirm versus `native-1.23.0` at `-13.6 +/- 18.7 Elo`. Treat the smoke as
+  noise and do not extend this output-head setup.
+- `native-1.38.x` / `native-1.39.x`: rejected. Hard-delta and move-gate
+  scalar repair runs moved some targeted replay-loss cases, but either failed
+  the move gate or damaged broad static validation. Best targeted movement was
+  `native-1.39.3` (`fixed=173`, `regressed=128`, `delta_avg_margin=+1.78cp`),
+  but loss-weighted margin remained negative (`-4.25cp`) and broad static
+  collapsed. Do not continue this scalar repair lane.
+- `native-1.23.0-movepolicy-x1`: rejected. The guarded sidecar move-policy
+  proof lost the 300-game smoke against the same `native-1.23.0` baseline at
+  about `-29.0 +/- 29.6 Elo`; this sidecar is not a promotion candidate.
 - `native-2.0.0-rc1`: rejected. The material-count output-bucket head-only
   adaptation lost to `native-1.5.0-rc1` in smoke at `-16.3 +/- 36.2 Elo`,
   LOS `18.8%`.
