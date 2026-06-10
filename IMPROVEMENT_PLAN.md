@@ -1015,10 +1015,15 @@ Static validation:
 Move-choice/failure-suite gate:
 
 - Use candidate/reference/oracle replay CSV where possible.
-- Current status: gate logic exists, but the committed baseline suite/status is
-  not yet recorded.
-- Blocker before architecture training starts: record the suite path, position
-  count, current-reference baseline numbers, and command used to produce them.
+- Frozen baseline suite: `runs/move-policy-loss-full-gate-20260531/cases.jsonl`
+  with `2487` positions.
+- Current-reference self-baseline is recorded in
+  `runs/move-gate-native123-self-baseline-20260611/`: native-1.23.0 versus
+  itself gives `baseline_prefers_best=1141/2487`,
+  `candidate_prefers_best=1141/2487`, `fixed=0`, `regressed=0`,
+  `delta_avg_margin=0.0cp`, and `delta_loss_weighted_margin=0.0cp`.
+- This gate is mandatory before spending SPRT on non-trivial native candidates.
+  It should reject ugly tails even when static MAE improves.
 - Track move-choice correlation metrics, not only scalar eval deltas:
   - top-move agreement.
   - top-3 overlap.
@@ -1184,6 +1189,58 @@ Conclusion:
 - Next work should focus on a new signal path or gate: replay/move-ranking as
   a separate policy/ranking path, threat/attack features with acceptable NPS, or
   a failure-suite source that passes a move-choice gate before training.
+
+## 2026-06-11 move-choice gate baseline
+
+Purpose:
+
+- Freeze the current replay-loss move-choice suite so future native candidates
+  have a pre-SPRT rejection gate instead of relying on static MAE and noisy
+  300-game smokes.
+
+Baseline:
+
+- Suite: `runs/move-policy-loss-full-gate-20260531/cases.jsonl`, `2487` rows.
+- Reference net: `native-1.23.0`.
+- Result directory: `runs/move-gate-native123-self-baseline-20260611/`.
+- Self-baseline result: `baseline_prefers_best=1141/2487`,
+  `candidate_prefers_best=1141/2487`, `fixed=0`, `regressed=0`,
+  `candidate_better_margin=0/2487`, `baseline_avg_margin=2.8cp`,
+  `candidate_avg_margin=2.8cp`, `delta_avg_margin=0.0cp`, and
+  `delta_loss_weighted_margin=0.0cp`.
+
+Historical sanity reference:
+
+- `runs/native-1.23.0-vs-native-1.16.0-movegate-20260608/` compares the
+  current reference against the previous confirmed native baseline on the same
+  suite: baseline `1135/2487`, candidate `1139/2487`, `fixed=16`,
+  `regressed=12`, `candidate_better_margin=1132/2487`,
+  `delta_avg_margin=+0.8cp`, and `delta_loss_weighted_margin=+2.6cp`.
+- This is only a mild aggregate positive with visible tail regressions, so the
+  gate is a rejection filter and not proof of game strength.
+
+Command shape:
+
+```sh
+.score-venv/bin/python tools/validate/eval_move_gate.py \
+  --cases runs/move-policy-loss-full-gate-20260531/cases.jsonl \
+  --engine "$ENYO_ENGINE" \
+  --baseline-net "$NATIVE_123_NET" \
+  --candidate-net "$NATIVE_123_NET" \
+  --threads 1 \
+  --hash 64 \
+  --timeout 20.0 \
+  --output runs/move-gate-native123-self-baseline-20260611/move_gate.jsonl \
+  --summary-json runs/move-gate-native123-self-baseline-20260611/summary.json
+```
+
+Conclusion:
+
+- The gate is stable for identical nets and now has a documented zero-delta
+  baseline.
+- Do not launch another native candidate unless it first improves this gate or
+  is explicitly an engine/runtime experiment with separate parity and NPS
+  justification.
 
 ## 2026-06-10 guarded move-policy sidecar rejection
 
