@@ -1,8 +1,8 @@
 {
-  "description": "Aggressive capped move-gate pairwise repair from native-1.23.0; no SPRT unless the frozen move gate improves clearly.",
-  "experiment": "native-1.39.0-movegatepair",
+  "description": "Target-only move-gate pairwise diagnostic from native-1.23.0; determines whether the scalar eval path can fit the replay-loss ranking signal without broad preservation.",
+  "experiment": "native-1.39.1-movegatepair-targetonly",
   "create": {
-    "name": "native-1.39.0-rc1-v23-movegatepair-pw32-cap300-lr3e6-e12-sb8192-20260611",
+    "name": "native-1.39.1-rc1-v23-movegatepair-targetonly-cap300-lr1e4-e80-sb8192-20260611",
     "backend": "pairwise",
     "event_command": "/home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh",
     "python": "/home/petter/.venv/bin/python",
@@ -17,8 +17,8 @@
     "engine_static_rows": 5000,
     "validate_provenance": true,
     "require_clean_enyo_owned": true,
-    "lr": 3e-06,
-    "epochs": 12,
+    "lr": 0.0001,
+    "epochs": 80,
     "batch_size": 8192,
     "pairwise_pair_batch_size": 512,
     "device": "cuda",
@@ -27,23 +27,24 @@
     "huber_beta": 200,
     "target_clamp": 800,
     "pairwise_pair_beta": 100,
-    "pairwise_pair_weight": 32.0,
-    "pairwise_broad_weight": 1.0,
+    "pairwise_pair_weight": 1.0,
+    "pairwise_broad_weight": 0.0,
     "pairwise_max_target_margin": 300.0,
     "pairwise_min_target_margin": 10.0,
     "pairwise_loss_weight_by_cp": true,
-    "pairwise_checkpoint_every": 1,
+    "pairwise_checkpoint_every": 10,
     "pairwise_move_gate_limit": 0,
     "pairwise_move_gate_fail_candidate_below_baseline": true,
     "pairwise_move_gate_fail_regressed_above": 40,
     "pairwise_move_gate_fail_fixed_below": 40,
     "pairwise_move_gate_fail_delta_below": 2.0,
-    "pairwise_move_gate_fail_loss_weighted_delta_below": 5.0
+    "pairwise_move_gate_fail_loss_weighted_delta_below": 5.0,
+    "pairwise_steps_per_epoch": 0
   },
   "validation": {
     "baseline": "native-1.23.0",
-    "hypothesis": "The frozen replay-loss move-gate pairs contain a game-relevant ranking signal that was under-dosed by native-1.32.2; a capped but stronger pairwise update can move the gate without broad static collapse.",
-    "only_change": "Pairwise loss dose rises from pw8/lr1e-6/cap800 to pw32/lr3e-6/cap300, while init, broad preserve data, and move-gate suite stay fixed.",
-    "promotion_gate": "Do not run games unless validate_move_gate passes candidate>=baseline, fixed>=40, regressed<=40, delta_avg_margin>=2cp, and delta_loss_weighted_margin>=5cp."
+    "hypothesis": "If target-only pairwise training cannot clearly move the frozen replay-loss move gate, the scalar eval path is not fitting this signal and the scalar pairwise lane should be closed. If it moves the gate but broad static collapses, the signal needs a separate ranking/policy path rather than more broad-preserved scalar fine-tuning.",
+    "only_change": "Set pairwise_broad_weight=0 and train only on the same move-gate pairs from native-1.39.0; no games are allowed from this diagnostic without a separate decision.",
+    "promotion_gate": "Diagnostic only. Inspect move_gate and static outputs; do not auto-SPRT."
   }
 }

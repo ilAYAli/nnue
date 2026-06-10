@@ -1269,6 +1269,45 @@ Stop criteria:
   `delta_avg_margin >= 2cp`, and `delta_loss_weighted_margin >= 5cp`.
 - If it passes, run only a 300-game smoke first.
 
+Result:
+
+- Rejected before games. Final checkpoint passed broad engine-static superficially
+  (`mae=140.290` versus baseline `147.001`, sign `83.16%` versus `83.14%`),
+  but the frozen move gate did not move in the needed direction:
+  candidate `1143/2487` versus baseline `1141/2487`, `fixed=6`, `regressed=4`,
+  `delta_avg_margin=-0.2cp`, `delta_loss_weighted_margin=-1.0cp`.
+- Checkpoint sweep `epoch-0000..0011` also failed. Best fixed count was only
+  `7`; every checkpoint had negative average and loss-weighted margin deltas.
+- Conclusion: stronger broad-preserved scalar pairwise pressure still cannot
+  repair the replay-loss move choices. Do not run games for `native-1.39.0`.
+
+## 2026-06-11 native-1.39.1 target-only move-gate diagnostic
+
+Hypothesis:
+
+- Before closing the replay-loss pair lane completely, test whether the scalar
+  eval can fit the pair signal at all when broad preservation is removed.
+- If target-only training still cannot clearly improve the frozen move gate,
+  the pair construction or scalar representation is not useful for this gate.
+- If target-only improves the gate but damages broad static, the signal belongs
+  in a separate ranking/policy path, not more scalar broad-preserved training.
+
+Run:
+
+- `native-1.39.1-rc1-v23-movegatepair-targetonly-cap300-lr1e4-e80-sb8192-20260611`.
+- Backend: `pairwise`.
+- Init and move-gate baseline: `native-1.23.0`.
+- Same pair rows and frozen gate as `native-1.39.0`.
+- Training change: `pairwise_broad_weight=0`, `lr=1e-4`, `epochs=80`,
+  `max_target_margin=300cp`.
+
+Stop criteria:
+
+- This is diagnostic only. Do not run games directly from this result.
+- Inspect the move gate and broad engine-static result to decide whether the
+  scalar pairwise lane is dead or whether a separate policy/ranking path is
+  warranted.
+
 ## 2026-06-10 guarded move-policy sidecar rejection
 
 Hypothesis:
