@@ -45,6 +45,9 @@ def test_network_size_supports_16_and_32_buckets() -> None:
     assert nn2.detect_output_head_features(
         nn2.network_size(16, 4, nn2.N_HEAD_FEATURES)
     ) == nn2.N_HEAD_FEATURES
+    assert nn2.detect_output_head_features(
+        nn2.network_size(16, 4, nn2.N_EXTENDED_HEAD_FEATURES)
+    ) == nn2.N_EXTENDED_HEAD_FEATURES
 
 
 def test_32_bucket_net_round_trip(tmp_path: Path) -> None:
@@ -178,6 +181,42 @@ def test_pytorch_model_expands_legacy_net_to_zero_material_head(
     )
 
 
+def test_pytorch_model_expands_legacy_net_to_zero_material_shape_head(
+        tmp_path: Path) -> None:
+    source = tmp_path / "legacy.nn"
+    exported = tmp_path / "shape-head.nn"
+    net = _zero_net(16)
+    net.output_biases[:] = np.asarray([64.0], dtype=np.float32)
+    nn2.write_net(net, source)
+
+    legacy = load_model_from_nn(source)
+    expanded = load_model_from_nn(
+        source, output_head_features=nn2.N_EXTENDED_HEAD_FEATURES)
+    counts = [32]
+    offsets = np.asarray([0])
+    feats = np.zeros(sum(counts), dtype=np.int64)
+    args = (
+        torch.from_numpy(feats),
+        torch.from_numpy(feats),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.zeros(len(counts), dtype=torch.long),
+        torch.ones(len(counts), dtype=torch.float32),
+    )
+
+    np.testing.assert_allclose(
+        expanded(*args).detach().numpy(),
+        legacy(*args).detach().numpy(),
+    )
+    export_model(expanded, exported)
+    loaded = nn2.load_net(exported)
+    assert loaded.output_head_features == nn2.N_EXTENDED_HEAD_FEATURES
+    np.testing.assert_array_equal(
+        loaded.output_weights[:, nn2.N_L3:],
+        np.zeros((1, nn2.N_EXTENDED_HEAD_FEATURES), dtype=np.float32),
+    )
+
+
 def test_pytorch_model_applies_material_head_features(tmp_path: Path) -> None:
     source = tmp_path / "material-head.nn"
     net = _zero_net(16, output_head_features=nn2.N_HEAD_FEATURES)
@@ -202,6 +241,43 @@ def test_pytorch_model_applies_material_head_features(tmp_path: Path) -> None:
     np.testing.assert_allclose(
         pred.detach().numpy(),
         np.asarray([3.75], dtype=np.float32),
+    )
+
+
+def test_pytorch_model_applies_material_shape_head_features(tmp_path: Path) -> None:
+    source = tmp_path / "material-shape-head.nn"
+    net = _zero_net(16, output_head_features=nn2.N_EXTENDED_HEAD_FEATURES)
+    net.output_weights[0, nn2.N_L3:] = np.asarray(
+        [32.0, 64.0, 96.0, 128.0, 160.0, 192.0, 224.0, 256.0],
+        dtype=np.float32)
+    nn2.write_net(net, source)
+
+    pieces, stm = nn2.parse_fen(
+        "4k3/8/8/8/8/8/PPPP4/RNBQK3 w - - 0 1")
+    pieces.sort(key=lambda item: item[2])
+    w_feats = nn2.features_from_pieces(pieces, nn2.WHITE)
+    b_feats = nn2.features_from_pieces(pieces, nn2.BLACK)
+    head = nn2.material_head_features_from_pieces(
+        pieces,
+        nn2.N_EXTENDED_HEAD_FEATURES)
+    model = load_model_from_nn(source)
+    raw = float(np.dot(net.output_weights[0, nn2.N_L3:], np.asarray(head)))
+
+    pred = model(
+        torch.tensor(w_feats, dtype=torch.long),
+        torch.tensor(b_feats, dtype=torch.long),
+        torch.tensor([0], dtype=torch.long),
+        torch.tensor([0], dtype=torch.long),
+        torch.tensor([stm], dtype=torch.long),
+        torch.tensor([nn2.phase_scale_from_pieces(pieces)], dtype=torch.float32),
+        piece_count=torch.tensor([len(pieces)], dtype=torch.long),
+    )
+
+    np.testing.assert_allclose(
+        pred.detach().numpy(),
+        np.asarray([raw / nn2.EVAL_DIVISOR * nn2.phase_scale_from_pieces(pieces)],
+                   dtype=np.float32),
+        rtol=1e-6,
     )
 
 

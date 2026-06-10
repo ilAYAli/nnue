@@ -24,7 +24,17 @@ DEFAULT_N_OUTPUT_BUCKETS = 1
 SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
 DEFAULT_N_OUTPUT_HEAD_FEATURES = 0
 N_HEAD_FEATURES = 2
-SUPPORTED_N_OUTPUT_HEAD_FEATURES = (0, N_HEAD_FEATURES)
+N_EXTENDED_HEAD_FEATURES = 8
+SUPPORTED_N_OUTPUT_HEAD_FEATURES = (
+    0,
+    N_HEAD_FEATURES,
+    N_EXTENDED_HEAD_FEATURES,
+)
+OUTPUT_HEAD_FEATURES_BY_NAME = {
+    "none": 0,
+    "material-phase": N_HEAD_FEATURES,
+    "material-shape": N_EXTENDED_HEAD_FEATURES,
+}
 N_KING_BUCKETS = DEFAULT_N_KING_BUCKETS
 N_PIECE_TYPES = 12
 N_SQUARES = 64
@@ -293,10 +303,32 @@ def output_bucket_from_pieces(
 
 def material_head_features_from_pieces(
     pieces: Sequence[tuple[int, int, int]],
-) -> tuple[float, float]:
+    output_head_features: int = N_HEAD_FEATURES,
+) -> tuple[float, ...]:
+    phase_delta = phase_scale_from_pieces(pieces) - 1.0
+    if output_head_features == N_HEAD_FEATURES:
+        return (
+            phase_delta,
+            (float(len(pieces)) - 16.0) / 16.0,
+        )
+    if output_head_features != N_EXTENDED_HEAD_FEATURES:
+        raise ValueError(
+            f"unsupported output head feature count {output_head_features}")
+
+    pawn_count = sum(1 for pt, _color, _sq in pieces if pt == PAWN)
+    minor_count = sum(1 for pt, _color, _sq in pieces if pt in (KNIGHT, BISHOP))
+    rook_count = sum(1 for pt, _color, _sq in pieces if pt == ROOK)
+    queen_count = sum(1 for pt, _color, _sq in pieces if pt == QUEEN)
+    pawn_feature = (float(pawn_count) - 16.0) / 8.0
     return (
-        phase_scale_from_pieces(pieces) - 1.0,
+        phase_delta,
         (float(len(pieces)) - 16.0) / 16.0,
+        pawn_feature,
+        (float(minor_count) - 8.0) / 4.0,
+        (float(rook_count) - 4.0) / 2.0,
+        (float(queen_count) - 2.0) / 2.0,
+        (float(minor_count + rook_count + queen_count) - 14.0) / 7.0,
+        phase_delta * pawn_feature,
     )
 
 

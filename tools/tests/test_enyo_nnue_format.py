@@ -87,6 +87,29 @@ class EnyoNNUEFormatTests(unittest.TestCase):
                 loaded.output_weights.shape,
                 (4, nn2.N_L3 + nn2.N_HEAD_FEATURES))
 
+    def test_material_shape_head_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "material-shape-head.nn"
+            nn2.write_net(
+                zero_net(output_buckets=4,
+                         output_head_features=nn2.N_EXTENDED_HEAD_FEATURES),
+                path)
+
+            self.assertEqual(
+                path.stat().st_size,
+                nn2.network_size(16, 4, nn2.N_EXTENDED_HEAD_FEATURES))
+            self.assertEqual(
+                nn2.detect_network_layout(path.stat().st_size),
+                (16, 12, 4, nn2.N_EXTENDED_HEAD_FEATURES))
+            loaded = nn2.load_net(path)
+
+            self.assertEqual(
+                loaded.output_head_features,
+                nn2.N_EXTENDED_HEAD_FEATURES)
+            self.assertEqual(
+                loaded.output_weights.shape,
+                (4, nn2.N_L3 + nn2.N_EXTENDED_HEAD_FEATURES))
+
     def test_halfka_v2_channel_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "halfka-v2.nn"

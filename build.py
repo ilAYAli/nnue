@@ -2024,7 +2024,7 @@ def add_create_args(
                         choices=["all", "float-head", "output"])
     parser.add_argument("--output-head-features",
                         default=value("output_head_features", d.output_head_features),
-                        choices=["none", "material-phase"])
+                        choices=["none", "material-phase", "material-shape"])
 
     parser.add_argument("--source-mix-jsonl", action="append",
                         default=append_default("source_mix_jsonl", d.source_mix_jsonl),

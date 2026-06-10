@@ -212,17 +212,15 @@ def train(args: argparse.Namespace) -> EnyoNNUE:
 
     if args.init_from_nn:
         print(f"initializing from {args.init_from_nn}", flush=True)
-        output_head_features = (
-            nn2.N_HEAD_FEATURES if args.output_head_features == "material-phase"
-            else 0)
+        output_head_features = nn2.OUTPUT_HEAD_FEATURES_BY_NAME[
+            args.output_head_features]
         model = load_model_from_nn(
             args.init_from_nn,
             device=args.device,
             output_head_features=output_head_features)
     else:
-        output_head_features = (
-            nn2.N_HEAD_FEATURES if args.output_head_features == "material-phase"
-            else 0)
+        output_head_features = nn2.OUTPUT_HEAD_FEATURES_BY_NAME[
+            args.output_head_features]
         model = EnyoNNUE(
             init=args.init,
             output_head_features=output_head_features).to(args.device)
@@ -370,9 +368,8 @@ def main() -> None:
                          "L2+output floats. 'output' trains only the final "
                          "linear layer.")
     ap.add_argument("--output-head-features", default="none",
-                    choices=["none", "material-phase"],
-                    help="Append material/phase scalar features to the final "
-                         "output layer.")
+                    choices=sorted(nn2.OUTPUT_HEAD_FEATURES_BY_NAME),
+                    help="Append scalar features to the final output layer.")
     args = ap.parse_args()
     source_map = load_source_map(args.data)
     args.source_wdl_lambdas = parse_source_values(

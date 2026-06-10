@@ -6,6 +6,25 @@ strategy for producing a stronger net.
 Goal: add new signal. Do not keep rerunning the same architecture on the same
 kind of Stockfish-labeled Enyo self-play.
 
+## Active Experiment
+
+2026-06-10 `native-8.0.0` material-shape output-head probe:
+
+- Lane: runtime/export-format change. Enyo can now load NNUE files with eight
+  scalar output-head features.
+- Hypothesis: the existing `16 x 12` transformer may already contain useful
+  position signal, but the scalar output layer lacks cheap material-shape
+  context. Extending the existing two-feature material/phase head to eight
+  normalized material-shape features may improve transfer without changing
+  input features, hidden width, or search.
+- Init: start from `native-1.23.0`, the best stable clean-native parent.
+- Data: use a small already-labeled d20/hard-delta `.bullet` dose first. Do not
+  launch a large distributed scoring job until the export/static gates show the
+  new head is trainable and Enyo runtime parity is correct.
+- Stop criteria: reject before SPRT if exported `.nn` gates fail, if engine
+  static regresses clearly versus `native-1.23.0`, or if the new head is a
+  no-op. Only run a 300-game smoke if static gates are neutral-positive.
+
 ## Current State
 
 No trained Enyo-owned net is proven stronger than Berserk yet. The previous

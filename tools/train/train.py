@@ -134,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--trainable", default="all",
                        choices=["all", "float-head", "output"])
     train.add_argument("--output-head-features", default="none",
-                       choices=["none", "material-phase"])
+                       choices=["none", "material-phase", "material-shape"])
     train.add_argument("--python", default=sys.executable)
     train.set_defaults(func=cmd_run)
 

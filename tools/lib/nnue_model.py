@@ -73,10 +73,35 @@ class EnyoNNUE(nn_pt.Module):
     def material_head_features(
         phase_scale: torch.Tensor,
         piece_count: torch.Tensor,
+        output_head_features: int,
+        piece_type_counts: torch.Tensor | None = None,
     ) -> torch.Tensor:
+        phase_delta = phase_scale - 1.0
+        if output_head_features == nn2.N_HEAD_FEATURES:
+            return torch.stack((
+                phase_delta,
+                (piece_count.float() - 16.0) / 16.0,
+            ), dim=-1)
+        if output_head_features != nn2.N_EXTENDED_HEAD_FEATURES:
+            raise ValueError(
+                f"unsupported output head feature count {output_head_features}")
+        if piece_type_counts is None:
+            raise ValueError("piece_type_counts is required for extended heads")
+
+        pawn_count = piece_type_counts[:, 0]
+        minor_count = piece_type_counts[:, 1] + piece_type_counts[:, 2]
+        rook_count = piece_type_counts[:, 3]
+        queen_count = piece_type_counts[:, 4]
+        pawn_feature = (pawn_count - 16.0) / 8.0
         return torch.stack((
-            phase_scale - 1.0,
+            phase_delta,
             (piece_count.float() - 16.0) / 16.0,
+            pawn_feature,
+            (minor_count - 8.0) / 4.0,
+            (rook_count - 4.0) / 2.0,
+            (queen_count - 2.0) / 2.0,
+            (minor_count + rook_count + queen_count - 14.0) / 7.0,
+            phase_delta * pawn_feature,
         ), dim=-1)
 
     def piece_counts_from_offsets(
@@ -88,6 +113,37 @@ class EnyoNNUE(nn_pt.Module):
         if len(offsets) > 1:
             counts[:-1] = offsets[1:] - offsets[:-1]
         counts[-1] = feats.numel() - offsets[-1]
+        return counts
+
+    def piece_type_counts_from_features(
+        self,
+        feats: torch.Tensor,
+        piece_count: torch.Tensor,
+    ) -> torch.Tensor:
+        row_count = piece_count.numel()
+        counts = torch.zeros(
+            (row_count, 6),
+            dtype=torch.float32,
+            device=feats.device)
+        if feats.numel() == 0:
+            return counts
+
+        row_ids = torch.repeat_interleave(
+            torch.arange(row_count, device=feats.device),
+            piece_count.to(feats.device))
+        channels = torch.remainder(torch.div(feats, 64, rounding_mode="floor"),
+                                   self.feature_channels)
+        if self.feature_channels == nn2.HALFKA_V2_FEATURE_CHANNELS:
+            piece_types = torch.where(
+                channels == 10,
+                torch.full_like(channels, 5),
+                torch.remainder(channels, 5))
+        else:
+            piece_types = torch.remainder(channels, 6)
+        counts.index_put_(
+            (row_ids, piece_types),
+            torch.ones_like(piece_types, dtype=torch.float32),
+            accumulate=True)
         return counts
 
     @staticmethod
@@ -134,7 +190,15 @@ class EnyoNNUE(nn_pt.Module):
         if self.output_head_features:
             if piece_count is None:
                 piece_count = self.piece_counts_from_offsets(w_feats, w_offsets)
-            head_features = self.material_head_features(phase_scale, piece_count)
+            piece_type_counts = None
+            if self.output_head_features == nn2.N_EXTENDED_HEAD_FEATURES:
+                piece_type_counts = self.piece_type_counts_from_features(
+                    w_feats, piece_count)
+            head_features = self.material_head_features(
+                phase_scale,
+                piece_count,
+                self.output_head_features,
+                piece_type_counts)
         raw = self.raw_forward(
             w_feats, b_feats, w_offsets, b_offsets, stm, output_bucket,
             head_features)
