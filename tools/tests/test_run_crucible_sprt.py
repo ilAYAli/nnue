@@ -212,6 +212,40 @@ class RunCrucibleSprtTests(unittest.TestCase):
 
         self.assertEqual(1, status["counts"]["fail"])
 
+    def test_transient_retry_uses_run_task(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            root = Path(tmp_name)
+            args = self.args(root)
+            run_dir = root / "run"
+            write_file(
+                run_dir / "logs" / "sprt_0007.log",
+                "Warning; Engine reference is not responsive\n",
+            )
+            write_file(run_dir / "manifest.json", "{}\n")
+            calls: list[list[str]] = []
+            old_status_json = run_crucible_sprt.status_json
+            old_run_streamed = run_crucible_sprt.run_streamed
+
+            def fake_status_json(crucible: str, run_name: str) -> dict:
+                return {"rows": [{"state": "fail", "id": "sprt_0007", "index": 7}]}
+
+            def fake_run_streamed(command: list[str], log_path: Path) -> int:
+                calls.append(command)
+                return 0
+
+            try:
+                run_crucible_sprt.status_json = fake_status_json
+                run_crucible_sprt.run_streamed = fake_run_streamed
+                retried = run_crucible_sprt.retry_transient_failures(args, "unit-run", run_dir)
+            finally:
+                run_crucible_sprt.status_json = old_status_json
+                run_crucible_sprt.run_streamed = old_run_streamed
+
+            self.assertEqual(1, retried)
+            self.assertEqual("run-task", calls[0][1])
+            self.assertIn("--index", calls[0])
+            self.assertIn("7", calls[0])
+
     def test_completion_event_accepts_default_hook(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             root = Path(tmp_name)

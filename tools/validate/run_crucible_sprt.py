@@ -484,7 +484,7 @@ def retry_transient_failures(args: argparse.Namespace, run_name: str, run_dir: P
         rc = run_streamed(
             [
                 args.crucible,
-                "run",
+                "run-task",
                 "--manifest", str(manifest),
                 "--index", str(row["index"]),
                 "--force",
