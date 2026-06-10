@@ -1185,6 +1185,43 @@ Conclusion:
   a separate policy/ranking path, threat/attack features with acceptable NPS, or
   a failure-suite source that passes a move-choice gate before training.
 
+## 2026-06-10 guarded move-policy sidecar rejection
+
+Hypothesis:
+
+- The exported loss-log sidecar policy could improve root choices without
+  pushing the signal through the saturated scalar `.nn` eval path.
+- Candidate and reference used the same Enyo binary and the same
+  `native-1.23.0` net. The candidate only enabled
+  `move_policy_file=runs/move-policy-export-x1-heldout-20260531/model.json`
+  with threshold `18` and `move_policy_max_eval_drop=80`.
+
+Offline gate recap:
+
+- Export recheck reproduced the held-out gate: at threshold `18`, the sidecar
+  selected `101/622` held-out mistake cases with no wrong selected cases.
+- Guard recheck selected `1/596` no-override guard cases, with `0` harmful
+  overrides.
+
+Result:
+
+- The first 300-game smoke attempt had two pwa-mbp0 task failures caused by a
+  generated worker cache path mismatch for the opening book. The completed
+  200 games were already negative: `44-61-95/200`, Elo `-29.60`.
+- A clean relaunch without pwa-mbp0 completed successfully:
+  `69-94-137/300`, Elo `-29.02 +/- 29.6` versus the same engine/net baseline.
+
+Conclusion:
+
+- Reject the current move-policy sidecar runtime path. The offline loss-log
+  move-choice gate did not transfer to games.
+- Do not integrate or tune this sidecar threshold further without a new runtime
+  action-rate/audit gate that explains why overrides should help in actual
+  search games.
+- This also reinforces that replay/move-choice signal cannot simply be bolted
+  on at root after search; if revisited, it needs either a safer in-search use
+  or a different policy/ranking design.
+
 ## Historical Notes
 
 Important failed signals:
