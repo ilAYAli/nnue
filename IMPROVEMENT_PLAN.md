@@ -1196,6 +1196,34 @@ Conclusion:
   a separate policy/ranking path, threat/attack features with acceptable NPS, or
   a failure-suite source that passes a move-choice gate before training.
 
+
+## 2026-06-11 Berserk-relative delta rerun rejection
+
+Purpose:
+
+- Recheck the one remaining positive-looking `native-6.1.0` result on the
+  current Enyo runtime. The original 2026-06-09 games used an older Enyo build
+  with noisy PV/50-move warnings, so the weak positive screen was not clean
+  enough to treat as a promotion signal.
+
+Results:
+
+- Final checkpoint rerun on current Enyo (`v.9f3a006`) versus `native-1.23.0`:
+  `native-6.1.0-vs-native-1.23.0-current-confirm1000-20260611` finished
+  `345-346-309/1000`, Elo `-0.35 +/- 17.91`, LOS `48.5%`.
+- Checkpoint rescue test at Bullet superbatch 32:
+  `native-6.1.0-sb32-vs-native-1.23.0-current-smoke300-20260611` finished
+  `96-112-92/300`, Elo `-18.55 +/- 32.82`, LOS `13.4%`.
+
+Conclusion:
+
+- Close the current Berserk-relative delta lane. The final checkpoint is neutral
+  on a clean current-engine confirm, and the only earlier checkpoint tested is
+  clearly negative.
+- Do not spend more games on `native-6.x` checkpoint rescue or same-lane
+  Berserk-relative scalar targets. If Berserk guidance is revisited, it needs a
+  different representation or a separate policy/ranking path with its own gate.
+
 ## 2026-06-11 move-choice gate baseline
 
 Purpose:
