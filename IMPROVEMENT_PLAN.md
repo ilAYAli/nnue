@@ -1222,6 +1222,39 @@ Conclusion:
   on at root after search; if revisited, it needs either a safer in-search use
   or a different policy/ranking design.
 
+## 2026-06-10 material-shape output-head rejection
+
+Hypothesis:
+
+- A small material/shape output head trained only on the output layer could
+  correct hard-delta positions without disturbing the saturated native-1.23.0
+  feature transformer.
+- `native-8.0.0-rc1-materialshape-v23-d20head100k-lr1e2-e16-20260610`
+  initialized from `native-1.23.0`, used the `native-1.37.0` hard-delta d20
+  `.bullet` slice, trained `output` only for 16 epochs at LR `0.01`, and added
+  `output_head_features=material-shape`.
+
+Result:
+
+- Static hard-delta gate improved MAE slightly versus baseline:
+  candidate `mae=192.707`, sign `88.96%`; baseline `mae=194.747`, sign
+  `88.97%`.
+- Static broad gate also improved MAE slightly versus baseline:
+  candidate `mae=147.147`, sign `83.08%`; baseline `mae=148.703`, sign
+  `83.00%`.
+- 300-game smoke versus `native-1.23.0` looked strongly positive:
+  `126-94-80/300`, Elo `+37.20 +/- 33.85`, LOS `98.5%`.
+- 1000-game confirmation rejected the candidate:
+  `341-380-279/1000`, Elo `-13.56 +/- 18.30`, LOS `7.3%`.
+
+Conclusion:
+
+- Do not promote or extend `native-8.0.0`.
+- Small output-head/static-MAE improvements are not reliable enough to spend
+  confirmation or screen budget without a separate game-relevant gate.
+- Treat material-shape output-only tuning as another short-smoke false positive
+  unless a future version has a stronger move/failure-mode gate before games.
+
 ## Historical Notes
 
 Important failed signals:
