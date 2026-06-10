@@ -19,3 +19,6 @@ __pycache__/
 
 # fastchess recovery config
 config.json
+
+# Local agent instructions
+AGENTS.md
