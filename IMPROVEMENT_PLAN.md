@@ -1308,6 +1308,44 @@ Stop criteria:
   scalar pairwise lane is dead or whether a separate policy/ranking path is
   warranted.
 
+
+Result:
+
+- Rejected before games as a candidate, but it answered the diagnostic.
+- Target-only training can move the frozen gate: final candidate `1257/2487`
+  versus baseline `1141/2487`, `fixed=398`, `delta_avg_margin=+12.8cp`, and
+  `delta_loss_weighted_margin=+5.4cp`.
+- It is destructive: `regressed=282` and broad engine-static collapsed to
+  `mae=225.831`, sign `66.92%`, corr `0.459`, slope `0.193`.
+- Checkpoint sweep found no usable point. `epoch-0009` already had
+  `regressed=48` and negative margin deltas; later checkpoints improved margin
+  only by accepting hundreds of regressions.
+- Conclusion: the pair signal is learnable, but fitting CP/loss magnitude
+  through the scalar eval path is not stable. Next test should convert this
+  into a small-margin ranking target instead of a CP-margin target.
+
+## 2026-06-11 native-1.39.2 small-margin move-gate ranking
+
+Hypothesis:
+
+- `native-1.39.1` showed that large CP-margin pair fitting is the wrong target:
+  it learns the gate by damaging broad behavior and many already-correct cases.
+- A small, unweighted ranking target should ask only for `best > played` by a
+  modest margin, avoiding the mate-like/loss-cp outlier pressure.
+
+Run:
+
+- `native-1.39.2-rc1-v23-movegatepair-rank30-pw64-lr1e5-e24-sb8192-20260611`.
+- Same init, pair rows, broad data, and frozen gate as `native-1.39.x`.
+- Training change: restore `pairwise_broad_weight=1`, use
+  `pairwise_max_target_margin=30cp`, `pairwise_loss_weight_by_cp=false`,
+  `pairwise_pair_weight=64`, `lr=1e-5`, `epochs=24`.
+
+Stop criteria:
+
+- Reject before games unless the frozen move gate passes the same hard criteria
+  as `native-1.39.0` and broad engine-static does not collapse.
+
 ## 2026-06-10 guarded move-policy sidecar rejection
 
 Hypothesis:
