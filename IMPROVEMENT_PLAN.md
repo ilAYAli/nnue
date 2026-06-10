@@ -1242,6 +1242,33 @@ Conclusion:
   is explicitly an engine/runtime experiment with separate parity and NPS
   justification.
 
+
+## 2026-06-11 native-1.39.0 move-gate pairwise repair
+
+Hypothesis:
+
+- The replay-loss move-gate pairs still contain a useful ranking signal, but
+  `native-1.32.2` under-dosed it: `pair_weight=8`, `lr=1e-6`, and an `800cp`
+  target cap only moved the frozen gate by `+0.2cp` loss-weighted.
+- Retest the same signal from `native-1.23.0` with a stronger but capped update:
+  `pair_weight=32`, `lr=3e-6`, `max_target_margin=300cp`, `epochs=12`, and the
+  same broad-preserve data.
+
+Run:
+
+- `native-1.39.0-rc1-v23-movegatepair-pw32-cap300-lr3e6-e12-sb8192-20260611`.
+- Backend: `pairwise`.
+- Init and move-gate baseline: `native-1.23.0`.
+- Pair rows: `runs/native-1.32.2-rc1-v23-gatepairrepair-pw8-lwcp-lr1e6-e8-sb8192-20260609/pairs/move_gate_pairs.jsonl`.
+- Frozen gate: `runs/move-policy-loss-full-gate-20260531/cases.jsonl`.
+
+Stop criteria:
+
+- Reject before games unless the move gate passes all configured thresholds:
+  candidate not below baseline, `fixed >= 40`, `regressed <= 40`,
+  `delta_avg_margin >= 2cp`, and `delta_loss_weighted_margin >= 5cp`.
+- If it passes, run only a 300-game smoke first.
+
 ## 2026-06-10 guarded move-policy sidecar rejection
 
 Hypothesis:
