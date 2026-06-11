@@ -2230,3 +2230,28 @@ Conclusion:
   lane. Further work should move to a separate policy/ranking signal, a new
   gated feature path, or a direct search fix rather than another scalar
   fine-tune on these replay-loss pairs.
+
+Policy sidecar diagnostic on the same gate:
+
+- `policy-d16child231-sidecar-20260611` trained the existing move-policy
+  sidecar tooling on the `231` d16-confirmed cases.
+- Compact features memorized the training split but generalized weakly:
+  all-case `212/231`, train `173/173`, validation `39/58` on seed `41`.
+- Board features overfit worse: all-case `200/231`, train `173/173`,
+  validation `27/58`.
+- `policy-d16child231-compact-cv-20260611` repeated compact training across
+  seeds `1,2,3,4,5,41,77,101` and hidden sizes `16,32,64`:
+  - hidden `16`: best validation average `33.12/58`, range `29-37`,
+    final average `30.88/58`;
+  - hidden `32`: best validation average `33.88/58`, range `30-38`,
+    final average `31.62/58`;
+  - hidden `64`: best validation average `31.50/58`, range `26-34`,
+    final average `30.50/58`.
+
+Conclusion:
+
+- The old sidecar feature sets can memorize this tiny gate but do not
+  generalize robustly. Do not integrate or SPRT this sidecar formulation.
+- This reinforces the scalar result: the replay-loss/d16-child signal needs a
+  better representation or a direct search fix, not another threshold tune on
+  the existing sidecar.
