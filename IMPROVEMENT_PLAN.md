@@ -1956,6 +1956,14 @@ Result:
   - compact threshold `20`: `39/2386` overrides, `33` harmful;
   - compact threshold `12`: `116/2386` overrides, `96` harmful;
   - board threshold `20`: `193/2386` overrides, `170` harmful.
+- Restricting the guard to the exact learned pattern, where the current move is
+  a capture and the policy alternative is quiet, did not help:
+  - compact threshold `12`: `62/2386` overrides, `0` helpful, `8` neutral,
+    `54` harmful;
+  - compact threshold `20`: `2/2386` overrides, `0` helpful, `1` neutral,
+    `1` harmful;
+  - board threshold `12`: `35/2386` overrides, `0` helpful, `5` neutral,
+    `30` harmful.
 - The old policy-gate threshold report was clarified in
   `eval_move_policy_gate.py`: nonnegative thresholds cannot produce
   `selected_wrong` by construction, so the report now prints
