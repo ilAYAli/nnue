@@ -1723,3 +1723,39 @@ Conclusion:
 - The short smoke/confirm result did not hold at 4000 games. Close this
   fresh-selfplay/static-label mix and switch failure theory instead of tuning
   the same recipe.
+
+## 2026-06-11 LC0 test91 policy/oracle audit
+
+Hypothesis:
+
+- Recent LC0 `test91` training data may provide a cleaner strong-play policy
+  distribution than the older LC0 samples used in previous native policy
+  probes.
+- Before spending game budget or runtime complexity, validate the source with
+  Stockfish oracle checks and a parent-heldout sidecar transfer test.
+
+Result:
+
+- Downloaded `training-run2-test91-20260128-1817.tar` from LC0 test91
+  (`3.8G` archive).
+- 500k-row extraction was clean: `500000/500000` rows, played move legal
+  `99.90%`, best move legal `99.89%`, top-policy legal `95.77%`.
+- Stockfish oracle pass over a 30k preselected subset produced `10000`
+  high-confidence parent positions and `65708` best-vs-played move pairs.
+- LC0 policy agreed very strongly with the Stockfish oracle inside this
+  selected slice: oracle best was LC0 top1 `9791/10000`, top3 `9972/10000`,
+  top8 `10000/10000`.
+- Parent-heldout move-policy sidecar audit:
+  - compact features: `9398/13157` holdout, `71.43%`;
+  - board features: `9825/13157` holdout, `74.68%`.
+- Transfer to the fixed Enyo loss move gate failed:
+  - compact features: `1236/2487`, `49.7%`;
+  - board features: `1037/2487`, `41.7%`.
+
+Conclusion:
+
+- LC0 test91 is a clean and useful strong-play data source, but the current
+  standalone sidecar formulation does not transfer to Enyo's actual loss gate.
+- Do not promote a runtime move-policy sidecar from this data alone.
+- Do not spend SPRT budget on the LC0-test91 sidecar lane without a new bridge
+  that proves transfer on Enyo-specific failures first.
