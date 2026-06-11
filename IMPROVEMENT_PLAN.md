@@ -979,6 +979,24 @@ Next work must first establish a new non-scalar or search-aware gate:
 Do not start another long bulk label/train/SPRT candidate until one of those
 gates gives a concrete reason.
 
+2026-06-11 residual search-depth audit:
+
+- Ran Enyo `9f3a006` with native `1.23.0` on the `175` high-confidence
+  depth-8 residual cases, using the same net and increasing only root search
+  depth.
+- Teacher-best recovery improved with depth:
+  - depth `8`: best `47/175`, replay-bad move `67/175`, other `61/175`;
+  - depth `12`: best `67/175`, replay-bad move `56/175`, other `52/175`;
+  - depth `14`: best `75/175`, replay-bad move `46/175`, other `54/175`;
+  - depth `16`: best `84/175`, replay-bad move `41/175`, other `50/175`.
+- Transitions from depth `8` to depth `16`: `25` replay-bad moves became
+  teacher-best, `30` replay-bad moves stayed replay-bad, and `4` depth-8
+  teacher-best moves regressed to replay-bad.
+- Interpretation: the residual set is partly search-depth sensitive. It is
+  not a pure scalar-eval representation target, and it is not fully solved by
+  deeper search either. Prioritize search/eval-interface diagnostics over
+  another scalar pairwise retrain.
+
 ## Candidate Workflow
 
 Normal candidate creation:
