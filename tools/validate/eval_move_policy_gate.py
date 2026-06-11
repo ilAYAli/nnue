@@ -42,17 +42,20 @@ def threshold_rows(rows: list[dict], margins: torch.Tensor,
     selected = margins >= threshold
     correct = margins > 0
     selected_correct = selected & correct
-    selected_wrong = selected & ~correct
+    selected_incorrect = selected & ~correct
+    missed_correct = correct & ~selected
     correct_count = int(correct.sum().item())
     selected_count = int(selected.sum().item())
     selected_correct_count = int(selected_correct.sum().item())
-    selected_wrong_count = int(selected_wrong.sum().item())
+    selected_incorrect_count = int(selected_incorrect.sum().item())
+    missed_correct_count = int(missed_correct.sum().item())
     return {
         "threshold": threshold,
         "correct": float(correct_count),
         "selected": float(selected_count),
         "selected_correct": float(selected_correct_count),
-        "selected_wrong": float(selected_wrong_count),
+        "selected_incorrect": float(selected_incorrect_count),
+        "missed_correct": float(missed_correct_count),
         "cases": float(len(rows)),
         "avg_margin": float(margins.mean().item()) if rows else 0.0,
     }
@@ -77,7 +80,8 @@ def print_summary(label: str, rows: list[dict], margins: torch.Tensor,
             f"{label} threshold={threshold:g} "
             f"selected={int(item['selected'])}/{len(rows)} "
             f"selected_correct={int(item['selected_correct'])} "
-            f"selected_wrong={int(item['selected_wrong'])} "
+            f"selected_incorrect={int(item['selected_incorrect'])} "
+            f"missed_correct={int(item['missed_correct'])} "
             f"total_correct={int(item['correct'])}/{len(rows)}",
             flush=True,
         )
