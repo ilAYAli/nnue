@@ -1813,6 +1813,15 @@ Result:
   `83.18%`, corr `0.831152`, slope `0.839410`.
 - 300-game smoke versus `native-1.23.0`: `106-105-89`, Elo
   `+1.16 +/- 33.03`, LOS `52.7%`.
+- Narrow hard-disagreement follow-up `native-7.5.0-rc1-lc0qharddelta100k-v23mix-lr1e8-sb128-20260611`
+  trained from the `100000` LC0-test91 rows with the largest native-vs-LC0-q
+  scalar disagreement, mixed with native `1.23.0` data.
+- `native-7.5.0` static gates were sane but not game-positive: Bullet static
+  on native `1.23.0` data `mae=147.986`, sign `83.04%`, corr `0.813329`,
+  slope `0.773158`; engine static on the material-phase mixed set
+  `mae=146.090`, sign `83.18%`, corr `0.831144`, slope `0.837194`.
+- `native-7.5.0` 300-game smoke versus `native-1.23.0`: `105-113-82`, Elo
+  `-9.27 +/- 33.58`, LOS `29.4%`.
 
 Conclusion:
 
@@ -1822,3 +1831,33 @@ Conclusion:
 - Close the direct LC0 value-mixing scalar lane unless a later analysis shows a
   narrower, concrete failure slice where LC0 value targets beat native/Stockfish
   targets before games.
+- The hard-disagreement LC0-q slice did not transfer either. Do not continue the
+  `native-7.x` public/LC0 scalar value family without a non-scalar bridge or a
+  new pre-game gate that predicts game Elo, not only static fit.
+
+## 2026-06-11 material-shape scalar head rejection
+
+Hypothesis:
+
+- A compact material/shape output head could let the saturated scalar eval use
+  different calibration by material shape without changing the main feature
+  transformer.
+
+Result:
+
+- `native-8.0.0-rc1-materialshape-v23-d20head100k-lr1e2-e16-20260610`
+  improved broad static fit relative to the native `1.23.0` baseline on the
+  same validation slice: candidate `mae=147.147`, sign `83.08%`, corr
+  `0.813002`, slope `0.764777`; baseline `mae=148.703`, sign `83.00%`, corr
+  `0.813298`, slope `0.778735`.
+- The 300-game smoke was misleadingly strong: `126-94-80`, Elo
+  `+37.20 +/- 33.85`, LOS `98.5%`.
+- The 1000-game confirm rejected it: `341-380-279`, Elo `-13.56 +/- 18.30`,
+  LOS `7.3%`.
+
+Conclusion:
+
+- Do not promote `native-8.0.0` and do not add more material-shape scalar heads
+  without a stronger pre-game gate. The 300-game smoke was a false positive.
+- Static fit and short smokes are now known to over-admit candidates in this
+  lane; 1000-game confirms remain required before any promotion.
