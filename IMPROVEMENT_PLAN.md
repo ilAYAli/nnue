@@ -2188,3 +2188,45 @@ Conclusion:
 - Further progress should not be another scalar pairwise replay-loss knob.
   Move effort to representation changes, search/eval interface changes, or a
   separate policy-like signal that does not fight broad scalar preservation.
+
+Depth-16 confirmed child gate:
+
+- Stockfish d16 audit of the depth-16 third-move bucket produced a cleaner
+  `231`-case child gate at `>=100cp`: `210` cases where the original gate-best
+  child is still preferred, and `21` cases where Enyo's depth-16 alternative is
+  actually better. Baseline native `1.23.0` prefers the teacher-best side in
+  only `95/231`.
+- `native-1.41.0-rc1-v23-d16child231-qproj-preserve-lr3e5-e80-sb8192-20260611`
+  trained this cleaner gate from native `1.23.0` with the same
+  export-projected preservation-balanced pairwise setup as `1.40.3`.
+- Broad static remained usable but softened: MAE improved `147.001 -> 145.189`,
+  sign fell `83.14% -> 82.71%`, correlation fell `0.831156 -> 0.816978`, and
+  slope fell `0.843495 -> 0.595216`.
+- The new move gate failed: candidate `103/231` versus baseline `95/231`,
+  `fixed=11`, `regressed=3`, `candidate_better_margin=148/231`,
+  `delta_avg_margin=+29.3cp`, and `delta_loss_weighted_margin=+41.7cp`.
+- `native-1.41.1-rc1-v23-d16child231-targetonly-qproj-lr1e4-e80-sb8192-20260611`
+  removed broad preservation and trained target-only on the same `231` pairs
+  to test whether the export-projected scalar net could memorize the gate at
+  all.
+- It still did not fit the gate cleanly: export reload pair correctness was
+  only `50.6%` with `pair_mae=208.27`, and the move gate reached `117/231`
+  versus baseline `95/231`, with `fixed=33`, `regressed=11`,
+  `candidate_better_margin=133/231`, `delta_avg_margin=+27.5cp`, and
+  `delta_loss_weighted_margin=+33.0cp`.
+- Broad static collapsed: MAE worsened `147.001 -> 192.798`, sign fell
+  `83.14% -> 78.47%`, correlation fell `0.831156 -> 0.736612`, and slope fell
+  `0.843495 -> 0.277875`.
+
+Conclusion:
+
+- The cleaner depth-16 gate is real and teacher-depth stable, but preserved
+  scalar training still mostly changes margins rather than root decisions. Do
+  not run games for `native-1.41.0`.
+- Target-only training cannot memorize the gate well enough and destroys broad
+  scalar eval. The blocker is not just broad-preservation tension; this is a
+  representation/search-interface mismatch for the current scalar `.nn` path.
+- Do not run games for `native-1.41.1`, and close the d16 child scalar pairwise
+  lane. Further work should move to a separate policy/ranking signal, a new
+  gated feature path, or a direct search fix rather than another scalar
+  fine-tune on these replay-loss pairs.
