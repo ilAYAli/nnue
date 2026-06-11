@@ -2411,3 +2411,63 @@ Conclusion:
   filter is `policy-d16child-threatrel-linearcv-20260611`: test whether the
   same signal survives as a linear or tiny hidden-8 scorer. If it does not,
   close the threat-relation sidecar lane as too weak/complex for runtime use.
+
+Threat relation linear/tiny capacity check:
+
+- `policy-d16child-threatrel-linearcv-20260611` tested `compact`,
+  `compact+rel`, and `rel-only` with linear, hidden `4`, hidden `8`, and
+  hidden `16` scorers over grouped `25cp` and `50cp` splits.
+- Strict `50cp` remained too weak/noisy:
+  - compact linear: best validation average `55.69/102.8`, final `52.38`;
+  - `compact+rel` linear: best validation average `56.25/102.8`, final
+    `52.94`;
+  - `rel-only` hidden `8`: best validation average `57.00/102.8`, final
+    `55.31`.
+- Wider `25cp` kept a modest low-capacity signal:
+  - compact linear: best validation average `80.00/147.4`, final `76.94`;
+  - `compact+rel` linear: best validation average `81.62/147.4`, final
+    `77.00`;
+  - `compact+rel` hidden `8`: best validation average `81.31/147.4`, final
+    `78.31`;
+  - `rel-only` hidden `16`: best validation average `79.25/147.4`, final
+    `77.62`.
+
+Conclusion:
+
+- The relation signal survives low capacity on the wider `25cp` diagnostic,
+  but it is still not strong or strict enough to justify Enyo runtime
+  integration.
+- Close the threat-relation sidecar lane. The next useful work is not another
+  move-policy sidecar. Run a training-process audit to separate mechanical
+  training/export bugs from objective/distribution failure: zero-step export
+  parity, tiny overfit, shuffled-label control, and heldout static movement.
+
+Pairwise training/export audit:
+
+- `training-process-audit-20260611` found a mechanical red flag in the recent
+  pairwise lane. `native-1.41.1` ended with `pair_correct=50.6%`,
+  `pred_margin=-6.09cp`, and `target_margin=199.33cp`, while engine static
+  validation collapsed from baseline `mae=147.001 sign=83.14 corr=0.831` to
+  candidate `mae=192.798 sign=78.47 corr=0.737`.
+- `pairwise-mech-audit-20260611` isolated this to export/quantization:
+  - baseline on 32 hard pairs: `pair_correct=37.5%`, `pred_margin=-72.4cp`;
+  - full PyTorch training without per-step projection could overfit at
+    `lr=1e-3` to `pair_correct=100.0%`, `pred_margin=204.3cp`;
+  - the exported/reloaded `.nn` from that same model fell back to
+    `pair_correct=56.2%`, `pred_margin=51.8cp`;
+  - per-step projection stayed export-stable but learned very slowly,
+    ending at only `pair_correct=53.1%`, `pred_margin=28.7cp`.
+- `pairwise-layer-audit-20260611` showed that training only export-stable
+  float layers preserves the learned signal across `.nn` export:
+  - output-only barely moved (`40.6%` at `lr=0.1`);
+  - `l2+output` reached `75-81%` and matched exactly after export/reload;
+  - including `l1` reached `100%` in PyTorch but reloaded at only `62.5%`.
+
+Conclusion:
+
+- The pairwise sign convention is not the main bug. The broken part was using
+  pairwise training on quantized layers where PyTorch improvements disappeared
+  at `.nn` export.
+- Pairwise runs should default to `pairwise_trainable=l2-output`; training
+  quantized input/L1 layers must be explicit and treated as a separate
+  quantization-aware-training problem.
