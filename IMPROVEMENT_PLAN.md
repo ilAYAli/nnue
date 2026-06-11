@@ -1197,6 +1197,43 @@ Conclusion:
   a failure-suite source that passes a move-choice gate before training.
 
 
+## 2026-06-11 threat-input runtime preflight rejection
+
+Purpose:
+
+- Test the Enyo `feature/nnue-threat-inputs` branch as a genuinely new
+  non-scalar signal path before spending NNUE training or game budget.
+
+Checks:
+
+- Enyo branch: `feature/nnue-threat-inputs` at `15d45be`.
+- Focused tests passed locally: `network_model.*`, `nnue_audit.*`, and threat
+  tests, `34/34`. Full Enyo test binary also passed, `107/107`.
+- A synthetic active threat-block net was built from `enyo-native-1.23.0-rc1.nn`
+  with zero threat weights and nonzero output weights. It is eval-identical on
+  startpos (`60cp` for both legacy and active-threat nets), so timing isolates
+  runtime overhead rather than strength changes.
+
+NPS result:
+
+- Single-thread local depth timing across three FENs, same Enyo branch/binary:
+  - depth `10`: active threat mean `1.31M nps` versus baseline `2.09M nps`,
+    about `-37.4%`;
+  - depth `11`: active threat mean `0.74M nps` versus baseline `1.23M nps`,
+    about `-39.3%`;
+  - depth `12`: active threat mean `0.79M nps` versus baseline `1.33M nps`,
+    about `-40.8%`.
+
+Conclusion:
+
+- Do not train or SPRT this threat-input implementation. The inactive loader
+  gate is correct, but any shipped threat net would pay roughly `-40%` NPS, far
+  beyond the `3-5%` preflight limit.
+- Keep the branch only as reference for threat indexing/parity tests. Revisit
+  threat/attack features only with a materially cheaper runtime design, likely
+  an incremental or search-integrated representation rather than fresh
+  per-eval threat collection.
+
 ## 2026-06-11 Berserk-relative delta rerun rejection
 
 Purpose:
