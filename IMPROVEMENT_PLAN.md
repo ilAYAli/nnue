@@ -999,14 +999,23 @@ gates gives a concrete reason.
 
 2026-06-11 LMR-off residual audit:
 
-- Re-ran the same `175` residual cases at depths `8`, `10`, and `12` with UCI
-  `use_lmr=false` on Enyo `9f3a006` and native `1.23.0`.
-- Result was row-identical to the baseline depth audit: all `525` searched
-  `(case, depth)` pairs had the same best move and score.
-- Conclusion: this residual set is not sensitive to the current `use_lmr` UCI
-  switch. Do not spend more time on LMR-off testing unless engine code review
-  first shows that the option is wired incorrectly or misses the relevant
-  reduction path.
+- Initial `use_lmr=false` testing on Enyo `9f3a006` was invalid: the UCI option
+  was parsed and exposed but not checked by the LMR search block. Enyo
+  `3e1a20b` fixes the guard while keeping the default at `use_lmr=true`, so
+  normal play remains row-identical to `9f3a006` on the `175` residual cases
+  at depths `8`, `10`, and `12`.
+- With fixed Enyo `3e1a20b` and `use_lmr=false`, the same residual gate changes:
+  - depth `8`: best `48/175`, replay-bad move `58/175`, other `69/175`;
+  - depth `10`: best `59/175`, replay-bad move `55/175`, other `61/175`;
+  - depth `12`: best `74/175`, replay-bad move `49/175`, other `52/175`.
+- Row transitions versus default at depth `12`: `12` replay-bad moves became
+  teacher-best, `8` teacher-best moves regressed to replay-bad.
+- Cost on this set is large: depth-12 average time rose from about `47.6ms` to
+  `170.7ms` per case, about `3.6x` slower.
+- Conclusion: LMR has a real but expensive effect on the residual gate once the
+  option is wired. Do not ship global LMR-off without games and NPS analysis.
+  The useful next search lane is targeted reduction tuning around these
+  residual motifs, not another scalar NNUE pairwise retrain.
 
 ## Candidate Workflow
 
