@@ -2369,3 +2369,45 @@ Conclusion:
   narrower `compact+rel` robustness pass over both `25cp` and `50cp` groups
   with more seeds. Only a repeatable result there justifies looking for a
   cheap runtime representation.
+
+Threat relation robustness:
+
+- `policy-d16child-threatrel-robustcv-20260611` repeated only `compact` and
+  `compact+rel` over grouped `25cp` and `50cp` splits with 16 seeds and hidden
+  sizes `16`, `32`, and `64`.
+- Strict `50cp` grouped CV remained weak/noisy:
+  - compact hidden `16`: best validation average `57.56/102.8`, final
+    average `51.44`;
+  - compact hidden `32`: best validation average `54.31/102.8`, final
+    average `50.81`;
+  - compact hidden `64`: best validation average `55.31/102.8`, final
+    average `52.19`;
+  - `compact+rel` hidden `16`: best validation average `55.31/102.8`, final
+    average `52.12`;
+  - `compact+rel` hidden `32`: best validation average `55.56/102.8`, final
+    average `53.06`;
+  - `compact+rel` hidden `64`: best validation average `52.94/102.8`, final
+    average `50.88`.
+- Wider `25cp` grouped CV did show a repeatable relation-feature signal:
+  - compact hidden `16`: best validation average `80.25/147.4`, final
+    average `74.88`;
+  - compact hidden `32`: best validation average `78.69/147.4`, final
+    average `73.12`;
+  - compact hidden `64`: best validation average `80.06/147.4`, final
+    average `72.50`;
+  - `compact+rel` hidden `16`: best validation average `83.12/147.4`, final
+    average `78.31`;
+  - `compact+rel` hidden `32`: best validation average `81.19/147.4`, final
+    average `77.81`;
+  - `compact+rel` hidden `64`: best validation average `79.88/147.4`, final
+    average `77.38`.
+
+Conclusion:
+
+- The relation features carry a modest but repeatable signal on the wider
+  `25cp` d16 child gate, strongest at the smallest hidden size. The strict
+  `50cp` signal is not convincing.
+- This still does not justify an Enyo hot-path threat NNUE block. The next
+  filter is `policy-d16child-threatrel-linearcv-20260611`: test whether the
+  same signal survives as a linear or tiny hidden-8 scorer. If it does not,
+  close the threat-relation sidecar lane as too weak/complex for runtime use.
