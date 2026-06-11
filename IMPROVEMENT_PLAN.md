@@ -1931,3 +1931,40 @@ Conclusion:
 - Treat the existing native `1.23.0` scale as close enough to optimal for the
   current search. Do not spend more games on scalar output-scale tuning unless
   the search/eval interface changes materially.
+
+## 2026-06-11 capture-over-quiet policy guard audit
+
+Purpose:
+
+- After `native-1.39.4` proved the quiet-over-capture signal cannot be pushed
+  into scalar eval safely, test whether a separate move-policy sidecar can learn
+  the same diagnostic slice and whether it has any safe no-override action
+  region.
+
+Result:
+
+- Built `runs/move-policy-capturequiet-audit-20260611` from the
+  quiet-over-capture subset of the fixed replay-loss gate:
+  `1076` cases across `97` source games, split by source game into `874`
+  train and `202` held-out cases.
+- Compact sidecar: train `874/874`, held-out `200/202` (`99.01%`).
+- Board sidecar: train `874/874`, held-out `170/202` (`84.16%`).
+- On the full fixed replay-loss gate, the compact sidecar ranked
+  `1918/2487` (`77.12%`) best-vs-played pairs correctly; the board sidecar
+  ranked `1932/2487` (`77.68%`) correctly.
+- No-override guard evaluation rejected runtime use:
+  - compact threshold `20`: `39/2386` overrides, `33` harmful;
+  - compact threshold `12`: `116/2386` overrides, `96` harmful;
+  - board threshold `20`: `193/2386` overrides, `170` harmful.
+- The old policy-gate threshold report was clarified in
+  `eval_move_policy_gate.py`: nonnegative thresholds cannot produce
+  `selected_wrong` by construction, so the report now prints
+  `selected_incorrect` and `missed_correct` instead.
+
+Conclusion:
+
+- A separate policy/ranking model can identify the quiet-over-capture pattern
+  offline, but the current sidecar/guard formulation has no safe runtime action
+  region. Do not integrate or SPRT this sidecar.
+- The signal remains useful as a diagnostic target for a future representation
+  or search feature, but not as the existing JSON sidecar threshold mechanism.
