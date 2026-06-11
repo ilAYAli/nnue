@@ -17,6 +17,9 @@ from lib.nnue_dataset import load_score_dataset
 from lib.nnue_model import EnyoNNUE, export_model, load_model_from_nn
 
 
+TRAINABLE_CHOICES = ("all", "l1-l2-output", "l2-output", "output")
+
+
 def fen_features(fen: str) -> tuple[list[int], list[int], int, float]:
     pieces, stm = nn2.parse_fen(fen)
     pieces.sort(key=lambda item: item[2])
@@ -131,6 +134,27 @@ def project_exportable_parameters(model: EnyoNNUE) -> None:
         torch.iinfo(torch.int32).min, torch.iinfo(torch.int32).max)
 
 
+def set_trainable_parameters(model: EnyoNNUE, trainable: str) -> list[str]:
+    prefixes = {
+        "all": ("",),
+        "l1-l2-output": ("l1_weight", "l1_bias", "l2.", "output."),
+        "l2-output": ("l2.", "output."),
+        "output": ("output.",),
+    }.get(trainable)
+    if prefixes is None:
+        raise ValueError(f"unknown trainable mode '{trainable}'")
+
+    trainable_names = []
+    for name, param in model.named_parameters():
+        is_trainable = any(name.startswith(prefix) for prefix in prefixes)
+        param.requires_grad = is_trainable
+        if is_trainable:
+            trainable_names.append(name)
+    if not trainable_names:
+        raise ValueError(f"trainable mode '{trainable}' matched no parameters")
+    return trainable_names
+
+
 @torch.no_grad()
 def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
     model.eval()
@@ -194,6 +218,7 @@ def pairwise_metadata(args, *, epoch: int | None = None) -> dict:
         "pair_beta": args.pair_beta,
         "pair_weight": args.pair_weight,
         "broad_weight": args.broad_weight,
+        "trainable": args.trainable,
         "target_clamp": args.target_clamp,
         "max_target_margin": args.max_target_margin,
         "min_target_margin": args.min_target_margin,
@@ -267,6 +292,10 @@ def train(args) -> EnyoNNUE:
         model = load_model_from_nn(args.init_from_nn, device=args.device)
     else:
         model = EnyoNNUE(init=args.init).to(args.device)
+    trainable_names = set_trainable_parameters(model, args.trainable)
+    print(
+        "trainable parameters: " + ", ".join(trainable_names),
+        flush=True)
 
     broad_loader = None
     if use_broad:
@@ -281,7 +310,9 @@ def train(args) -> EnyoNNUE:
     pair_iter = cycle(pair_loader)
 
     opt = torch.optim.AdamW(
-        model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        (param for param in model.parameters() if param.requires_grad),
+        lr=args.lr,
+        weight_decay=args.weight_decay)
     if args.project_export_weights_each_step:
         project_exportable_parameters(model)
 
@@ -379,6 +410,9 @@ def main() -> None:
     ap.add_argument("--pair-beta", type=float, default=100.0)
     ap.add_argument("--pair-weight", type=float, default=1.0)
     ap.add_argument("--broad-weight", type=float, default=1.0)
+    ap.add_argument("--trainable", choices=TRAINABLE_CHOICES,
+                    default="l2-output",
+                    help="Parameters to train. l2-output is export-stable.")
     ap.add_argument("--steps-per-epoch", type=int, default=0,
                     help="Target-only steps per epoch when --broad-weight=0.")
     ap.add_argument("--target-clamp", type=float, default=1600.0)

@@ -178,6 +178,7 @@ class CandidateDefaults:
     pairwise_pair_beta: float = 100.0
     pairwise_max_target_margin: float = 800.0
     pairwise_min_target_margin: float = 1.0
+    pairwise_trainable: str = "l2-output"
     pairwise_loss_weight_by_cp: bool = False
     pairwise_project_export_weights_each_step: bool = False
     pairwise_steps_per_epoch: int = 0

@@ -37,6 +37,7 @@ class TrainPairwiseMetadataTests(unittest.TestCase):
                 pair_beta=100.0,
                 pair_weight=5.0,
                 broad_weight=1.0,
+                trainable="l2-output",
                 target_clamp=800.0,
                 max_target_margin=800.0,
                 min_target_margin=1.0,
@@ -57,6 +58,30 @@ class TrainPairwiseMetadataTests(unittest.TestCase):
             self.assertIn(str(data), metadata["position_refs"])
             self.assertIn("/runs/replay/replay_full_pairs.jsonl", metadata["position_refs"])
             self.assertTrue(metadata["project_export_weights_each_step"])
+            self.assertEqual(metadata["trainable"], "l2-output")
+
+    def test_trainable_modes_freeze_expected_parameters(self) -> None:
+        params = {
+            "embed.weight": SimpleNamespace(requires_grad=True),
+            "input_bias": SimpleNamespace(requires_grad=True),
+            "l1_weight": SimpleNamespace(requires_grad=True),
+            "l1_bias": SimpleNamespace(requires_grad=True),
+            "l2.weight": SimpleNamespace(requires_grad=True),
+            "l2.bias": SimpleNamespace(requires_grad=True),
+            "output.weight": SimpleNamespace(requires_grad=True),
+            "output.bias": SimpleNamespace(requires_grad=True),
+        }
+        model = SimpleNamespace(named_parameters=lambda: params.items())
+
+        names = train_pairwise.set_trainable_parameters(model, "l2-output")
+
+        self.assertEqual(names, ["l2.weight", "l2.bias", "output.weight", "output.bias"])
+        self.assertFalse(params["embed.weight"].requires_grad)
+        self.assertFalse(params["input_bias"].requires_grad)
+        self.assertFalse(params["l1_weight"].requires_grad)
+        self.assertFalse(params["l1_bias"].requires_grad)
+        self.assertTrue(params["l2.weight"].requires_grad)
+        self.assertTrue(params["output.bias"].requires_grad)
 
 
 if __name__ == "__main__":

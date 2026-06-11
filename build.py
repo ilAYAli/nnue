@@ -1438,6 +1438,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--pair-beta", str(args.pairwise_pair_beta),
                 "--pair-weight", str(args.pairwise_pair_weight),
                 "--broad-weight", str(args.pairwise_broad_weight),
+                "--trainable", args.pairwise_trainable,
                 "--steps-per-epoch", str(args.pairwise_steps_per_epoch),
                 "--target-clamp", str(args.target_clamp),
                 "--max-target-margin", str(args.pairwise_max_target_margin),
@@ -2119,6 +2120,9 @@ def add_create_args(
                         default=value("pairwise_max_target_margin", d.pairwise_max_target_margin))
     parser.add_argument("--pairwise-min-target-margin", type=float,
                         default=value("pairwise_min_target_margin", d.pairwise_min_target_margin))
+    parser.add_argument("--pairwise-trainable",
+                        choices=["all", "l1-l2-output", "l2-output", "output"],
+                        default=value("pairwise_trainable", d.pairwise_trainable))
     parser.add_argument("--pairwise-loss-weight-by-cp",
                         action=argparse.BooleanOptionalAction,
                         default=value("pairwise_loss_weight_by_cp", d.pairwise_loss_weight_by_cp))

@@ -730,6 +730,7 @@ class BuildConfigTests(unittest.TestCase):
                     "pairwise_init_from_nn": str(baseline),
                     "pairwise_pair_weight": 3.0,
                     "pairwise_checkpoint_every": 2,
+                    "pairwise_trainable": "l2-output",
                     "pairwise_project_export_weights_each_step": True,
                     "pairwise_move_gate_cases": str(gate),
                     "engine_static_jsonl": str(labeled),
@@ -765,6 +766,10 @@ class BuildConfigTests(unittest.TestCase):
             self.assertEqual(
                 "3.0",
                 train["command"][train["command"].index("--pair-weight") + 1],
+            )
+            self.assertEqual(
+                "l2-output",
+                train["command"][train["command"].index("--trainable") + 1],
             )
             self.assertIn("--project-export-weights-each-step", train["command"])
 
