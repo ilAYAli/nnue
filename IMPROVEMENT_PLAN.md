@@ -1023,11 +1023,18 @@ gates gives a concrete reason.
   `55-178-67/300`, about `-151.35 Elo`. Do not test or ship global LMR-off
   again; keep only the diagnostic insight that some residual failures are
   reduction-sensitive.
-- TT-off residual audit: with Enyo `3e1a20b`, native `1.23.0`, and UCI
-  `use_tt=false`, all `525` searched `(case, depth)` pairs at depths `8`,
-  `10`, and `12` were row-identical to default for best move and score. The
-  residual gate is not caused by transposition-table cutoffs in these fresh
-  per-position searches.
+- Initial TT-off residual testing on Enyo `3e1a20b` was also invalid: the
+  `use_tt` UCI option was parsed and exposed but not checked by the main
+  search/qsearch TT probes and stores. Enyo `743f3c2` fixes the runtime guard
+  without changing default play.
+- With fixed Enyo `743f3c2`, native `1.23.0`, and `use_tt=false`, the same
+  residual gate gets worse:
+  - depth `8`: best `53/175`, replay-bad move `50/175`, other `72/175`;
+  - depth `10`: best `52/175`, replay-bad move `53/175`, other `70/175`;
+  - depth `12`: best `52/175`, replay-bad move `60/175`, other `63/175`.
+- Conclusion: global TT-off is not a rescue lane. It removes useful search
+  structure on this set. Keep the diagnostic only as confirmation that the
+  residual failure is not fixed by disabling transposition-table cutoffs.
 
 ## Candidate Workflow
 
