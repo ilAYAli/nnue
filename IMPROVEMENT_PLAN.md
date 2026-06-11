@@ -1016,6 +1016,13 @@ gates gives a concrete reason.
   option is wired. Do not ship global LMR-off without games and NPS analysis.
   The useful next search lane is targeted reduction tuning around these
   residual motifs, not another scalar NNUE pairwise retrain.
+- Game smoke rejected global LMR-off decisively. The 300-game Crucible smoke
+  `enyo-lmr-off-vs-default-smoke300-20260611` used the same Enyo `3e1a20b`
+  binary and native `1.23.0` net on both sides, with only candidate
+  `use_lmr=false` versus reference `use_lmr=true`. It finished
+  `55-178-67/300`, about `-151.35 Elo`. Do not test or ship global LMR-off
+  again; keep only the diagnostic insight that some residual failures are
+  reduction-sensitive.
 
 ## Candidate Workflow
 
