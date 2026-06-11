@@ -2290,3 +2290,82 @@ Conclusion:
   (`policy-d16child-threatcv-20260611`) to test whether explicit attack
   relation features generalize before any Enyo hot-path threat work is
   considered.
+
+Threat/attack feature diagnostics:
+
+- `policy-d16child-threatcv-20260611` added CPU-only, ad hoc move-choice
+  features derived from python-chess attack relations. It did not change Enyo
+  code or NNUE runtime files.
+- Random row-split CV on the strict `50cp` set:
+  - aggregate attack features, hidden `32`: best validation average
+    `54.88/100`, range `50-59`, final average `52.62/100`;
+  - aggregate attack features, hidden `64`: best validation average
+    `54.50/100`, range `48-64`, final average `53.25/100`;
+  - hashed attacker/victim/square features, hidden `32`: best validation
+    average `54.88/100`, range `47-60`, final average `51.50/100`.
+- Random row-split CV on the wider `25cp` set:
+  - aggregate attack features, hidden `32`: best validation average
+    `80.62/144`, range `75-84`, final average `79.25/144`;
+  - aggregate attack features, hidden `64`: best validation average
+    `81.00/144`, range `76-87`, final average `79.62/144`;
+  - hashed attacker/victim/square features, hidden `32`: best validation
+    average `74.38/144`, range `64-82`, final average `72.38/144`.
+- `policy-d16child-threatagg-groupcv-20260611` repeated the useful aggregate
+  attack feature set with validation split by replay/game id to reduce leakage.
+- Grouped CV on the strict `50cp` set:
+  - compact baseline, hidden `32`: best validation average `53.62`,
+    average validation cases `102.2`, range `47-59`, final average `51.38`;
+  - aggregate attack features, hidden `32`: best validation average `54.75`,
+    average validation cases `102.2`, range `46-59`, final average `51.12`;
+  - aggregate attack features, hidden `64`: best validation average `56.62`,
+    average validation cases `102.2`, range `46-67`, final average `53.88`.
+- Grouped CV on the wider `25cp` set:
+  - compact baseline, hidden `32`: best validation average `78.62`,
+    average validation cases `146.9`, range `76-82`, final average `74.38`;
+  - aggregate attack features, hidden `32`: best validation average `82.38`,
+    average validation cases `146.9`, range `77-86`, final average `79.38`;
+  - aggregate attack features, hidden `64`: best validation average `81.88`,
+    average validation cases `146.9`, range `78-84`, final average `78.12`.
+
+Conclusion:
+
+- The large hashed attacker/victim/square feature idea is not supported by the
+  diagnostic. It is noisy and worse than compact on the grouped `25cp` split.
+- Simple aggregate attack features show a real but modest grouped-CV signal on
+  the wider `25cp` d16 child gate, especially at hidden `32`. The strict
+  `50cp` set is still weak/noisy.
+- Do not implement an Enyo hot-path threat input block from this alone. The
+  next useful step is `policy-d16child-threatagg-ablation-20260611`: identify
+  which cheap aggregate components carry the signal before any runtime design
+  is considered.
+
+Threat aggregate ablation:
+
+- `policy-d16child-threatagg-ablation-20260611` tested grouped `25cp` CV with
+  the aggregate attack features split into cheap components:
+  - compact baseline: best validation average `78.38/146.9`, range `76-82`,
+    final average `73.88`;
+  - compact plus tactic flags: best validation average `77.38/146.9`, range
+    `70-89`, final average `74.12`;
+  - compact plus piece attack/defense counts: best validation average
+    `77.38/146.9`, range `74-83`, final average `75.75`;
+  - compact plus king-zone features: best validation average `81.38/146.9`,
+    range `76-85`, final average `75.75`;
+  - compact plus relation features: best validation average `81.62/146.9`,
+    range `78-86`, final average `79.50`;
+  - compact plus piece and king-zone features: best validation average
+    `79.38/146.9`, range `71-86`, final average `77.62`;
+  - compact plus all aggregate features: best validation average
+    `80.75/146.9`, range `76-89`, final average `76.88`.
+
+Conclusion:
+
+- Most aggregate attack components are not useful on their own. The broad
+  `compact+all` set is less stable than the narrower relation component.
+- `compact+rel` is the only clean signal: it improves both best and final
+  grouped validation over compact baseline without the noisy full 619-feature
+  aggregate set.
+- Still do not implement Enyo runtime threat inputs. The next diagnostic is a
+  narrower `compact+rel` robustness pass over both `25cp` and `50cp` groups
+  with more seeds. Only a repeatable result there justifies looking for a
+  cheap runtime representation.
