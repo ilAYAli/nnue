@@ -1443,6 +1443,10 @@ def create_config(args: argparse.Namespace) -> dict:
                 "--max-target-margin", str(args.pairwise_max_target_margin),
                 "--min-target-margin", str(args.pairwise_min_target_margin),
                 *(["--loss-weight-by-cp"] if args.pairwise_loss_weight_by_cp else []),
+                *(
+                    ["--project-export-weights-each-step"]
+                    if args.pairwise_project_export_weights_each_step else []
+                ),
                 "--device", args.device,
                 "--workers", str(args.workers),
                 "--max-rows", str(args.pairwise_max_rows),
@@ -2118,6 +2122,11 @@ def add_create_args(
     parser.add_argument("--pairwise-loss-weight-by-cp",
                         action=argparse.BooleanOptionalAction,
                         default=value("pairwise_loss_weight_by_cp", d.pairwise_loss_weight_by_cp))
+    parser.add_argument("--pairwise-project-export-weights-each-step",
+                        action=argparse.BooleanOptionalAction,
+                        default=value(
+                            "pairwise_project_export_weights_each_step",
+                            d.pairwise_project_export_weights_each_step))
     parser.add_argument("--pairwise-steps-per-epoch", type=int,
                         default=value("pairwise_steps_per_epoch", d.pairwise_steps_per_epoch))
     parser.add_argument("--pairwise-max-rows", type=int,

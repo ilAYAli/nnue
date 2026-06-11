@@ -730,6 +730,7 @@ class BuildConfigTests(unittest.TestCase):
                     "pairwise_init_from_nn": str(baseline),
                     "pairwise_pair_weight": 3.0,
                     "pairwise_checkpoint_every": 2,
+                    "pairwise_project_export_weights_each_step": True,
                     "pairwise_move_gate_cases": str(gate),
                     "engine_static_jsonl": str(labeled),
                     "engine_static_rows": 10,
@@ -765,6 +766,7 @@ class BuildConfigTests(unittest.TestCase):
                 "3.0",
                 train["command"][train["command"].index("--pair-weight") + 1],
             )
+            self.assertIn("--project-export-weights-each-step", train["command"])
 
             baseline_static = next(
                 step for step in config["steps"]

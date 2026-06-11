@@ -120,6 +120,18 @@ def to_device(items, device: str):
 
 
 @torch.no_grad()
+def project_exportable_parameters(model: EnyoNNUE) -> None:
+    model.embed.weight.round_().clamp_(
+        torch.iinfo(torch.int16).min, torch.iinfo(torch.int16).max)
+    model.input_bias.round_().clamp_(
+        torch.iinfo(torch.int16).min, torch.iinfo(torch.int16).max)
+    model.l1_weight.round_().clamp_(
+        torch.iinfo(torch.int8).min, torch.iinfo(torch.int8).max)
+    model.l1_bias.round_().clamp_(
+        torch.iinfo(torch.int32).min, torch.iinfo(torch.int32).max)
+
+
+@torch.no_grad()
 def pair_metrics(model: EnyoNNUE, loader: DataLoader, args) -> dict[str, float]:
     model.eval()
     n = 0
@@ -186,6 +198,8 @@ def pairwise_metadata(args, *, epoch: int | None = None) -> dict:
         "max_target_margin": args.max_target_margin,
         "min_target_margin": args.min_target_margin,
         "loss_weight_by_cp": bool(args.loss_weight_by_cp),
+        "project_export_weights_each_step": bool(
+            args.project_export_weights_each_step),
         "max_rows": args.max_rows,
         "skip_rows": args.skip_rows,
     }
@@ -268,6 +282,8 @@ def train(args) -> EnyoNNUE:
 
     opt = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    if args.project_export_weights_each_step:
+        project_exportable_parameters(model)
 
     for epoch in range(args.epochs):
         broad_mae_sum = 0.0
@@ -317,6 +333,8 @@ def train(args) -> EnyoNNUE:
             opt.zero_grad()
             loss.backward()
             opt.step()
+            if args.project_export_weights_each_step:
+                project_exportable_parameters(model)
 
             pair_err = (pred_margin.detach() - target_margin).abs()
             pair_mae_sum += float(pair_err.sum())
@@ -367,6 +385,8 @@ def main() -> None:
     ap.add_argument("--max-target-margin", type=float, default=800.0)
     ap.add_argument("--min-target-margin", type=float, default=1.0)
     ap.add_argument("--loss-weight-by-cp", action="store_true")
+    ap.add_argument("--project-export-weights-each-step", action="store_true",
+                    help="Round/clamp int-quantized weights after each optimizer step.")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--max-rows", type=int, default=0)
@@ -380,6 +400,24 @@ def main() -> None:
         Path(args.out_nn) if args.out_nn else None,
         args.device,
         pairwise_metadata(args))
+    if args.out_nn:
+        pair_set = HardPairDataset.from_jsonl(
+            args.pairs,
+            min_target_margin=args.min_target_margin,
+            max_target_margin=args.max_target_margin)
+        pair_loader = DataLoader(
+            pair_set, batch_size=args.pair_batch_size, shuffle=False,
+            collate_fn=collate_pairs, num_workers=0,
+            pin_memory=args.device.startswith("cuda"))
+        reloaded = load_model_from_nn(args.out_nn, device=args.device)
+        metrics = pair_metrics(reloaded, pair_loader, args)
+        print(
+            "export_reload"
+            f" pair_mae={metrics['pair_mae']:7.2f}"
+            f" pair_correct={100.0 * metrics['pair_correct']:5.1f}%"
+            f" pred_margin={metrics['pred_margin']:7.2f}"
+            f" target_margin={metrics['target_margin']:7.2f}",
+            flush=True)
 
 
 if __name__ == "__main__":

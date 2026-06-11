@@ -41,6 +41,7 @@ class TrainPairwiseMetadataTests(unittest.TestCase):
                 max_target_margin=800.0,
                 min_target_margin=1.0,
                 loss_weight_by_cp=True,
+                project_export_weights_each_step=True,
                 max_rows=200000,
                 skip_rows=0,
             )
@@ -55,6 +56,7 @@ class TrainPairwiseMetadataTests(unittest.TestCase):
             self.assertEqual(metadata["label_refs"], ["enyo", "stockfish"])
             self.assertIn(str(data), metadata["position_refs"])
             self.assertIn("/runs/replay/replay_full_pairs.jsonl", metadata["position_refs"])
+            self.assertTrue(metadata["project_export_weights_each_step"])
 
 
 if __name__ == "__main__":
