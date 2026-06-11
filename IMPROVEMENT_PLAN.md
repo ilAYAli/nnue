@@ -1759,3 +1759,32 @@ Conclusion:
 - Do not promote a runtime move-policy sidecar from this data alone.
 - Do not spend SPRT budget on the LC0-test91 sidecar lane without a new bridge
   that proves transfer on Enyo-specific failures first.
+
+## 2026-06-11 LC0 test91 plus Enyo loss-gate bridge audit
+
+Hypothesis:
+
+- LC0 test91 may still help if the sidecar is anchored on Enyo's own replay
+  loss gate instead of trained on LC0-only data.
+- Split the fixed `2487` Enyo loss-gate cases by source game, train on `1969`
+  cases, hold out `518` cases, then compare Enyo-only versus Enyo+LC0 mixes.
+
+Result:
+
+- Enyo-only sidecar holdout:
+  - compact features: `418/518`, `80.69%`;
+  - board features: `415/518`, `80.12%`.
+- Enyo x5 plus LC0-test91 5k holdout:
+  - compact features: `351/518`, `67.76%`;
+  - board features: `333/518`, `64.29%`.
+- Enyo x5 plus LC0-test91 10k holdout:
+  - compact features: `352/518`, `67.95%`;
+  - board features: `314/518`, `60.62%`.
+
+Conclusion:
+
+- LC0-test91 data actively hurts Enyo loss-gate generalization in this
+  bridge setup.
+- Close LC0-test91 as a direct move-policy bridge for now. Its value is as a
+  strong-play source audit, not as an immediate Enyo failure-correction signal.
+- Do not spend SPRT or runtime-integration budget on this mixed sidecar lane.
