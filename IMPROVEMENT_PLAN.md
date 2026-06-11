@@ -2063,16 +2063,28 @@ Result:
 - The dominant capture-over-quiet slice also improves with search depth:
   depth `8` selects the gate-best quiet move in `628/1071` (`58.6%`) cases and
   the original played capture in only `15/1071`.
+- Follow-up depth `12`/`16` sweep on the same `2487` rows with Enyo `743f3c2`
+  and native `1.23.0`:
+  - depth `12`: gate-best `1263/2487` (`50.8%`), played move `104`, other
+    `1120`;
+  - depth `16`: gate-best `1418/2487` (`57.0%`), played move `90`, other
+    `979`.
+- By move kind at depth `16`, the large capture-over-quiet slice improved to
+  `522/1071` gate-best with only `14` original played captures, but still left
+  `535` third-move choices. Quiet-over-quiet improved to `435/819` gate-best
+  but still left `319` third-move choices and `65` original played moves.
 
 Conclusion:
 
 - The replay-loss gate is not a pure scalar-eval training target. A large part
   of it is shallow search recovery: the existing net plus deeper search already
   finds many oracle moves.
-- Do not keep treating this gate as direct scalar NNUE supervision. Future work
-  should target the search/eval interface, move ordering, pruning/reduction
-  conditions, or a representation feature that changes root decisions without
-  broad scalar collapse.
+- Do not keep treating this gate as direct scalar NNUE supervision. Even depth
+  `16` leaves a large third-move bucket, so the gate is partly oracle/search
+  disagreement rather than a clean “bad replay move versus correct move” label.
+  Future work should target the search/eval interface, move ordering,
+  pruning/reduction conditions, or a representation feature that changes root
+  decisions without broad scalar collapse.
 - A useful next diagnostic is to isolate the `943/2487` depth-8 residual
   failures (`131` played move, `812` other) and study them separately; those
   are more likely to represent real missing evaluation/representation signal
