@@ -1023,6 +1023,11 @@ gates gives a concrete reason.
   `55-178-67/300`, about `-151.35 Elo`. Do not test or ship global LMR-off
   again; keep only the diagnostic insight that some residual failures are
   reduction-sensitive.
+- TT-off residual audit: with Enyo `3e1a20b`, native `1.23.0`, and UCI
+  `use_tt=false`, all `525` searched `(case, depth)` pairs at depths `8`,
+  `10`, and `12` were row-identical to default for best move and score. The
+  residual gate is not caused by transposition-table cutoffs in these fresh
+  per-position searches.
 
 ## Candidate Workflow
 
