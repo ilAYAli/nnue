@@ -997,6 +997,17 @@ gates gives a concrete reason.
   deeper search either. Prioritize search/eval-interface diagnostics over
   another scalar pairwise retrain.
 
+2026-06-11 LMR-off residual audit:
+
+- Re-ran the same `175` residual cases at depths `8`, `10`, and `12` with UCI
+  `use_lmr=false` on Enyo `9f3a006` and native `1.23.0`.
+- Result was row-identical to the baseline depth audit: all `525` searched
+  `(case, depth)` pairs had the same best move and score.
+- Conclusion: this residual set is not sensitive to the current `use_lmr` UCI
+  switch. Do not spend more time on LMR-off testing unless engine code review
+  first shows that the option is wired incorrectly or misses the relevant
+  reduction path.
+
 ## Candidate Workflow
 
 Normal candidate creation:
