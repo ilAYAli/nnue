@@ -1788,3 +1788,37 @@ Conclusion:
 - Close LC0-test91 as a direct move-policy bridge for now. Its value is as a
   strong-play source audit, not as an immediate Enyo failure-correction signal.
 - Do not spend SPRT or runtime-integration budget on this mixed sidecar lane.
+
+## 2026-06-11 LC0 test91 q-value scalar probe
+
+Hypothesis:
+
+- LC0 `test91` value targets may provide useful strong-play value information
+  even though LC0 policy sidecar transfer failed.
+- Calibrate LC0 `root_q` to Stockfish oracle CP on the audited 10k oracle
+  subset, convert the 500k LC0 slice to `.bullet`, mix it with the native
+  `1.23.0` searched-label data, and train a very low-dose scalar continuation.
+
+Result:
+
+- `native-7.4.0-rc1-lc0test91q500k-v23mix-lr5e9-sb128-20260611`
+  completed from `native-1.23.0` init using native data plus `500000` LC0
+  q-value rows.
+- Q calibration used the clean bounded fit `cp ~= 16.3 + 294.3 * root_q`
+  from the Stockfish-oracle subset; `.bullet` conversion was CP-only
+  (`bullet_wdl=0.0`).
+- Bullet static gate on native `1.23.0` data: `mae=148.246`, sign `83.02%`,
+  corr `0.813327`, slope `0.775087`.
+- Engine static gate on the material-phase mixed set: `mae=146.442`, sign
+  `83.18%`, corr `0.831152`, slope `0.839410`.
+- 300-game smoke versus `native-1.23.0`: `106-105-89`, Elo
+  `+1.16 +/- 33.03`, LOS `52.7%`.
+
+Conclusion:
+
+- Do not promote `native-7.4.0`; the smoke is neutral, not an improvement.
+- This is the best 7.x public/LC0 scalar probe so far, but still does not show
+  enough game movement to justify a 1000-game confirm.
+- Close the direct LC0 value-mixing scalar lane unless a later analysis shows a
+  narrower, concrete failure slice where LC0 value targets beat native/Stockfish
+  targets before games.
