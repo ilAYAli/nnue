@@ -2073,6 +2073,12 @@ Result:
   `522/1071` gate-best with only `14` original played captures, but still left
   `535` third-move choices. Quiet-over-quiet improved to `435/819` gate-best
   but still left `319` third-move choices and `65` original played moves.
+- Stockfish d12 child-position audit of the `979` depth-16 third-move choices
+  compared the gate-best child against Enyo's depth-16 alternative. With a
+  `25cp` parent-POV threshold, Stockfish preferred gate-best in `514`, Enyo's
+  alternative in `38`, and considered `427` equal. By move kind:
+  capture-over-quiet was `286/13/236` gate-best/Enyo/equal, and quiet-over-quiet
+  was `158/18/143`.
 
 Conclusion:
 
@@ -2080,8 +2086,10 @@ Conclusion:
   of it is shallow search recovery: the existing net plus deeper search already
   finds many oracle moves.
 - Do not keep treating this gate as direct scalar NNUE supervision. Even depth
-  `16` leaves a large third-move bucket, so the gate is partly oracle/search
-  disagreement rather than a clean “bad replay move versus correct move” label.
+  `16` leaves a large third-move bucket, and the Stockfish child audit says many
+  of those alternatives are still inferior to the gate-best move. The signal is
+  real, but the scalar net has repeatedly failed to move it without broad static
+  collapse.
   Future work should target the search/eval interface, move ordering,
   pruning/reduction conditions, or a representation feature that changes root
   decisions without broad scalar collapse.
