@@ -2074,3 +2074,29 @@ Conclusion:
   export-projected preservation-balanced probe. If that cannot keep broad static
   sane while moving the residual gate materially, close the depth-8 residual
   scalar lane and move back to representation/search-interface changes.
+
+Preservation-balanced export-projected check:
+
+- `native-1.40.3-rc1-v23-depth8resid175-qproj-preserve-lr3e5-e80-sb8192-20260611`
+  repeated the export-projected residual run with broad preservation restored
+  (`broad_weight=16`, `pair_weight=8`).
+- Broad engine-static stayed sane and modestly improved on MAE, but correlation
+  and slope softened:
+  - baseline: `mae=147.001`, sign `83.14%`, corr `0.831156`,
+    slope `0.843495`;
+  - candidate: `mae=143.013`, sign `82.26%`, corr `0.820356`,
+    slope `0.603012`.
+- The residual move gate still failed: baseline preferred the best move in
+  `89/175`; candidate `99/175`; fixed `12`; regressed `2`;
+  `delta_avg_margin=+17.9cp`; `delta_loss_weighted_margin=+24.2cp`.
+  The gate required at least `30` fixes and `+30cp` loss-weighted margin.
+
+Conclusion:
+
+- The depth-8 residual scalar lane is closed. Target-only export-projected
+  training can move the selected root cases but destroys broad eval; preserved
+  training keeps static eval usable but moves too few decisions.
+- Do not run SPRT for `native-1.40.3`.
+- Further progress should not be another scalar pairwise replay-loss knob.
+  Move effort to representation changes, search/eval interface changes, or a
+  separate policy-like signal that does not fight broad scalar preservation.
