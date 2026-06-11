@@ -1502,6 +1502,19 @@ Result:
 - A clean relaunch without pwa-mbp0 completed successfully:
   `69-94-137/300`, Elo `-29.02 +/- 29.6` versus the same engine/net baseline.
 
+Runtime audit:
+
+- SF14 child-scored root-trigger audit:
+  `runs/sidecar-rootguard-vs-native15-smoke1000-20260603/audit-engine-full-mt20.sf14.jsonl`.
+- Of `252` runtime trigger contexts, `203` had numeric Stockfish child deltas.
+  At the runtime threshold (`policy_margin_vs_baseline >= 18`,
+  `eval_drop_cp <= 80`), the selected set was `11` helpful, `38` neutral, and
+  `154` harmful using +/-`10cp` as the helpful/harmful cutoff.
+- Tightening the policy threshold did not reveal a safe action region: examples
+  include threshold `40` with `eval_drop_cp <= 80` selecting `2` helpful, `6`
+  neutral, and `46` harmful; threshold `10000` with `eval_drop_cp <= 80` still
+  selected `2` helpful, `6` neutral, and `42` harmful.
+
 Conclusion:
 
 - Reject the current move-policy sidecar runtime path. The offline loss-log
