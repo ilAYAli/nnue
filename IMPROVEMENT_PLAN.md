@@ -2079,6 +2079,12 @@ Result:
   alternative in `38`, and considered `427` equal. By move kind:
   capture-over-quiet was `286/13/236` gate-best/Enyo/equal, and quiet-over-quiet
   was `158/18/143`.
+- Repeating the same child-position audit at Stockfish d16 did not reverse the
+  result: `521` gate-best, `53` Enyo alternative, and `405` equal at the same
+  `25cp` threshold. At `100cp`, the confirmed set is `210` gate-best versus
+  `21` Enyo alternative. The signal is therefore teacher-depth stable, but still
+  small enough to treat as a focused diagnostic gate rather than a broad
+  training distribution.
 
 Conclusion:
 
