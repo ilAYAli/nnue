@@ -2044,3 +2044,33 @@ Conclusion:
   cannot memorize this slice when broad preservation is disabled, the failure is
   representational; if it can memorize it, the problem is preserving broad eval
   while moving those decisions.
+
+Target-only diagnostics:
+
+- `native-1.40.1-rc1-v23-depth8resid175-targetonly-lr1e4-e80-sb8192-20260611`
+  disabled broad preservation and appeared to fit the pair rows in float
+  PyTorch training (`98.9%` pair-correct), but the exported `.nn` reloaded in
+  Python fell back to `54.3%` pair-correct. Engine move gate only reached
+  `93/175`, with `fixed=32`, `regressed=28`, `delta_avg_margin=+9.9cp`, and
+  `delta_loss_weighted_margin=+17.5cp`. Broad static collapsed to
+  `mae=236.377`, sign `65.62%`, corr `0.541719`.
+- `train_pairwise.py` now reports export-reloaded pair metrics and supports
+  `--project-export-weights-each-step` so these runs cannot hide improvement in
+  unexportable float deltas.
+- `native-1.40.2-rc1-v23-depth8resid175-targetonly-qproj-lr1e4-e80-sb8192-20260611`
+  repeated the target-only diagnostic with export-grid projection. Exported
+  metrics matched training: `67.4%` pair-correct, `pred_margin=45.65cp`.
+  Engine move gate improved to `117/175`, with `fixed=63`, `regressed=35`,
+  `delta_avg_margin=+43.7cp`, and `delta_loss_weighted_margin=+50.0cp`.
+  Broad static collapsed harder: `mae=255.345`, sign `52.38%`, corr `0.211712`.
+
+Conclusion:
+
+- The residual signal is real enough to move the exported engine gate when
+  trained on the quantized grid, but target-only fitting destroys broad scalar
+  eval and still leaves a large harmful tail. Do not run games for `1.40.1` or
+  `1.40.2`.
+- The only remaining scalar follow-up worth running is a small
+  export-projected preservation-balanced probe. If that cannot keep broad static
+  sane while moving the residual gate materially, close the depth-8 residual
+  scalar lane and move back to representation/search-interface changes.
