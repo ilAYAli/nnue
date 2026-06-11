@@ -1035,6 +1035,14 @@ gates gives a concrete reason.
 - Conclusion: global TT-off is not a rescue lane. It removes useful search
   structure on this set. Keep the diagnostic only as confirmation that the
   residual failure is not fixed by disabling transposition-table cutoffs.
+- Temporary Enyo `743f3c2` diagnostic with quiet futility pruning and LMP
+  disabled did not improve the residual gate enough to justify a code lane:
+  - depth `8`: best `50/175`, replay-bad move `60/175`, other `65/175`;
+  - depth `10`: best `57/175`, replay-bad move `59/175`, other `59/175`;
+  - depth `12`: best `63/175`, replay-bad move `56/175`, other `56/175`.
+- Conclusion: broad quiet-pruning removal is weaker than LMR-off and below the
+  default depth-12 teacher-best count. Do not add pruning-disable options or
+  test this in games.
 
 ## Candidate Workflow
 
