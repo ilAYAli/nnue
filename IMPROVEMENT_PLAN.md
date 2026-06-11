@@ -1484,6 +1484,52 @@ Conclusion:
   this signal is revisited, it should be a separate policy/ranking path or a
   new non-scalar feature path with its own parity and NPS gates.
 
+## 2026-06-11 native-1.39.4 capture-over-quiet scalar diagnostic
+
+Purpose:
+
+- Check whether the scalar pairwise lane only failed because the replay-loss
+  gate was too broad. A failure taxonomy of
+  `runs/move-policy-loss-full-gate-20260531/cases.jsonl` showed the dominant
+  pattern: `68.4%` middlegame, `65.6%` queens-on, and the played move was a
+  capture in `60.6%` of cases while the oracle best move was quiet in `76.8%`
+  of cases.
+
+Run:
+
+- `native-1.39.4-rc1-v23-capturequiet-rank30-pw48-lr3e5-e40-sb8192-20260611`.
+- Pair rows: `runs/move-policy-loss-full-gate-20260531/pairs_capturequiet_rank30.jsonl`.
+- Filtered subset: `801` baseline-wrong quiet-over-capture pairs, `1602`
+  child rows, mostly queen middlegames.
+- Init and move-gate baseline: `native-1.23.0`.
+
+Result:
+
+- Rejected before games. The final checkpoint learned the targeted signal only
+  by collapsing broad scalar eval: engine-static went from baseline
+  `mae=147.001`, sign `83.14%`, corr `0.831`, slope `0.843` to candidate
+  `mae=236.911`, sign `61.63%`, corr `0.263`, slope `0.057`.
+- Final move gate also failed: candidate `1230/2487` versus baseline
+  `1141/2487`, `fixed=591`, `regressed=502`, `delta_avg_margin=-2.8cp`,
+  `delta_loss_weighted_margin=-14.9cp`.
+- Early checkpoint screen found no rescue point:
+  - `epoch-0003`: static `mae=138.086`, sign `82.72%`, corr `0.818`; gate
+    `fixed=36`, `regressed=29`, `delta_avg_margin=-0.1cp`,
+    `delta_loss_weighted_margin=-2.9cp`.
+  - `epoch-0007`: static `mae=169.605`; gate `fixed=154`, `regressed=115`,
+    `delta_loss_weighted_margin=-5.0cp`.
+  - later checkpoints fixed more cases only by damaging static fit and the
+    loss-weighted bad tail.
+
+Conclusion:
+
+- This focused subset confirms the closure of the scalar replay-loss/move-gate
+  repair lane. The quiet-over-capture signal is real, but scalar eval cannot
+  absorb it without broad regressions. Do not run games for `native-1.39.4`.
+- The next attempt at this signal must be non-scalar: a separate policy/ranking
+  path, a search-side feature, or a cheap attack/threat representation with
+  explicit NPS and parity gates.
+
 ## 2026-06-11 hard-delta scalar continuation check
 
 Purpose:
@@ -1861,3 +1907,27 @@ Conclusion:
   without a stronger pre-game gate. The 300-game smoke was a false positive.
 - Static fit and short smokes are now known to over-admit candidates in this
   lane; 1000-game confirms remain required before any promotion.
+
+## 2026-06-11 native-1.23 output-scale sweep
+
+Hypothesis:
+
+- The native `1.23.0` net might be under- or over-scaled for Enyo search even
+  if the raw scalar ordering is unchanged.
+
+Result:
+
+- Smoke tests scaled the native `1.23.0` output and played each scale against
+  unscaled native `1.23.0` for `300` games:
+  - scale `0.85`: `102-118-80`, Elo `-18.55 +/- 33.76`, LOS `14.0%`.
+  - scale `0.95`: `109-109-82`, Elo `0.00 +/- 33.57`, LOS `50.0%`.
+  - scale `1.05`: `108-113-79`, Elo `-5.79 +/- 33.80`, LOS `36.8%`.
+  - scale `1.15`: `89-129-82`, Elo `-46.60 +/- 33.76`, LOS `0.3%`.
+
+Conclusion:
+
+- No output-scale variant is an improvement candidate. Scale `0.95` is neutral,
+  modestly higher scale is negative, and `1.15` is clearly bad.
+- Treat the existing native `1.23.0` scale as close enough to optimal for the
+  current search. Do not spend more games on scalar output-scale tuning unless
+  the search/eval interface changes materially.
