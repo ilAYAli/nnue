@@ -2255,3 +2255,38 @@ Conclusion:
 - This reinforces the scalar result: the replay-loss/d16-child signal needs a
   better representation or a direct search fix, not another threshold tune on
   the existing sidecar.
+
+Wide-gate sidecar diagnostic:
+
+- `policy-d16child-widegate-compact-cv-20260611` widened the same
+  d16-confirmed child gate from the strict `231`-case `>=100cp` slice to
+  thresholded `50cp` and `25cp` slices, still using the existing compact
+  sidecar features.
+- At `50cp`, the dataset had `402` cases: `371` gate-best and `31`
+  engine-other. Across seeds `1,2,3,4,5,41,77,101`:
+  - hidden `16`: best validation average `52.62/100`, range `49-56`,
+    final average `50.00/100`;
+  - hidden `32`: best validation average `53.00/100`, range `50-55`,
+    final average `49.38/100`;
+  - hidden `64`: best validation average `53.00/100`, range `48-56`,
+    final average `49.25/100`.
+- At `25cp`, the dataset had `574` cases: `521` gate-best and `53`
+  engine-other. Across the same seeds:
+  - hidden `16`: best validation average `76.88/144`, range `74-84`,
+    final average `76.25/144`;
+  - hidden `32`: best validation average `77.62/144`, range `74-82`,
+    final average `75.88/144`;
+  - hidden `64`: best validation average `78.00/144`, range `74-82`,
+    final average `74.12/144`.
+
+Conclusion:
+
+- Adding more d16 child cases does not rescue the existing compact sidecar
+  representation. It memorizes training almost perfectly but validates only
+  around chance on the balanced `50cp` split and only slightly above label
+  prior on the `25cp` split.
+- Close the current compact sidecar formulation for this signal. The active
+  follow-up is a CPU-only threat/attack feature CV diagnostic
+  (`policy-d16child-threatcv-20260611`) to test whether explicit attack
+  relation features generalize before any Enyo hot-path threat work is
+  considered.
