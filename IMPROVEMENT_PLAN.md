@@ -1976,3 +1976,71 @@ Conclusion:
   region. Do not integrate or SPRT this sidecar.
 - The signal remains useful as a diagnostic target for a future representation
   or search feature, but not as the existing JSON sidecar threshold mechanism.
+
+## 2026-06-11 replay-loss gate depth sweep
+
+Purpose:
+
+- Check whether the fixed replay-loss move gate is mostly exposing scalar NNUE
+  ranking errors, or whether the current search already recovers many gate-best
+  moves when allowed a little more depth.
+
+Result:
+
+- Ran Enyo `9f3a006` with native `1.23.0` on all `2487` fixed replay-loss gate
+  positions and compared the engine root best move at depths `1`, `4`, and `8`
+  against the gate oracle move.
+- Overall gate-best recovery:
+  - depth `1`: `1082/2487` (`43.5%`), played move `261`, other `1144`.
+  - depth `4`: `1357/2487` (`54.6%`), played move `158`, other `972`.
+  - depth `8`: `1544/2487` (`62.1%`), played move `131`, other `812`.
+- By phase at depth `8`:
+  - opening: `141/201` (`70.1%`);
+  - middlegame: `1093/1701` (`64.3%`);
+  - endgame: `310/585` (`53.0%`).
+- The dominant capture-over-quiet slice also improves with search depth:
+  depth `8` selects the gate-best quiet move in `628/1071` (`58.6%`) cases and
+  the original played capture in only `15/1071`.
+
+Conclusion:
+
+- The replay-loss gate is not a pure scalar-eval training target. A large part
+  of it is shallow search recovery: the existing net plus deeper search already
+  finds many oracle moves.
+- Do not keep treating this gate as direct scalar NNUE supervision. Future work
+  should target the search/eval interface, move ordering, pruning/reduction
+  conditions, or a representation feature that changes root decisions without
+  broad scalar collapse.
+- A useful next diagnostic is to isolate the `943/2487` depth-8 residual
+  failures (`131` played move, `812` other) and study them separately; those
+  are more likely to represent real missing evaluation/representation signal
+  than the full replay-loss gate.
+
+Follow-up:
+
+- Extracted child positions for the depth-8 residual cases and labeled them
+  with Stockfish d12. Usable paired labels: `921`; Stockfish preferred the
+  gate-best move in `728`, the Enyo depth-8 move in `178`, and was equal in
+  `15`.
+- High-confidence subset with Stockfish margin `>=100cp`: `175` parent pairs.
+- `native-1.40.0-rc1-v23-depth8resid175-lr1e6-e24-sb8192-20260611` trained
+  only this high-confidence residual subset from native `1.23.0`, preserving
+  broad scalar fit.
+- Broad engine-static stayed sane and slightly improved:
+  - baseline: `mae=147.001`, sign `83.14%`, corr `0.831156`,
+    slope `0.843495`;
+  - candidate: `mae=142.492`, sign `83.02%`, corr `0.831594`,
+    slope `0.804543`.
+- The residual move gate failed: baseline preferred the best move in
+  `89/175`; candidate `90/175`; fixed `2`; regressed `1`;
+  `delta_avg_margin=+0.5cp`; `delta_loss_weighted_margin=+1.0cp`.
+
+Conclusion:
+
+- Even after removing shallow-search-recovered cases, direct scalar pairwise
+  training barely moves the relevant root choices. Do not SPRT `native-1.40.0`.
+- Before spending more game budget on this lane, run a target-only overfit
+  diagnostic on the same `175` residual pairs. If the current scalar network
+  cannot memorize this slice when broad preservation is disabled, the failure is
+  representational; if it can memorize it, the problem is preserving broad eval
+  while moving those decisions.
