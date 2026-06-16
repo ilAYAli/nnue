@@ -180,32 +180,34 @@ git diff --name-only origin/main..HEAD
 
 - Run long NNUE jobs in tmux.
 - Route notifications by audience:
-  - `AI_stdin`: agent wakeups for actionable long-run `done` and `fail`
-    events.
-  - `AI_stdout`: the agent stdout stream. Send concise summaries of status,
-    conclusions, actions taken, rejected lanes, critical failures, and next
-    actions. Strip raw shell commands and long logs; summarize them as actions
-    instead.
+  - `AI_stdin`: inbound to the agent. Anything sent here is delivered as if it
+    were typed directly into the agent's prompt. Two legitimate sources: the
+    user typing into the ntfy app, and the NNUE event hook waking the agent
+    for actionable long-run `done` and `fail` events. Do not send anything
+    here that is not meant to enter the agent's prompt.
+  - `AI_stdout`: outbound from the agent, exclusively for replying to a user
+    message that arrived via `AI_stdin`. Not a status stream, completion
+    stream, or failure stream. Do not use it for phase events, generic
+    summaries, or "the agent would tell the user in chat" mirroring.
   - `nnue`: user-worthy NNUE conclusions only.
   - `sprt`: handled by `sprt --ntfy-url`; do not duplicate SPRT summaries from
-    the NNUE event hook. Raw SPRT belongs on `sprt`; the interpreted conclusion
-    belongs on `AI_stdout`.
+    the NNUE event hook. Raw SPRT belongs on `sprt`; an interpreted
+    conclusion belongs on `nnue` if user-worthy, otherwise it stays in the
+    agent's chat reply.
 - User-worthy means promotion-relevant, materially improved, explicitly marked
   good news, or critical. Do not send phase spam, generic `done`, ordinary
   failed experiments, or pings to user-facing topics.
-- `AI_stdout` is not the same as the `nnue` user topic. Do not suppress
-  `AI_stdout` merely because the message is not good news; if the agent would
-  tell the user in chat, mirror the concise version to `AI_stdout`.
-- Use `tools/events/ai_stdout.sh` for manual agent summaries. Do not use raw
-  unauthenticated `curl` calls to `AI_stdout`.
+- Use `tools/events/ai_stdout.sh` only when replying to a user message that
+  arrived via `AI_stdin`. Do not use raw unauthenticated `curl` calls to
+  `AI_stdout`.
 - Always wake the agent for long-running completions and failures through the
   event hook. It sends agent control traffic to `AI_stdin` by default and also
   tries `notifai.sh` as a direct tmux wakeup path.
 - Set `NNUE_NOTIFAI_TARGET` explicitly for long-running jobs. It must point to
-  the active Codex pane, never a worker tmux session such as `nnue_native`,
+  the active Claude pane, never a worker tmux session such as `nnue_native`,
   `nnue_reckless`, `nnue_training`, or `nnue_test`.
-- Do not disable `NNUE_AI_STDIN_NTFY_ENABLE` for long runs. `AI_stdin` is agent
-  control traffic, not user-facing status.
+- Do not disable `NNUE_AI_STDIN_NTFY_ENABLE` for long runs. `AI_stdin` is the
+  agent's inbound channel, not user-facing status.
 - Do not rely on inherited tmux environment. Long-run launches should set the
   event split explicitly:
 
@@ -213,9 +215,8 @@ git diff --name-only origin/main..HEAD
 NNUE_NTFY_EVENTS=done,fail,test \
 NNUE_AI_STDIN_EVENTS=phase_done,done,fail \
 NNUE_AI_STDIN_NTFY_ENABLE=1 \
-NNUE_AI_STDOUT_EVENTS=done,fail \
 NNUE_USER_NOTIFY_GENERIC=0 \
-NNUE_NOTIFAI_TARGET=<current-codex-pane> \
+NNUE_NOTIFAI_TARGET=<current-claude-pane> \
 ./build.py create -c build.json \
   --event-command /home/petter/code/cpp/chess/nnue/tools/events/nnue_event_ntfy.sh
 ```
