@@ -63,13 +63,35 @@ def main():
     net_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Bullet pads to 64-byte boundary; Enyo expects exact size. Trim padding.
-    # Expected size for 16 input/12 channels/1 output/0 head with 1024 hidden: 25,203,012 bytes
-    expected_size = 25203012
+    # Compute expected size from architecture config
+    hidden = config["architecture"]["hidden"]
+    input_buckets = config["architecture"]["input_buckets"]
+    feature_channels = config["architecture"]["feature_channels"]
+    output_buckets = config["architecture"]["output_buckets"]
+    l2 = config["architecture"]["l2_size"]
+    l3 = 32
+    output_head_features = 0
+
+    expected_size = (
+        input_buckets * feature_channels * 64 * hidden * 2
+        + hidden * 2
+        + (2 * hidden) * l2
+        + l2 * 4
+        + l2 * l3 * 4
+        + l3 * 4
+        + output_buckets * (l3 + output_head_features) * 4
+        + output_buckets * 4
+    )
+
     with open(checkpoint, 'rb') as f:
         data = f.read()
+
+    if len(data) < expected_size:
+        raise RuntimeError(f"checkpoint too small: {len(data)} < {expected_size}")
     if len(data) > expected_size:
         print(f"Trimming Bullet padding: {len(data)} -> {expected_size} bytes", flush=True)
         data = data[:expected_size]
+
     with open(net_path, 'wb') as f:
         f.write(data)
 
