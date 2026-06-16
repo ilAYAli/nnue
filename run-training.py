@@ -35,22 +35,22 @@ def main():
     else:
         final_lr = config["training"]["lr_end_deep"]
 
-    # Build env vars for spike_trainer
+    # Build env vars for spike_trainer (Enyo mode)
     env = os.environ.copy()
     env.update({
+        "ENYO_BULLET_MODE": "enyo",
         "ENYO_BULLET_DATA": config["data"],
         "ENYO_BULLET_OUT": str(output_dir),
         "ENYO_BULLET_SUPERBATCHES": str(superbatches),
         "ENYO_BULLET_LR": str(config["training"]["lr_start"]),
         "ENYO_BULLET_FINAL_LR": str(final_lr),
         "ENYO_BULLET_HIDDEN": str(config["architecture"]["hidden"]),
-        "ENYO_BULLET_L2_SIZE": str(config["architecture"]["l2_size"]),
-        "ENYO_BULLET_L3_SIZE": str(config["architecture"]["l3_size"]),
-        "ENYO_BULLET_OUTPUT_BUCKETS": str(config["architecture"]["output_buckets"]),
-        "ENYO_BULLET_INPUT_BUCKETS": str(config["architecture"]["input_buckets"]),
-        "ENYO_BULLET_FEATURE_CHANNELS": str(config["architecture"]["feature_channels"]),
+        "ENYO_BULLET_L2": str(config["architecture"]["l2_size"]),
+        "ENYO_BULLET_ENYO_INPUT_BUCKETS": str(config["architecture"]["input_buckets"]),
+        "ENYO_BULLET_ENYO_FEATURE_CHANNELS": str(config["architecture"]["feature_channels"]),
+        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS": str(config["architecture"]["output_buckets"]),
         "ENYO_BULLET_THREADS": str(config["training"]["threads"]),
-        "ENYO_BULLET_WDL_LAMBDA": str(config["training"]["wdl_lambda"]),
+        "ENYO_BULLET_WDL": str(config["training"]["wdl_lambda"]),
         "ENYO_BULLET_EXPORT_INIT_ONLY": str(config["training"]["export_init_only"]),
     })
 
