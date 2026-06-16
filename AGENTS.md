@@ -21,11 +21,22 @@ Owns training and tooling changes only.
 - Read `IMPROVEMENT_PLAN.md` before choosing the next experiment.
 - Change one hypothesis at a time: data, target construction, objective,
   architecture, or validation.
+- Use `nnue-run` and a small `build.json` for normal NNUE runs. The config must
+  show `hypothesis`, `changed_variables`, and ordered `stages`.
+- Run `./nnue-run doctor -c build.json` before any training launch. Do not start
+  training if doctor fails.
 - Prefer changing `build.json` for experiment name, run directory, input data,
   target files, trainable scope, objective weights, thresholds, seeds, and row
   limits.
 - Change Python/C++ tools only when `build.py` cannot express the experiment or
   a tooling bug is found.
+- Python may orchestrate, report status, and run tests. Hot-path data work
+  over large row sets must use compiled C++ tools.
+- Do not add new Python tools under `tools/posgen`, `tools/pack`,
+  `tools/bullet`, `tools/score`, or `tools/validate` unless the change is a
+  small wrapper around a compiled tool and `nnue-run doctor` allows it.
+- If a Python hot-path has a compiled replacement, build configs must call the
+  compiled tool directly.
 - If a useful helper script lacks a `build.py` wrapper, add the wrapper before
   making it part of the normal workflow.
 - If a tool is added, it must be staged intentionally or removed before
@@ -234,3 +245,5 @@ NNUE_NOTIFAI_TARGET=<current-codex-pane> \
   distributed, record why in the status.
 - Do not start a new training run without an explicit instruction and a written
   hypothesis in `IMPROVEMENT_PLAN.md`.
+- Do not start a new training run from a dirty tree unless the only dirty files
+  are the active `build.json` and a deliberate `IMPROVEMENT_PLAN.md` update.

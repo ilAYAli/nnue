@@ -628,6 +628,10 @@ class BuildConfigTests(unittest.TestCase):
                 names.index("validate_engine_static"),
             )
 
+            train = next(step for step in config["steps"] if step["name"] == "train")
+            self.assertTrue(train["command"][0].endswith("nnue-train"))
+            self.assertEqual("supervised", train["command"][1])
+
             source_mix = next(
                 step for step in config["steps"]
                 if step["name"] == "source_mix"
@@ -758,6 +762,8 @@ class BuildConfigTests(unittest.TestCase):
             self.assertLess(names.index("validate_engine_static"), names.index("validate_move_gate"))
 
             train = next(step for step in config["steps"] if step["name"] == "train_pairwise")
+            self.assertTrue(train["command"][0].endswith("nnue-train"))
+            self.assertEqual("pairwise", train["command"][1])
             self.assertIn("--checkpoint-dir", train["command"])
             self.assertEqual(
                 "2",

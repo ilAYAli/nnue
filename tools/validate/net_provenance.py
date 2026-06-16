@@ -213,6 +213,7 @@ def extract_input_data_refs(text: str) -> list[str]:
     refs: list[str] = []
     for line in text.splitlines():
         if not any(marker in line for marker in (
+            "nnue-jsonl-to-bullet-text",
             "jsonl_to_bullet_text.py",
             "tools/score/score.py",
             "pack_dataset.py",

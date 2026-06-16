@@ -1,18 +1,22 @@
 # train
 
-`train` trains and evaluates Enyo NNUE candidate nets.
+`train` contains implementation modules for Enyo NNUE training.
+
+Use the single public training frontend from the repo root:
 
 ## Commands
 
 ```sh
-tools/train/train.py run --help
-tools/train/train.py eval --help
+./nnue-train supervised --help
+./nnue-train pairwise --help
+./nnue-train move-policy --help
+./nnue-train eval --help
 ```
 
 Example:
 
 ```sh
-tools/train/train.py run \
+./nnue-train supervised \
   --data run/packed \
   --init-from-nn ~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn \
   --objective huber \

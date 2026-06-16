@@ -1,7 +1,10 @@
 # NNUE Tools
 
-These are lower-level phase tools. Use `../build.py` for the normal net build
-workflow.
+These are lower-level phase tools. Use `../nnue-run` plus `../build.json` for
+the normal net build workflow.
+
+Python tools here may orchestrate, inspect, and run small validations. Large
+row processing in the normal workflow must go through compiled tools.
 
 ## Phase Tools
 
@@ -9,7 +12,7 @@ workflow.
 tools/posgen/posgen.py --help
 tools/score/score.py --help
 tools/pack/pack.py --help
-tools/train/train.py --help
+../nnue-train --help
 tools/validate/validate.py --help
 tools/pipeline/pipeline.py --help
 ```

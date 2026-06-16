@@ -31,6 +31,14 @@ def tool(path: str) -> str:
     return str(repo_root() / "tools" / path)
 
 
+def root_tool(path: str) -> str:
+    return str(repo_root() / path)
+
+
+def fast_tool(name: str) -> str:
+    return str(repo_root() / "build" / "fast" / name)
+
+
 def run(command: list[str], *, dry_run: bool = False) -> int:
     print(" ".join(command), flush=True)
     if dry_run:
@@ -510,10 +518,9 @@ def append_source_mix_step(
     steps: list[dict],
     args: argparse.Namespace,
 ) -> str:
-    python = str(expand_user(args.python))
     mix_output = "{score}/mixed.jsonl"
     command = [
-        python, tool("posgen/mix_jsonl.py"),
+        fast_tool("nnue-mix-jsonl"),
         "--output", mix_output,
         "--seed", str(args.source_mix_seed),
         "--progress", str(args.source_mix_progress),
@@ -1359,7 +1366,7 @@ def create_config(args: argparse.Namespace) -> dict:
             {
                 "name": "train",
                 "command": [
-                    python, tool("train/train.py"), "run",
+                    root_tool("nnue-train"), "supervised",
                     "--data", "{pack}/train",
                     "--init-from-nn", str(expand_path(args.init_net)),
                     "--objective", args.objective,
@@ -1421,7 +1428,7 @@ def create_config(args: argparse.Namespace) -> dict:
         steps.append({
             "name": "train_pairwise",
             "command": [
-                python, tool("train/train_pairwise.py"),
+                root_tool("nnue-train"), "pairwise",
                 "--data", pairwise_data,
                 "--pairs", templated_path_arg(args.pairwise_pairs_jsonl),
                 "--out", f"{candidate_dir}/model.pt",
@@ -1580,7 +1587,7 @@ def create_config(args: argparse.Namespace) -> dict:
                         {
                             "name": "bullet_text",
                             "command": [
-                                python, tool("bullet/jsonl_to_bullet_text.py"),
+                                fast_tool("nnue-jsonl-to-bullet-text"),
                                 "--input", templated_path_arg(args.bullet_source_jsonl),
                                 "--output", bullet_text,
                                 "--limit", str(args.bullet_limit),

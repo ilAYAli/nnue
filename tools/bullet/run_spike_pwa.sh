@@ -50,7 +50,7 @@ cd "$ROOT"
 {
     CURRENT_STAGE="bullet_text"
     notify phase_start bullet_text ok "convert JSONL to Bullet text"
-    tools/bullet/jsonl_to_bullet_text.py \
+    build/fast/nnue-jsonl-to-bullet-text \
         --input "$SOURCE_JSONL" \
         --output "$TEXT" \
         --limit "$ROWS" \
