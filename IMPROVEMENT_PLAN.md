@@ -45,6 +45,44 @@ Promotion criterion: 300-game smoke vs `default.net` neutral-positive
 (LOS > 30%), followed by a longer SPRT. Per `AGENTS.md`, three
 consecutive rejected candidates from the same family close the family.
 
+### Iteration 2+ outlook
+
+Conditional on iteration 1 producing a measurable candidate.
+
+Reference NNUE architectures from top engines:
+
+|                                  | Input buckets | L1   | L2 | L3 | Output buckets | Extras                       |
+|----------------------------------|---------------|------|----|----|----------------|------------------------------|
+| Enyo (current)                   | 16            | ~1024 | —  | —  | 1 (est.)       | —                            |
+| Alexandria 7.0.0 (CCRL Blitz #6) | 16            | 1536 | 16 | 32 | 8              | —                            |
+| Reckless (CCRL Blitz #2)         | 10            | 768  | 16 | 32 | 8              | threats (+66864 ft features) |
+
+Iteration 2+ priority, one variable family per iteration:
+
+1. **Add 8 output buckets** (Enyo source change, small). Both top
+   references use 8; Enyo at 1 is the clearest current gap. Smallest
+   effort, largest expected payoff.
+2. **Drop to ~10 input buckets** (Enyo source change: new
+   `KING_BUCKETS_10` table + `IsSupportedFeatureLayout` extension).
+   Matches Reckless; reduces data starvation per bucket.
+3. **Add L2/L3 hidden layers** (16 → 32 → 1×OUTPUT_BUCKETS). Matches
+   both references. Requires runtime extension on the engine side.
+4. **Threat features** as a parallel accumulator (Reckless-style).
+   Prior local work measured -39% NPS. Defer until 1–3 prove out.
+5. **L1 width** is bottom-priority. Alexandria (1536) and Reckless (768)
+   are both top-10; width alone is not a strength gate.
+
+Data scale-up — HF Stockfish, Lc0 FENs, or re-extracting the existing
+test91 tar — is an independent lever and can run in parallel with any
+of these. The preferred ingestion format for non-Lc0 sources is
+binpack: Stockfish publishes training data in binpack, Bullet has
+native `SfBinpackLoader` / `MontyBinpackLoader` / `ViriBinpackLoader`,
+and binpack is lossless relative to BulletFormat (which discards
+side-to-move, halfmove counter, and castling rights). Adding binpack
+ingestion is a small `tools/bullet/spike_trainer` change to select
+the loader by source-file extension; do not write a custom binpack
+parser, and do not add a binpack-to-BulletFormat conversion step.
+
 ## Closed Lanes
 
 Do not restart without a new representation or objective:
