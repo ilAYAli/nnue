@@ -62,7 +62,7 @@ def run_spike_trainer(
         "ENYO_BULLET_EXPORT_INIT_ONLY": "0",
     }
 
-    spike_trainer = Path(__file__).resolve().parents[1] / "bullet" / "spike_trainer"
+    spike_trainer = Path(__file__).resolve().parents[1] / "bullet" / "spike_trainer" / "target" / "release" / "enyo-bullet-spike"
     if not spike_trainer.exists():
         spike_trainer = shutil.which("enyo-bullet-spike")
         if not spike_trainer:
@@ -70,6 +70,7 @@ def run_spike_trainer(
                 "spike_trainer not found. Build it first:\n"
                 "  cd tools/bullet/spike_trainer && cargo build --release"
             )
+        spike_trainer = Path(spike_trainer)
 
     print(f"Training {rows} rows for {superbatches} superbatches via {spike_trainer}...", flush=True)
     result = subprocess.run(
