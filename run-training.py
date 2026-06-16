@@ -69,7 +69,7 @@ def main():
     feature_channels = config["architecture"]["feature_channels"]
     output_buckets = config["architecture"]["output_buckets"]
     l2 = config["architecture"]["l2_size"]
-    l3 = 32
+    l3 = config["architecture"]["l3_size"]
     output_head_features = 0
 
     expected_size = (
@@ -82,6 +82,7 @@ def main():
         + output_buckets * (l3 + output_head_features) * 4
         + output_buckets * 4
     )
+    print(f"Expected net size: {expected_size} bytes (hidden={hidden}, l2={l2}, l3={l3})", flush=True)
 
     with open(checkpoint, 'rb') as f:
         data = f.read()
