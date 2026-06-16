@@ -1,6 +1,55 @@
 {
-  "run": "placeholder",
-  "hypothesis": "Awaiting native-8.0.0-rc0 (pipeline parity). See IMPROVEMENT_PLAN.md. The iteration build.json will be written on a fresh branch when training starts.",
-  "changed_variables": {},
-  "stages": []
+  "run": "native-8.0.0-rc0-parity",
+  "hypothesis": "Pipeline parity check after square-indexing fix. Train 100k-row slice from lc0q10m.bullet, export, verify engine loads and evaluates sensibly (not -600 Elo). This is NOT a candidate; it's proof the fixed spike_trainer works.",
+  "changed_variables": {
+    "data_source": "lc0q10m.bullet 100k slice",
+    "architecture": "16×12 input buckets, 1024 hidden, 1 output bucket",
+    "training": "Bullet spike_trainer with square ^ 63 fix, 1 epoch, baseline params"
+  },
+  "stages": [
+    {
+      "name": "build_spike_trainer",
+      "command": "cd tools/bullet/spike_trainer && cargo build --release --features cuda",
+      "why": "Rebuild spike_trainer with CUDA and the square ^ 63 fix from main"
+    },
+    {
+      "name": "train",
+      "command": [
+        "ENYO_BULLET_DATASET=data/bullet/lc0q10m.bullet",
+        "ENYO_BULLET_OUTPUT=runs/native-8.0.0-rc0-parity/train",
+        "ENYO_BULLET_LIMIT=100000",
+        "ENYO_BULLET_SUPERBATCHES=64",
+        "ENYO_BULLET_LR=1e-3",
+        "ENYO_BULLET_FINAL_LR=3e-4",
+        "ENYO_BULLET_HIDDEN=1024",
+        "ENYO_BULLET_L2_SIZE=16",
+        "ENYO_BULLET_L3_SIZE=8",
+        "ENYO_BULLET_OUTPUT_BUCKETS=1",
+        "ENYO_BULLET_INPUT_BUCKETS=16",
+        "ENYO_BULLET_FEATURE_CHANNELS=12",
+        "ENYO_BULLET_THREADS=8",
+        "ENYO_BULLET_WDL_LAMBDA=0.3",
+        "ENYO_BULLET_EXPORT_INIT_ONLY=0",
+        "tools/bullet/spike_trainer/target/release/enyo-bullet-spike"
+      ],
+      "why": "Train 100k rows for 64 superbatches (~1 epoch equivalent). Small enough for fast iteration, large enough to produce coherent features."
+    },
+    {
+      "name": "export_verify",
+      "command": "ls -lh runs/native-8.0.0-rc0-parity/train/parity-64/quantised.bin && cp runs/native-8.0.0-rc0-parity/train/parity-64/quantised.bin ~/assets/nets/native-8.0.0-rc0-parity.nn",
+      "why": "Verify .nn was exported and copy to assets for testing"
+    },
+    {
+      "name": "engine_load_test",
+      "command": "echo 'uci\\nsetoption name nnue_file value ~/assets/nets/native-8.0.0-rc0-parity.nn\\nisready\\nposition fen r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\\nevalnet\\nquit' | ~/assets/engines/enyo_8bae476",
+      "why": "Load the net in hardened engine and eval a test position. Should print 'evalnet <score> cp' without errors. Score should be reasonable (-500 to +500 range, not wildly broken)."
+    }
+  ],
+  "gates": [
+    "spike_trainer builds successfully with cuda feature",
+    "training completes and produces quantised.bin at expected path",
+    "engine loads the .nn without error (hardened engine would fail on bad path/format)",
+    "evalnet produces a score in reasonable range (parity gate: if score looks sane, indexing is correct)",
+    "if this passes, iteration 1 (native-8.0.0-rc1 on full 10M lc0q10m) is cleared to start"
+  ]
 }
