@@ -63,24 +63,26 @@ def main():
     net_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Bullet pads to 64-byte boundary; Enyo expects exact size. Trim padding.
-    # Compute expected size from architecture config
+    # Compute expected size matching engine's NetworkSize formula
     hidden = config["architecture"]["hidden"]
     input_buckets = config["architecture"]["input_buckets"]
     feature_channels = config["architecture"]["feature_channels"]
     output_buckets = config["architecture"]["output_buckets"]
     l2 = config["architecture"]["l2_size"]
-    l3 = config["architecture"]["l3_size"]
+    # Engine has N_L3 = 32 hardcoded, not read from config
+    l3 = 32
     output_head_features = 0
+    n_output = 1
 
     expected_size = (
-        input_buckets * feature_channels * 64 * hidden * 2
-        + hidden * 2
-        + (2 * hidden) * l2
-        + l2 * 4
-        + l2 * l3 * 4
-        + l3 * 4
-        + output_buckets * (l3 + output_head_features) * 4
-        + output_buckets * 4
+        input_buckets * feature_channels * 64 * hidden * 2  # INPUT_WEIGHTS (int16)
+        + hidden * 2                                         # INPUT_BIASES (int16)
+        + (2 * hidden) * l2 * 1                             # L1_WEIGHTS (int8)
+        + l2 * 4                                            # L1_BIASES (int32)
+        + l2 * l3 * 4                                       # L2_WEIGHTS (float)
+        + l3 * 4                                            # L2_BIASES (float)
+        + output_buckets * (l3 + output_head_features) * n_output * 4  # OUTPUT_WEIGHTS (float)
+        + output_buckets * n_output * 4                     # OUTPUT_BIASES (float)
     )
     print(f"Expected net size: {expected_size} bytes (hidden={hidden}, l2={l2}, l3={l3})", flush=True)
 
