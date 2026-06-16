@@ -14,7 +14,7 @@ AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
 EVENTS=${NNUE_NTFY_EVENTS-done,fail,test}
 AI_EVENTS=${NNUE_AI_STDIN_EVENTS-phase_done,done,fail}
-AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS-done,fail}
+AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS-plan,done,fail}
 USER_GENERIC=${NNUE_USER_NOTIFY_GENERIC:-0}
 AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 AI_STDIN_NTFY_ENABLE=${NNUE_AI_STDIN_NTFY_ENABLE:-1}
@@ -319,6 +319,11 @@ if status:
     lines.append(f"  • State: {status}")
 if "rc" in event:
     lines.append(f"  • RC: {event['rc']}")
+if event_name == "plan" and message_text:
+    lines.append("")
+    lines.append("Plan")
+    for line in message_text.splitlines():
+        lines.append(f"  {line}" if line else "")
 
 lines.append("")
 lines.append("What ran")

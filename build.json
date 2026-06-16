@@ -7,12 +7,15 @@
     "data": "primary:uho52:sf:berserk",
     "objective": "output-only",
     "lr": "1e-10",
-    "batch": 512
+    "batch": 512,
+    "forge": "../crucible/scripts/forge",
+    "engine_hash": "replace-engine-hash",
+    "candidate_nnue": "{run_dir}/train/model.nn",
+    "reference_nnue": "default.net",
+    "smoke_games": 300,
+    "sprt_games": 1500
   },
   "run_dir": "runs/{run}",
-  "hooks": {
-    "event_command": "tools/events/nnue_event_ntfy.sh"
-  },
   "stages": [
     {
       "name": "train",
@@ -31,17 +34,42 @@
       ]
     },
     {
-      "name": "sprt_if_candidate",
-      "why": "Launch only when static_gate marks the net candidate-worthy.",
+      "name": "smoke_if_candidate",
+      "why": "Launch a small Crucible smoke through forge only when static_gate marks the net candidate-worthy.",
       "command": [
-        "echo",
-        "replace forge/crucible command for {run}"
+        "{var_forge}",
+        "nnue",
+        "{var_engine_hash}",
+        "--candidate-nnue",
+        "{var_candidate_nnue}",
+        "--reference-nnue",
+        "{var_reference_nnue}",
+        "--",
+        "--games",
+        "{var_smoke_games}"
+      ]
+    },
+    {
+      "name": "sprt_if_smoke_passes",
+      "why": "Launch the larger Crucible SPRT only after the smoke is neutral-positive.",
+      "command": [
+        "{var_forge}",
+        "nnue",
+        "{var_engine_hash}",
+        "--candidate-nnue",
+        "{var_candidate_nnue}",
+        "--reference-nnue",
+        "{var_reference_nnue}",
+        "--",
+        "--games",
+        "{var_sprt_games}"
       ]
     }
   ],
   "gates": [
     "train/export command must produce one model.nn",
     "static gate must report changed-variable metrics and decision",
-    "SPRT is allowed only for candidate_for_sprt_review"
+    "smoke is allowed only for candidate_for_smoke_review",
+    "SPRT is allowed only after smoke is neutral-positive"
   ]
 }
