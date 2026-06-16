@@ -55,6 +55,7 @@ def main():
     })
 
     print(f"=== Training {run_name}: {superbatches} superbatches ===", flush=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     subprocess.run([str(spike_trainer)], env=env, check=True)
 
     print(f"\n=== Exporting to {net_path} ===", flush=True)
