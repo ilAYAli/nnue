@@ -61,7 +61,17 @@ def main():
     print(f"\n=== Exporting to {net_path} ===", flush=True)
     checkpoint = output_dir / f"enyo_bullet_spike-{superbatches}/quantised.bin"
     net_path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["cp", str(checkpoint), str(net_path)], check=True)
+
+    # Bullet pads to 64-byte boundary; Enyo expects exact size. Trim padding.
+    # Expected size for 16 input/12 channels/1 output/0 head with 1024 hidden: 25,203,012 bytes
+    expected_size = 25203012
+    with open(checkpoint, 'rb') as f:
+        data = f.read()
+    if len(data) > expected_size:
+        print(f"Trimming Bullet padding: {len(data)} -> {expected_size} bytes", flush=True)
+        data = data[:expected_size]
+    with open(net_path, 'wb') as f:
+        f.write(data)
 
     print(f"\nTrained net: {net_path}")
 
