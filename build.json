@@ -1,27 +1,21 @@
 {
-  "run": "native-8.0.0-rc0-parity",
-  "hypothesis": "Pipeline parity check after square-indexing fix. Train 100k-row slice from lc0q10m.bullet, export, verify engine loads and evaluates sensibly (not -600 Elo). This is NOT a candidate; it's proof the fixed spike_trainer works.",
+  "run": "native-8.0.0-rc1",
+  "hypothesis": "First real native-8.0.0 candidate after square-indexing fix. Train on full 10M Lc0 test91 Q-targets (lc0q10m.bullet) for multiple epochs. Baseline architecture (16×12 input, 1536 hidden, 1 output bucket). Goal: establish native-8.0.0 lineage with verified training pipeline, target neutral-to-positive vs default.net.",
   "changed_variables": {
-    "data_source": "lc0q10m.bullet 100k slice",
-    "architecture": "16×12 input buckets, 1024 hidden, 1 output bucket",
-    "training": "Bullet spike_trainer with square ^ 63 fix, 1 epoch, baseline params"
+    "data_source": "lc0q10m.bullet (full 10M rows)",
+    "training_duration": "10 epochs (~760 superbatches, ~10 minutes on RTX 5090)",
+    "architecture": "16×12 input buckets, 1536 hidden, 1 output bucket (matches existing engine/tooling)"
   },
   "stages": [
     {
-      "name": "build_spike_trainer",
-      "command": "cd tools/bullet/spike_trainer && cargo build --release --features cuda",
-      "why": "Rebuild spike_trainer with CUDA and the square ^ 63 fix from main"
-    },
-    {
       "name": "train",
       "command": [
-        "ENYO_BULLET_DATASET=data/bullet/lc0q10m.bullet",
-        "ENYO_BULLET_OUTPUT=runs/native-8.0.0-rc0-parity/train",
-        "ENYO_BULLET_LIMIT=100000",
-        "ENYO_BULLET_SUPERBATCHES=64",
+        "ENYO_BULLET_DATA=data/bullet/lc0q10m.bullet",
+        "ENYO_BULLET_OUTPUT=runs/native-8.0.0-rc1/checkpoints",
+        "ENYO_BULLET_SUPERBATCHES=760",
         "ENYO_BULLET_LR=1e-3",
-        "ENYO_BULLET_FINAL_LR=3e-4",
-        "ENYO_BULLET_HIDDEN=1024",
+        "ENYO_BULLET_FINAL_LR=1e-4",
+        "ENYO_BULLET_HIDDEN=1536",
         "ENYO_BULLET_L2_SIZE=16",
         "ENYO_BULLET_L3_SIZE=8",
         "ENYO_BULLET_OUTPUT_BUCKETS=1",
@@ -32,24 +26,40 @@
         "ENYO_BULLET_EXPORT_INIT_ONLY=0",
         "tools/bullet/spike_trainer/target/release/enyo-bullet-spike"
       ],
-      "why": "Train 100k rows for 64 superbatches (~1 epoch equivalent). Small enough for fast iteration, large enough to produce coherent features."
+      "why": "Train on full 10M lc0q10m for 10 epochs. At ~76 superbatches/epoch, 760 total = 10 epochs. RTX 5090: ~1.2M pos/sec → ~10 min total. Standard lr schedule 1e-3 → 1e-4."
     },
     {
-      "name": "export_verify",
-      "command": "ls -lh runs/native-8.0.0-rc0-parity/train/parity-64/quantised.bin && cp runs/native-8.0.0-rc0-parity/train/parity-64/quantised.bin ~/assets/nets/native-8.0.0-rc0-parity.nn",
-      "why": "Verify .nn was exported and copy to assets for testing"
+      "name": "export_and_copy",
+      "command": "ls -lh runs/native-8.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin && cp runs/native-8.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin ~/assets/nets/native-8.0.0-rc1.nn",
+      "why": "Copy final checkpoint to assets as candidate net"
     },
     {
-      "name": "engine_load_test",
-      "command": "echo 'uci\\nsetoption name nnue_file value ~/assets/nets/native-8.0.0-rc0-parity.nn\\nisready\\nposition fen r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\\nevalnet\\nquit' | ~/assets/engines/enyo_8bae476",
-      "why": "Load the net in hardened engine and eval a test position. Should print 'evalnet <score> cp' without errors. Score should be reasonable (-500 to +500 range, not wildly broken)."
+      "name": "smoke_test",
+      "command": "echo 'uci\\nisready\\nevalnet load ~/assets/nets/native-8.0.0-rc1.nn\\nposition fen r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\\nevalnet\\nquit' | ~/assets/engines/enyo_dcc637b",
+      "why": "Sanity check: load net and eval test position. Should return reasonable score (not broken)."
+    },
+    {
+      "name": "sprt_256_game_smoke",
+      "command": "sprt --reference ~/assets/engines/enyo_dcc637b --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_dcc637b --candidate-uci 'nnue_file=~/assets/nets/native-8.0.0-rc1.nn' --games 256 --tc 10+0.1",
+      "why": "256-game smoke test vs default.net. Per memory: run smoke (256 games) before any longer SPRT. Gate: LOS > 20% to proceed to full SPRT. If LOS < 20%, candidate is likely regressive."
+    },
+    {
+      "name": "sprt_1k_main",
+      "command": "sprt --reference ~/assets/engines/enyo_dcc637b --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_dcc637b --candidate-uci 'nnue_file=~/assets/nets/native-8.0.0-rc1.nn' --games 1000 --tc 10+0.1 --sprt elo0=-5 elo1=5 alpha=0.05 beta=0.05",
+      "why": "Full 1k-game SPRT if smoke passes. H0: Elo ≤ -5, H1: Elo ≥ +5. Accept if neutral-to-positive, gives starting point for native-8.0.0 lineage."
     }
   ],
   "gates": [
-    "spike_trainer builds successfully with cuda feature",
-    "training completes and produces quantised.bin at expected path",
-    "engine loads the .nn without error (hardened engine would fail on bad path/format)",
-    "evalnet produces a score in reasonable range (parity gate: if score looks sane, indexing is correct)",
-    "if this passes, iteration 1 (native-8.0.0-rc1 on full 10M lc0q10m) is cleared to start"
+    "training completes (~10 min) and exports quantised.bin",
+    "smoke_test evalnet returns reasonable score (proves net is loadable and sane)",
+    "256-game smoke: LOS > 20% (if not, reject and iterate)",
+    "1k SPRT: if accepted (Elo ≥ -5), native-8.0.0-rc1 becomes native-8.0.0 baseline",
+    "if rejected at 1k SPRT (Elo < -5), document and start iteration 2 with different hyperparams"
+  ],
+  "notes": [
+    "This is the first native-8.0.0 candidate with verified square indexing.",
+    "Deliberately conservative: baseline arch, standard lr, Q-targets only.",
+    "If this passes, future iterations can explore: more epochs, pairwise training, architecture changes.",
+    "RTX 5090 training speed: ~1.2M pos/sec for 1536-hidden → 10M×10 epochs in ~10 min."
   ]
 }
