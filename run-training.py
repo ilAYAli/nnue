@@ -39,7 +39,7 @@ def main():
     env = os.environ.copy()
     env.update({
         "ENYO_BULLET_DATA": config["data"],
-        "ENYO_BULLET_OUTPUT": str(output_dir),
+        "ENYO_BULLET_OUT": str(output_dir),
         "ENYO_BULLET_SUPERBATCHES": str(superbatches),
         "ENYO_BULLET_LR": str(config["training"]["lr_start"]),
         "ENYO_BULLET_FINAL_LR": str(final_lr),
