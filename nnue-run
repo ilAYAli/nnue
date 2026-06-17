@@ -715,9 +715,15 @@ def event_hook_failures(config: dict[str, Any]) -> list[str]:
     return []
 
 
-def check_compiled_tools() -> list[str]:
+def check_compiled_tools(config: dict[str, Any]) -> list[str]:
     failures: list[str] = []
-    for new_tool in sorted(set(REPLACED_HOT_PATH_TOOLS.values())):
+    required_tools: set[str] = set()
+    for stage in config["stages"]:
+        text = command_text(stage["command"])
+        for new_tool in REPLACED_HOT_PATH_TOOLS.values():
+            if new_tool in text:
+                required_tools.add(new_tool)
+    for new_tool in sorted(required_tools):
         if compiled_tool_path(new_tool) is None:
             failures.append(f"compiled hot-path tool not found: {new_tool}; run cmake build first")
     return failures
@@ -783,7 +789,7 @@ def run_doctor_checks(
     failures.extend(event_hook_failures(config))
     failures.extend(check_forge_tools(config))
     if require_tools:
-        failures.extend(check_compiled_tools())
+        failures.extend(check_compiled_tools(config))
     if not skip_git:
         failures.extend(check_git_hygiene(config_path))
     return failures

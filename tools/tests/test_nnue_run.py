@@ -324,7 +324,7 @@ class NnueRunTests(unittest.TestCase):
             )
             self.assertTrue(any("./nnue-train pairwise" in failure for failure in failures))
 
-    def test_doctor_reports_missing_compiled_tools(self) -> None:
+    def test_doctor_does_not_require_unused_compiled_tools(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = self.write_config(Path(tmp))
             _, config = nnue_run.load_config(path)
@@ -334,6 +334,26 @@ class NnueRunTests(unittest.TestCase):
                 failures = nnue_run.run_doctor_checks(
                     path,
                     config,
+                    skip_git=True,
+                    require_tools=True,
+                )
+            finally:
+                nnue_run.compiled_tool_path = old_func
+            self.assertFalse(any("compiled hot-path tool" in failure for failure in failures))
+
+    def test_doctor_reports_missing_compiled_tools_when_config_uses_them(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self.write_config(Path(tmp))
+            config = json.loads(path.read_text(encoding="utf-8"))
+            config["stages"][0]["command"] = ["nnue-mix-jsonl", "--output", "x"]
+            path.write_text(json.dumps(config), encoding="utf-8")
+            _, loaded = nnue_run.load_config(path)
+            old_func = nnue_run.compiled_tool_path
+            nnue_run.compiled_tool_path = lambda _name: None
+            try:
+                failures = nnue_run.run_doctor_checks(
+                    path,
+                    loaded,
                     skip_git=True,
                     require_tools=True,
                 )
