@@ -1,20 +1,21 @@
 {
-  "run": "native-10.0.0-rc1",
+  "run": "native-11.0.0-rc1",
 
   "architecture": "architecture.json",
   "architecture_overrides": {
-    "output_buckets": 8
+    "input_buckets": 8,
+    "runtime_input_buckets": 8
   },
-  "hypothesis": "Keep the 1-input-bucket Enyo-native feature layout that now has clean export/eval parity, but split the output head into 8 material-count buckets. This tests whether the simple lane failed partly because one shared output head was underfitting across material phases.",
+  "hypothesis": "Keep the Enyo-native 12-channel feature layout and 1 output bucket, but reintroduce moderate king conditioning with 8 input buckets. This tests whether the 1-bucket candidates were too position-blind while avoiding the data starvation risk of the full 16-bucket layout.",
   "changed_variables": {
-    "architecture": "Set architecture_overrides.output_buckets=8; keep input_buckets=1, feature_channels=12, hidden=1024, data, dose, WDL, LR, and l0_std=32.0 unchanged from native-9.2.0-rc1."
+    "architecture": "Set architecture_overrides.input_buckets=8 and runtime_input_buckets=8; keep output_buckets=1, feature_channels=12, hidden=1024, data, dose, WDL, LR, and l0_std=32.0 unchanged."
   },
   "training": {
     "l0_std": 32.0
   },
   "notes": [
-    "native-9.2.0-rc1 passed Python .nn vs Enyo evalnet parity within 2 cp, so this is not an export/layout rescue run.",
-    "This is a new native major lineage because output-bucket runtime semantics change.",
+    "native-10.0.0-rc1 with 8 output buckets passed export/eval parity but lost every game in the 100-game smoke.",
+    "This is a new native major lineage because input-bucket runtime semantics change.",
     "Reject immediately if load/eval parity fails or if the 100-game smoke is negative."
   ]
 }

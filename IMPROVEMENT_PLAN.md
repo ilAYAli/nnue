@@ -29,6 +29,13 @@ the Enyo engine eval path agree within 2 cp on the fixed FEN set for
 `native-9.2.0-rc1`. The failure is not a byte layout, loader, or eval-path
 parity issue.
 
+The first output-bucket-only candidate, `native-10.0.0-rc1`, is also
+rejected. It loaded correctly as `hidden=1024`, `input_buckets=1`,
+`feature_channels=12`, `output_buckets=8`, and passed Python `.nn` vs
+Enyo `evalnet` parity within 2 cp. The 100-game smoke then lost every
+game: Elo -inf, LOS 0.0%, draw 0.0%, with no warnings. Do not retry
+8 output buckets on the 1-input-bucket base.
+
 ## Active Hypothesis
 
 ### Iteration 0 — pipeline parity (not a candidate)
@@ -111,21 +118,42 @@ spike-trainer path passed on `native-9.2.0-rc1`:
 Conclusion: the next candidate should change architecture or objective.
 Do not spend more games on 1-bucket init-scale variants.
 
-### Iteration 5 — next architecture hypothesis
+### Iteration 5 — `native-10.0.0-rc1` rejected
 
-Start the next candidate by adding output buckets before reintroducing
-more input buckets. This changes one architecture family while keeping the
-known-good 1-input-bucket feature layout:
+Added output buckets before reintroducing more input buckets. This changed
+one architecture family while keeping the known-good 1-input-bucket feature
+layout:
 
 - `input_buckets`: 1
 - `output_buckets`: 8
 - `hidden`: 1024
 - `feature_channels`: 12
 
-Gate this as a new native lineage because runtime semantics change. First
-prove the exact Enyo engine build can load and evaluate the 8-output-bucket
-net, then run the same 100-game smoke. If the smoke is negative, reject the
-output-bucket hypothesis and move to the 10/8 input-bucket lane.
+Result: rejected by the quick smoke. Export trimmed correctly to 1,610,976
+bytes. The engine loaded it as native NNUE with the intended 8 output
+buckets, the fixed smoke position returned `+5cp`, and Python `.nn` vs
+engine `evalnet` parity passed within 2 cp. The 100-game smoke lost every
+game: Elo -inf, LOS 0.0%, draw 0.0%, with no warnings.
+
+Conclusion: output buckets alone do not rescue the 1-input-bucket base.
+Move to the input-bucket lane.
+
+### Iteration 6 — `native-11.0.0-rc1` input-bucket hypothesis
+
+Reintroduce moderate king conditioning without returning to Enyo's full
+16-bucket layout yet. This changes one architecture family from the last
+playable-equivalent base:
+
+- `input_buckets`: 8
+- `runtime_input_buckets`: 8
+- `output_buckets`: 1
+- `hidden`: 1024
+- `feature_channels`: 12
+
+Keep data, dose, WDL, LR, and `l0_std=32.0` unchanged. Gate in the same
+order: export, load/eval metadata, Python `.nn` vs engine parity, then
+the 100-game smoke. If this still loses every game, stop architecture
+churn and change the data/objective theory instead.
 
 Reference NNUE architectures from top engines:
 
@@ -137,17 +165,14 @@ Reference NNUE architectures from top engines:
 
 Iteration 2+ priority, one variable family per iteration:
 
-1. **Add 8 output buckets** (Enyo source change, small). Both top
-   references use 8; Enyo at 1 is the clearest current gap. Smallest
-   effort, largest expected payoff.
-2. **Drop to ~10 input buckets** (Enyo source change: new
+1. **Drop to ~10 input buckets** (Enyo source change: new
    `KING_BUCKETS_10` table + `IsSupportedFeatureLayout` extension).
    Matches Reckless; reduces data starvation per bucket.
-3. **Add L2/L3 hidden layers** (16 → 32 → 1×OUTPUT_BUCKETS). Matches
+2. **Add L2/L3 hidden layers** (16 → 32 → 1×OUTPUT_BUCKETS). Matches
    both references. Requires runtime extension on the engine side.
-4. **Threat features** as a parallel accumulator (Reckless-style).
+3. **Threat features** as a parallel accumulator (Reckless-style).
    Prior local work measured -39% NPS. Defer until 1–3 prove out.
-5. **L1 width** is bottom-priority. Alexandria (1536) and Reckless (768)
+4. **L1 width** is bottom-priority. Alexandria (1536) and Reckless (768)
    are both top-10; width alone is not a strength gate.
 
 Data scale-up — HF Stockfish, Lc0 FENs, or re-extracting the existing
