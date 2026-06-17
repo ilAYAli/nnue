@@ -1,6 +1,11 @@
 __pycache__/
 *.pyc
 
+# Build artifacts
+/build/
+/build-*/
+/tools/bullet/spike_trainer/target/
+
 # Training artifacts
 *.pt
 *.nn
@@ -16,6 +21,15 @@ __pycache__/
 /tmp/
 /runs/
 /artifacts/
+/logs/
 
 # fastchess recovery config
 config.json
+
+# Local-only agent/operator notes and scratch helpers
+.claude/settings.local.json
+*.local.md
+check-training-progress.sh
+test-eval-scales.sh
+train-overnight.sh
+train-python-restart.sh
