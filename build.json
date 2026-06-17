@@ -1,65 +1,65 @@
 {
-  "run": "native-8.0.0-rc1",
-  "hypothesis": "First real native-8.0.0 candidate after square-indexing fix. Train on full 10M Lc0 test91 Q-targets (lc0q10m.bullet) for multiple epochs. Baseline architecture (16×12 input, 1536 hidden, 1 output bucket). Goal: establish native-8.0.0 lineage with verified training pipeline, target neutral-to-positive vs default.net.",
+  "run": "native-9.0.0-rc1",
+  "hypothesis": "Start the next native lineage with the simplest Enyo-native feature set: 1 input bucket, 12 piece-square channels, 1024 hidden, 1 output bucket. This tests whether removing king buckets avoids data starvation on the current 10M-row dataset before reintroducing 2/4/8/16 bucket layouts by Elo.",
   "changed_variables": {
+    "architecture": "1x12 input layout instead of 16x12; 1024 hidden to match Enyo runtime",
     "data_source": "lc0q10m.bullet (full 10M rows)",
-    "training_duration": "10 epochs (~760 superbatches, ~10 minutes on RTX 5090)",
-    "architecture": "16×12 input buckets, 1536 hidden, 1 output bucket (matches existing engine/tooling)"
+    "training_duration": "10 epochs (~760 superbatches)"
   },
   "stages": [
     {
       "name": "train",
       "command": [
+        "ENYO_BULLET_MODE=enyo",
         "ENYO_BULLET_DATA=data/bullet/lc0q10m.bullet",
-        "ENYO_BULLET_OUTPUT=runs/native-8.0.0-rc1/checkpoints",
+        "ENYO_BULLET_OUT=runs/native-9.0.0-rc1/checkpoints",
         "ENYO_BULLET_SUPERBATCHES=760",
         "ENYO_BULLET_LR=1e-3",
         "ENYO_BULLET_FINAL_LR=1e-4",
-        "ENYO_BULLET_HIDDEN=1536",
-        "ENYO_BULLET_L2_SIZE=16",
-        "ENYO_BULLET_L3_SIZE=8",
-        "ENYO_BULLET_OUTPUT_BUCKETS=1",
-        "ENYO_BULLET_INPUT_BUCKETS=16",
-        "ENYO_BULLET_FEATURE_CHANNELS=12",
+        "ENYO_BULLET_HIDDEN=1024",
+        "ENYO_BULLET_L2=16",
+        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS=1",
+        "ENYO_BULLET_ENYO_INPUT_BUCKETS=1",
+        "ENYO_BULLET_ENYO_FEATURE_CHANNELS=12",
         "ENYO_BULLET_THREADS=8",
-        "ENYO_BULLET_WDL_LAMBDA=0.3",
+        "ENYO_BULLET_WDL=0.3",
         "ENYO_BULLET_EXPORT_INIT_ONLY=0",
         "tools/bullet/spike_trainer/target/release/enyo-bullet-spike"
       ],
-      "why": "Train on full 10M lc0q10m for 10 epochs. At ~76 superbatches/epoch, 760 total = 10 epochs. RTX 5090: ~1.2M pos/sec → ~10 min total. Standard lr schedule 1e-3 → 1e-4."
+      "why": "Train the simplest Enyo native net first: 768 features per perspective, no king buckets, runtime-compatible 1024 hidden, and otherwise the same data/dose/lr family."
     },
     {
       "name": "export_and_copy",
-      "command": "ls -lh runs/native-8.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin && cp runs/native-8.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin ~/assets/nets/native-8.0.0-rc1.nn",
-      "why": "Copy final checkpoint to assets as candidate net"
+      "command": "ls -lh runs/native-9.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin && cp runs/native-9.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin ~/assets/nets/native-9.0.0-rc1.nn",
+      "why": "Copy final checkpoint to assets as the candidate net."
     },
     {
       "name": "smoke_test",
-      "command": "echo 'uci\\nisready\\nevalnet load ~/assets/nets/native-8.0.0-rc1.nn\\nposition fen r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\\nevalnet\\nquit' | ~/assets/engines/enyo_dcc637b",
-      "why": "Sanity check: load net and eval test position. Should return reasonable score (not broken)."
+      "command": "printf 'uci\\nisready\\nsetoption name nnue_file value ~/assets/nets/native-9.0.0-rc1.nn\\nposition fen r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\\ngo depth 1\\nquit\\n' | ~/assets/engines/enyo_1bucket_loadproof",
+      "why": "The engine must be built from the Enyo branch with 1-bucket runtime support. Startup must log evaluator=native-nnue, the candidate path, sha256, hidden=1024, input_buckets=1, feature_channels=12."
     },
     {
       "name": "sprt_256_game_smoke",
-      "command": "sprt --reference ~/assets/engines/enyo_dcc637b --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_dcc637b --candidate-uci 'nnue_file=~/assets/nets/native-8.0.0-rc1.nn' --games 256 --tc 10+0.1",
-      "why": "256-game smoke test vs default.net. Per memory: run smoke (256 games) before any longer SPRT. Gate: LOS > 20% to proceed to full SPRT. If LOS < 20%, candidate is likely regressive."
+      "command": "sprt --reference ~/assets/engines/enyo_1bucket_loadproof --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_1bucket_loadproof --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 256 --tc 10+0.1",
+      "why": "256-game smoke vs default.net before any longer SPRT. Gate: neutral-positive, or reject and iterate."
     },
     {
       "name": "sprt_1k_main",
-      "command": "sprt --reference ~/assets/engines/enyo_dcc637b --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_dcc637b --candidate-uci 'nnue_file=~/assets/nets/native-8.0.0-rc1.nn' --games 1000 --tc 10+0.1 --sprt elo0=-5 elo1=5 alpha=0.05 beta=0.05",
-      "why": "Full 1k-game SPRT if smoke passes. H0: Elo ≤ -5, H1: Elo ≥ +5. Accept if neutral-to-positive, gives starting point for native-8.0.0 lineage."
+      "command": "sprt --reference ~/assets/engines/enyo_1bucket_loadproof --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_1bucket_loadproof --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 1000 --tc 10+0.1 --sprt elo0=-5 elo1=5 alpha=0.05 beta=0.05",
+      "why": "Only run if the 256-game smoke is not negative. Elo, not training loss, decides whether this simple architecture is worth keeping."
     }
   ],
   "gates": [
-    "training completes (~10 min) and exports quantised.bin",
-    "smoke_test evalnet returns reasonable score (proves net is loadable and sane)",
-    "256-game smoke: LOS > 20% (if not, reject and iterate)",
-    "1k SPRT: if accepted (Elo ≥ -5), native-8.0.0-rc1 becomes native-8.0.0 baseline",
-    "if rejected at 1k SPRT (Elo < -5), document and start iteration 2 with different hyperparams"
+    "Enyo engine build with 1-bucket support passes unit tests and accumulator refresh tests",
+    "training completes and exports quantised.bin",
+    "smoke_test logs evaluator=native-nnue with hidden=1024 input_buckets=1 feature_channels=12 and the expected sha256",
+    "256-game smoke is neutral-positive before any longer SPRT",
+    "if accepted, try 2 buckets next; if rejected, tune only one of init scale, lr, or data dose"
   ],
   "notes": [
-    "This is the first native-8.0.0 candidate with verified square indexing.",
-    "Deliberately conservative: baseline arch, standard lr, Q-targets only.",
-    "If this passes, future iterations can explore: more epochs, pairwise training, architecture changes.",
-    "RTX 5090 training speed: ~1.2M pos/sec for 1536-hidden → 10M×10 epochs in ~10 min."
+    "This follows Bullet's recommendation to start with a simple net before scaling architecture.",
+    "Do not warm-start from 16-bucket weights into this 1-bucket layout without an explicit folding converter.",
+    "Keep WDL/lr/data unchanged for this first architecture test; mutate one of those only after this baseline is measured.",
+    "The required engine is not the old enyo_dcc637b binary; it must include the Enyo 1-bucket loader/runtime changes."
   ]
 }

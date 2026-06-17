@@ -14,9 +14,10 @@ hash, and static gates were treated as promotion evidence without verified
 game results. The reported `uho52_lr1e4_e64.nn` -730 Elo result is
 uninterpretable, not a measurement.
 
-A new lineage, `native-8.0.0`, starts after the validation chain is
-hardened in the engine (`~/code/cpp/chess/enyo`) and in
-`./nnue-run doctor`. No training counts until then.
+A new simple-architecture lineage, `native-9.0.0`, is the next active
+candidate lane. It starts after native loading is hardened in the engine
+and `./nnue-run doctor` can prove the configured engine/net path before
+training or games. No training counts until then.
 
 ## Active Hypothesis
 
@@ -29,16 +30,19 @@ SPRT vs `default.net` to verify both sides log the expected evaluator and
 file hash. The candidate is expected to lose; the test is whether the
 chain reports it correctly.
 
-### Iteration 1 — `native-8.0.0-rc1`
+### Iteration 1 — `native-9.0.0-rc1`
 
 Run only if iteration 0 passes.
 
-Lc0 test91 Q-targets at 10M rows produce a native-MAJOR baseline that
-holds its own against `default.net`. One variable family changed: data.
-Architecture, objective, learning rate, and batch size come from the
-cleanest pre-codex recipe under `recipes/`.
+Lc0 test91 Q-targets at 10M rows produce a simple Enyo-native baseline
+that holds its own against `default.net`. One variable family changed:
+architecture. Start without king/input buckets so each piece-square
+feature receives far more data before reintroducing 2/4/8/16 bucket
+layouts by Elo.
 
 `changed_variables`:
+- `architecture`: 1 input bucket, 12 piece-square channels, 1024 hidden,
+  1 output bucket
 - `source_bullet`: `data/bullet/lc0q10m.bullet`
 
 Promotion criterion: 300-game smoke vs `default.net` neutral-positive
