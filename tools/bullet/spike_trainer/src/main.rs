@@ -177,7 +177,7 @@ impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize> SparseInputType
         let stm_king = pos.our_ksq() ^ 56;
         let ntm_king = pos.opp_ksq();
         for (piece, square) in pos.into_iter() {
-            let sq = square ^ 63;
+            let sq = square ^ 56;
             f(
                 enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, stm_king, 0),
                 enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, ntm_king, 1),
