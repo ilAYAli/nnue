@@ -14,7 +14,7 @@
     },
     {
       "name": "export_and_copy",
-      "command": "ls -lh runs/native-9.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin && cp runs/native-9.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin ~/assets/nets/native-9.0.0-rc1.nn",
+      "command": "src=runs/native-9.0.0-rc1/checkpoints/enyo_bullet_spike-760/quantised.bin; dst=$HOME/assets/nets/native-9.0.0-rc1.nn; expected_size=1610052; ls -lh \"$src\"; actual=$(stat -c '%s' \"$src\"); if [ \"$actual\" -lt \"$expected_size\" ]; then echo \"ERROR: $src is $actual bytes, expected at least $expected_size\" >&2; exit 1; fi; if [ \"$actual\" -ne \"$expected_size\" ]; then echo \"Trimming Bullet padding: $actual -> $expected_size bytes\"; fi; mkdir -p \"$HOME/assets/nets\"; head -c \"$expected_size\" \"$src\" > \"$dst\"; stat -c '%n %s bytes' \"$dst\"",
       "why": "Copy final checkpoint to assets as the candidate net."
     },
     {
