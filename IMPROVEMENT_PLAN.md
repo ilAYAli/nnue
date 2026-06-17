@@ -21,9 +21,10 @@ the engine loaded the candidate as native NNUE with `hidden=1024`,
 `default.net` failed cleanly with no warnings: Elo -381.7 +/- 128.6,
 LOS 0.0%, draw 0.0%. Do not promote it and do not run the 1k SPRT.
 
-The active lane remains the simple 1-bucket architecture for now. This
-is only the first failed candidate in the family, so do not close it yet.
-The next experiment must mutate exactly one non-architecture variable.
+The active lane remains the simple 1-bucket architecture for now. Two
+candidate settings in this family have failed the smoke gate; a third
+near-identical failure closes the family. Do not start the next training
+run until its single changed variable is written here first.
 
 ## Active Hypothesis
 
@@ -50,7 +51,7 @@ searched correctly, but game strength was far below `default.net`.
 
 Result: rejected by the quick smoke. Do not rerun unchanged.
 
-### Iteration 2 — `native-9.1.0-rc1`
+### Iteration 2 — `native-9.1.0-rc1` rejected
 
 Same architecture, data, dose, WDL, and learning-rate family as
 `native-9.0.0-rc1`. Mutate only the L0 initialization scale to compensate
@@ -61,9 +62,25 @@ for the Enyo quantized path dividing L0 activations by 32:
   rejected
 - keep input buckets at 1
 
-Promotion criterion: 100-game smoke vs `default.net` with LOS >= 50%,
-then a longer SPRT. Per `AGENTS.md`, three consecutive rejected
-candidates from the same family close the family.
+Result: rejected by the quick smoke. The net loaded as native NNUE with
+`hidden=1024`, `input_buckets=1`, and `feature_channels=12`, and export
+trimmed correctly to 1,610,052 bytes. The fixed smoke position produced
+a wildly high `+2045cp` depth-1 eval. The 100-game smoke vs `default.net`
+finished Elo -798.2, LOS 0.0%, draw 0.0%, with one reference
+responsiveness warning. Do not promote it and do not run the 1k SPRT.
+
+Conclusion: full 32x L0 init compensation is too large for this path.
+The init-scale theory is not closed, but `l0_std=256` is rejected.
+
+### Iteration 3 — next decision
+
+Before training again, choose exactly one:
+
+- continue the same lane with a smaller single init-scale mutation, such
+  as `training.l0_std=32.0`; or
+- stop training and inspect spike-trainer export/eval parity on this
+  1-bucket architecture, because both failed candidates load correctly
+  but produce unplayable game strength.
 
 ### Iteration 2+ outlook
 
