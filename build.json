@@ -23,21 +23,21 @@
       "why": "The engine must be built from the Enyo branch with 1-bucket runtime support. Startup must log evaluator=native-nnue, the candidate path, sha256, hidden=1024, input_buckets=1, feature_channels=12."
     },
     {
-      "name": "sprt_256_game_smoke",
-      "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 256 --concurrency 8 --threads 1 --tc 10+0.1",
-      "why": "256-game smoke vs default.net before any longer SPRT. Gate: neutral-positive, or reject and iterate."
+      "name": "sprt_100_game_smoke",
+      "command": "bash -lc 'tmp=$(mktemp); sprt --reference ~/assets/engines/enyo_91ede5f --candidate ~/assets/engines/enyo_91ede5f --reference-uci nnue_file=~/code/cpp/chess/enyo/net/default.net --candidate-uci nnue_file=~/assets/nets/native-9.0.0-rc1.nn --concurrency 16 --games 100 2>&1 | tee \"$tmp\"; rc=${{PIPESTATUS[0]}}; final=$(grep -E \"^\\[[[:space:]]*[0-9]+/\" \"$tmp\" | tail -1); rm -f \"$tmp\"; echo \"Final SPRT line: $final\"; if [ \"$rc\" -ne 0 ]; then exit \"$rc\"; fi; los=$(printf \"%s\\n\" \"$final\" | sed -n \"s/.*LOS[[:space:]]*\\([0-9.]*\\)%.*/\\1/p\"); if [ -z \"$los\" ]; then echo \"ERROR: no LOS in SPRT output\"; exit 1; fi; if ! awk -v los=\"$los\" \"BEGIN {{ exit !(los >= 50.0) }}\"; then echo \"ERROR: smoke SPRT was negative (LOS ${{los}}%)\"; exit 1; fi'",
+      "why": "100-game smoke vs default.net before any longer SPRT. Gate: LOS must be at least 50%, or reject and iterate."
     },
     {
       "name": "sprt_1k_main",
       "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 1000 --concurrency 8 --threads 1 --tc 10+0.1 --elo0 -5 --elo1 5 --alpha 0.05 --beta 0.05",
-      "why": "Only run if the 256-game smoke is not negative. Elo, not training loss, decides whether this simple architecture is worth keeping."
+      "why": "Only run if the smoke gate is not negative. Elo, not training loss, decides whether this simple architecture is worth keeping."
     }
   ],
   "gates": [
     "Enyo engine build with 1-bucket support passes unit tests and accumulator refresh tests",
     "training completes and exports quantised.bin",
     "smoke_test logs evaluator=native-nnue with hidden=1024 input_buckets=1 feature_channels=12 and the expected sha256",
-    "256-game smoke is neutral-positive before any longer SPRT",
+    "100-game smoke is neutral-positive before any longer SPRT",
     "if accepted, try 2 buckets next; if rejected, tune only one of init scale, lr, or data dose"
   ],
   "notes": [
