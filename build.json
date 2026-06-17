@@ -1,15 +1,16 @@
 {
-  "run": "native-9.1.0-rc1",
+  "run": "native-9.2.0-rc1",
   "architecture": "architecture.json",
-  "hypothesis": "Same native 1-bucket architecture, data, dose, WDL, and learning-rate family as native-9.0.0-rc1. Mutate only the first-layer init scale to compensate for the Enyo quantized path dividing L0 activations by 32.",
+  "hypothesis": "Same native 1-bucket architecture, data, dose, WDL, and learning-rate family as native-9.0.0-rc1. Mutate only the first-layer init scale to a smaller compensation value after l0_std=256.0 overshot badly.",
   "changed_variables": {
-    "init_scale": "Set training.l0_std=256.0; keep the native-9.0.0-rc1 architecture, data, dose, WDL, and LR family unchanged."
+    "init_scale": "Set training.l0_std=32.0; keep the native-9.0.0-rc1 architecture, data, dose, WDL, and LR family unchanged."
   },
   "training": {
-    "l0_std": 256.0
+    "l0_std": 32.0
   },
   "notes": [
     "native-9.0.0-rc1 was rejected by the 100-game smoke: Elo -381.7 +/- 128.6, LOS 0.0%, draw 0.0%.",
+    "native-9.1.0-rc1 with l0_std=256.0 was rejected by the 100-game smoke: Elo -798.2, LOS 0.0%, draw 0.0%.",
     "Do not change bucket count, data dose, WDL, LR, or l1_std for this candidate."
   ]
 }

@@ -72,15 +72,20 @@ responsiveness warning. Do not promote it and do not run the 1k SPRT.
 Conclusion: full 32x L0 init compensation is too large for this path.
 The init-scale theory is not closed, but `l0_std=256` is rejected.
 
-### Iteration 3 — next decision
+### Iteration 3 — `native-9.2.0-rc1`
 
-Before training again, choose exactly one:
+Same architecture, data, dose, WDL, and learning-rate family as
+`native-9.0.0-rc1`. Mutate only the L0 initialization scale to a smaller
+single compensation value after `native-9.1.0-rc1` overshot badly:
 
-- continue the same lane with a smaller single init-scale mutation, such
-  as `training.l0_std=32.0`; or
-- stop training and inspect spike-trainer export/eval parity on this
-  1-bucket architecture, because both failed candidates load correctly
-  but produce unplayable game strength.
+- set `training.l0_std=32.0`
+- keep `training.l1_std=1.0`
+- keep input buckets at 1
+
+Promotion criterion: 100-game smoke vs `default.net` with LOS >= 50%,
+then a longer SPRT. If this fails hard, close the simple 1-bucket
+init-scale family and inspect spike-trainer export/eval parity before
+spending more games.
 
 ### Iteration 2+ outlook
 
