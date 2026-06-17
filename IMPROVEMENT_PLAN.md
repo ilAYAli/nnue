@@ -14,10 +14,16 @@ hash, and static gates were treated as promotion evidence without verified
 game results. The reported `uho52_lr1e4_e64.nn` -730 Elo result is
 uninterpretable, not a measurement.
 
-A new simple-architecture lineage, `native-9.0.0`, is the next active
-candidate lane. It starts after native loading is hardened in the engine
-and `./nnue-run doctor` can prove the configured engine/net path before
-training or games. No training counts until then.
+The first simple-architecture candidate, `native-9.0.0-rc1`, proved the
+pipeline but failed the game gate. Export and engine loading were correct:
+the engine loaded the candidate as native NNUE with `hidden=1024`,
+`input_buckets=1`, and `feature_channels=12`. The 100-game smoke vs
+`default.net` failed cleanly with no warnings: Elo -381.7 +/- 128.6,
+LOS 0.0%, draw 0.0%. Do not promote it and do not run the 1k SPRT.
+
+The active lane remains the simple 1-bucket architecture for now. This
+is only the first failed candidate in the family, so do not close it yet.
+The next experiment must mutate exactly one non-architecture variable.
 
 ## Active Hypothesis
 
@@ -30,24 +36,34 @@ SPRT vs `default.net` to verify both sides log the expected evaluator and
 file hash. The candidate is expected to lose; the test is whether the
 chain reports it correctly.
 
-### Iteration 1 — `native-9.0.0-rc1`
+### Iteration 1 — `native-9.0.0-rc1` rejected
 
-Run only if iteration 0 passes.
-
-Lc0 test91 Q-targets at 10M rows produce a simple Enyo-native baseline
-that holds its own against `default.net`. One variable family changed:
-architecture. Start without king/input buckets so each piece-square
-feature receives far more data before reintroducing 2/4/8/16 bucket
-layouts by Elo.
+Lc0 test91 Q-targets at 10M rows did not produce a playable simple
+Enyo-native baseline from the default spike trainer Enyo init scale.
+One variable family changed: architecture. The resulting net loaded and
+searched correctly, but game strength was far below `default.net`.
 
 `changed_variables`:
 - `architecture`: 1 input bucket, 12 piece-square channels, 1024 hidden,
   1 output bucket
 - `source_bullet`: `data/bullet/lc0q10m.bullet`
 
-Promotion criterion: 300-game smoke vs `default.net` neutral-positive
-(LOS > 30%), followed by a longer SPRT. Per `AGENTS.md`, three
-consecutive rejected candidates from the same family close the family.
+Result: rejected by the quick smoke. Do not rerun unchanged.
+
+### Iteration 2 — `native-9.1.0-rc1`
+
+Same architecture, data, dose, WDL, and learning-rate family as
+`native-9.0.0-rc1`. Mutate only the L0 initialization scale to compensate
+for the Enyo quantized path dividing L0 activations by 32:
+
+- set `ENYO_BULLET_ENYO_L0_STD=256`
+- keep `ENYO_BULLET_ENYO_L1_STD` at the default unless this candidate is
+  rejected
+- keep input buckets at 1
+
+Promotion criterion: 100-game smoke vs `default.net` with LOS >= 50%,
+then a longer SPRT. Per `AGENTS.md`, three consecutive rejected
+candidates from the same family close the family.
 
 ### Iteration 2+ outlook
 
@@ -130,7 +146,7 @@ near-identical reruns.
 2. Training and export complete and produce one intended `.nn`.
 3. Train/export/engine parity passes on the produced net within
    quantization tolerance.
-4. 200–300 game smoke vs `default.net` is neutral-positive.
+4. 100-game smoke vs `default.net` is neutral-positive.
 5. Longer SPRT only after smoke passes.
 
 ## Active Workflow
