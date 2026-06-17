@@ -35,17 +35,17 @@
     },
     {
       "name": "smoke_test",
-      "command": "printf 'uci\\nisready\\nsetoption name nnue_file value ~/assets/nets/native-9.0.0-rc1.nn\\nposition fen r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\\ngo depth 1\\nquit\\n' | ~/assets/engines/enyo_1bucket_loadproof",
+      "command": "printf 'uci\\nisready\\nsetoption name nnue_file value ~/assets/nets/native-9.0.0-rc1.nn\\nposition fen r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4\\ngo depth 1\\nquit\\n' | ~/assets/engines/enyo_91ede5f",
       "why": "The engine must be built from the Enyo branch with 1-bucket runtime support. Startup must log evaluator=native-nnue, the candidate path, sha256, hidden=1024, input_buckets=1, feature_channels=12."
     },
     {
       "name": "sprt_256_game_smoke",
-      "command": "sprt --reference ~/assets/engines/enyo_1bucket_loadproof --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_1bucket_loadproof --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 256 --tc 10+0.1",
+      "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 256 --tc 10+0.1",
       "why": "256-game smoke vs default.net before any longer SPRT. Gate: neutral-positive, or reject and iterate."
     },
     {
       "name": "sprt_1k_main",
-      "command": "sprt --reference ~/assets/engines/enyo_1bucket_loadproof --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_1bucket_loadproof --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 1000 --tc 10+0.1 --sprt elo0=-5 elo1=5 alpha=0.05 beta=0.05",
+      "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 1000 --tc 10+0.1 --sprt elo0=-5 elo1=5 alpha=0.05 beta=0.05",
       "why": "Only run if the 256-game smoke is not negative. Elo, not training loss, decides whether this simple architecture is worth keeping."
     }
   ],
