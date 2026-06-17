@@ -21,10 +21,11 @@ the engine loaded the candidate as native NNUE with `hidden=1024`,
 `default.net` failed cleanly with no warnings: Elo -381.7 +/- 128.6,
 LOS 0.0%, draw 0.0%. Do not promote it and do not run the 1k SPRT.
 
-The active lane remains the simple 1-bucket architecture for now. Two
-candidate settings in this family have failed the smoke gate; a third
-near-identical failure closes the family. Do not start the next training
-run until its single changed variable is written here first.
+The simple 1-bucket init-scale family is closed. Three candidate settings
+loaded correctly but failed game smoke badly. Do not start another
+near-identical 1-bucket init-scale run. The next action is diagnostic:
+prove spike-trainer export/eval parity on the 1-bucket architecture
+before spending more games.
 
 ## Active Hypothesis
 
@@ -72,7 +73,7 @@ responsiveness warning. Do not promote it and do not run the 1k SPRT.
 Conclusion: full 32x L0 init compensation is too large for this path.
 The init-scale theory is not closed, but `l0_std=256` is rejected.
 
-### Iteration 3 — `native-9.2.0-rc1`
+### Iteration 3 — `native-9.2.0-rc1` rejected
 
 Same architecture, data, dose, WDL, and learning-rate family as
 `native-9.0.0-rc1`. Mutate only the L0 initialization scale to a smaller
@@ -82,14 +83,35 @@ single compensation value after `native-9.1.0-rc1` overshot badly:
 - keep `training.l1_std=1.0`
 - keep input buckets at 1
 
-Promotion criterion: 100-game smoke vs `default.net` with LOS >= 50%,
-then a longer SPRT. If this fails hard, close the simple 1-bucket
-init-scale family and inspect spike-trainer export/eval parity before
-spending more games.
+Result: rejected by the quick smoke. The net loaded as native NNUE with
+`hidden=1024`, `input_buckets=1`, and `feature_channels=12`. The fixed
+smoke position produced a sane-looking `+5cp` depth-1 eval, but the game
+smoke was catastrophically negative: at 62/100 games, Elo -714.1,
+LOS 0.0%, draw 0.0%. The tournament then stopped on a transient reference
+engine startup failure; direct startup checks for both `default.net` and
+the candidate passed afterward. The partial result is already sufficient
+to reject the candidate. Do not promote it and do not run the 1k SPRT.
+
+Conclusion: init-scale tuning did not rescue the simple 1-bucket lane.
+Close this family and inspect spike-trainer export/eval parity before
+more training.
+
+### Iteration 4 — diagnostics before more training
+
+No new training run yet. The next useful work is a deterministic parity
+diagnostic for the 1-bucket Enyo-native spike-trainer path:
+
+- compare spike-trainer exported `.nn` against the engine eval path on a
+  small fixed FEN set;
+- compare the same FENs against a known-good Python export when available;
+- verify selected move ordering/eval signs, not only file size and loader
+  metadata;
+- only after parity passes choose a new single hypothesis, likely an
+  architecture change rather than another init-scale tweak.
 
 ### Iteration 2+ outlook
 
-Conditional on iteration 1 producing a measurable candidate.
+Deferred until the spike-trainer parity diagnostic is clean.
 
 Reference NNUE architectures from top engines:
 
