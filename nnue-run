@@ -24,6 +24,7 @@ from typing import Any
 TOP_LEVEL_KEYS = {
     "run",
     "architecture",
+    "architecture_overrides",
     "description",
     "hypothesis",
     "changed_variables",
@@ -219,6 +220,16 @@ def load_architecture(config: dict[str, Any], *, path: Path) -> dict[str, Any]:
         architecture = read_json(resolve_reference(reference, base_path=path))
     else:
         raise SystemExit(f"{path}: architecture must be a path or object")
+    overrides = config.get("architecture_overrides", {})
+    if not isinstance(overrides, dict):
+        raise SystemExit(f"{path}: architecture_overrides must be an object")
+    override_unknown = sorted(set(overrides) - ARCHITECTURE_KEYS)
+    if override_unknown:
+        raise SystemExit(
+            f"{path}: architecture_overrides unknown field(s): "
+            f"{', '.join(override_unknown)}"
+        )
+    architecture.update(overrides)
     unknown = sorted(set(architecture) - ARCHITECTURE_KEYS)
     if unknown:
         raise SystemExit(
@@ -449,7 +460,7 @@ def expand_compact_config(config: dict[str, Any], *, path: Path) -> dict[str, An
         "training completes and exports quantised.bin",
         (
             "smoke_test logs evaluator=native-nnue with the configured "
-            "hidden/input_buckets/feature_channels"
+            "hidden/input_buckets/feature_channels/output_buckets"
         ),
         (
             f"{validation['smoke_games']}-game smoke has LOS >= "

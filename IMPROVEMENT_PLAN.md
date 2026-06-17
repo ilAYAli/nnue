@@ -23,9 +23,11 @@ LOS 0.0%, draw 0.0%. Do not promote it and do not run the 1k SPRT.
 
 The simple 1-bucket init-scale family is closed. Three candidate settings
 loaded correctly but failed game smoke badly. Do not start another
-near-identical 1-bucket init-scale run. The next action is diagnostic:
-prove spike-trainer export/eval parity on the 1-bucket architecture
-before spending more games.
+near-identical 1-bucket init-scale run. Spike-trainer export/eval parity
+has now been checked on the 1-bucket architecture: Python `.nn` load and
+the Enyo engine eval path agree within 2 cp on the fixed FEN set for
+`native-9.2.0-rc1`. The failure is not a byte layout, loader, or eval-path
+parity issue.
 
 ## Active Hypothesis
 
@@ -96,22 +98,34 @@ Conclusion: init-scale tuning did not rescue the simple 1-bucket lane.
 Close this family and inspect spike-trainer export/eval parity before
 more training.
 
-### Iteration 4 — diagnostics before more training
+### Iteration 4 — parity diagnostic passed
 
-No new training run yet. The next useful work is a deterministic parity
-diagnostic for the 1-bucket Enyo-native spike-trainer path:
+The deterministic parity diagnostic for the 1-bucket Enyo-native
+spike-trainer path passed on `native-9.2.0-rc1`:
 
-- compare spike-trainer exported `.nn` against the engine eval path on a
-  small fixed FEN set;
-- compare the same FENs against a known-good Python export when available;
-- verify selected move ordering/eval signs, not only file size and loader
-  metadata;
-- only after parity passes choose a new single hypothesis, likely an
-  architecture change rather than another init-scale tweak.
+- Python `.nn` load vs Enyo `evalnet` agreed within 2 cp;
+- tested FENs included startpos, a normal middlegame, castling-rights
+  position, and an en-passant FEN;
+- local tooling now supports 1/2/4/8/16/32 input-bucket Enyo `.nn` sizes.
 
-### Iteration 2+ outlook
+Conclusion: the next candidate should change architecture or objective.
+Do not spend more games on 1-bucket init-scale variants.
 
-Deferred until the spike-trainer parity diagnostic is clean.
+### Iteration 5 — next architecture hypothesis
+
+Start the next candidate by adding output buckets before reintroducing
+more input buckets. This changes one architecture family while keeping the
+known-good 1-input-bucket feature layout:
+
+- `input_buckets`: 1
+- `output_buckets`: 8
+- `hidden`: 1024
+- `feature_channels`: 12
+
+Gate this as a new native lineage because runtime semantics change. First
+prove the exact Enyo engine build can load and evaluate the 8-output-bucket
+net, then run the same 100-game smoke. If the smoke is negative, reject the
+output-bucket hypothesis and move to the 10/8 input-bucket lane.
 
 Reference NNUE architectures from top engines:
 

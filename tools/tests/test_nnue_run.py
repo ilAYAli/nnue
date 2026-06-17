@@ -177,6 +177,29 @@ class NnueRunTests(unittest.TestCase):
                 nnue_run.load_config(path)
             self.assertIn("training unknown field", str(ctx.exception))
 
+    def test_compact_config_applies_architecture_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_architecture(root)
+            path = root / "build.json"
+            path.write_text(json.dumps({
+                "run": "native-unit",
+                "architecture": "architecture.json",
+                "architecture_overrides": {
+                    "output_buckets": 8,
+                },
+                "hypothesis": "unit compact config",
+                "changed_variables": {
+                    "architecture": "output buckets only",
+                },
+            }), encoding="utf-8")
+
+            _, loaded = nnue_run.load_config(path)
+            train_env = loaded["stages"][0]["env"]
+            self.assertEqual(loaded["architecture"]["output_buckets"], 8)
+            self.assertEqual(train_env["ENYO_BULLET_ENYO_OUTPUT_BUCKETS"], 8)
+            self.assertIn("expected_size=1610976", loaded["stages"][1]["command"])
+
     def test_enyo_network_size_matches_known_layouts(self) -> None:
         architecture = {
             "input_buckets": 1,
