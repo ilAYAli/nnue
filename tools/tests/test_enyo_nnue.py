@@ -34,8 +34,11 @@ def _zero_net(
 
 
 def test_network_size_supports_16_and_32_buckets() -> None:
+    assert nn2.network_size(1) < nn2.network_size(16)
     assert nn2.network_size(16) == nn2.NETWORK_SIZE
     assert nn2.network_size(32) > nn2.network_size(16)
+    for input_buckets in (1, 2, 4, 8, 16, 32):
+        assert nn2.detect_input_buckets(nn2.network_size(input_buckets)) == input_buckets
     assert nn2.detect_input_buckets(nn2.network_size(16)) == 16
     assert nn2.detect_input_buckets(nn2.network_size(32)) == 32
     assert nn2.detect_feature_channels(nn2.network_size(16)) == 12
@@ -57,6 +60,26 @@ def test_32_bucket_net_round_trip(tmp_path: Path) -> None:
     assert loaded.input_buckets == 32
     assert loaded.feature_channels == 12
     assert loaded.input_weights.shape == (nn2.feature_count(32), nn2.N_HIDDEN)
+
+
+def test_scaled_king_bucket_net_round_trip(tmp_path: Path) -> None:
+    for input_buckets in (1, 2, 4, 8):
+        path = tmp_path / f"zero{input_buckets}.nn"
+        nn2.write_net(_zero_net(input_buckets), path)
+
+        loaded = nn2.load_net(path)
+
+        assert path.stat().st_size == nn2.network_size(input_buckets)
+        assert loaded.input_buckets == input_buckets
+        assert loaded.feature_channels == 12
+        assert loaded.input_weights.shape == (
+            nn2.feature_count(input_buckets), nn2.N_HIDDEN)
+
+
+def test_small_bucket_layouts_scale_16_bucket_table_like_engine() -> None:
+    for input_buckets in (1, 2, 4, 8, 16):
+        expected = tuple(bucket * input_buckets // 16 for bucket in nn2.KING_BUCKETS_16)
+        assert nn2.king_buckets(input_buckets) == expected
 
 
 def test_halfka_v2_channel_net_round_trip(tmp_path: Path) -> None:
