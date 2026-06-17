@@ -9,23 +9,7 @@
   "stages": [
     {
       "name": "train",
-      "command": [
-        "ENYO_BULLET_MODE=enyo",
-        "ENYO_BULLET_DATA=data/bullet/lc0q10m.bullet",
-        "ENYO_BULLET_OUT=runs/native-9.0.0-rc1/checkpoints",
-        "ENYO_BULLET_SUPERBATCHES=760",
-        "ENYO_BULLET_LR=1e-3",
-        "ENYO_BULLET_FINAL_LR=1e-4",
-        "ENYO_BULLET_HIDDEN=1024",
-        "ENYO_BULLET_L2=16",
-        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS=1",
-        "ENYO_BULLET_ENYO_INPUT_BUCKETS=1",
-        "ENYO_BULLET_ENYO_FEATURE_CHANNELS=12",
-        "ENYO_BULLET_THREADS=8",
-        "ENYO_BULLET_WDL=0.3",
-        "ENYO_BULLET_EXPORT_INIT_ONLY=0",
-        "tools/bullet/spike_trainer/target/release/enyo-bullet-spike"
-      ],
+      "command": "ENYO_BULLET_MODE=enyo ENYO_BULLET_DATA=data/bullet/lc0q10m.bullet ENYO_BULLET_OUT=runs/native-9.0.0-rc1/checkpoints ENYO_BULLET_SUPERBATCHES=760 ENYO_BULLET_LR=1e-3 ENYO_BULLET_FINAL_LR=1e-4 ENYO_BULLET_HIDDEN=1024 ENYO_BULLET_L2=16 ENYO_BULLET_ENYO_OUTPUT_BUCKETS=1 ENYO_BULLET_ENYO_INPUT_BUCKETS=1 ENYO_BULLET_ENYO_FEATURE_CHANNELS=12 ENYO_BULLET_THREADS=8 ENYO_BULLET_WDL=0.3 ENYO_BULLET_EXPORT_INIT_ONLY=0 tools/bullet/spike_trainer/target/release/enyo-bullet-spike",
       "why": "Train the simplest Enyo native net first: 768 features per perspective, no king buckets, runtime-compatible 1024 hidden, and otherwise the same data/dose/lr family."
     },
     {
