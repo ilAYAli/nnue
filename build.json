@@ -24,12 +24,12 @@
     },
     {
       "name": "sprt_256_game_smoke",
-      "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 256 --tc 10+0.1",
+      "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 256 --concurrency 8 --threads 1 --tc 10+0.1",
       "why": "256-game smoke vs default.net before any longer SPRT. Gate: neutral-positive, or reject and iterate."
     },
     {
       "name": "sprt_1k_main",
-      "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 1000 --tc 10+0.1 --sprt elo0=-5 elo1=5 alpha=0.05 beta=0.05",
+      "command": "sprt --reference ~/assets/engines/enyo_91ede5f --reference-uci 'nnue_file=~/code/cpp/chess/enyo/net/default.net' --candidate ~/assets/engines/enyo_91ede5f --candidate-uci 'nnue_file=~/assets/nets/native-9.0.0-rc1.nn' --games 1000 --concurrency 8 --threads 1 --tc 10+0.1 --sprt elo0=-5 elo1=5 alpha=0.05 beta=0.05",
       "why": "Only run if the 256-game smoke is not negative. Elo, not training loss, decides whether this simple architecture is worth keeping."
     }
   ],
