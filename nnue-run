@@ -23,9 +23,12 @@ from typing import Any
 
 TOP_LEVEL_KEYS = {
     "run",
+    "architecture",
     "description",
     "hypothesis",
     "changed_variables",
+    "training",
+    "validation",
     "run_dir",
     "hooks",
     "env",
@@ -57,6 +60,106 @@ STAGE_KEYS = {
     "timeout_seconds",
     "artifacts",
 }
+ARCHITECTURE_KEYS = {
+    "name",
+    "mode",
+    "hidden",
+    "l2_size",
+    "input_buckets",
+    "runtime_input_buckets",
+    "feature_channels",
+    "input_factoriser",
+    "output_buckets",
+    "eval_scale",
+    "l1_export_scale",
+    "export_format",
+}
+TRAINING_KEYS = {
+    "data",
+    "trainer",
+    "net_id",
+    "superbatches",
+    "batch_size",
+    "batches_per_superbatch",
+    "threads",
+    "wdl",
+    "lr",
+    "final_lr",
+    "l0_std",
+    "l1_std",
+    "save_rate",
+    "export_init_only",
+    "trainable",
+    "weight_decay",
+    "init_weights",
+    "loader",
+    "sfbinpack_buffer_mb",
+    "sfbinpack_min_ply",
+    "sfbinpack_max_abs_cp",
+    "sfbinpack_quiet_only",
+}
+VALIDATION_KEYS = {
+    "engine",
+    "reference_net",
+    "candidate_net",
+    "smoke_fen",
+    "smoke_games",
+    "smoke_concurrency",
+    "smoke_los_threshold",
+    "main_games",
+    "main_concurrency",
+    "main_threads",
+    "tc",
+    "elo0",
+    "elo1",
+    "alpha",
+    "beta",
+}
+DEFAULT_TRAINING: dict[str, Any] = {
+    "data": "data/bullet/lc0q10m.bullet",
+    "trainer": "tools/bullet/spike_trainer/target/release/enyo-bullet-spike",
+    "net_id": "enyo_bullet_spike",
+    "superbatches": 760,
+    "batch_size": 2048,
+    "batches_per_superbatch": 64,
+    "threads": 8,
+    "wdl": 0.3,
+    "lr": "1e-3",
+    "final_lr": "1e-4",
+    "l0_std": 8.0,
+    "l1_std": 1.0,
+    "save_rate": 64,
+    "export_init_only": False,
+    "trainable": "all",
+    "weight_decay": 0.0,
+    "loader": "direct",
+    "sfbinpack_buffer_mb": 1024,
+    "sfbinpack_min_ply": 16,
+    "sfbinpack_max_abs_cp": 10000,
+    "sfbinpack_quiet_only": True,
+}
+DEFAULT_VALIDATION: dict[str, Any] = {
+    "engine": "~/assets/engines/enyo_91ede5f",
+    "reference_net": "~/code/cpp/chess/enyo/net/default.net",
+    "candidate_net": "~/assets/nets/{run}.nn",
+    "smoke_fen": (
+        "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/"
+        "PPPP1PPP/RNBQK2R w KQkq - 4 4"
+    ),
+    "smoke_games": 100,
+    "smoke_concurrency": 16,
+    "smoke_los_threshold": 50.0,
+    "main_games": 1000,
+    "main_concurrency": 8,
+    "main_threads": 1,
+    "tc": "10+0.1",
+    "elo0": -5,
+    "elo1": 5,
+    "alpha": 0.05,
+    "beta": 0.05,
+}
+ENYO_SQUARES = 64
+ENYO_L3 = 32
 
 _ACTIVE_PROCESS: subprocess.Popen[str] | None = None
 _SIGNAL_EVENT_EMITTED = False
@@ -75,6 +178,286 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise SystemExit(f"{path}: expected a JSON object")
     return data
+
+
+def bool_env(value: Any) -> str:
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, int):
+        return "1" if value else "0"
+    text = str(value).strip().lower()
+    return "1" if text in {"1", "true", "yes", "on"} else "0"
+
+
+def merge_defaults(defaults: dict[str, Any], overrides: Any, *, path: Path, name: str) -> dict[str, Any]:
+    if overrides is None:
+        return dict(defaults)
+    if not isinstance(overrides, dict):
+        raise SystemExit(f"{path}: {name} must be an object")
+    unknown = sorted(set(overrides) - set(defaults))
+    if unknown:
+        raise SystemExit(f"{path}: {name} unknown field(s): {', '.join(unknown)}")
+    merged = dict(defaults)
+    merged.update(overrides)
+    return merged
+
+
+def resolve_reference(reference: str | Path, *, base_path: Path) -> Path:
+    raw = Path(os.path.expandvars(str(reference))).expanduser()
+    if raw.is_absolute():
+        return raw.resolve()
+    return (base_path.parent / raw).resolve()
+
+
+def load_architecture(config: dict[str, Any], *, path: Path) -> dict[str, Any]:
+    if "architecture" not in config:
+        raise SystemExit(f"{path}: compact NNUE config requires architecture")
+    reference = config["architecture"]
+    if isinstance(reference, dict):
+        architecture = dict(reference)
+    elif isinstance(reference, str) and reference.strip():
+        architecture = read_json(resolve_reference(reference, base_path=path))
+    else:
+        raise SystemExit(f"{path}: architecture must be a path or object")
+    unknown = sorted(set(architecture) - ARCHITECTURE_KEYS)
+    if unknown:
+        raise SystemExit(
+            f"{path}: architecture unknown field(s): {', '.join(unknown)}"
+        )
+    required = {
+        "name",
+        "mode",
+        "hidden",
+        "l2_size",
+        "input_buckets",
+        "feature_channels",
+        "output_buckets",
+    }
+    missing = sorted(required - set(architecture))
+    if missing:
+        raise SystemExit(f"{path}: architecture missing field(s): {', '.join(missing)}")
+    return architecture
+
+
+def enyo_network_size(architecture: dict[str, Any]) -> int:
+    features = (
+        int(architecture["input_buckets"])
+        * int(architecture["feature_channels"])
+        * ENYO_SQUARES
+    )
+    hidden = int(architecture["hidden"])
+    l2_size = int(architecture["l2_size"])
+    output_buckets = int(architecture["output_buckets"])
+    l3_size = ENYO_L3
+    l1_size = 2 * hidden
+    output_head_features = int(architecture.get("output_head_features", 0))
+    return (
+        features * hidden * 2
+        + hidden * 2
+        + l1_size * l2_size
+        + l2_size * 4
+        + l2_size * l3_size * 4
+        + l3_size * 4
+        + output_buckets * (l3_size + output_head_features) * 4
+        + output_buckets * 4
+    )
+
+
+def build_train_env(
+    architecture: dict[str, Any],
+    training: dict[str, Any],
+) -> dict[str, Any]:
+    env = {
+        "ENYO_BULLET_MODE": architecture["mode"],
+        "ENYO_BULLET_DATA": training["data"],
+        "ENYO_BULLET_OUT": "runs/{run}/checkpoints",
+        "ENYO_BULLET_NET_ID": training["net_id"],
+        "ENYO_BULLET_HIDDEN": architecture["hidden"],
+        "ENYO_BULLET_L2": architecture["l2_size"],
+        "ENYO_BULLET_BATCH_SIZE": training["batch_size"],
+        "ENYO_BULLET_BATCHES": training["batches_per_superbatch"],
+        "ENYO_BULLET_SUPERBATCHES": training["superbatches"],
+        "ENYO_BULLET_THREADS": training["threads"],
+        "ENYO_BULLET_WDL": training["wdl"],
+        "ENYO_BULLET_LR": training["lr"],
+        "ENYO_BULLET_FINAL_LR": training["final_lr"],
+        "ENYO_BULLET_ENYO_L0_STD": training["l0_std"],
+        "ENYO_BULLET_ENYO_L1_STD": training["l1_std"],
+        "ENYO_BULLET_ENYO_INPUT_BUCKETS": architecture["input_buckets"],
+        "ENYO_BULLET_ENYO_FEATURE_CHANNELS": architecture["feature_channels"],
+        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS": architecture["output_buckets"],
+        "ENYO_BULLET_EVAL_SCALE": architecture.get("eval_scale", 400.0),
+        "ENYO_BULLET_SAVE_RATE": training["save_rate"],
+        "ENYO_BULLET_EXPORT_INIT_ONLY": bool_env(training["export_init_only"]),
+        "ENYO_BULLET_TRAINABLE": training["trainable"],
+        "ENYO_BULLET_WEIGHT_DECAY": training["weight_decay"],
+        "ENYO_BULLET_LOADER": training["loader"],
+        "ENYO_BULLET_SFBINPACK_BUFFER_MB": training["sfbinpack_buffer_mb"],
+        "ENYO_BULLET_SFBINPACK_MIN_PLY": training["sfbinpack_min_ply"],
+        "ENYO_BULLET_SFBINPACK_MAX_ABS_CP": training["sfbinpack_max_abs_cp"],
+        "ENYO_BULLET_SFBINPACK_QUIET_ONLY": bool_env(training["sfbinpack_quiet_only"]),
+    }
+    if "input_factoriser" in architecture:
+        env["ENYO_BULLET_ENYO_INPUT_FACTORISER"] = bool_env(architecture["input_factoriser"])
+    if "runtime_input_buckets" in architecture:
+        env["ENYO_BULLET_ENYO_RUNTIME_INPUT_BUCKETS"] = architecture["runtime_input_buckets"]
+    if "l1_export_scale" in architecture:
+        env["ENYO_BULLET_ENYO_L1_EXPORT_SCALE"] = architecture["l1_export_scale"]
+    if training.get("init_weights"):
+        env["ENYO_BULLET_INIT_WEIGHTS"] = training["init_weights"]
+    return env
+
+
+def export_command(training: dict[str, Any], expected_size: int) -> str:
+    net_id = str(training["net_id"])
+    superbatches = int(training["superbatches"])
+    return (
+        f'src="runs/{{run}}/checkpoints/{net_id}-{superbatches}/quantised.bin"; '
+        'dst="$HOME/assets/nets/{run}.nn"; '
+        f"expected_size={expected_size}; "
+        'ls -lh "$src"; '
+        'actual=$(python3 -c \'import os, sys; print(os.path.getsize(sys.argv[1]))\' "$src"); '
+        'if [ "$actual" -lt "$expected_size" ]; then '
+        'echo "ERROR: $src is $actual bytes, expected at least $expected_size" >&2; '
+        "exit 1; "
+        "fi; "
+        'if [ "$actual" -ne "$expected_size" ]; then '
+        'echo "Trimming Bullet padding: $actual -> $expected_size bytes"; '
+        "fi; "
+        'mkdir -p "$HOME/assets/nets"; '
+        'head -c "$expected_size" "$src" > "$dst"; '
+        'python3 -c \'import os, sys; print("%s %d bytes" % '
+        '(sys.argv[1], os.path.getsize(sys.argv[1])))\' "$dst"'
+    )
+
+
+def smoke_command(validation: dict[str, Any]) -> str:
+    return (
+        "printf 'uci\\nisready\\n"
+        f"setoption name nnue_file value {validation['candidate_net']}\\n"
+        f"position fen {validation['smoke_fen']}\\n"
+        "go depth 1\\nquit\\n' "
+        f"| {validation['engine']}"
+    )
+
+
+def smoke_sprt_command(validation: dict[str, Any]) -> str:
+    return (
+        "bash -lc '"
+        "tmp=$(mktemp); "
+        f"sprt --reference {validation['engine']} "
+        f"--candidate {validation['engine']} "
+        f"--reference-uci nnue_file={validation['reference_net']} "
+        f"--candidate-uci nnue_file={validation['candidate_net']} "
+        f"--concurrency {validation['smoke_concurrency']} "
+        f"--games {validation['smoke_games']} "
+        '2>&1 | tee "$tmp"; '
+        "rc=$PIPESTATUS; "
+        'final=$(grep -E "^\\[[[:space:]]*[0-9]+/" "$tmp" | tail -1); '
+        'rm -f "$tmp"; '
+        'echo "Final SPRT line: $final"; '
+        'if [ "$rc" -ne 0 ]; then exit "$rc"; fi; '
+        'los=$(printf "%s\\n" "$final" '
+        '| sed -n "s/.*LOS[[:space:]]*\\([0-9.]*\\)%.*/\\1/p"); '
+        'if [ -z "$los" ]; then echo "ERROR: no LOS in SPRT output"; exit 1; fi; '
+        "if ! python3 -c '\\''import sys; "
+        "los=float(sys.argv[1]); threshold=float(sys.argv[2]); "
+        "sys.exit(0 if los >= threshold else 1)'\\'' "
+        f' "$los" "{validation["smoke_los_threshold"]}"; then '
+        'echo "ERROR: smoke SPRT was negative (LOS $los%)"; exit 1; '
+        "fi'"
+    )
+
+
+def main_sprt_command(validation: dict[str, Any]) -> str:
+    return (
+        f"sprt --reference {validation['engine']} "
+        f"--reference-uci 'nnue_file={validation['reference_net']}' "
+        f"--candidate {validation['engine']} "
+        f"--candidate-uci 'nnue_file={validation['candidate_net']}' "
+        f"--games {validation['main_games']} "
+        f"--concurrency {validation['main_concurrency']} "
+        f"--threads {validation['main_threads']} "
+        f"--tc {validation['tc']} "
+        f"--elo0 {validation['elo0']} "
+        f"--elo1 {validation['elo1']} "
+        f"--alpha {validation['alpha']} "
+        f"--beta {validation['beta']}"
+    )
+
+
+def expand_compact_config(config: dict[str, Any], *, path: Path) -> dict[str, Any]:
+    if "stages" in config:
+        return config
+    if not any(key in config for key in ("architecture", "training", "validation")):
+        return config
+
+    expanded = dict(config)
+    architecture = load_architecture(config, path=path)
+    training = merge_defaults(
+        DEFAULT_TRAINING,
+        config.get("training", {}),
+        path=path,
+        name="training",
+    )
+    validation = merge_defaults(
+        DEFAULT_VALIDATION,
+        config.get("validation", {}),
+        path=path,
+        name="validation",
+    )
+    expected_size = enyo_network_size(architecture)
+    train_env = build_train_env(architecture, training)
+    expanded["architecture"] = architecture
+    expanded["training"] = training
+    expanded["validation"] = validation
+    expanded["stages"] = [
+        {
+            "name": "train",
+            "why": "Train the compact Enyo-native Bullet configuration.",
+            "command": training["trainer"],
+            "env": train_env,
+        },
+        {
+            "name": "export_and_copy",
+            "why": "Trim Bullet padding and copy the candidate net to assets.",
+            "command": export_command(training, expected_size),
+        },
+        {
+            "name": "smoke_test",
+            "why": (
+                "The engine must load the candidate as native-nnue with the "
+                "configured architecture."
+            ),
+            "command": smoke_command(validation),
+        },
+        {
+            "name": "sprt_100_game_smoke",
+            "why": (
+                "Quick game smoke vs default.net; reject candidates with "
+                "negative LOS before longer SPRT."
+            ),
+            "command": smoke_sprt_command(validation),
+        },
+        {
+            "name": "sprt_1k_main",
+            "why": "Only run if the smoke gate is not negative.",
+            "command": main_sprt_command(validation),
+        },
+    ]
+    expanded.setdefault("gates", [
+        "training completes and exports quantised.bin",
+        (
+            "smoke_test logs evaluator=native-nnue with the configured "
+            "hidden/input_buckets/feature_channels"
+        ),
+        (
+            f"{validation['smoke_games']}-game smoke has LOS >= "
+            f"{validation['smoke_los_threshold']}%"
+        ),
+        "if accepted, continue the same lane; if rejected, change one hypothesis",
+    ])
+    return expanded
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -192,11 +575,14 @@ def validate_config(config: dict[str, Any], *, path: Path) -> None:
         if key in config and not isinstance(config[key], dict if key != "gates" else list):
             expected = "object" if key != "gates" else "array"
             raise SystemExit(f"{path}: {key} must be an {expected}")
+    for key in ("architecture", "training", "validation"):
+        if key in config and not isinstance(config[key], dict):
+            raise SystemExit(f"{path}: {key} must be an object after expansion")
 
 
 def load_config(path_text: str | Path) -> tuple[Path, dict[str, Any]]:
     path = expand_path(path_text)
-    config = read_json(path)
+    config = expand_compact_config(read_json(path), path=path)
     validate_config(config, path=path)
     return path, config
 
@@ -699,6 +1085,10 @@ def render_plan(config: dict[str, Any]) -> str:
         why = str(rendered.get("why", "")).strip()
         suffix = f" - {why}" if why else ""
         lines.append(f"  {index}. {rendered['name']}{suffix}")
+        env = rendered.get("env", {})
+        if isinstance(env, dict) and env:
+            env_text = " ".join(f"{key}={value}" for key, value in sorted(env.items()))
+            lines.append(f"     env {env_text}")
         lines.append(f"     {command_text(rendered['command'])}")
     gates = config.get("gates", [])
     if gates:

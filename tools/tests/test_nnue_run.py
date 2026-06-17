@@ -103,6 +103,92 @@ class NnueRunTests(unittest.TestCase):
             text = nnue_run.render_plan(loaded)
             self.assertIn(str(root / "runs" / "unit-simple" / "train" / "model.nn"), text)
 
+    def write_architecture(self, root: Path) -> Path:
+        path = root / "architecture.json"
+        path.write_text(json.dumps({
+            "name": "enyo-native-1bucket-v1",
+            "mode": "enyo",
+            "hidden": 1024,
+            "l2_size": 16,
+            "input_buckets": 1,
+            "runtime_input_buckets": 1,
+            "feature_channels": 12,
+            "input_factoriser": False,
+            "output_buckets": 1,
+            "eval_scale": 400.0,
+            "l1_export_scale": 1.0,
+            "export_format": "enyo-native-v1",
+        }), encoding="utf-8")
+        return path
+
+    def test_compact_config_generates_native_bullet_stages(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_architecture(root)
+            path = root / "build.json"
+            path.write_text(json.dumps({
+                "run": "native-unit",
+                "architecture": "architecture.json",
+                "hypothesis": "unit compact config",
+                "changed_variables": {
+                    "init_scale": "l0_std is the only changed training knob",
+                },
+                "training": {
+                    "l0_std": 256.0,
+                },
+            }), encoding="utf-8")
+
+            _, loaded = nnue_run.load_config(path)
+            self.assertEqual(
+                [stage["name"] for stage in loaded["stages"]],
+                [
+                    "train",
+                    "export_and_copy",
+                    "smoke_test",
+                    "sprt_100_game_smoke",
+                    "sprt_1k_main",
+                ],
+            )
+            train_env = loaded["stages"][0]["env"]
+            self.assertEqual(train_env["ENYO_BULLET_MODE"], "enyo")
+            self.assertEqual(train_env["ENYO_BULLET_HIDDEN"], 1024)
+            self.assertEqual(train_env["ENYO_BULLET_ENYO_INPUT_BUCKETS"], 1)
+            self.assertEqual(train_env["ENYO_BULLET_ENYO_FEATURE_CHANNELS"], 12)
+            self.assertEqual(train_env["ENYO_BULLET_ENYO_L0_STD"], 256.0)
+            self.assertIn("expected_size=1610052", loaded["stages"][1]["command"])
+            self.assertIn("~/assets/nets/{run}.nn", loaded["validation"]["candidate_net"])
+
+    def test_compact_config_rejects_unknown_training_knobs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_architecture(root)
+            path = root / "build.json"
+            path.write_text(json.dumps({
+                "run": "native-unit",
+                "architecture": "architecture.json",
+                "hypothesis": "unit compact config",
+                "changed_variables": {"x": "y"},
+                "training": {
+                    "l0_std": 256.0,
+                    "mystery": True,
+                },
+            }), encoding="utf-8")
+            with self.assertRaises(SystemExit) as ctx:
+                nnue_run.load_config(path)
+            self.assertIn("training unknown field", str(ctx.exception))
+
+    def test_enyo_network_size_matches_known_layouts(self) -> None:
+        architecture = {
+            "input_buckets": 1,
+            "feature_channels": 12,
+            "hidden": 1024,
+            "l2_size": 16,
+            "output_buckets": 1,
+        }
+        self.assertEqual(nnue_run.enyo_network_size(architecture), 1610052)
+        architecture["input_buckets"] = 16
+        self.assertEqual(nnue_run.enyo_network_size(architecture), 25203012)
+
     def test_plan_publish_uses_generic_event_hook(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

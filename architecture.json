@@ -1,0 +1,14 @@
+{
+  "name": "enyo-native-1bucket-v1",
+  "mode": "enyo",
+  "hidden": 1024,
+  "l2_size": 16,
+  "input_buckets": 1,
+  "runtime_input_buckets": 1,
+  "feature_channels": 12,
+  "input_factoriser": false,
+  "output_buckets": 1,
+  "eval_scale": 400.0,
+  "l1_export_scale": 1.0,
+  "export_format": "enyo-native-v1"
+}
