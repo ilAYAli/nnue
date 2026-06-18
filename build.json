@@ -1,26 +1,26 @@
 {
-  "run": "scratch-smoke",
+  "run": "scratch-v1",
   "lineage": "scratch-native",
-  "hypothesis": "Restart from a clean scratch-only Enyo-native net. First prove that 1 input bucket, 12 feature channels, 1024 hidden, and 1 output bucket can train, export, load, and produce sane static/game smoke results on 1M Stockfish rows.",
+  "hypothesis": "Restart from a clean scratch-only Enyo-native net. First prove that 1 input bucket, 12 feature channels, 1024 hidden, and 1 output bucket can train, export, load, and produce sane static/game smoke results on Stockfish rows.",
   "changed_variables": {
     "data_source": "data/nodes5000pv2_UHO.binpack",
-    "data_output": "data/bullet/scratch-smoke-1m.bullet",
+    "data_output": "data/bullet/scratch-v1-1m.bullet",
     "dose": "64 superbatches",
     "purpose": "mechanics and sanity smoke, not promotion"
   },
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
-    "bullet_output": "data/bullet/scratch-smoke-1m.bullet",
-    "limit": 1000000,
+    "bullet_output": "data/bullet/scratch-v1-1m.bullet",
+    "limit": 10000000,
     "threads": 16,
     "buffer_mb": 1024,
     "min_ply": 16,
     "max_abs_cp": 10000,
     "quiet_only": true
   },
-  "out": "runs/scratch-smoke/checkpoints",
-  "net": "~/assets/nets/scratch-smoke.nn",
-  "superbatches": 64,
+  "out": "runs/scratch-v1/checkpoints",
+  "net": "~/assets/nets/scratch-v1.nn",
+  "superbatches": 760,
   "gates": {
     "provenance": "no borrowed weights and no previous run weights",
     "load": "engine logs evaluator=native-nnue hidden=1024 input_buckets=1 feature_channels=12",
