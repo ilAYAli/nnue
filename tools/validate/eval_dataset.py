@@ -117,12 +117,16 @@ def main() -> None:
                     help="Print metrics grouped by source id/name.")
     args = ap.parse_args()
 
-    ds, collate_fn = load_score_dataset(
-        args.data, limit=args.rows, skip=args.skip)
-    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
-                        collate_fn=collate_fn)
     model = load_model_from_nn(args.net, device=args.device)
     model.eval()
+    ds, collate_fn = load_score_dataset(
+        args.data,
+        limit=args.rows,
+        skip=args.skip,
+        input_buckets=model.input_buckets,
+        feature_channels=model.feature_channels)
+    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
+                        collate_fn=collate_fn)
 
     overall = empty_stats()
     by_source: dict[int, dict[str, float]] = {}

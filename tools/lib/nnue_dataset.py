@@ -20,7 +20,9 @@ assert BULLET_CHESSBOARD_STRUCT.size == bullet_format.RECORD_BYTES
 
 
 class FenScoreDataset(Dataset):
-    def __init__(self, rows: Iterable[dict]):
+    def __init__(self, rows: Iterable[dict], *,
+                 input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
+                 feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS):
         self.items: list[
             tuple[list[int], list[int], int, int, float, float, float, int]
         ] = []
@@ -29,8 +31,10 @@ class FenScoreDataset(Dataset):
             fen = row["fen"]
             pieces, stm = nn2.parse_fen(fen)
             pieces.sort(key=lambda item: item[2])
-            w_feats = nn2.features_from_pieces(pieces, nn2.WHITE)
-            b_feats = nn2.features_from_pieces(pieces, nn2.BLACK)
+            w_feats = nn2.features_from_pieces(
+                pieces, nn2.WHITE, input_buckets, feature_channels)
+            b_feats = nn2.features_from_pieces(
+                pieces, nn2.BLACK, input_buckets, feature_channels)
             phase_scale = nn2.phase_scale_from_pieces(pieces)
             source_name = str(
                 row.get("source_type") or row.get("teacher") or "unknown")
@@ -49,7 +53,10 @@ class FenScoreDataset(Dataset):
 
     @classmethod
     def from_jsonl(cls, path: str | Path, *,
-                   limit: int = 0, skip: int = 0) -> "FenScoreDataset":
+                   limit: int = 0, skip: int = 0,
+                   input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
+                   feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
+                   ) -> "FenScoreDataset":
         rows = []
         with Path(path).open() as f:
             for i, line in enumerate(f):
@@ -61,7 +68,10 @@ class FenScoreDataset(Dataset):
                 rows.append(json.loads(line))
                 if limit > 0 and len(rows) >= limit:
                     break
-        return cls(rows)
+        return cls(
+            rows,
+            input_buckets=input_buckets,
+            feature_channels=feature_channels)
 
     def __len__(self) -> int:
         return len(self.items)
@@ -121,8 +131,12 @@ class PackedFenScoreDataset(Dataset):
 
 class BulletDataScoreDataset(Dataset):
     def __init__(self, path: str | Path, *,
-                 limit: int = 0, skip: int = 0) -> None:
+                 limit: int = 0, skip: int = 0,
+                 input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
+                 feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS) -> None:
         self.path = Path(path)
+        self.input_buckets = input_buckets
+        self.feature_channels = feature_channels
         size = self.path.stat().st_size
         if size % bullet_format.RECORD_BYTES:
             raise ValueError(
@@ -172,8 +186,10 @@ class BulletDataScoreDataset(Dataset):
             piece_idx += 1
 
         pieces.sort(key=lambda item: item[2])
-        w_feats = nn2.features_from_pieces(pieces, nn2.WHITE)
-        b_feats = nn2.features_from_pieces(pieces, nn2.BLACK)
+        w_feats = nn2.features_from_pieces(
+            pieces, nn2.WHITE, self.input_buckets, self.feature_channels)
+        b_feats = nn2.features_from_pieces(
+            pieces, nn2.BLACK, self.input_buckets, self.feature_channels)
         phase_scale = nn2.phase_scale_from_pieces(pieces)
         return (
             torch.tensor(w_feats, dtype=torch.long),
@@ -261,12 +277,24 @@ def count_rows(path: str | Path) -> int:
 
 
 def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
-                       in_memory: bool = False
+                       in_memory: bool = False,
+                       input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
+                       feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
                        ) -> tuple[Dataset, Callable]:
     p = Path(path)
     if p.is_dir():
         return PackedFenScoreDataset(
             p, limit=limit, skip=skip, in_memory=in_memory), collate_packed
     if p.suffix in {".bullet", ".data"}:
-        return BulletDataScoreDataset(p, limit=limit, skip=skip), collate
-    return FenScoreDataset.from_jsonl(p, limit=limit, skip=skip), collate
+        return BulletDataScoreDataset(
+            p,
+            limit=limit,
+            skip=skip,
+            input_buckets=input_buckets,
+            feature_channels=feature_channels), collate
+    return FenScoreDataset.from_jsonl(
+        p,
+        limit=limit,
+        skip=skip,
+        input_buckets=input_buckets,
+        feature_channels=feature_channels), collate
