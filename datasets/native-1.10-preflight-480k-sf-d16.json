@@ -1,0 +1,19 @@
+{
+  "bytes": 216790907,
+  "created_at": "2026-06-05T11:05:56+0200",
+  "name": "native-1.10-preflight-480k-sf-d16",
+  "notes": [
+    "Rescued from the completed score_rescore96 output of the native-1.10.0 preflight run.",
+    "The original score-native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604 Crucible wrapper failed and must not be resumed."
+  ],
+  "path": "runs/native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604/score_rescore96/labeled.jsonl",
+  "rows": 480024,
+  "schema": "nnue.dataset.v1",
+  "sha256": "aa596a0832d5885d3cbf32d17b18afc2f933a6d91efe99a8f6662420e74edcad",
+  "source": {
+    "position_source": "Enyo self-play",
+    "run": "native-1.10.0-preflight-500k-sf-d16-lr3e7-sb128-20260604"
+  },
+  "teacher": "Stockfish",
+  "teacher_depth": 16
+}

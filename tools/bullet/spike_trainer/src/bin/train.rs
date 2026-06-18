@@ -1,0 +1,719 @@
+use std::{
+    env,
+    ffi::OsStr,
+    fs::{self, File},
+    io::{BufWriter, Write},
+    mem,
+    path::{Path, PathBuf},
+    process,
+    time::Instant,
+};
+
+use bullet_lib::{
+    game::formats::bulletformat::ChessBoard,
+    value::loader::{
+        DataLoader, SfBinpackLoader,
+        sfbinpack::{MoveType, PieceType, TrainingDataEntry},
+    },
+};
+use serde_json::Value;
+
+mod trainer_main {
+    include!("../main.rs");
+
+    pub fn run_from_env() {
+        main();
+    }
+}
+
+const FORBIDDEN_KEYS: &[&str] = &[
+    "init_weights",
+    "bullet_init_weights",
+    "init_net",
+    "init_from_nn",
+    "export_init_only",
+];
+
+const FORBIDDEN_TEXT: &[&str] = &[
+    "default.net",
+    "berserk",
+    "native-28",
+    "native-29",
+    "weights.bin",
+];
+
+const ENYO_SUPPORTED_INPUT_BUCKETS: &[usize] = &[1, 2, 4, 8, 16, 32];
+const ENYO_SUPPORTED_FEATURE_CHANNELS: &[usize] = &[11, 12];
+const ENYO_SUPPORTED_OUTPUT_BUCKETS: &[usize] = &[1, 2, 4, 8];
+const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
+    0, 1, 2, 3, 4, 5, 6, 7,
+    8, 9, 10, 11, 8, 9, 10, 11,
+    12, 12, 13, 13, 12, 12, 13, 13,
+    14, 14, 15, 15, 14, 14, 15, 15,
+];
+
+#[derive(Clone)]
+struct Config {
+    arch: Value,
+    defaults: Value,
+    build: Value,
+}
+
+#[derive(Clone)]
+struct DataConfig {
+    source_binpack: String,
+    bullet_output: String,
+    limit: u64,
+    threads: usize,
+    buffer_mb: usize,
+    min_ply: u16,
+    max_abs_cp: u32,
+    quiet_only: bool,
+}
+
+#[derive(Clone, Copy)]
+struct Filter {
+    min_ply: u16,
+    max_abs_cp: u32,
+    quiet_only: bool,
+}
+
+impl Filter {
+    fn keep(self, entry: &TrainingDataEntry) -> bool {
+        if entry.ply < self.min_ply {
+            return false;
+        }
+        if i32::from(entry.score).unsigned_abs() > self.max_abs_cp {
+            return false;
+        }
+        if self.quiet_only
+            && (entry.mv.mtype() != MoveType::Normal
+                || entry.pos.piece_at(entry.mv.to()).piece_type() != PieceType::None)
+        {
+            return false;
+        }
+        if entry.pos.is_checked(entry.pos.side_to_move()) {
+            return false;
+        }
+        true
+    }
+}
+
+fn usage() -> ! {
+    eprintln!(
+        "usage: tools/bullet/train <plan|data|run|export|all> \
+         [--build build.json] [--arch architecture.json] [--defaults defaults.json]"
+    );
+    process::exit(2);
+}
+
+fn root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .expect("unexpected crate path")
+        .to_owned()
+}
+
+fn expand_path(value: &str) -> PathBuf {
+    let expanded = if let Some(rest) = value.strip_prefix("~/") {
+        match env::var("HOME") {
+            Ok(home) => format!("{home}/{rest}"),
+            Err(_) => value.to_owned(),
+        }
+    } else {
+        value.to_owned()
+    };
+    let expanded = env::vars().fold(expanded, |text, (key, val)| {
+        text.replace(&format!("${key}"), &val)
+            .replace(&format!("${{{key}}}"), &val)
+    });
+    let path = PathBuf::from(expanded);
+    if path.is_absolute() {
+        path
+    } else {
+        root().join(path)
+    }
+}
+
+fn load_json(path: &str) -> Value {
+    let path = expand_path(path);
+    let text = fs::read_to_string(&path).unwrap_or_else(|err| {
+        eprintln!("error: cannot read {}: {err}", path.display());
+        process::exit(1);
+    });
+    serde_json::from_str(&text).unwrap_or_else(|err| {
+        eprintln!("error: invalid JSON in {}: {err}", path.display());
+        process::exit(1);
+    })
+}
+
+fn string_at<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    value.get(key).and_then(Value::as_str)
+}
+
+fn required_string(value: &Value, key: &str) -> String {
+    string_at(value, key)
+        .unwrap_or_else(|| {
+            eprintln!("error: missing string key `{key}`");
+            process::exit(1);
+        })
+        .to_owned()
+}
+
+fn usize_at(value: &Value, key: &str, default: usize) -> usize {
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .map(|v| v as usize)
+        .unwrap_or(default)
+}
+
+fn u64_at(value: &Value, key: &str, default: u64) -> u64 {
+    value.get(key).and_then(Value::as_u64).unwrap_or(default)
+}
+
+fn f64_at(value: &Value, key: &str, default: f64) -> f64 {
+    value.get(key).and_then(Value::as_f64).unwrap_or(default)
+}
+
+fn bool_at(value: &Value, key: &str, default: bool) -> bool {
+    value.get(key).and_then(Value::as_bool).unwrap_or(default)
+}
+
+fn object_at<'a>(value: &'a Value, key: &str) -> &'a Value {
+    value.get(key).unwrap_or(&Value::Null)
+}
+
+fn walk_poison(value: &Value, path: &str, hits: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                let child_path = if path.is_empty() {
+                    key.to_owned()
+                } else {
+                    format!("{path}.{key}")
+                };
+                if FORBIDDEN_KEYS.contains(&key.as_str()) {
+                    hits.push(child_path.clone());
+                }
+                walk_poison(child, &child_path, hits);
+            }
+        }
+        Value::Array(items) => {
+            for (idx, child) in items.iter().enumerate() {
+                walk_poison(child, &format!("{path}[{idx}]"), hits);
+            }
+        }
+        Value::String(text) => {
+            let lower = text.to_ascii_lowercase();
+            for token in FORBIDDEN_TEXT {
+                if lower.contains(token) {
+                    hits.push(path.to_owned());
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn reject_poison(config: &Config) {
+    let mut hits = Vec::new();
+    walk_poison(&config.arch, "architecture", &mut hits);
+    walk_poison(&config.defaults, "defaults", &mut hits);
+    walk_poison(&config.build, "build", &mut hits);
+    if !hits.is_empty() {
+        eprintln!("scratch provenance rejected:");
+        for hit in hits {
+            eprintln!("  {hit}");
+        }
+        process::exit(2);
+    }
+}
+
+fn load_config(args: &[String]) -> (String, Config) {
+    let command = args.first().cloned().unwrap_or_else(|| usage());
+    let mut build = "build.json".to_owned();
+    let mut arch = "architecture.json".to_owned();
+    let mut defaults = "defaults.json".to_owned();
+
+    let mut idx = 1;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--build" => {
+                idx += 1;
+                build = args.get(idx).cloned().unwrap_or_else(|| usage());
+            }
+            "--arch" => {
+                idx += 1;
+                arch = args.get(idx).cloned().unwrap_or_else(|| usage());
+            }
+            "--defaults" => {
+                idx += 1;
+                defaults = args.get(idx).cloned().unwrap_or_else(|| usage());
+            }
+            _ => usage(),
+        }
+        idx += 1;
+    }
+
+    let config = Config {
+        arch: load_json(&arch),
+        defaults: load_json(&defaults),
+        build: load_json(&build),
+    };
+    reject_poison(&config);
+
+    if string_at(&config.arch, "lineage") != Some("scratch-native")
+        || string_at(&config.build, "lineage") != Some("scratch-native")
+    {
+        eprintln!("error: architecture.json and build.json lineage must be scratch-native");
+        process::exit(2);
+    }
+
+    (command, config)
+}
+
+fn data_config(config: &Config) -> DataConfig {
+    let data = object_at(&config.build, "data");
+    let sf = object_at(&config.defaults, "sfbinpack");
+    DataConfig {
+        source_binpack: required_string(data, "source_binpack"),
+        bullet_output: required_string(data, "bullet_output"),
+        limit: u64_at(data, "limit", 0),
+        threads: usize_at(data, "threads", usize_at(&config.defaults, "threads", 4)),
+        buffer_mb: usize_at(data, "buffer_mb", usize_at(sf, "buffer_mb", 1024)),
+        min_ply: usize_at(data, "min_ply", usize_at(sf, "min_ply", 16)) as u16,
+        max_abs_cp: usize_at(data, "max_abs_cp", usize_at(sf, "max_abs_cp", 10000)) as u32,
+        quiet_only: bool_at(data, "quiet_only", bool_at(sf, "quiet_only", true)),
+    }
+}
+
+fn run_name(config: &Config) -> String {
+    required_string(&config.build, "run")
+}
+
+fn out_dir(config: &Config) -> String {
+    string_at(&config.build, "out")
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("runs/{}/checkpoints", run_name(config)))
+}
+
+fn net_path(config: &Config) -> String {
+    string_at(&config.build, "net")
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("~/assets/nets/{}.nn", run_name(config)))
+}
+
+fn net_id(config: &Config) -> String {
+    string_at(&config.defaults, "net_id")
+        .unwrap_or("scratch_native")
+        .to_owned()
+}
+
+fn validate_layout(config: &Config) {
+    let input_buckets = usize_at(&config.arch, "input_buckets", 1);
+    let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
+    let feature_channels = usize_at(&config.arch, "feature_channels", 12);
+    let output_buckets = usize_at(&config.arch, "output_buckets", 1);
+    if !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&input_buckets)
+        || !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&runtime_input_buckets)
+    {
+        eprintln!("error: unsupported Enyo input bucket count");
+        process::exit(2);
+    }
+    if input_buckets > runtime_input_buckets {
+        eprintln!("error: runtime_input_buckets cannot be smaller than input_buckets");
+        process::exit(2);
+    }
+    if !ENYO_SUPPORTED_FEATURE_CHANNELS.contains(&feature_channels) {
+        eprintln!("error: unsupported Enyo feature_channels={feature_channels}");
+        process::exit(2);
+    }
+    if feature_channels == 11 && (input_buckets != 32 || runtime_input_buckets != 32) {
+        eprintln!("error: 11-channel layout requires 32 input/runtime buckets");
+        process::exit(2);
+    }
+    if !ENYO_SUPPORTED_OUTPUT_BUCKETS.contains(&output_buckets) {
+        eprintln!("error: unsupported Enyo output_buckets={output_buckets}");
+        process::exit(2);
+    }
+}
+
+fn cmd_plan(config: &Config) {
+    let data = data_config(config);
+    println!("run={}", run_name(config));
+    println!("lineage={}", required_string(&config.build, "lineage"));
+    println!("source_binpack={}", data.source_binpack);
+    println!("bullet_output={}", data.bullet_output);
+    println!("net={}", net_path(config));
+    println!();
+    println!("commands:");
+    println!("  tools/bullet/train data --build build.json");
+    println!("  tools/bullet/train run --build build.json");
+    println!("  tools/bullet/train export --build build.json");
+    println!();
+    println!("resolved:");
+    println!(
+        "  layout={} buckets, {} channels, hidden={}, output_buckets={}",
+        usize_at(&config.arch, "input_buckets", 1),
+        usize_at(&config.arch, "feature_channels", 12),
+        usize_at(&config.arch, "hidden", 1024),
+        usize_at(&config.arch, "output_buckets", 1),
+    );
+    println!(
+        "  dose={} superbatches, batch_size={}, batches={}",
+        usize_at(&config.build, "superbatches", 64),
+        usize_at(&config.defaults, "batch_size", 2048),
+        usize_at(&config.defaults, "batches", 64),
+    );
+}
+
+fn write_chunk(writer: &mut BufWriter<File>, chunk: &[ChessBoard]) -> std::io::Result<()> {
+    let bytes = unsafe {
+        std::slice::from_raw_parts(
+            chunk.as_ptr() as *const u8,
+            mem::size_of_val(chunk),
+        )
+    };
+    writer.write_all(bytes)
+}
+
+fn cmd_data(config: &Config) {
+    let data = data_config(config);
+    let source = expand_path(&data.source_binpack);
+    if !source.exists() {
+        eprintln!("error: missing source binpack: {}", source.display());
+        process::exit(1);
+    }
+    let output = expand_path(&data.bullet_output);
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|err| {
+            eprintln!("error: cannot create {}: {err}", parent.display());
+            process::exit(1);
+        });
+    }
+    let out_file = File::create(&output).unwrap_or_else(|err| {
+        eprintln!("error: cannot create {}: {err}", output.display());
+        process::exit(1);
+    });
+    let mut writer = BufWriter::new(out_file);
+    let paths = data
+        .source_binpack
+        .split(';')
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(|path| expand_path(path).display().to_string())
+        .collect::<Vec<_>>();
+    let refs = paths.iter().map(String::as_str).collect::<Vec<_>>();
+    let filter = Filter {
+        min_ply: data.min_ply,
+        max_abs_cp: data.max_abs_cp,
+        quiet_only: data.quiet_only,
+    };
+    let loader = SfBinpackLoader::new_concat_multiple(
+        &refs,
+        data.buffer_mb,
+        data.threads,
+        move |entry| filter.keep(entry),
+    );
+    let start = Instant::now();
+    let mut written = 0_u64;
+    loader.map_chunks(0, |chunk: &[ChessBoard]| {
+        let remaining = if data.limit == 0 {
+            chunk.len()
+        } else {
+            data.limit.saturating_sub(written).min(chunk.len() as u64) as usize
+        };
+        if remaining == 0 {
+            return true;
+        }
+        let chunk = &chunk[..remaining];
+        write_chunk(&mut writer, chunk).unwrap_or_else(|err| {
+            eprintln!("error: write failed: {err}");
+            process::exit(1);
+        });
+        written += chunk.len() as u64;
+        if written % 5_000_000 < chunk.len() as u64 {
+            let secs = start.elapsed().as_secs_f32();
+            eprintln!(
+                "converted {} positions ({:.1}M/s)",
+                written,
+                written as f32 / secs.max(0.001) / 1e6
+            );
+        }
+        data.limit != 0 && written >= data.limit
+    });
+    let secs = start.elapsed().as_secs_f32();
+    eprintln!(
+        "done: converted {} positions to {} in {:.1}s ({:.1}M/s)",
+        written,
+        output.display(),
+        secs,
+        written as f32 / secs.max(0.001) / 1e6
+    );
+}
+
+fn set_env(key: &str, value: impl ToString) {
+    unsafe {
+        env::set_var(key, value.to_string());
+    }
+}
+
+fn cmd_run(config: &Config) {
+    validate_layout(config);
+    let data = data_config(config);
+    let bullet_output = expand_path(&data.bullet_output);
+    if !bullet_output.exists() {
+        eprintln!(
+            "error: missing Bullet data: {}; run tools/bullet/train data --build build.json",
+            bullet_output.display()
+        );
+        process::exit(1);
+    }
+    let output = expand_path(&out_dir(config));
+    fs::create_dir_all(&output).unwrap_or_else(|err| {
+        eprintln!("error: cannot create {}: {err}", output.display());
+        process::exit(1);
+    });
+
+    set_env("ENYO_BULLET_DATA", bullet_output.display());
+    set_env("ENYO_BULLET_LOADER", string_at(&config.defaults, "loader").unwrap_or("direct"));
+    set_env("ENYO_BULLET_OUT", output.display());
+    set_env("ENYO_BULLET_NET_ID", net_id(config));
+    set_env("ENYO_BULLET_MODE", string_at(&config.arch, "mode").unwrap_or("enyo"));
+    set_env("ENYO_BULLET_HIDDEN", usize_at(&config.arch, "hidden", 1024));
+    set_env("ENYO_BULLET_L2", usize_at(&config.arch, "l2_size", 16));
+    set_env("ENYO_BULLET_BATCH_SIZE", usize_at(&config.defaults, "batch_size", 2048));
+    set_env("ENYO_BULLET_BATCHES", usize_at(&config.defaults, "batches", 64));
+    set_env("ENYO_BULLET_SUPERBATCHES", usize_at(&config.build, "superbatches", 64));
+    set_env("ENYO_BULLET_THREADS", usize_at(&config.defaults, "threads", 4));
+    set_env("ENYO_BULLET_WDL", f64_at(&config.defaults, "wdl", 0.3));
+    set_env("ENYO_BULLET_LR", f64_at(&config.defaults, "lr", 1e-3));
+    set_env("ENYO_BULLET_FINAL_LR", f64_at(&config.defaults, "final_lr", 1e-4));
+    set_env("ENYO_BULLET_ENYO_L0_STD", f64_at(&config.arch, "l0_std", 8.0));
+    set_env("ENYO_BULLET_ENYO_L1_STD", f64_at(&config.arch, "l1_std", 1.0));
+    set_env(
+        "ENYO_BULLET_ENYO_L1_EXPORT_SCALE",
+        f64_at(&config.arch, "l1_export_scale", 1.0),
+    );
+    set_env(
+        "ENYO_BULLET_ENYO_INPUT_FACTORISER",
+        usize::from(bool_at(&config.arch, "input_factoriser", false)),
+    );
+    set_env("ENYO_BULLET_ENYO_INPUT_BUCKETS", usize_at(&config.arch, "input_buckets", 1));
+    set_env(
+        "ENYO_BULLET_ENYO_RUNTIME_INPUT_BUCKETS",
+        usize_at(&config.arch, "runtime_input_buckets", usize_at(&config.arch, "input_buckets", 1)),
+    );
+    set_env("ENYO_BULLET_ENYO_FEATURE_CHANNELS", usize_at(&config.arch, "feature_channels", 12));
+    set_env("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", usize_at(&config.arch, "output_buckets", 1));
+    set_env("ENYO_BULLET_EVAL_SCALE", f64_at(&config.arch, "eval_scale", 400.0));
+    set_env("ENYO_BULLET_SAVE_RATE", usize_at(&config.defaults, "save_rate", 64));
+    set_env("ENYO_BULLET_EXPORT_INIT_ONLY", 0);
+    set_env("ENYO_BULLET_TRAINABLE", string_at(&config.defaults, "trainable").unwrap_or("all"));
+    set_env("ENYO_BULLET_WEIGHT_DECAY", f64_at(&config.defaults, "weight_decay", 0.0));
+    set_env("ENYO_BULLET_SFBINPACK_BUFFER_MB", data.buffer_mb);
+    set_env("ENYO_BULLET_SFBINPACK_MIN_PLY", data.min_ply);
+    set_env("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", data.max_abs_cp);
+    set_env("ENYO_BULLET_SFBINPACK_QUIET_ONLY", usize::from(data.quiet_only));
+
+    trainer_main::run_from_env();
+    write_model(config);
+}
+
+fn enyo_network_size(
+    input_buckets: usize,
+    feature_channels: usize,
+    output_buckets: usize,
+    hidden: usize,
+    l2: usize,
+) -> usize {
+    let features = input_buckets * feature_channels * 64;
+    let l1 = 2 * hidden;
+    let l3 = 32;
+    features * hidden * 2
+        + hidden * 2
+        + l1 * l2
+        + l2 * 4
+        + l2 * l3 * 4
+        + l3 * 4
+        + output_buckets * l3 * 4
+        + output_buckets * 4
+}
+
+fn trim_checkpoint(
+    raw: &[u8],
+    input_buckets: usize,
+    feature_channels: usize,
+    output_buckets: usize,
+    hidden: usize,
+    l2: usize,
+) -> Vec<u8> {
+    let expected = enyo_network_size(input_buckets, feature_channels, output_buckets, hidden, l2);
+    if raw.len() < expected {
+        eprintln!("error: checkpoint is {} bytes, expected at least {expected}", raw.len());
+        process::exit(1);
+    }
+    if raw.len() == expected {
+        return raw.to_vec();
+    }
+    let trailer = &raw[expected..];
+    for (idx, byte) in trailer.iter().enumerate() {
+        if *byte != b"bullet"[idx % 6] {
+            eprintln!("error: checkpoint has unexpected {} byte trailer", trailer.len());
+            process::exit(1);
+        }
+    }
+    raw[..expected].to_vec()
+}
+
+fn parent_bucket(target_bucket: usize, input_buckets: usize, runtime_input_buckets: usize) -> usize {
+    if input_buckets == runtime_input_buckets {
+        return target_bucket;
+    }
+    if runtime_input_buckets == 32 {
+        return ENYO_LEGACY_BUCKET_FOR_32[target_bucket] * input_buckets / 16;
+    }
+    target_bucket * input_buckets / runtime_input_buckets
+}
+
+fn expand_input_buckets(
+    raw: &[u8],
+    input_buckets: usize,
+    feature_channels: usize,
+    runtime_input_buckets: usize,
+    output_buckets: usize,
+    hidden: usize,
+    l2: usize,
+) -> Vec<u8> {
+    let raw = trim_checkpoint(raw, input_buckets, feature_channels, output_buckets, hidden, l2);
+    if input_buckets == runtime_input_buckets {
+        return raw;
+    }
+
+    let feature_stride = feature_channels * 64;
+    let source_features = input_buckets * feature_stride;
+    let target_features = runtime_input_buckets * feature_stride;
+    let feature_bytes = hidden * 2;
+    let source_l0_bytes = source_features * feature_bytes;
+    let target_l0_bytes = target_features * feature_bytes;
+    let rest = &raw[source_l0_bytes..];
+    let mut expanded = vec![0_u8; target_l0_bytes + rest.len()];
+
+    for target_bucket in 0..runtime_input_buckets {
+        let source_bucket = parent_bucket(target_bucket, input_buckets, runtime_input_buckets);
+        for offset in 0..feature_stride {
+            let source_feature = source_bucket * feature_stride + offset;
+            let target_feature = target_bucket * feature_stride + offset;
+            let source_start = source_feature * feature_bytes;
+            let target_start = target_feature * feature_bytes;
+            expanded[target_start..target_start + feature_bytes]
+                .copy_from_slice(&raw[source_start..source_start + feature_bytes]);
+        }
+    }
+    expanded[target_l0_bytes..].copy_from_slice(rest);
+    expanded
+}
+
+fn latest_checkpoint(config: &Config) -> PathBuf {
+    let output = expand_path(&out_dir(config));
+    let prefix = format!("{}-", net_id(config));
+    let mut checkpoints = fs::read_dir(&output)
+        .unwrap_or_else(|err| {
+            eprintln!("error: cannot read {}: {err}", output.display());
+            process::exit(1);
+        })
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(OsStr::to_str)
+                .is_some_and(|name| name.starts_with(&prefix))
+        })
+        .map(|path| path.join("quantised.bin"))
+        .filter(|path| path.exists())
+        .collect::<Vec<_>>();
+    checkpoints.sort_by_key(|path| {
+        path.metadata()
+            .and_then(|metadata| metadata.modified())
+            .ok()
+    });
+    checkpoints.into_iter().last().unwrap_or_else(|| {
+        eprintln!("error: no quantised.bin checkpoints found under {}", output.display());
+        process::exit(1);
+    })
+}
+
+fn write_model(config: &Config) {
+    let checkpoint = latest_checkpoint(config);
+    let raw = fs::read(&checkpoint).unwrap_or_else(|err| {
+        eprintln!("error: cannot read {}: {err}", checkpoint.display());
+        process::exit(1);
+    });
+    let input_buckets = usize_at(&config.arch, "input_buckets", 1);
+    let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
+    let model = expand_input_buckets(
+        &raw,
+        input_buckets,
+        usize_at(&config.arch, "feature_channels", 12),
+        runtime_input_buckets,
+        usize_at(&config.arch, "output_buckets", 1),
+        usize_at(&config.arch, "hidden", 1024),
+        usize_at(&config.arch, "l2_size", 16),
+    );
+    let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
+    if let Some(parent) = model_path.parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|err| {
+            eprintln!("error: cannot create {}: {err}", parent.display());
+            process::exit(1);
+        });
+    }
+    fs::write(&model_path, model).unwrap_or_else(|err| {
+        eprintln!("error: cannot write {}: {err}", model_path.display());
+        process::exit(1);
+    });
+    println!("wrote {}", model_path.display());
+}
+
+fn cmd_export(config: &Config) {
+    let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
+    if !model_path.exists() {
+        write_model(config);
+    }
+    let net = expand_path(&net_path(config));
+    if let Some(parent) = net.parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|err| {
+            eprintln!("error: cannot create {}: {err}", parent.display());
+            process::exit(1);
+        });
+    }
+    fs::copy(&model_path, &net).unwrap_or_else(|err| {
+        eprintln!(
+            "error: cannot copy {} -> {}: {err}",
+            model_path.display(),
+            net.display()
+        );
+        process::exit(1);
+    });
+    let size = net.metadata().map(|m| m.len()).unwrap_or(0);
+    println!("wrote {} ({} bytes)", net.display(), size);
+}
+
+fn main() {
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    let (command, config) = load_config(&args);
+    match command.as_str() {
+        "plan" => cmd_plan(&config),
+        "data" => cmd_data(&config),
+        "run" => cmd_run(&config),
+        "export" => cmd_export(&config),
+        "all" => {
+            cmd_data(&config);
+            cmd_run(&config);
+            cmd_export(&config);
+        }
+        _ => usage(),
+    }
+}
