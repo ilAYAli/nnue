@@ -16,6 +16,7 @@ __pycache__/
 /tmp/
 /runs/
 /artifacts/
+/tools/bullet/train
 
 # fastchess recovery config
 config.json
