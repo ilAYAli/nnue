@@ -535,7 +535,7 @@ fn enyo_network_size(
     let l3 = 32;
     features * hidden * 2
         + hidden * 2
-        + l1 * l2 * 4
+        + l1 * l2
         + l2 * 4
         + l2 * l3 * 4
         + l3 * 4
