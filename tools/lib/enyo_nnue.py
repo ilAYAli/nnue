@@ -16,10 +16,13 @@ WHITE, BLACK = 0, 1
 PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6
 
 DEFAULT_N_KING_BUCKETS = 16
-SUPPORTED_N_KING_BUCKETS = (16, 32)
+SUPPORTED_N_KING_BUCKETS = (1, 2, 4, 8, 16, 32)
 DEFAULT_N_FEATURE_CHANNELS = 12
 HALFKA_V2_FEATURE_CHANNELS = 11
-SUPPORTED_N_FEATURE_LAYOUTS = ((16, 12), (32, 12), (32, 11))
+SUPPORTED_N_FEATURE_LAYOUTS = (
+    (1, 12), (2, 12), (4, 12), (8, 12), (16, 12), (32, 12),
+    (32, 11),
+)
 DEFAULT_N_OUTPUT_BUCKETS = 1
 SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
 DEFAULT_N_OUTPUT_HEAD_FEATURES = 0
@@ -104,8 +107,8 @@ KING_BUCKETS = KING_BUCKETS_16
 
 
 def king_buckets(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> tuple[int, ...]:
-    if input_buckets == 16:
-        return KING_BUCKETS_16
+    if input_buckets in (1, 2, 4, 8, 16):
+        return tuple(bucket * input_buckets // 16 for bucket in KING_BUCKETS_16)
     if input_buckets == 32:
         return KING_BUCKETS_32
     raise ValueError(f"unsupported input bucket count {input_buckets}")
