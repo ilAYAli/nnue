@@ -9,7 +9,15 @@ set -Eeuo pipefail
 #   ./nnue-run sprt      candidate vs reference games
 #   ./nnue-run status    print current run/reference and latest logs
 
-cmd=${1:-iterate}
+cmd=iterate
+SOLO=0
+for arg in "$@"; do
+  case "$arg" in
+    --solo) SOLO=1 ;;
+    iterate|plan|train|gates|sprt|status|help|-h|--help) cmd=$arg ;;
+    *) echo "unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
 
 BUILD=${BUILD:-build.json}
 ARCH=${ARCH:-architecture.json}
@@ -139,7 +147,7 @@ notify() {
 }
 
 section() {
-  printf '\n==== %s ====\n' "$1"
+  printf '\n============ %s ============\n' "$1"
 }
 
 show_config() {
@@ -294,6 +302,33 @@ sprt_gate() {
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
 
   local log="$log_dir/05-sprt-${GAMES}.log"
+  if [[ "$SOLO" != 1 ]]; then
+    local forge="$HOME/code/cpp/chess/crucible/scripts/forge"
+    local engine_hash="${ENGINE##*/}"
+    local crucible_run="${run}-sprt-${GAMES}-$(date +%Y%m%d-%H%M%S)"
+    engine_hash="${engine_hash#enyo_}"
+    [[ -x "$forge" ]] || fail "missing forge: $forge" sprt
+    "$forge" nnue "$engine_hash" \
+      --candidate-nnue "$candidate_net" \
+      --reference-nnue "$reference_net" \
+      --verify \
+      --run "$crucible_run" \
+      -- \
+      --games "$GAMES" \
+      2>&1 | tee "$log" \
+      || fail "forge SPRT failed for $run" sprt
+
+    local status_json
+    status_json=$(crucible status "$crucible_run" --json) || fail "could not read Crucible status for $crucible_run" sprt
+    last_sprt_elo=$(jq -r '.progress_fields[]? | select(startswith("elo=")) | sub("^elo="; "") | sub("^\\+"; "")' <<< "$status_json" | tail -1)
+    last_sprt_line="Crucible $crucible_run $(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json")"
+    [[ -n "$last_sprt_elo" ]] || fail "could not parse Crucible SPRT Elo" sprt
+    float_ge "$last_sprt_elo" "$MIN_SPRT_ELO" || fail "sprt elo $last_sprt_elo < $MIN_SPRT_ELO" sprt
+    echo "PASS sprt elo=$last_sprt_elo"
+    notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$log" 0
+    return 0
+  fi
+
   sprt \
     --concurrency "$CONCURRENCY" \
     --threads "$THREADS" \
@@ -401,6 +436,7 @@ Usage:
   ./nnue-run train
   ./nnue-run gates
   ./nnue-run sprt
+  ./nnue-run sprt --solo
   ./nnue-run status
 
 Useful overrides:
