@@ -102,7 +102,7 @@ impl Filter {
 fn usage() -> ! {
     eprintln!(
         "usage: tools/bullet/train <plan|data|run|export|all> \
-         [--build build.json] [--arch architecture.json] [--defaults defaults.json]"
+         [--build build.json] [--arch architecture.json] [--defaults defaults.json] [--force]"
     );
     process::exit(2);
 }
@@ -232,11 +232,12 @@ fn reject_poison(config: &Config) {
     }
 }
 
-fn load_config(args: &[String]) -> (String, Config) {
+fn load_config(args: &[String]) -> (String, Config, bool) {
     let command = args.first().cloned().unwrap_or_else(|| usage());
     let mut build = "build.json".to_owned();
     let mut arch = "architecture.json".to_owned();
     let mut defaults = "defaults.json".to_owned();
+    let mut force = false;
 
     let mut idx = 1;
     while idx < args.len() {
@@ -253,6 +254,7 @@ fn load_config(args: &[String]) -> (String, Config) {
                 idx += 1;
                 defaults = args.get(idx).cloned().unwrap_or_else(|| usage());
             }
+            "--force" => force = true,
             _ => usage(),
         }
         idx += 1;
@@ -272,7 +274,7 @@ fn load_config(args: &[String]) -> (String, Config) {
         process::exit(2);
     }
 
-    (command, config)
+    (command, config, force)
 }
 
 fn data_config(config: &Config) -> DataConfig {
@@ -280,7 +282,9 @@ fn data_config(config: &Config) -> DataConfig {
     let sf = object_at(&config.defaults, "sfbinpack");
     DataConfig {
         source_binpack: required_string(data, "source_binpack"),
-        bullet_output: required_string(data, "bullet_output"),
+        bullet_output: string_at(data, "bullet_output")
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("data/bullet/{}.bullet", run_name(config))),
         limit: u64_at(data, "limit", 0),
         threads: usize_at(data, "threads", usize_at(&config.defaults, "threads", 4)),
         buffer_mb: usize_at(data, "buffer_mb", usize_at(sf, "buffer_mb", 1024)),
@@ -310,6 +314,18 @@ fn net_id(config: &Config) -> String {
     string_at(&config.defaults, "net_id")
         .unwrap_or("scratch_native")
         .to_owned()
+}
+
+fn continue_from(config: &Config) -> Option<String> {
+    string_at(&config.build, "continue_from").map(str::to_owned)
+}
+
+fn training_lr(config: &Config) -> f64 {
+    f64_at(&config.build, "lr", f64_at(&config.defaults, "lr", 1e-3))
+}
+
+fn training_final_lr(config: &Config) -> f64 {
+    f64_at(&config.build, "final_lr", f64_at(&config.defaults, "final_lr", 1e-4))
 }
 
 fn validate_layout(config: &Config) {
@@ -345,11 +361,21 @@ fn cmd_plan(config: &Config) {
     let data = data_config(config);
     println!("run={}", run_name(config));
     println!("lineage={}", required_string(&config.build, "lineage"));
+    if let Some(previous_run) = continue_from(config) {
+        println!("continue_from={previous_run}");
+        println!(
+            "init_weights={}",
+            latest_weight_checkpoint(config, &previous_run).display()
+        );
+    }
     println!("source_binpack={}", data.source_binpack);
     println!("bullet_output={}", data.bullet_output);
     println!("net={}", net_path(config));
     println!();
     println!("commands:");
+    println!("  tools/bullet/train plan --build build.json");
+    println!("  tools/bullet/train all --build build.json");
+    println!("debug:");
     println!("  tools/bullet/train data --build build.json");
     println!("  tools/bullet/train run --build build.json");
     println!("  tools/bullet/train export --build build.json");
@@ -367,6 +393,11 @@ fn cmd_plan(config: &Config) {
         usize_at(&config.build, "superbatches", 64),
         usize_at(&config.defaults, "batch_size", 2048),
         usize_at(&config.defaults, "batches", 64),
+    );
+    println!(
+        "  lr={}, final_lr={}",
+        training_lr(config),
+        training_final_lr(config),
     );
 }
 
@@ -482,6 +513,9 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_LOADER", string_at(&config.defaults, "loader").unwrap_or("direct"));
     set_env("ENYO_BULLET_OUT", output.display());
     set_env("ENYO_BULLET_NET_ID", net_id(config));
+    if let Some(previous_run) = continue_from(config) {
+        set_env("ENYO_BULLET_INIT_WEIGHTS", latest_weight_checkpoint(config, &previous_run).display());
+    }
     set_env("ENYO_BULLET_MODE", string_at(&config.arch, "mode").unwrap_or("enyo"));
     set_env("ENYO_BULLET_HIDDEN", usize_at(&config.arch, "hidden", 1024));
     set_env("ENYO_BULLET_L2", usize_at(&config.arch, "l2_size", 16));
@@ -490,8 +524,8 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_SUPERBATCHES", usize_at(&config.build, "superbatches", 64));
     set_env("ENYO_BULLET_THREADS", usize_at(&config.defaults, "threads", 4));
     set_env("ENYO_BULLET_WDL", f64_at(&config.defaults, "wdl", 0.3));
-    set_env("ENYO_BULLET_LR", f64_at(&config.defaults, "lr", 1e-3));
-    set_env("ENYO_BULLET_FINAL_LR", f64_at(&config.defaults, "final_lr", 1e-4));
+    set_env("ENYO_BULLET_LR", training_lr(config));
+    set_env("ENYO_BULLET_FINAL_LR", training_final_lr(config));
     set_env("ENYO_BULLET_ENYO_L0_STD", f64_at(&config.arch, "l0_std", 8.0));
     set_env("ENYO_BULLET_ENYO_L1_STD", f64_at(&config.arch, "l1_std", 1.0));
     set_env(
@@ -646,6 +680,41 @@ fn latest_checkpoint(config: &Config) -> PathBuf {
     })
 }
 
+fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
+    if run.contains('/') || run.contains('\\') || run == "." || run == ".." {
+        eprintln!("error: continue_from must be a previous run name, not a path");
+        process::exit(2);
+    }
+    let output = expand_path(&format!("runs/{run}/checkpoints"));
+    let prefix = format!("{}-", net_id(config));
+    let mut checkpoints = fs::read_dir(&output)
+        .unwrap_or_else(|err| {
+            eprintln!("error: cannot read {}: {err}", output.display());
+            process::exit(1);
+        })
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter_map(|path| {
+            let name = path.file_name().and_then(OsStr::to_str)?;
+            let superbatch = name.strip_prefix(&prefix)?.parse::<usize>().ok()?;
+            let weights = path.join("optimiser_state/weights.bin");
+            weights.exists().then_some((superbatch, weights))
+        })
+        .collect::<Vec<_>>();
+    checkpoints.sort_by_key(|(superbatch, _)| *superbatch);
+    checkpoints
+        .into_iter()
+        .last()
+        .map(|(_, path)| path)
+        .unwrap_or_else(|| {
+            eprintln!(
+                "error: no optimiser_state/weights.bin checkpoints found under {}",
+                output.display()
+            );
+            process::exit(1);
+        })
+}
+
 fn write_model(config: &Config) {
     let checkpoint = latest_checkpoint(config);
     let raw = fs::read(&checkpoint).unwrap_or_else(|err| {
@@ -677,7 +746,7 @@ fn write_model(config: &Config) {
     println!("wrote {}", model_path.display());
 }
 
-fn cmd_export(config: &Config) {
+fn cmd_export(config: &Config, force: bool) {
     let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
     if !model_path.exists() {
         write_model(config);
@@ -688,6 +757,13 @@ fn cmd_export(config: &Config) {
             eprintln!("error: cannot create {}: {err}", parent.display());
             process::exit(1);
         });
+    }
+    if net.exists() && !force {
+        eprintln!(
+            "error: refusing to overwrite existing net: {}\npass --force or use a unique run name",
+            net.display()
+        );
+        process::exit(1);
     }
     fs::copy(&model_path, &net).unwrap_or_else(|err| {
         eprintln!(
@@ -703,16 +779,16 @@ fn cmd_export(config: &Config) {
 
 fn main() {
     let args = env::args().skip(1).collect::<Vec<_>>();
-    let (command, config) = load_config(&args);
+    let (command, config, force) = load_config(&args);
     match command.as_str() {
         "plan" => cmd_plan(&config),
         "data" => cmd_data(&config),
         "run" => cmd_run(&config),
-        "export" => cmd_export(&config),
+        "export" => cmd_export(&config, force),
         "all" => {
             cmd_data(&config);
             cmd_run(&config);
-            cmd_export(&config);
+            cmd_export(&config, force);
         }
         _ => usage(),
     }
