@@ -1,16 +1,17 @@
 {
-  "run": "pwa-native-v10",
-  "continue_from": "pwa-native-v7",
+  "run": "pwa-native-v11",
   "lineage": "scratch-native",
-  "hypothesis": "Continue from the last clear winner with lower LR to avoid post-saturation drift.",
+  "hypothesis": "Test whether adding the first king split improves over the accepted 1-bucket native net.",
   "changed_variables": {
-    "training_schedule": "lower LR only; same data, same architecture"
+    "architecture": "2 input buckets instead of 1",
+    "reference": "compare against pwa-native-v7"
   },
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
     "limit": 100000000
   },
   "superbatches": 7600,
-  "lr": 0.0003,
-  "final_lr": 3e-05
+  "lr": 0.001,
+  "final_lr": 0.0001,
+  "continue_from": null
 }
