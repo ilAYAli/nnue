@@ -1,11 +1,12 @@
 {
-  "run": "pwa-native-v12",
+  "run": "pwa-native-v13",
   "lineage": "scratch-native",
-  "hypothesis": "Test whether 4 input buckets improves over the accepted pwa-native-v7 1-bucket native net after the 2-bucket v11 result failed to show a clear gain.",
+  "hypothesis": "Continue saturating the accepted 1-bucket native architecture before testing more king buckets. The 2-bucket v11 run failed vs pwa-native-v7, so the next useful experiment keeps the architecture simple and tests same-lane continuation/training dose instead of adding buckets.",
   "changed_variables": {
-    "architecture": "4 input buckets instead of 1",
+    "architecture": "back to 1 input bucket",
     "reference": "compare against pwa-native-v7",
-    "init": "scratch; do not continue across architecture changes"
+    "goal": "saturate the accepted simple architecture before changing bucket count",
+    "iteration": "continue from pwa-native-v12"
   },
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
@@ -14,5 +15,6 @@
   "superbatches": 7600,
   "lr": 0.001,
   "final_lr": 0.0001,
-  "continue_from": null
+  "continue_from": "pwa-native-v12",
+  "reference": "pwa-native-v12"
 }
