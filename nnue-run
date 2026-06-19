@@ -179,11 +179,36 @@ plan() {
 
 train() {
   load_config
+  if [[ "${FORCE:-0}" != 1 ]]; then
+    local log="$log_dir/01-train-export.log"
+    local model_net="$run_dir/model.nn"
+    if [[ -s "$model_net" ]]; then
+      section train
+      if cmp -s "$model_net" "$candidate_net"; then
+        echo "SKIP train/export: $candidate_net already matches $model_net" | tee -a "$log"
+      else
+        echo "INSTALL completed model: $model_net -> $candidate_net" | tee -a "$log"
+        install -D -m 0644 "$model_net" "$candidate_net"
+      fi
+      notify phase_done train "training/export resumed for $run: installed $candidate_net" "$log" 0
+      return 0
+    fi
+    if [[ -s "$candidate_net" ]]; then
+      section train
+      echo "SKIP train/export: $candidate_net exists (FORCE=1 to rebuild)" | tee -a "$log"
+      notify phase_done train "training/export skipped for $run: $candidate_net exists" "$log" 0
+      return 0
+    fi
+  fi
+  local train_args=(all --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS")
+  if [[ "${FORCE:-0}" == 1 ]]; then
+    train_args+=(--force)
+  fi
   notify phase_start train "training $run" "$log_dir/01-train-export.log" 0
   section plan
   plan | tee "$log_dir/00-plan.log" || fail "plan failed for $run" plan
   section train
-  tools/bullet/train all --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS" \
+  tools/bullet/train "${train_args[@]}" \
     2>&1 | tee "$log_dir/01-train-export.log" \
     || fail "train/export failed for $run" train
   notify phase_done train "training/export passed for $run" "$log_dir/01-train-export.log" 0
@@ -443,6 +468,7 @@ Useful overrides:
   ITERATIONS=5 ./nnue-run iterate
   REFERENCE_NET=$HOME/assets/nets/pwa-native-v7.nn ./nnue-run sprt
   GAMES=1000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
+  FORCE=1 ./nnue-run train
   MOVE_GATE_STRICT=1 ./nnue-run gates
 EOF
 }
