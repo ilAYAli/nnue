@@ -186,7 +186,7 @@ class CandidateDefaults:
     pairwise_skip_rows: int = 0
     pairwise_checkpoint_every: int = 1
     pairwise_move_gate_cases: str = ""
-    pairwise_move_gate_baseline_net: str = ""
+    pairwise_move_gate_reference_net: str = ""
     pairwise_move_gate_limit: int = 0
     pairwise_move_gate_fail_candidate_below_baseline: bool = True
     pairwise_move_gate_fail_regressed_above: int = -1

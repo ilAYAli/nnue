@@ -147,7 +147,7 @@ def cmd_move_gate(args: argparse.Namespace) -> int:
         str(script),
         "--cases", str(expand_path(args.cases)),
         "--engine", str(expand_path(args.engine)),
-        "--baseline-net", str(expand_path(args.baseline_net)),
+        "--reference-net", str(expand_path(args.reference_net)),
         "--candidate-net", str(expand_path(args.candidate_net)),
         "--threads", str(args.threads),
         "--hash", str(args.hash),
@@ -303,7 +303,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     move_gate.add_argument("--cases", required=True)
     move_gate.add_argument("--engine", required=True)
-    move_gate.add_argument("--baseline-net", required=True)
+    move_gate.add_argument("--reference-net", required=True)
     move_gate.add_argument("--candidate-net", required=True)
     move_gate.add_argument("--threads", type=int, default=1)
     move_gate.add_argument("--hash", type=int, default=64)
