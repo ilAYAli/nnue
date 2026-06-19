@@ -1,10 +1,11 @@
 {
-  "run": "pwa-native-v11",
+  "run": "pwa-native-v12",
   "lineage": "scratch-native",
-  "hypothesis": "Test whether adding the first king split improves over the accepted 1-bucket native net.",
+  "hypothesis": "Test whether 4 input buckets improves over the accepted pwa-native-v7 1-bucket native net after the 2-bucket v11 result failed to show a clear gain.",
   "changed_variables": {
-    "architecture": "2 input buckets instead of 1",
-    "reference": "compare against pwa-native-v7"
+    "architecture": "4 input buckets instead of 1",
+    "reference": "compare against pwa-native-v7",
+    "init": "scratch; do not continue across architecture changes"
   },
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
