@@ -208,7 +208,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--cases", required=True, type=Path)
     ap.add_argument("--engine", required=True, type=Path)
-    ap.add_argument("--baseline-net", required=True, type=Path)
+    ap.add_argument("--reference-net", required=True, type=Path)
     ap.add_argument("--candidate-net", required=True, type=Path)
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--hash", type=int, default=64)
@@ -230,7 +230,7 @@ def main() -> None:
         validate_case(row)
 
     baseline = EnyoEvalNet(
-        args.engine, args.baseline_net, args.threads, args.hash, args.timeout)
+        args.engine, args.reference_net, args.threads, args.hash, args.timeout)
     try:
         baseline_margins = margins(baseline, rows)
     finally:

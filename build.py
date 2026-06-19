@@ -1461,8 +1461,8 @@ def create_config(args: argparse.Namespace) -> dict:
             net=f"{candidate_dir}/model.nn",
         )
         if args.engine_static_jsonl:
-            baseline_net = templated_path_arg(
-                args.pairwise_move_gate_baseline_net
+            reference_net = templated_path_arg(
+                args.pairwise_move_gate_reference_net
                 or args.pairwise_init_from_nn
                 or args.init_net
             )
@@ -1470,7 +1470,7 @@ def create_config(args: argparse.Namespace) -> dict:
                 steps,
                 args,
                 name="validate_engine_static_baseline",
-                net=baseline_net,
+                net=reference_net,
                 jsonl=args.engine_static_jsonl,
             )
             append_engine_static_step(
@@ -1486,8 +1486,8 @@ def create_config(args: argparse.Namespace) -> dict:
                 python, tool("validate/eval_move_gate.py"),
                 "--cases", templated_path_arg(args.pairwise_move_gate_cases),
                 "--engine", str(expand_path(args.engine_static_engine)),
-                "--baseline-net", templated_path_arg(
-                    args.pairwise_move_gate_baseline_net
+                "--reference-net", templated_path_arg(
+                    args.pairwise_move_gate_reference_net
                     or args.pairwise_init_from_nn
                     or args.init_net
                 ),
@@ -2141,8 +2141,8 @@ def add_create_args(
                         default=value("pairwise_checkpoint_every", d.pairwise_checkpoint_every))
     parser.add_argument("--pairwise-move-gate-cases",
                         default=value("pairwise_move_gate_cases", d.pairwise_move_gate_cases))
-    parser.add_argument("--pairwise-move-gate-baseline-net",
-                        default=value("pairwise_move_gate_baseline_net", d.pairwise_move_gate_baseline_net))
+    parser.add_argument("--pairwise-move-gate-reference-net",
+                        default=value("pairwise_move_gate_reference_net", d.pairwise_move_gate_reference_net))
     parser.add_argument("--pairwise-move-gate-limit", type=int,
                         default=value("pairwise_move_gate_limit", d.pairwise_move_gate_limit))
     parser.add_argument("--pairwise-move-gate-fail-candidate-below-baseline",

@@ -44,7 +44,7 @@ $PYTHON tools/validate/build_fixed_move_gate.py \
 $PYTHON tools/validate/validate.py move-gate \
   --cases runs/fixed-move-gate/cases.jsonl \
   --engine ~/code/cpp/chess/assets/engines/reference \
-  --baseline-net ~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn \
+  --reference-net ~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn \
   --candidate-net run/candidate/model.nn \
   --fail-if-candidate-below-baseline \
   --fail-if-regressed-above 0
