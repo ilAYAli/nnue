@@ -1,6 +1,16 @@
 {
-  "run": "placeholder",
-  "hypothesis": "Awaiting native-8.0.0-rc0 (pipeline parity). See IMPROVEMENT_PLAN.md. The iteration build.json will be written on a fresh branch when training starts.",
-  "changed_variables": {},
-  "stages": []
+  "run": "pwa-native-v10",
+  "continue_from": "pwa-native-v7",
+  "lineage": "scratch-native",
+  "hypothesis": "Continue from the last clear winner with lower LR to avoid post-saturation drift.",
+  "changed_variables": {
+    "training_schedule": "lower LR only; same data, same architecture"
+  },
+  "data": {
+    "source_binpack": "data/nodes5000pv2_UHO.binpack",
+    "limit": 100000000
+  },
+  "superbatches": 7600,
+  "lr": 0.0003,
+  "final_lr": 3e-05
 }
