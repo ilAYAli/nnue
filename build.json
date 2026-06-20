@@ -1,10 +1,9 @@
 {
   "run": "pwa-native-v15",
   "lineage": "scratch-native",
-  "hypothesis": "Continue saturating the accepted 1-bucket native architecture before testing more king buckets. The 2-bucket v11 run failed vs pwa-native-v7, so the next useful experiment keeps the architecture simple and tests same-lane continuation/training dose instead of adding buckets.",
+  "hypothesis": "Continue the accepted 1-bucket native architecture with the current training dose.",
   "changed_variables": {
     "architecture": "back to 1 input bucket",
-    "reference": "compare against pwa-native-v14",
     "goal": "saturate the accepted simple architecture before changing bucket count"
   },
   "data": {
@@ -13,7 +12,5 @@
   },
   "superbatches": 7600,
   "lr": 0.001,
-  "final_lr": 0.0001,
-  "continue_from": "pwa-native-v14",
-  "reference": "pwa-native-v14"
+  "final_lr": 0.0001
 }

@@ -60,6 +60,7 @@ log_dir=
 candidate_net=
 data_file=
 reference_net=
+train_build=
 summary_file=
 last_sprt_elo=
 last_sprt_llr=
@@ -111,18 +112,29 @@ load_config() {
   run=$(json '.run')
   continue_from=$(json '.continue_from // empty')
   reference_name=$(json '.reference // empty')
+  if [[ -z "$continue_from" ]]; then
+    continue_from=$(previous_run_name "$run") || fail "cannot infer previous run from run=$run" config
+  fi
   run_dir="runs/$run"
   log_dir="$run_dir/logs"
   candidate_net="$HOME/assets/nets/$run.nn"
   data_file="data/bullet/$run.bullet"
   mkdir -p "$log_dir" runs/logs
   local ref_source="${REFERENCE_NET:-${reference_name:-$continue_from}}"
-  if [[ -z "$ref_source" ]]; then
-    ref_source=$(previous_run_name "$run") || fail "missing reference/continue_from and cannot infer previous from run=$run" config
-    reference_name=$ref_source
-  fi
   reference_net=$(net_for_name_or_path "$ref_source")
   summary_file=${summary_file:-runs/logs/nnue-run-iterate-$(date +%Y%m%d_%H%M%S).txt}
+}
+
+reference_label() {
+  printf '%s\n' "${REFERENCE_NET:-${reference_name:-$continue_from}}"
+}
+
+training_build() {
+  train_build="$run_dir/build.resolved.json"
+  jq --arg prev "$continue_from" \
+    '.continue_from = $prev | del(.reference) | del(.changed_variables.reference)' \
+    "$BUILD" > "$train_build"
+  printf '%s\n' "$train_build"
 }
 
 notify() {
@@ -166,7 +178,7 @@ show_config() {
   cat <<EOF
 run=$run
 continue_from=${continue_from:-}
-reference=${reference_name:-${continue_from:-pwa-native-v7}}
+reference=$(reference_label)
 engine=$ENGINE
 reference_net=$reference_net
 candidate_net=$candidate_net
@@ -195,7 +207,9 @@ metric() {
 
 plan() {
   load_config
-  tools/bullet/train plan --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS"
+  local build_for_train
+  build_for_train=$(training_build)
+  tools/bullet/train plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS"
 }
 
 train() {
@@ -221,13 +235,15 @@ train() {
       return 0
     fi
   fi
-  local train_args=(all --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS")
+  local build_for_train
+  build_for_train=$(training_build)
+  local train_args=(all --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS")
   if [[ "${FORCE:-0}" == 1 ]]; then
     train_args+=(--force)
   fi
   notify phase_start train "training $run" "$log_dir/01-train-export.log" 0
   section plan
-  plan | tee "$log_dir/00-plan.log" || fail "plan failed for $run" plan
+  tools/bullet/train plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" | tee "$log_dir/00-plan.log" || fail "plan failed for $run" plan
   section train
   tools/bullet/train "${train_args[@]}" \
     2>&1 | tee "$log_dir/01-train-export.log" \
@@ -323,7 +339,7 @@ gates() {
 
 sprt_gate() {
   load_config
-  notify phase_start sprt "SPRT $run vs ${reference_name:-${continue_from:-pwa-native-v7}}" "$log_dir/05-sprt-${GAMES}.log" 0
+  notify phase_start sprt "SPRT $run vs $(reference_label)" "$log_dir/05-sprt-${GAMES}.log" 0
   section sprt
   show_config
   [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" sprt
@@ -413,14 +429,13 @@ bump_build_json() {
   tmp=$(mktemp)
   jq \
     --arg run "$next" \
-    --arg prev "$accepted" \
     '.run = $run
-     | .continue_from = $prev
-     | .reference = $prev
-     | .changed_variables.reference = ("compare against " + $prev)' \
+     | del(.continue_from)
+     | del(.reference)
+     | del(.changed_variables.reference)' \
     "$BUILD" > "$tmp"
   mv "$tmp" "$BUILD"
-  echo "updated $BUILD: run=$next continue_from=$accepted reference=$accepted"
+  echo "updated $BUILD: run=$next"
 
   git commit --only \
     -m "${accepted}.nn: Elo ${elo},LLR ${llr}" \
@@ -431,28 +446,11 @@ Result:
 $details" \
     -- "$BUILD"
 }
-
-ensure_iteration_reference() {
-  local expected
-  expected=$(previous_run_name "$run") || fail "cannot infer previous run from $run" iterate
-  REFERENCE_NET=
-  local tmp
-  tmp=$(mktemp)
-  jq \
-    --arg prev "$expected" \
-    '.continue_from = $prev
-     | .reference = $prev
-     | .changed_variables.reference = ("compare against " + $prev)' \
-    "$BUILD" > "$tmp"
-  mv "$tmp" "$BUILD"
-  load_config
-}
-
 record_iteration() {
   local result=$1
   local detail=$2
   {
-    echo "$run vs ${reference_name:-${continue_from:-pwa-native-v7}}: $result"
+    echo "$run vs $(reference_label): $result"
     echo "  $detail"
     [[ -n "${last_sprt_line:-}" ]] && echo "  $last_sprt_line"
   } >> "$summary_file"
@@ -474,9 +472,6 @@ iterate() {
     section "iteration $i"
     show_config
     notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
-    ensure_iteration_reference
-    show_config
-
     train || fail "train failed for $run" train
     gates || fail "gates failed for $run" gates
     if sprt_gate; then
@@ -516,7 +511,7 @@ Usage:
 
 Useful overrides:
   ITERATIONS=5 ./nnue-run iterate
-  REFERENCE_NET=$HOME/assets/nets/pwa-native-v7.nn ./nnue-run sprt
+  REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue-run sprt
   GAMES=1000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
   FORCE=1 ./nnue-run train
   MOVE_GATE_STRICT=1 ./nnue-run gates
