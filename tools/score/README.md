@@ -26,3 +26,23 @@ tools/score/score.py uci \
   --hash 128
 ```
 
+## Binpack count
+
+Build the C++ score tools out of tree:
+
+```sh
+cmake -S tools/score -B /tmp/nnue-score-tools-build -DCMAKE_BUILD_TYPE=Release
+cmake --build /tmp/nnue-score-tools-build --parallel
+```
+
+Count usable sfbinpack rows with the same default filters as the Bullet
+sfbinpack conversion path: `min_ply=16`, `max_abs_cp=10000`, `quiet_only=1`,
+and side to move not in check.
+
+```sh
+/tmp/nnue-score-tools-build/count_binpack data/nodes5000pv2_UHO.binpack
+```
+
+```sh
+/tmp/nnue-score-tools-build/count_binpack --max-seen 1000000 data/nodes5000pv2_UHO.binpack
+```
