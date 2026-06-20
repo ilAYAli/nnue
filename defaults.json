@@ -3,6 +3,7 @@
   "net_id": "scratch_native",
   "batches": 64,
   "batch_size": 2048,
+  "superbatches": 7600,
   "threads": 16,
   "wdl": 0.3,
   "lr": 0.001,

@@ -328,6 +328,10 @@ fn training_final_lr(config: &Config) -> f64 {
     f64_at(&config.build, "final_lr", f64_at(&config.defaults, "final_lr", 1e-4))
 }
 
+fn training_superbatches(config: &Config) -> usize {
+    usize_at(&config.build, "superbatches", usize_at(&config.defaults, "superbatches", 64))
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -390,7 +394,7 @@ fn cmd_plan(config: &Config) {
     );
     println!(
         "  dose={} superbatches, batch_size={}, batches={}",
-        usize_at(&config.build, "superbatches", 64),
+        training_superbatches(config),
         usize_at(&config.defaults, "batch_size", 2048),
         usize_at(&config.defaults, "batches", 64),
     );
@@ -521,7 +525,7 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_L2", usize_at(&config.arch, "l2_size", 16));
     set_env("ENYO_BULLET_BATCH_SIZE", usize_at(&config.defaults, "batch_size", 2048));
     set_env("ENYO_BULLET_BATCHES", usize_at(&config.defaults, "batches", 64));
-    set_env("ENYO_BULLET_SUPERBATCHES", usize_at(&config.build, "superbatches", 64));
+    set_env("ENYO_BULLET_SUPERBATCHES", training_superbatches(config));
     set_env("ENYO_BULLET_THREADS", usize_at(&config.defaults, "threads", 4));
     set_env("ENYO_BULLET_WDL", f64_at(&config.defaults, "wdl", 0.3));
     set_env("ENYO_BULLET_LR", training_lr(config));
