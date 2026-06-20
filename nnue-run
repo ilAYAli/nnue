@@ -230,9 +230,7 @@ metric() {
 
 plan() {
   load_config
-  local build_for_train
-  build_for_train=$(training_build)
-  tools/bullet/train plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS"
+  tools/bullet/train plan --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS"
 }
 
 train() {
