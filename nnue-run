@@ -29,6 +29,8 @@ REFERENCE_NET=${REFERENCE_NET:-}
 CASES=${CASES:-runs/lichess-inacc-miss-blunder-20260612/native760_vs_native123_net_value_bad_move_gate.jsonl}
 
 ROWS=${ROWS:-50000}
+SMOKE_GAMES=${SMOKE_GAMES:-400}
+SMOKE_MIN_ELO=${SMOKE_MIN_ELO:--5}
 GAMES=${GAMES:-5000}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
@@ -65,6 +67,7 @@ last_sprt_elo=
 last_sprt_llr=
 last_sprt_line=
 last_sprt_command=
+last_sprt_log=
 
 fail() {
   echo "FAILED: $*" >&2
@@ -344,19 +347,16 @@ gates() {
   move_gate
 }
 
-sprt_gate() {
-  load_config
-  notify phase_start sprt "SPRT $run vs $(reference_label)" "$log_dir/05-sprt-${GAMES}.log" 0
-  section sprt
-  show_config
-  [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" sprt
-  [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
+run_sprt_once() {
+  local label=$1 sprt_games=$2 stage=$3
+  last_sprt_log="$log_dir/05-${label}-${sprt_games}.log"
+  notify phase_start "$stage" "SPRT $label $run vs $(reference_label)" "$last_sprt_log" 0
+  section "$label"
 
-  local log="$log_dir/05-sprt-${GAMES}.log"
   if [[ "$SOLO" != 1 ]]; then
     local forge="$HOME/code/cpp/chess/crucible/scripts/forge"
     local engine_hash="${ENGINE##*/}"
-    local crucible_run="${run}-sprt-${GAMES}-$(date +%Y%m%d-%H%M%S)"
+    local crucible_run="${run}-${label}-${sprt_games}-$(date +%Y%m%d-%H%M%S)"
     engine_hash="${engine_hash#enyo_}"
     [[ -x "$forge" ]] || fail "missing forge: $forge" sprt
     local forge_cmd=(
@@ -366,7 +366,7 @@ sprt_gate() {
       --verify
       --run "$crucible_run"
       --
-      --games "$GAMES"
+      --games "$sprt_games"
       --elo0 "$SPRT_ELO0"
       --elo1 "$SPRT_ELO1"
       --alpha "$SPRT_ALPHA"
@@ -374,7 +374,7 @@ sprt_gate() {
     )
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     "${forge_cmd[@]}" \
-      2>&1 | tee "$log" \
+      2>&1 | tee "$last_sprt_log" \
       || fail "forge SPRT failed for $run" sprt
 
     local status_json
@@ -384,9 +384,6 @@ sprt_gate() {
     last_sprt_line="Crucible $crucible_run $(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json")"
     [[ -n "$last_sprt_elo" ]] || fail "could not parse Crucible SPRT Elo" sprt
     [[ -n "$last_sprt_llr" ]] || fail "could not parse Crucible SPRT LLR" sprt
-    sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
-    echo "PASS sprt H1 elo=$last_sprt_elo llr=$last_sprt_llr"
-    notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$log" 0
     return 0
   fi
 
@@ -398,7 +395,7 @@ sprt_gate() {
     --candidate "$ENGINE"
     --reference-uci "nnue_file=$reference_net"
     --candidate-uci "nnue_file=$candidate_net"
-    --games "$GAMES"
+    --games "$sprt_games"
     --elo0 "$SPRT_ELO0"
     --elo1 "$SPRT_ELO1"
     --alpha "$SPRT_ALPHA"
@@ -406,20 +403,40 @@ sprt_gate() {
   )
   last_sprt_command=$(quote_cmd "${sprt_cmd[@]}")
   "${sprt_cmd[@]}" \
-    2>&1 | tee "$log" \
+    2>&1 | tee "$last_sprt_log" \
     || fail "SPRT command failed for $run" sprt
 
-  last_sprt_line=$(grep -E '^\[[[:space:]]*[0-9]+/[0-9]+\] Elo' "$log" | tail -1)
+  last_sprt_line=$(grep -E '^\[[[:space:]]*[0-9]+/[0-9]+\] Elo' "$last_sprt_log" | tail -1)
   [[ -n "$last_sprt_line" ]] || fail "could not parse SPRT output" sprt
   last_sprt_elo=$(awk '{ for (i = 1; i <= NF; i++) if ($i == "Elo") { print $(i + 1); exit } }' <<< "$last_sprt_line")
   last_sprt_llr=$(sed -nE 's/.*[Ll][Ll][Rr][ =:]+([+-]?[0-9.]+\/[+-]?[0-9.]+).*/\1/p' <<< "$last_sprt_line" | tail -1)
   [[ -n "$last_sprt_elo" ]] || fail "could not parse SPRT Elo" sprt
   [[ -n "$last_sprt_llr" ]] || fail "could not parse SPRT LLR" sprt
-  sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
-  echo "PASS sprt H1 elo=$last_sprt_elo llr=$last_sprt_llr"
-  notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$log" 0
 }
 
+sprt_gate() {
+  load_config
+  section sprt
+  show_config
+  [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" sprt
+  [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
+
+  run_sprt_once smoke "$SMOKE_GAMES" sprt_smoke
+  if sprt_h1_passed "$last_sprt_llr"; then
+    echo "PASS smoke H1 elo=$last_sprt_elo llr=$last_sprt_llr"
+    notify phase_done sprt "SPRT smoke passed for $run: $last_sprt_line" "$last_sprt_log" 0
+    return 0
+  fi
+  float_ge "$last_sprt_elo" "$SMOKE_MIN_ELO" \
+    || fail "smoke SPRT elo $last_sprt_elo < $SMOKE_MIN_ELO" sprt
+  echo "PASS smoke filter elo=$last_sprt_elo llr=$last_sprt_llr; running full SPRT"
+  notify phase_done sprt_smoke "SPRT smoke inconclusive for $run: $last_sprt_line" "$last_sprt_log" 0
+
+  run_sprt_once sprt "$GAMES" sprt
+  sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
+  echo "PASS sprt H1 elo=$last_sprt_elo llr=$last_sprt_llr"
+  notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
+}
 next_run_name() {
   if [[ "$1" =~ ^(.*-v|.*v)([0-9]+)$ ]]; then
     printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
@@ -519,6 +536,7 @@ Usage:
 Useful overrides:
   ITERATIONS=5 ./nnue-run iterate
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue-run sprt
+  SMOKE_GAMES=400 SMOKE_MIN_ELO=-5 ./nnue-run sprt
   GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
   FORCE=1 ./nnue-run train
   MOVE_GATE_STRICT=1 ./nnue-run gates
