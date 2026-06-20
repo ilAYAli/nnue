@@ -13,6 +13,7 @@
   "weight_decay": 0.0,
   "sfbinpack": {
     "buffer_mb": 1024,
+    "offset": 0,
     "min_ply": 16,
     "max_abs_cp": 10000,
     "quiet_only": true
