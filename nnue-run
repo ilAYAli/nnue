@@ -29,12 +29,12 @@ REFERENCE_NET=${REFERENCE_NET:-}
 CASES=${CASES:-runs/lichess-inacc-miss-blunder-20260612/native760_vs_native123_net_value_bad_move_gate.jsonl}
 
 ROWS=${ROWS:-50000}
-GAMES=${GAMES:-1000}
+GAMES=${GAMES:-5000}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
-SPRT_ELO1=${SPRT_ELO1:-5.0}
+SPRT_ELO1=${SPRT_ELO1:-3.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.05}
 SPRT_BETA=${SPRT_BETA:-0.05}
 
@@ -46,7 +46,6 @@ MIN_SIGN=${MIN_SIGN:-55}                   # 50% is chance; below 55% barely kno
 MIN_CORR=${MIN_CORR:-0.20}                 # Near zero means eval is mostly unrelated to target.
 MAX_ABS_BIAS=${MAX_ABS_BIAS:-300}          # Hundreds of cp offset indicates global bias/scale/sign trouble.
 MIN_SLOPE=${MIN_SLOPE:-0.10}               # Near zero means dead/flat eval.
-MIN_SPRT_ELO=${MIN_SPRT_ELO:-0}            # Iterate only continues when candidate is non-negative vs reference.
 MOVE_GATE_STRICT=${MOVE_GATE_STRICT:-0}    # 0 reports move gate; 1 also fails on worse selected-move counts.
 
 EVENT_HOOK=${EVENT_HOOK:-tools/events/nnue_event_ntfy.sh}
@@ -190,6 +189,14 @@ EOF
 float_ge() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a >= b) }'; }
 float_le() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a <= b) }'; }
 abs_float_le() { awk -v a="$1" -v b="$2" 'BEGIN { if (a < 0) a = -a; exit !(a <= b) }'; }
+
+sprt_h1_passed() {
+  local value upper
+  value=$(sed -nE 's/^[[:space:]]*([+-]?[0-9]+([.][0-9]+)?)\/.*/\1/p' <<< "$1")
+  upper=$(sed -nE 's/^[[:space:]]*[+-]?[0-9]+([.][0-9]+)?\/([+-]?[0-9]+([.][0-9]+)?).*/\2/p' <<< "$1")
+  [[ -n "$value" && -n "$upper" ]] || return 2
+  float_ge "$value" "$upper"
+}
 
 quote_cmd() {
   printf '%q ' "$@"
@@ -377,8 +384,8 @@ sprt_gate() {
     last_sprt_line="Crucible $crucible_run $(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json")"
     [[ -n "$last_sprt_elo" ]] || fail "could not parse Crucible SPRT Elo" sprt
     [[ -n "$last_sprt_llr" ]] || fail "could not parse Crucible SPRT LLR" sprt
-    float_ge "$last_sprt_elo" "$MIN_SPRT_ELO" || fail "sprt elo $last_sprt_elo < $MIN_SPRT_ELO" sprt
-    echo "PASS sprt elo=$last_sprt_elo"
+    sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
+    echo "PASS sprt H1 elo=$last_sprt_elo llr=$last_sprt_llr"
     notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$log" 0
     return 0
   fi
@@ -408,8 +415,8 @@ sprt_gate() {
   last_sprt_llr=$(sed -nE 's/.*[Ll][Ll][Rr][ =:]+([+-]?[0-9.]+\/[+-]?[0-9.]+).*/\1/p' <<< "$last_sprt_line" | tail -1)
   [[ -n "$last_sprt_elo" ]] || fail "could not parse SPRT Elo" sprt
   [[ -n "$last_sprt_llr" ]] || fail "could not parse SPRT LLR" sprt
-  float_ge "$last_sprt_elo" "$MIN_SPRT_ELO" || fail "sprt elo $last_sprt_elo < $MIN_SPRT_ELO" sprt
-  echo "PASS sprt elo=$last_sprt_elo"
+  sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
+  echo "PASS sprt H1 elo=$last_sprt_elo llr=$last_sprt_llr"
   notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$log" 0
 }
 
@@ -512,7 +519,7 @@ Usage:
 Useful overrides:
   ITERATIONS=5 ./nnue-run iterate
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue-run sprt
-  GAMES=1000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
+  GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
   FORCE=1 ./nnue-run train
   MOVE_GATE_STRICT=1 ./nnue-run gates
 EOF
