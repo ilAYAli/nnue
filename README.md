@@ -140,16 +140,15 @@ These are shell overrides, not persistent training parameters:
 
 `ROWS`: Rows sampled by static eval gate.
 
-`GAMES`: SPRT games.
+`GAMES`: Hard SPRT game cap. Reaching this without H1 is a failed SPRT.
 
 `CONCURRENCY`: Game concurrency for local `--solo` SPRT.
 
 `THREADS`: Engine threads per game.
 
 `SPRT_ELO0`, `SPRT_ELO1`, `SPRT_ALPHA`, `SPRT_BETA`: Passed to Forge/SPRT.
-Keep these as SPRT-wrapper parameters, not hard-coded build config.
-
-`MIN_SPRT_ELO`: Minimum parsed SPRT Elo for automatic acceptance.
+Default H1 is `SPRT_ELO1=3.0`; iteration accepts only when LLR reaches
+the H1 upper bound.
 
 `MOVE_GATE_STRICT`: Set to `1` to make move-gate regressions fail hard.
 
@@ -213,6 +212,6 @@ Those are not build.json-only tweaks; they require engine/runtime parity.
 
 Reject immediately if export or engine parity fails, the engine does not load
 the intended `.nn`, move-gate coverage is incomplete, static eval is obviously
-broken, or SPRT is negative against the intended reference.
+broken, or SPRT does not pass H1 before the configured game cap.
 
 Static metrics are rejection filters only. Elo comes from games.
