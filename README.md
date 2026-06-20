@@ -143,8 +143,9 @@ These are shell overrides, not persistent training parameters:
 `SMOKE_GAMES`: Cheap SPRT smoke game count before the full gate. Default is
 `400`.
 
-`SMOKE_MIN_ELO`: Smoke rejection floor. Default is `-5`; below this, the run
-stops before the full SPRT.
+`SMOKE_FAIL_LLR`: Smoke rejection threshold. Default is `-0.5`; smoke fails
+early only when Elo is negative and the current LLR is at or below this value.
+Negative Elo alone continues to the full SPRT.
 
 `GAMES`: Full SPRT game cap. Reaching this without H1 is a failed SPRT.
 
