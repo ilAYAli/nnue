@@ -1,16 +1,11 @@
 {
-  "run": "pwa-native-v17",
+  "run": "pwa-native-v18",
   "lineage": "scratch-native",
-  "hypothesis": "Fine-tune the accepted 1-bucket native net with a lower learning rate after dose increase was flat.",
-  "changed_variables": {
-    "architecture": "back to 1 input bucket",
-    "lr": "lower learning rate for fine-tuning after dose increase was flat"
-  },
+  "hypothesis": "increasing superbatches might not have been properly tested",
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
     "limit": 100000000
   },
   "continue_from": "pwa-native-v15",
-  "lr": 0.0003,
-  "final_lr": 0.00003
+  "superbatches": 10000
 }
