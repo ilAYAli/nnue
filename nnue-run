@@ -30,7 +30,7 @@ CASES=${CASES:-runs/lichess-inacc-miss-blunder-20260612/native760_vs_native123_n
 
 ROWS=${ROWS:-50000}
 SMOKE_GAMES=${SMOKE_GAMES:-400}
-SMOKE_MIN_ELO=${SMOKE_MIN_ELO:--5}
+SMOKE_FAIL_LLR=${SMOKE_FAIL_LLR:--0.5}
 GAMES=${GAMES:-5000}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
@@ -191,6 +191,7 @@ EOF
 
 float_ge() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a >= b) }'; }
 float_le() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a <= b) }'; }
+float_lt() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a < b) }'; }
 abs_float_le() { awk -v a="$1" -v b="$2" 'BEGIN { if (a < 0) a = -a; exit !(a <= b) }'; }
 
 sprt_h1_passed() {
@@ -199,6 +200,13 @@ sprt_h1_passed() {
   upper=$(sed -nE 's/^[[:space:]]*[+-]?[0-9]+([.][0-9]+)?\/([+-]?[0-9]+([.][0-9]+)?).*/\2/p' <<< "$1")
   [[ -n "$value" && -n "$upper" ]] || return 2
   float_ge "$value" "$upper"
+}
+
+sprt_llr_value() {
+  local value
+  value=$(sed -nE 's/^[[:space:]]*([+-]?[0-9]+([.][0-9]+)?)\/.*/\1/p' <<< "$1")
+  [[ -n "$value" ]] || return 2
+  printf '%s\n' "$value"
 }
 
 quote_cmd() {
@@ -427,8 +435,11 @@ sprt_gate() {
     notify phase_done sprt "SPRT smoke passed for $run: $last_sprt_line" "$last_sprt_log" 0
     return 0
   fi
-  float_ge "$last_sprt_elo" "$SMOKE_MIN_ELO" \
-    || fail "smoke SPRT elo $last_sprt_elo < $SMOKE_MIN_ELO" sprt
+  local smoke_llr
+  smoke_llr=$(sprt_llr_value "$last_sprt_llr") || fail "could not parse smoke SPRT LLR: $last_sprt_llr" sprt
+  if float_lt "$last_sprt_elo" 0 && float_le "$smoke_llr" "$SMOKE_FAIL_LLR"; then
+    fail "smoke SPRT negative: elo=$last_sprt_elo llr=$last_sprt_llr <= $SMOKE_FAIL_LLR" sprt
+  fi
   echo "PASS smoke filter elo=$last_sprt_elo llr=$last_sprt_llr; running full SPRT"
   notify phase_done sprt_smoke "SPRT smoke inconclusive for $run: $last_sprt_line" "$last_sprt_log" 0
 
@@ -536,7 +547,7 @@ Usage:
 Useful overrides:
   ITERATIONS=5 ./nnue-run iterate
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue-run sprt
-  SMOKE_GAMES=400 SMOKE_MIN_ELO=-5 ./nnue-run sprt
+  SMOKE_GAMES=400 SMOKE_FAIL_LLR=-0.5 ./nnue-run sprt
   GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
   FORCE=1 ./nnue-run train
   MOVE_GATE_STRICT=1 ./nnue-run gates
