@@ -1,3 +1,6 @@
+#[cfg(not(feature = "cuda"))]
+compile_error!("build tools/bullet/train with --features cuda");
+
 use std::{
     env,
     ffi::OsStr,
