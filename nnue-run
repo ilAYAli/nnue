@@ -84,10 +84,10 @@ abs_path() {
 }
 
 net_for_name_or_path() {
+  [[ -z "$1" || "$1" == "null" ]] && return 1
   case "$1" in
-    ""|"null") return 1 ;;
     ~/*|/*|*.nn) abs_path "$1" ;;
-    *) printf '%s/assets/nets/%s.nn\n' "$HOME" "$1" ;;
+    *) echo "$HOME/assets/nets/$1.nn" ;;
   esac
 }
 
@@ -100,17 +100,12 @@ load_config() {
   candidate_net="$HOME/assets/nets/$run.nn"
   data_file="data/bullet/$run.bullet"
   mkdir -p "$log_dir" runs/logs
-
-  if [[ -n "$REFERENCE_NET" ]]; then
-    reference_net=$(net_for_name_or_path "$REFERENCE_NET")
-  elif [[ -n "$reference_name" ]]; then
-    reference_net=$(net_for_name_or_path "$reference_name")
-  elif [[ -n "$continue_from" ]]; then
-    reference_net=$(net_for_name_or_path "$continue_from")
+  local ref_source="${REFERENCE_NET:-${reference_name:-$continue_from}}"
+  if [[ -n "$ref_source" ]]; then
+    reference_net=$(net_for_name_or_path "$ref_source")
   else
     reference_net="$HOME/assets/nets/pwa-native-v7.nn"
   fi
-
   summary_file=${summary_file:-runs/logs/nnue-run-iterate-$(date +%Y%m%d_%H%M%S).txt}
 }
 
@@ -249,25 +244,17 @@ static_gate() {
   section static_eval
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" static_eval
   [[ -f "$data_file" ]] || fail "missing data: $data_file" static_eval
-
   local log="$log_dir/03-static-eval.log"
   "$PYTHON" tools/validate/eval_dataset.py \
-    --net "$candidate_net" \
-    --data "$data_file" \
-    --rows "$ROWS" \
-    --batch-size 4096 \
-    --device cpu \
-    --buckets \
-    2>&1 | tee "$log"
-
+    --net "$candidate_net" --data "$data_file" --rows "$ROWS" \
+    --batch-size 4096 --device cpu --buckets 2>&1 | tee "$log"
   local mae sign corr bias slope
   mae=$(metric mae "$log")
   sign=$(metric sign "$log")
   corr=$(metric corr "$log")
   bias=$(metric bias "$log")
   slope=$(metric slope "$log")
-  [[ -n "$mae" && -n "$sign" && -n "$corr" && -n "$bias" && -n "$slope" ]] \
-    || fail "missing static eval metric" static_eval
+  [[ -n "$mae" && -n "$sign" && -n "$corr" && -n "$bias" && -n "$slope" ]] || fail "missing static eval metric" static_eval
   float_le "$mae" "$MAX_MAE" || fail "MAE $mae > $MAX_MAE" static_eval
   float_ge "$sign" "$MIN_SIGN" || fail "sign $sign < $MIN_SIGN" static_eval
   float_ge "$corr" "$MIN_CORR" || fail "corr $corr < $MIN_CORR" static_eval
@@ -281,23 +268,13 @@ move_gate() {
   load_config
   notify phase_start move_gate "move gate $run" "$log_dir/04-move-gate.log" 0
   section move_gate
-  [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" move_gate
-  [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" move_gate
-  [[ -f "$CASES" ]] || fail "missing cases: $CASES" move_gate
-
+  [[ -f "$reference_net" && -f "$candidate_net" && -f "$CASES" ]] || fail "missing gate prerequisites" move_gate
   local log="$log_dir/04-move-gate.log"
   local summary="$run_dir/move_gate.summary.json"
   "$PYTHON" tools/validate/eval_move_gate.py \
-    --cases "$CASES" \
-    --engine "$ENGINE" \
-    --reference-net "$reference_net" \
-    --candidate-net "$candidate_net" \
-    --threads 1 \
-    --hash 64 \
-    --summary-json "$summary" \
-    --output "$run_dir/move_gate.jsonl" \
-    2>&1 | tee "$log"
-
+    --cases "$CASES" --engine "$ENGINE" --reference-net "$reference_net" \
+    --candidate-net "$candidate_net" --threads 1 --hash 64 \
+    --summary-json "$summary" --output "$run_dir/move_gate.jsonl" 2>&1 | tee "$log"
   local ref cand fixed regressed
   ref=$(jq -r .baseline_prefers_best "$summary")
   cand=$(jq -r .candidate_prefers_best "$summary")
@@ -375,18 +352,15 @@ sprt_gate() {
 }
 
 next_run_name() {
-  local name=$1
-  if [[ "$name" =~ ^(.*-v)([0-9]+)$ ]]; then
-    printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
-  elif [[ "$name" =~ ^(.*v)([0-9]+)$ ]]; then
+  if [[ "$1" =~ ^(.*-v|.*v)([0-9]+)$ ]]; then
     printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
   else
-    fail "cannot bump run name: $name" iterate
+    fail "cannot bump run name: $1" iterate
   fi
 }
 
 bump_build_json() {
-  local accepted=$1
+  local accepted=$1 elo=$2 details=$3
   local next
   next=$(next_run_name "$accepted")
   local tmp
@@ -401,6 +375,9 @@ bump_build_json() {
     "$BUILD" > "$tmp"
   mv "$tmp" "$BUILD"
   echo "updated $BUILD: run=$next continue_from=$accepted reference=$accepted"
+
+  git add "$BUILD"
+  git commit -m "nnue: advance to $next (+${elo} Elo vs $accepted)" -m "$details"
 }
 
 record_iteration() {
@@ -433,7 +410,7 @@ iterate() {
     if sprt_gate; then
       record_iteration PASS "accepted; build.json advanced"
       notify done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
-      bump_build_json "$run"
+      bump_build_json "$run" "$last_sprt_elo" "${last_sprt_line:-passed sprt}"
     else
       record_iteration FAIL "SPRT rejected or failed"
       notify fail sprt "rejected $run"
@@ -483,3 +460,4 @@ case "$cmd" in
   help|-h|--help) help ;;
   *) fail "unknown command: $cmd" ;;
 esac
+
