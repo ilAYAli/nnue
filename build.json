@@ -1,14 +1,16 @@
 {
-  "run": "pwa-native-v16",
+  "run": "pwa-native-v17",
   "lineage": "scratch-native",
-  "hypothesis": "Continue the accepted 1-bucket native architecture with the current training dose.",
+  "hypothesis": "Fine-tune the accepted 1-bucket native net with a lower learning rate after dose increase was flat.",
   "changed_variables": {
     "architecture": "back to 1 input bucket",
-    "goal": "saturate the accepted simple architecture before changing bucket count"
+    "lr": "lower learning rate for fine-tuning after dose increase was flat"
   },
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
     "limit": 100000000
   },
-  "superbatches": 10000
+  "continue_from": "pwa-native-v15",
+  "lr": 0.0003,
+  "final_lr": 0.00003
 }
