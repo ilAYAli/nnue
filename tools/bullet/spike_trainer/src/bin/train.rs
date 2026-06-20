@@ -66,6 +66,7 @@ struct Config {
 struct DataConfig {
     source_binpack: String,
     bullet_output: String,
+    offset: u64,
     limit: u64,
     threads: usize,
     buffer_mb: usize,
@@ -288,6 +289,7 @@ fn data_config(config: &Config) -> DataConfig {
         bullet_output: string_at(data, "bullet_output")
             .map(str::to_owned)
             .unwrap_or_else(|| format!("data/bullet/{}.bullet", run_name(config))),
+        offset: u64_at(data, "offset", u64_at(sf, "offset", 0)),
         limit: u64_at(data, "limit", 0),
         threads: usize_at(data, "threads", usize_at(&config.defaults, "threads", 4)),
         buffer_mb: usize_at(data, "buffer_mb", usize_at(sf, "buffer_mb", 1024)),
@@ -377,6 +379,8 @@ fn cmd_plan(config: &Config) {
     }
     println!("source_binpack={}", data.source_binpack);
     println!("bullet_output={}", data.bullet_output);
+    println!("offset={}", data.offset);
+    println!("limit={}", data.limit);
     println!("net={}", net_path(config));
     println!();
     println!("commands:");
@@ -458,7 +462,26 @@ fn cmd_data(config: &Config) {
     );
     let start = Instant::now();
     let mut written = 0_u64;
+    let mut skipped = 0_u64;
     loader.map_chunks(0, |chunk: &[ChessBoard]| {
+        let mut chunk = chunk;
+        if skipped < data.offset {
+            let before = skipped;
+            let skip = data.offset.saturating_sub(skipped).min(chunk.len() as u64) as usize;
+            skipped += skip as u64;
+            chunk = &chunk[skip..];
+            if skipped % 5_000_000 < skipped - before {
+                let secs = start.elapsed().as_secs_f32();
+                eprintln!(
+                    "skipped {} positions ({:.1}M/s)",
+                    skipped,
+                    skipped as f32 / secs.max(0.001) / 1e6
+                );
+            }
+            if chunk.is_empty() {
+                return false;
+            }
+        }
         let remaining = if data.limit == 0 {
             chunk.len()
         } else {
@@ -485,7 +508,8 @@ fn cmd_data(config: &Config) {
     });
     let secs = start.elapsed().as_secs_f32();
     eprintln!(
-        "done: converted {} positions to {} in {:.1}s ({:.1}M/s)",
+        "done: skipped {} positions, converted {} positions to {} in {:.1}s ({:.1}M/s)",
+        skipped,
         written,
         output.display(),
         secs,

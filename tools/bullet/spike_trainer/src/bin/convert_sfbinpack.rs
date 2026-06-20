@@ -58,7 +58,7 @@ fn write_chunk(writer: &mut BufWriter<File>, chunk: &[ChessBoard]) -> std::io::R
 fn usage() -> ! {
     eprintln!(
         "usage: convert_sfbinpack --data PATH[;PATH...] --output PATH \
-         [--buffer-mb N] [--threads N] [--limit N] [--min-ply N] \
+         [--buffer-mb N] [--threads N] [--offset N] [--limit N] [--min-ply N] \
          [--max-abs-cp N] [--quiet-only 0|1]"
     );
     process::exit(2);
@@ -69,6 +69,7 @@ fn main() {
     let mut output = String::new();
     let mut buffer_mb = 1024_usize;
     let mut threads = 4_usize;
+    let mut offset = 0_u64;
     let mut limit = 0_u64;
     let mut filter = Filter {
         min_ply: 16,
@@ -84,6 +85,7 @@ fn main() {
             "--output"     => output = value(),
             "--buffer-mb"  => buffer_mb  = value().parse().unwrap_or_else(|_| usage()),
             "--threads"    => threads    = value().parse().unwrap_or_else(|_| usage()),
+            "--offset"     => offset     = value().parse().unwrap_or_else(|_| usage()),
             "--limit"      => limit      = value().parse().unwrap_or_else(|_| usage()),
             "--min-ply"    => filter.min_ply    = value().parse().unwrap_or_else(|_| usage()),
             "--max-abs-cp" => filter.max_abs_cp = value().parse().unwrap_or_else(|_| usage()),
@@ -117,8 +119,27 @@ fn main() {
 
     let start = Instant::now();
     let mut written: u64 = 0;
+    let mut skipped: u64 = 0;
 
     loader.map_chunks(0, |chunk: &[ChessBoard]| {
+        let mut chunk = chunk;
+        if skipped < offset {
+            let before = skipped;
+            let skip = offset.saturating_sub(skipped).min(chunk.len() as u64) as usize;
+            skipped += skip as u64;
+            chunk = &chunk[skip..];
+            if skipped % 5_000_000 < skipped - before {
+                let secs = start.elapsed().as_secs_f32();
+                eprintln!(
+                    "skipped {} positions ({:.1}M/s)",
+                    skipped,
+                    skipped as f32 / secs.max(0.001) / 1e6
+                );
+            }
+            if chunk.is_empty() {
+                return false;
+            }
+        }
         let remaining = if limit == 0 {
             chunk.len()
         } else {
@@ -147,7 +168,8 @@ fn main() {
 
     let secs = start.elapsed().as_secs_f32();
     eprintln!(
-        "done: converted {} positions to {} in {:.1}s ({:.1}M/s)",
+        "done: skipped {} positions, converted {} positions to {} in {:.1}s ({:.1}M/s)",
+        skipped,
         written,
         output,
         secs,
