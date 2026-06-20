@@ -1,5 +1,5 @@
 {
-  "run": "pwa-native-v18",
+  "run": "pwa-native-v19",
   "lineage": "scratch-native",
   "hypothesis": "increasing superbatches might not have been properly tested",
   "data": {
@@ -7,5 +7,6 @@
     "limit": 100000000
   },
   "continue_from": "pwa-native-v15",
-  "superbatches": 10000
+  "superbatches": 10000,
+  "lr": 0.0007
 }
