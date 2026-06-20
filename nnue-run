@@ -33,6 +33,10 @@ GAMES=${GAMES:-1000}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
+SPRT_ELO0=${SPRT_ELO0:-0.0}
+SPRT_ELO1=${SPRT_ELO1:-5.0}
+SPRT_ALPHA=${SPRT_ALPHA:-0.05}
+SPRT_BETA=${SPRT_BETA:-0.05}
 
 # Loose broken-net gates. These stop obviously bad exports/training before SPRT.
 # They are not promotion criteria; SPRT decides whether an iteration is accepted.
@@ -58,7 +62,9 @@ data_file=
 reference_net=
 summary_file=
 last_sprt_elo=
+last_sprt_llr=
 last_sprt_line=
+last_sprt_command=
 
 fail() {
   echo "FAILED: $*" >&2
@@ -91,6 +97,16 @@ net_for_name_or_path() {
   esac
 }
 
+previous_run_name() {
+  if [[ "$1" =~ ^(.*-v|.*v)([0-9]+)$ ]]; then
+    local n=$((10#${BASH_REMATCH[2]} - 1))
+    (( n >= 0 )) || return 1
+    printf '%s%d\n' "${BASH_REMATCH[1]}" "$n"
+  else
+    return 1
+  fi
+}
+
 load_config() {
   run=$(json '.run')
   continue_from=$(json '.continue_from // empty')
@@ -101,11 +117,11 @@ load_config() {
   data_file="data/bullet/$run.bullet"
   mkdir -p "$log_dir" runs/logs
   local ref_source="${REFERENCE_NET:-${reference_name:-$continue_from}}"
-  if [[ -n "$ref_source" ]]; then
-    reference_net=$(net_for_name_or_path "$ref_source")
-  else
-    reference_net="$HOME/assets/nets/pwa-native-v7.nn"
+  if [[ -z "$ref_source" ]]; then
+    ref_source=$(previous_run_name "$run") || fail "missing reference/continue_from and cannot infer previous from run=$run" config
+    reference_name=$ref_source
   fi
+  reference_net=$(net_for_name_or_path "$ref_source")
   summary_file=${summary_file:-runs/logs/nnue-run-iterate-$(date +%Y%m%d_%H%M%S).txt}
 }
 
@@ -162,6 +178,16 @@ EOF
 float_ge() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a >= b) }'; }
 float_le() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a <= b) }'; }
 abs_float_le() { awk -v a="$1" -v b="$2" 'BEGIN { if (a < 0) a = -a; exit !(a <= b) }'; }
+
+quote_cmd() {
+  printf '%q ' "$@"
+  printf '\n'
+}
+
+ensure_git_identity() {
+  git config user.name "Petter Wahlman"
+  git config user.email "petter@wahlman.no"
+}
 
 metric() {
   awk -F= -v key="$1" '$1 == key { gsub(/%/, "", $2); print $2 }' "$2" | tail -1
@@ -310,42 +336,62 @@ sprt_gate() {
     local crucible_run="${run}-sprt-${GAMES}-$(date +%Y%m%d-%H%M%S)"
     engine_hash="${engine_hash#enyo_}"
     [[ -x "$forge" ]] || fail "missing forge: $forge" sprt
-    "$forge" nnue "$engine_hash" \
-      --candidate-nnue "$candidate_net" \
-      --reference-nnue "$reference_net" \
-      --verify \
-      --run "$crucible_run" \
-      -- \
-      --games "$GAMES" \
+    local forge_cmd=(
+      "$forge" nnue "$engine_hash"
+      --candidate-nnue "$candidate_net"
+      --reference-nnue "$reference_net"
+      --verify
+      --run "$crucible_run"
+      --
+      --games "$GAMES"
+      --elo0 "$SPRT_ELO0"
+      --elo1 "$SPRT_ELO1"
+      --alpha "$SPRT_ALPHA"
+      --beta "$SPRT_BETA"
+    )
+    last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
+    "${forge_cmd[@]}" \
       2>&1 | tee "$log" \
       || fail "forge SPRT failed for $run" sprt
 
     local status_json
     status_json=$(crucible status "$crucible_run" --json) || fail "could not read Crucible status for $crucible_run" sprt
     last_sprt_elo=$(jq -r '.progress_fields[]? | select(startswith("elo=")) | sub("^elo="; "") | sub("^\\+"; "")' <<< "$status_json" | tail -1)
+    last_sprt_llr=$(jq -r '.progress_fields[]? | select(startswith("llr=")) | sub("^llr="; "")' <<< "$status_json" | tail -1)
     last_sprt_line="Crucible $crucible_run $(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json")"
     [[ -n "$last_sprt_elo" ]] || fail "could not parse Crucible SPRT Elo" sprt
+    [[ -n "$last_sprt_llr" ]] || fail "could not parse Crucible SPRT LLR" sprt
     float_ge "$last_sprt_elo" "$MIN_SPRT_ELO" || fail "sprt elo $last_sprt_elo < $MIN_SPRT_ELO" sprt
     echo "PASS sprt elo=$last_sprt_elo"
     notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$log" 0
     return 0
   fi
 
-  sprt \
-    --concurrency "$CONCURRENCY" \
-    --threads "$THREADS" \
-    --reference "$ENGINE" \
-    --candidate "$ENGINE" \
-    --reference-uci "nnue_file=$reference_net" \
-    --candidate-uci "nnue_file=$candidate_net" \
-    --games "$GAMES" \
+  local sprt_cmd=(
+    sprt
+    --concurrency "$CONCURRENCY"
+    --threads "$THREADS"
+    --reference "$ENGINE"
+    --candidate "$ENGINE"
+    --reference-uci "nnue_file=$reference_net"
+    --candidate-uci "nnue_file=$candidate_net"
+    --games "$GAMES"
+    --elo0 "$SPRT_ELO0"
+    --elo1 "$SPRT_ELO1"
+    --alpha "$SPRT_ALPHA"
+    --beta "$SPRT_BETA"
+  )
+  last_sprt_command=$(quote_cmd "${sprt_cmd[@]}")
+  "${sprt_cmd[@]}" \
     2>&1 | tee "$log" \
     || fail "SPRT command failed for $run" sprt
 
   last_sprt_line=$(grep -E '^\[[[:space:]]*[0-9]+/[0-9]+\] Elo' "$log" | tail -1)
   [[ -n "$last_sprt_line" ]] || fail "could not parse SPRT output" sprt
   last_sprt_elo=$(awk '{ for (i = 1; i <= NF; i++) if ($i == "Elo") { print $(i + 1); exit } }' <<< "$last_sprt_line")
+  last_sprt_llr=$(sed -nE 's/.*[Ll][Ll][Rr][ =:]+([+-]?[0-9.]+\/[+-]?[0-9.]+).*/\1/p' <<< "$last_sprt_line" | tail -1)
   [[ -n "$last_sprt_elo" ]] || fail "could not parse SPRT Elo" sprt
+  [[ -n "$last_sprt_llr" ]] || fail "could not parse SPRT LLR" sprt
   float_ge "$last_sprt_elo" "$MIN_SPRT_ELO" || fail "sprt elo $last_sprt_elo < $MIN_SPRT_ELO" sprt
   echo "PASS sprt elo=$last_sprt_elo"
   notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$log" 0
@@ -360,7 +406,7 @@ next_run_name() {
 }
 
 bump_build_json() {
-  local accepted=$1 elo=$2 details=$3
+  local accepted=$1 elo=$2 llr=$3 command=$4 details=$5
   local next
   next=$(next_run_name "$accepted")
   local tmp
@@ -371,13 +417,35 @@ bump_build_json() {
     '.run = $run
      | .continue_from = $prev
      | .reference = $prev
-     | .changed_variables.iteration = ("continue from " + $prev)' \
+     | .changed_variables.reference = ("compare against " + $prev)' \
     "$BUILD" > "$tmp"
   mv "$tmp" "$BUILD"
   echo "updated $BUILD: run=$next continue_from=$accepted reference=$accepted"
 
-  git add "$BUILD"
-  git commit -m "nnue: advance to $next (+${elo} Elo vs $accepted)" -m "$details"
+  git commit --only \
+    -m "${accepted}.nn: Elo ${elo},LLR ${llr}" \
+    -m "Forge command:
+$command
+
+Result:
+$details" \
+    -- "$BUILD"
+}
+
+ensure_iteration_reference() {
+  local expected
+  expected=$(previous_run_name "$run") || fail "cannot infer previous run from $run" iterate
+  REFERENCE_NET=
+  local tmp
+  tmp=$(mktemp)
+  jq \
+    --arg prev "$expected" \
+    '.continue_from = $prev
+     | .reference = $prev
+     | .changed_variables.reference = ("compare against " + $prev)' \
+    "$BUILD" > "$tmp"
+  mv "$tmp" "$BUILD"
+  load_config
 }
 
 record_iteration() {
@@ -399,18 +467,23 @@ print_summary() {
 
 iterate() {
   need jq
+  need git
+  ensure_git_identity
   for ((i = 1; i <= ITERATIONS; i++)); do
     load_config
     section "iteration $i"
     show_config
     notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
+    ensure_iteration_reference
+    show_config
 
     train || fail "train failed for $run" train
     gates || fail "gates failed for $run" gates
     if sprt_gate; then
+      bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
+        || fail "build.json commit failed for $run" iterate
       record_iteration PASS "accepted; build.json advanced"
       notify done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
-      bump_build_json "$run" "$last_sprt_elo" "${last_sprt_line:-passed sprt}"
     else
       record_iteration FAIL "SPRT rejected or failed"
       notify fail sprt "rejected $run"
@@ -460,4 +533,3 @@ case "$cmd" in
   help|-h|--help) help ;;
   *) fail "unknown command: $cmd" ;;
 esac
-
