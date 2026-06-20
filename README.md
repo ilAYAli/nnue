@@ -140,7 +140,13 @@ These are shell overrides, not persistent training parameters:
 
 `ROWS`: Rows sampled by static eval gate.
 
-`GAMES`: Hard SPRT game cap. Reaching this without H1 is a failed SPRT.
+`SMOKE_GAMES`: Cheap SPRT smoke game count before the full gate. Default is
+`400`.
+
+`SMOKE_MIN_ELO`: Smoke rejection floor. Default is `-5`; below this, the run
+stops before the full SPRT.
+
+`GAMES`: Full SPRT game cap. Reaching this without H1 is a failed SPRT.
 
 `CONCURRENCY`: Game concurrency for local `--solo` SPRT.
 
@@ -212,6 +218,7 @@ Those are not build.json-only tweaks; they require engine/runtime parity.
 
 Reject immediately if export or engine parity fails, the engine does not load
 the intended `.nn`, move-gate coverage is incomplete, static eval is obviously
-broken, or SPRT does not pass H1 before the configured game cap.
+broken, smoke SPRT is below the rejection floor, or full SPRT does not pass H1
+before the configured game cap.
 
 Static metrics are rejection filters only. Elo comes from games.
