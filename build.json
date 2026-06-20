@@ -1,5 +1,5 @@
 {
-  "run": "pwa-native-v15",
+  "run": "pwa-native-v16",
   "lineage": "scratch-native",
   "hypothesis": "Continue the accepted 1-bucket native architecture with the current training dose.",
   "changed_variables": {
@@ -10,7 +10,5 @@
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
     "limit": 100000000
   },
-  "superbatches": 7600,
-  "lr": 0.001,
-  "final_lr": 0.0001
+  "superbatches": 10000
 }
