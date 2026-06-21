@@ -1,5 +1,5 @@
 {
-    "run": "pwa-native-v27",
+    "run": "pwa-native-v28",
     "lineage": "scratch-native",
     "hypothesis": "Continue accepted pwa-native-v25 on the next broad UHO data window.",
     "data": {
@@ -7,5 +7,6 @@
         "limit": 100000000,
         "offset": 100000000
     },
-    "continue_from": "pwa-native-v25"
-  }
+    "continue_from": "pwa-native-v25",
+    "wdl": 0.75
+}

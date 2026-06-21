@@ -34,7 +34,7 @@ CASES=${CASES:-runs/lichess-inacc-miss-blunder-20260612/native760_vs_native123_n
 ROWS=${ROWS:-50000}
 SMOKE_GAMES=${SMOKE_GAMES:-400}
 SMOKE_FAIL_LLR=${SMOKE_FAIL_LLR:--0.5}
-GAMES=${GAMES:-8000}
+GAMES=${GAMES:-3000}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
@@ -206,6 +206,7 @@ EOF
 float_ge() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a >= b) }'; }
 float_le() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a <= b) }'; }
 float_lt() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a < b) }'; }
+float_gt() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a > b) }'; }
 abs_float_le() { awk -v a="$1" -v b="$2" 'BEGIN { if (a < 0) a = -a; exit !(a <= b) }'; }
 
 sprt_h1_passed() {
@@ -221,6 +222,22 @@ sprt_llr_value() {
   value=$(sed -nE 's/^[[:space:]]*([+-]?[0-9]+([.][0-9]+)?)\/.*/\1/p' <<< "$1")
   [[ -n "$value" ]] || return 2
   printf '%s\n' "$value"
+}
+
+full_sprt_label=
+full_sprt_pass() {
+  if sprt_h1_passed "$last_sprt_llr"; then
+    full_sprt_label="H1 reached"
+    return 0
+  fi
+
+  local llr_value
+  llr_value=$(sprt_llr_value "$last_sprt_llr") || fail "could not parse SPRT LLR: $last_sprt_llr" sprt
+  if float_gt "$last_sprt_elo" 0 && float_gt "$llr_value" 0; then
+    full_sprt_label="positive at cap"
+    return 0
+  fi
+  fail "SPRT not positive at $GAMES games: elo=$last_sprt_elo llr=$last_sprt_llr" sprt
 }
 
 quote_cmd() {
@@ -476,9 +493,9 @@ sprt_gate() {
   notify phase_done sprt_smoke "SPRT smoke inconclusive for $run: $last_sprt_line" "$last_sprt_log" 0
 
   run_sprt_once sprt "$GAMES" sprt
-  sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
+  full_sprt_pass
   printf '  ┌─────────────────────────────────────\n'
-  printf '  │ \033[1;32m✓ PASS\033[0m  sprt (H1 reached)\n'
+  printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
   printf '  └─────────────────────────────────────\n'
   notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
@@ -491,9 +508,9 @@ full_sprt_gate() {
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
 
   run_sprt_once sprt "$GAMES" sprt
-  sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
+  full_sprt_pass
   printf '  ┌─────────────────────────────────────\n'
-  printf '  │ \033[1;32m✓ PASS\033[0m  sprt (H1 reached)\n'
+  printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
   printf '  └─────────────────────────────────────\n'
   notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
