@@ -31,14 +31,14 @@ CASES=${CASES:-runs/lichess-inacc-miss-blunder-20260612/native760_vs_native123_n
 ROWS=${ROWS:-50000}
 SMOKE_GAMES=${SMOKE_GAMES:-400}
 SMOKE_FAIL_LLR=${SMOKE_FAIL_LLR:--0.5}
-GAMES=${GAMES:-5000}
+GAMES=${GAMES:-8000}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 SPRT_ELO1=${SPRT_ELO1:-3.0}
-SPRT_ALPHA=${SPRT_ALPHA:-0.05}
-SPRT_BETA=${SPRT_BETA:-0.05}
+SPRT_ALPHA=${SPRT_ALPHA:-0.10}
+SPRT_BETA=${SPRT_BETA:-0.10}
 
 # Loose broken-net gates. These stop obviously bad exports/training before SPRT.
 # They are not promotion criteria; SPRT decides whether an iteration is accepted.
@@ -113,7 +113,11 @@ previous_run_name() {
 load_config() {
   run=$(json '.run')
   continue_from=$(json '.continue_from // empty')
+  init_net=$(json '.init_net // empty')
   reference_name=$(json '.reference // empty')
+  if [[ -n "$init_net" && -n "$continue_from" ]]; then
+    fail "init_net conflicts with continue_from; use reference to override the SPRT reference" config
+  fi
   if [[ -z "$continue_from" ]]; then
     continue_from=$(previous_run_name "$run") || fail "cannot infer previous run from run=$run" config
   fi
@@ -134,7 +138,9 @@ reference_label() {
 training_build() {
   train_build="$run_dir/build.resolved.json"
   jq --arg prev "$continue_from" \
-    '.continue_from = $prev | del(.reference) | del(.changed_variables.reference)' \
+    'if (.init_net // "") != "" then del(.continue_from) else .continue_from = $prev end
+     | del(.reference)
+     | del(.changed_variables.reference)' \
     "$BUILD" > "$train_build"
   printf '%s\n' "$train_build"
 }
@@ -493,6 +499,7 @@ bump_build_json() {
     '.run = $run
      | del(.continue_from)
      | del(.reference)
+     | del(.init_net)
      | del(.changed_variables.reference)' \
     "$BUILD" > "$tmp"
   mv "$tmp" "$BUILD"

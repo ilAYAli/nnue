@@ -1,12 +1,10 @@
 {
-  "run": "pwa-native-v19",
+  "run": "pwa-native-v25",
   "lineage": "scratch-native",
-  "hypothesis": "increasing superbatches might not have been properly tested",
+  "hypothesis": "Expand pwa-native-v15 into 8 input buckets and retrain on the 100M UHO window.",
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
     "limit": 100000000
   },
-  "continue_from": "pwa-native-v15",
-  "superbatches": 10000,
-  "lr": 0.0007
+  "init_net": "~/assets/nets/pwa-native-v15.nn"
 }

@@ -8,7 +8,7 @@ use std::{
     io::{BufWriter, Write},
     mem,
     path::{Path, PathBuf},
-    process,
+    process::{self, Command},
     time::Instant,
 };
 
@@ -32,7 +32,6 @@ mod trainer_main {
 const FORBIDDEN_KEYS: &[&str] = &[
     "init_weights",
     "bullet_init_weights",
-    "init_net",
     "init_from_nn",
     "export_init_only",
 ];
@@ -325,6 +324,91 @@ fn continue_from(config: &Config) -> Option<String> {
     string_at(&config.build, "continue_from").map(str::to_owned)
 }
 
+fn init_net(config: &Config) -> Option<String> {
+    string_at(&config.build, "init_net").map(str::to_owned)
+}
+
+fn reject_conflicting_init(config: &Config) {
+    if continue_from(config).is_some() && init_net(config).is_some() {
+        eprintln!("error: init_net conflicts with continue_from");
+        process::exit(2);
+    }
+}
+
+fn init_weights_path(config: &Config) -> PathBuf {
+    expand_path(&format!(
+        "runs/{}/init/optimiser_state/weights.bin",
+        run_name(config)
+    ))
+}
+
+fn command_path(value: &str) -> PathBuf {
+    if value.starts_with("~/")
+        || value.starts_with('/')
+        || value.starts_with("./")
+        || value.starts_with("../")
+    {
+        expand_path(value)
+    } else {
+        PathBuf::from(value)
+    }
+}
+
+fn python_command() -> PathBuf {
+    if let Ok(value) = env::var("PYTHON") {
+        let value = value.trim();
+        if !value.is_empty() {
+            return command_path(value);
+        }
+    }
+    let venv = root().join(".venv/bin/python");
+    if venv.exists() {
+        venv
+    } else {
+        PathBuf::from("python3")
+    }
+}
+
+fn convert_init_net(config: &Config, init_net: &str) -> PathBuf {
+    let input = expand_path(init_net);
+    if !input.exists() {
+        eprintln!("error: missing init_net: {}", input.display());
+        process::exit(1);
+    }
+    let output = init_weights_path(config);
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|err| {
+            eprintln!("error: cannot create {}: {err}", parent.display());
+            process::exit(1);
+        });
+    }
+    let status = Command::new(python_command())
+        .arg(root().join("tools/bullet/enyo_nn_to_bullet_weights.py"))
+        .arg("--input")
+        .arg(input)
+        .arg("--output")
+        .arg(&output)
+        .arg("--eval-scale")
+        .arg(f64_at(&config.arch, "eval_scale", 400.0).to_string())
+        .arg("--l1-export-scale")
+        .arg(f64_at(&config.arch, "l1_export_scale", 1.0).to_string())
+        .arg("--input-buckets")
+        .arg(usize_at(&config.arch, "input_buckets", 1).to_string())
+        .arg("--feature-channels")
+        .arg(usize_at(&config.arch, "feature_channels", 12).to_string())
+        .arg("--output-buckets")
+        .arg(usize_at(&config.arch, "output_buckets", 1).to_string())
+        .status()
+        .unwrap_or_else(|err| {
+            eprintln!("error: cannot run init_net converter: {err}");
+            process::exit(1);
+        });
+    if !status.success() {
+        eprintln!("error: init_net conversion failed");
+        process::exit(1);
+    }
+    output
+}
 fn training_lr(config: &Config) -> f64 {
     f64_at(&config.build, "lr", f64_at(&config.defaults, "lr", 1e-3))
 }
@@ -368,6 +452,7 @@ fn validate_layout(config: &Config) {
 
 fn cmd_plan(config: &Config) {
     let data = data_config(config);
+    reject_conflicting_init(config);
     println!("run={}", run_name(config));
     println!("lineage={}", required_string(&config.build, "lineage"));
     if let Some(previous_run) = continue_from(config) {
@@ -376,6 +461,10 @@ fn cmd_plan(config: &Config) {
             "init_weights={}",
             latest_weight_checkpoint(config, &previous_run).display()
         );
+    }
+    if let Some(net) = init_net(config) {
+        println!("init_net={net}");
+        println!("init_weights={}", init_weights_path(config).display());
     }
     println!("source_binpack={}", data.source_binpack);
     println!("bullet_output={}", data.bullet_output);
@@ -524,6 +613,7 @@ fn set_env(key: &str, value: impl ToString) {
 }
 
 fn cmd_run(config: &Config) {
+    reject_conflicting_init(config);
     validate_layout(config);
     let data = data_config(config);
     let bullet_output = expand_path(&data.bullet_output);
@@ -544,7 +634,10 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_LOADER", string_at(&config.defaults, "loader").unwrap_or("direct"));
     set_env("ENYO_BULLET_OUT", output.display());
     set_env("ENYO_BULLET_NET_ID", net_id(config));
-    if let Some(previous_run) = continue_from(config) {
+    if let Some(net) = init_net(config) {
+        let init_weights = convert_init_net(config, &net);
+        set_env("ENYO_BULLET_INIT_WEIGHTS", init_weights.display());
+    } else if let Some(previous_run) = continue_from(config) {
         set_env("ENYO_BULLET_INIT_WEIGHTS", latest_weight_checkpoint(config, &previous_run).display());
     }
     set_env("ENYO_BULLET_MODE", string_at(&config.arch, "mode").unwrap_or("enyo"));
