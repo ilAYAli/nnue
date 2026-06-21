@@ -79,6 +79,8 @@ def load_legacy_net_raw(path: Path):
 def source_bucket_for_target(target_bucket: int, source_buckets: int, target_buckets: int) -> int:
     if source_buckets == target_buckets:
         return target_bucket
+    if source_buckets == 1:
+        return 0
     if source_buckets == 16 and target_buckets == 32:
         return LEGACY_BUCKET_FOR_32[target_bucket]
     raise SystemExit(
