@@ -5,7 +5,7 @@ use std::{
     env,
     ffi::OsStr,
     fs::{self, File},
-    io::{BufWriter, Write},
+    io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     mem,
     path::{Path, PathBuf},
     process::{self, Command},
@@ -511,6 +511,75 @@ fn write_chunk(writer: &mut BufWriter<File>, chunk: &[ChessBoard]) -> std::io::R
     writer.write_all(bytes)
 }
 
+fn is_bullet_data_path(path: &Path) -> bool {
+    matches!(path.extension().and_then(OsStr::to_str), Some("bullet" | "data"))
+}
+
+fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
+    let record_size = mem::size_of::<ChessBoard>() as u64;
+    let source_size = source
+        .metadata()
+        .unwrap_or_else(|err| {
+            eprintln!("error: cannot stat {}: {err}", source.display());
+            process::exit(1);
+        })
+        .len();
+    if source_size % record_size != 0 {
+        eprintln!(
+            "error: Bullet data size is not a multiple of record size: {}",
+            source.display()
+        );
+        process::exit(1);
+    }
+    let total = source_size / record_size;
+    if offset >= total {
+        eprintln!("error: offset {offset} >= Bullet data records {total}");
+        process::exit(1);
+    }
+    let available = total - offset;
+    let records = if limit == 0 { available } else { limit.min(available) };
+    if records == 0 {
+        eprintln!("error: selected 0 Bullet data records");
+        process::exit(1);
+    }
+    if source == output {
+        if offset != 0 || records != total {
+            eprintln!("error: cannot slice Bullet data in place: {}", source.display());
+            process::exit(1);
+        }
+        eprintln!("using existing Bullet data: {} records from {}", records, source.display());
+        return;
+    }
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|err| {
+            eprintln!("error: cannot create {}: {err}", parent.display());
+            process::exit(1);
+        });
+    }
+    let mut input = BufReader::new(File::open(source).unwrap_or_else(|err| {
+        eprintln!("error: cannot open {}: {err}", source.display());
+        process::exit(1);
+    }));
+    input.seek(SeekFrom::Start(offset * record_size)).unwrap_or_else(|err| {
+        eprintln!("error: cannot seek {}: {err}", source.display());
+        process::exit(1);
+    });
+    let mut output_file = BufWriter::new(File::create(output).unwrap_or_else(|err| {
+        eprintln!("error: cannot create {}: {err}", output.display());
+        process::exit(1);
+    }));
+    let bytes = records * record_size;
+    let copied = std::io::copy(&mut input.take(bytes), &mut output_file).unwrap_or_else(|err| {
+        eprintln!("error: copy failed: {err}");
+        process::exit(1);
+    });
+    if copied != bytes {
+        eprintln!("error: copied {copied} bytes, expected {bytes}");
+        process::exit(1);
+    }
+    eprintln!("copied {} Bullet data records to {}", records, output.display());
+}
+
 fn cmd_data(config: &Config) {
     let data = data_config(config);
     let source = expand_path(&data.source_binpack);
@@ -519,6 +588,11 @@ fn cmd_data(config: &Config) {
         process::exit(1);
     }
     let output = expand_path(&data.bullet_output);
+    if is_bullet_data_path(&source) {
+        copy_bullet_data(&source, &output, data.offset, data.limit);
+        return;
+    }
+
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
             eprintln!("error: cannot create {}: {err}", parent.display());
@@ -811,12 +885,17 @@ fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
     }
     let output = expand_path(&format!("runs/{run}/checkpoints"));
     let prefix = format!("{}-", net_id(config));
-    let mut checkpoints = fs::read_dir(&output)
-        .unwrap_or_else(|err| {
+    let entries = match fs::read_dir(&output) {
+        Ok(entries) => Some(entries),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+        Err(err) => {
             eprintln!("error: cannot read {}: {err}", output.display());
             process::exit(1);
-        })
-        .filter_map(Result::ok)
+        }
+    };
+    let mut checkpoints = entries
+        .into_iter()
+        .flat_map(|entries| entries.filter_map(Result::ok))
         .map(|entry| entry.path())
         .filter_map(|path| {
             let name = path.file_name().and_then(OsStr::to_str)?;
@@ -826,17 +905,28 @@ fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
         })
         .collect::<Vec<_>>();
     checkpoints.sort_by_key(|(superbatch, _)| *superbatch);
-    checkpoints
-        .into_iter()
-        .last()
-        .map(|(_, path)| path)
-        .unwrap_or_else(|| {
-            eprintln!(
-                "error: no optimiser_state/weights.bin checkpoints found under {}",
-                output.display()
-            );
-            process::exit(1);
-        })
+    if let Some((_, weights)) = checkpoints.into_iter().last() {
+        return weights;
+    }
+
+    for net in [
+        format!("runs/{run}/model.nn"),
+        format!("~/assets/nets/{run}.nn"),
+    ] {
+        let net = expand_path(&net);
+        if net.exists() {
+            let net = net.to_string_lossy().into_owned();
+            return convert_init_net(config, &net);
+        }
+    }
+
+    eprintln!(
+        "error: no optimiser_state/weights.bin checkpoints or exported .nn found for continue_from={run}"
+    );
+    eprintln!("  checked {}", output.display());
+    eprintln!("  checked runs/{run}/model.nn");
+    eprintln!("  checked ~/assets/nets/{run}.nn");
+    process::exit(1);
 }
 
 fn write_model(config: &Config) {
