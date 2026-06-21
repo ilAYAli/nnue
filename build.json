@@ -1,10 +1,11 @@
-{
-  "run": "pwa-native-v25",
-  "lineage": "scratch-native",
-  "hypothesis": "Expand pwa-native-v15 into 8 input buckets and retrain on the 100M UHO window.",
-  "data": {
-    "source_binpack": "data/nodes5000pv2_UHO.binpack",
-    "limit": 100000000
-  },
-  "init_net": "~/assets/nets/pwa-native-v15.nn"
-}
+  {
+    "run": "pwa-native-v26",
+    "lineage": "scratch-native",
+    "hypothesis": "Continue accepted pwa-native-v25 from Enyo positions",
+    "data": {
+      "source_binpack": "data/enyo/run-packs/bullet-reckless-512h-movechoice-wdl0-sb128.data",
+      "limit": 5437722,
+      "offset": 0
+    },
+    "continue_from": "pwa-native-v25"
+  }
