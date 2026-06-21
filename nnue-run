@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 # Thin native NNUE loop:
 #   ./nnue-run iterate   train, gate, SPRT, bump build.json on success, stop on failure
+#   ./nnue-run iterate --full-sprt-first  run full SPRT directly for iteration 1 only
 #   ./nnue-run plan      show resolved tools/bullet/train plan
 #   ./nnue-run train     data + train + export
 #   ./nnue-run gates     startpos + static eval + move gate
@@ -11,9 +12,11 @@ set -Eeuo pipefail
 
 cmd=iterate
 SOLO=0
+FULL_SPRT_FIRST=0
 for arg in "$@"; do
   case "$arg" in
     --solo) SOLO=1 ;;
+    --full-sprt-first) FULL_SPRT_FIRST=1 ;;
     iterate|plan|train|gates|sprt|status|help|-h|--help) cmd=$arg ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
@@ -480,6 +483,22 @@ sprt_gate() {
   printf '  └─────────────────────────────────────\n'
   notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
 }
+full_sprt_gate() {
+  load_config
+  section sprt
+  show_config
+  [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" sprt
+  [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
+
+  run_sprt_once sprt "$GAMES" sprt
+  sprt_h1_passed "$last_sprt_llr" || fail "SPRT did not pass H1 before $GAMES games: llr=$last_sprt_llr" sprt
+  printf '  ┌─────────────────────────────────────\n'
+  printf '  │ \033[1;32m✓ PASS\033[0m  sprt (H1 reached)\n'
+  result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
+  printf '  └─────────────────────────────────────\n'
+  notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
+}
+
 next_run_name() {
   if [[ "$1" =~ ^(.*-v|.*v)([0-9]+)$ ]]; then
     printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
@@ -540,19 +559,17 @@ iterate() {
     section "iteration $i"
     show_config
     notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
-    train || fail "train failed for $run" train
-    gates || fail "gates failed for $run" gates
-    if sprt_gate; then
-      bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
-        || fail "build.json commit failed for $run" iterate
-      record_iteration PASS "accepted; build.json advanced"
-      notify done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
+    if (( FULL_SPRT_FIRST == 1 && i == 1 )); then
+      full_sprt_gate
     else
-      record_iteration FAIL "SPRT rejected or failed"
-      notify fail sprt "rejected $run"
-      print_summary
-      exit 1
+      train || fail "train failed for $run" train
+      gates || fail "gates failed for $run" gates
+      sprt_gate
     fi
+    bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
+      || fail "build.json commit failed for $run" iterate
+    record_iteration PASS "accepted; build.json advanced"
+    notify done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
   done
   print_summary
 }
@@ -570,6 +587,7 @@ help() {
   cat <<'EOF'
 Usage:
   ./nnue-run iterate   # main command: train, gate, SPRT, bump build.json on pass
+  ./nnue-run iterate --full-sprt-first
   ./nnue-run plan
   ./nnue-run train
   ./nnue-run gates
@@ -579,6 +597,7 @@ Usage:
 
 Useful overrides:
   ITERATIONS=5 ./nnue-run iterate
+  ./nnue-run iterate --full-sprt-first  # first iteration skips train/gates/smoke
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue-run sprt
   SMOKE_GAMES=400 SMOKE_FAIL_LLR=-0.5 ./nnue-run sprt
   GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
