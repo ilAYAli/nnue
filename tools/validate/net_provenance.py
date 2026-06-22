@@ -117,7 +117,6 @@ def context_for(path: Path) -> RunContext:
             "run.log",
             "train.log",
             "events.jsonl",
-            "config.json",
             "manifest.json",
             "meta.json",
         ):

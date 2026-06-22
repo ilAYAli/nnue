@@ -100,7 +100,7 @@ class NetProvenanceTests(unittest.TestCase):
                 "data=/runs/mix/assets/bullet.bullet\n",
                 encoding="utf-8",
             )
-            run.joinpath("config.json").write_text(
+            run.joinpath("meta.json").write_text(
                 json.dumps({
                     "create_args": {
                         "source_mix_jsonl": [
