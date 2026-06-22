@@ -39,6 +39,22 @@ def test_32_bucket_init_uses_legacy_parent_buckets() -> None:
     assert source_bucket_for_target(31, 16, 32) == 15
 
 
+def test_clean_bucket_expansion_repeats_parent_buckets() -> None:
+    assert [source_bucket_for_target(bucket, 8, 16) for bucket in range(16)] == [
+        0, 0, 1, 1, 2, 2, 3, 3,
+        4, 4, 5, 5, 6, 6, 7, 7,
+    ]
+
+
+def test_unsupported_bucket_mapping_fails() -> None:
+    try:
+        source_bucket_for_target(0, 8, 12)
+    except SystemExit as err:
+        assert "cannot map input buckets 8 -> 12" in str(err)
+    else:
+        raise AssertionError("expected unsupported bucket mapping to fail")
+
+
 def test_halfka_v2_init_merges_king_channels_by_square_legality() -> None:
     assert source_channel_for_target(0, 0, 31, 12, 11) == 0
     assert source_channel_for_target(4, 0, 31, 12, 11) == 4
@@ -46,3 +62,14 @@ def test_halfka_v2_init_merges_king_channels_by_square_legality() -> None:
     assert source_channel_for_target(9, 0, 31, 12, 11) == 10
     assert source_channel_for_target(10, 0, 31, 12, 11) == 5
     assert source_channel_for_target(10, 1, 31, 12, 11) == 11
+
+def main() -> None:
+    test_expanded_l3_weights_use_bullet_internal_orientation()
+    test_32_bucket_init_uses_legacy_parent_buckets()
+    test_clean_bucket_expansion_repeats_parent_buckets()
+    test_unsupported_bucket_mapping_fails()
+    test_halfka_v2_init_merges_king_channels_by_square_legality()
+
+
+if __name__ == "__main__":
+    main()

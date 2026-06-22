@@ -83,6 +83,8 @@ def source_bucket_for_target(target_bucket: int, source_buckets: int, target_buc
         return 0
     if source_buckets == 16 and target_buckets == 32:
         return LEGACY_BUCKET_FOR_32[target_bucket]
+    if target_buckets % source_buckets == 0:
+        return target_bucket * source_buckets // target_buckets
     raise SystemExit(
         f"cannot map input buckets {source_buckets} -> {target_buckets}")
 
