@@ -6,7 +6,8 @@ data.
 Normal entry point:
 
 ```sh
-./build.py create --backend bullet ...
+tools/bullet/train plan --build build.json
+tools/bullet/train all --build build.json
 ```
 
 Pipeline shape:

@@ -234,8 +234,6 @@ def count_rows(path):
         return ""
 
 
-config = read_json(run_dir / "config.json")
-args = config.get("create_args", {}) if isinstance(config, dict) else {}
 log_text = tail_text(log)
 message_text = str(event.get("message") or "")
 
@@ -250,36 +248,6 @@ def message_result_line(message, prefixes):
                 return stripped
     return ""
 
-source = "unknown"
-if args.get("backend") == "bullet":
-    if args.get("score_source_jsonl"):
-        source = f"existing source JSONL: {Path(str(args['score_source_jsonl'])).name}"
-    elif args.get("bullet_generate_source"):
-        evaluator = "HCE/no-NNUE" if args.get("selfplay_use_nnue") is False else "NNUE"
-        source = f"{evaluator} self-play"
-    elif args.get("bullet_source_jsonl"):
-        source = f"pre-scored JSONL: {Path(str(args['bullet_source_jsonl'])).name}"
-    elif args.get("bullet_data"):
-        source = f"Bullet data: {Path(str(args['bullet_data'])).name}"
-
-label = "unknown"
-if args.get("score_engine"):
-    depth = args.get("score_depth")
-    label = f"{Path(str(args['score_engine'])).name}"
-    if depth:
-        label += f" depth {depth}"
-
-train_bits = []
-if args.get("backend"):
-    train_bits.append(str(args["backend"]))
-if args.get("bullet_hidden"):
-    train_bits.append(f"h{args['bullet_hidden']}")
-if args.get("bullet_enyo_runtime_input_buckets"):
-    train_bits.append(f"kb{args['bullet_enyo_runtime_input_buckets']}")
-if args.get("bullet_superbatches"):
-    train_bits.append(f"{args['bullet_superbatches']} superbatches")
-if args.get("bullet_lr"):
-    train_bits.append(f"lr={args['bullet_lr']}")
 
 candidate_net = event.get("candidate_net", "")
 if not candidate_net and run_dir:
@@ -324,14 +292,8 @@ lines.append("")
 lines.append("What ran")
 if why:
     lines.append(f"  • Why: {why}")
-if source != "unknown":
-    lines.append(f"  • Source: {source}")
-if label != "unknown":
-    lines.append(f"  • Labels: {label}")
 if score_rows:
     lines.append(f"  • Scored rows: {score_rows}")
-if train_bits:
-    lines.append(f"  • Training: {', '.join(train_bits)}")
 if train_time:
     lines.append(f"  • {train_time}")
 
