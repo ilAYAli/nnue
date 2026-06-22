@@ -1,12 +1,11 @@
 {
-  "run": "uho-native-v30",
+  "run": "uho-native-v32",
   "lineage": "scratch-native",
-  "hypothesis": "Try 16 input king buckets initialized from accepted pwa-native-v28.",
+  "hypothesis": "Continue accepted pwa-native-v28 with 8 input buckets on the next UHO data window",
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
     "limit": 100000000,
     "offset": 300000000
   },
-  "init_net": "~/assets/nets/pwa-native-v28.nn",
-  "reference": "pwa-native-v28"
+  "wdl": 0.75
 }

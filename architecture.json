@@ -5,7 +5,7 @@
   "hidden": 1024,
   "l2_size": 16,
   "feature_channels": 12,
-  "input_buckets": 16,
+  "input_buckets": 8,
   "output_buckets": 1,
   "input_factoriser": false,
   "eval_scale": 400.0,
