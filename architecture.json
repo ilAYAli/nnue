@@ -1,5 +1,5 @@
 {
-  "name": "scratch-native-16bucket-12ch-1024-v1",
+  "name": "scratch-native-8bucket-12ch-1024-v1",
   "lineage": "scratch-native",
   "mode": "enyo",
   "hidden": 1024,
