@@ -14,18 +14,31 @@ HOOK = REPO / "tools" / "events" / "nnue_event_ntfy.sh"
 
 
 class NnueEventNtfyTests(unittest.TestCase):
-    def run_hook(self, env_extra: dict[str, str]) -> tuple[subprocess.CompletedProcess[str], str]:
+    def run_hook(
+        self,
+        env_extra: dict[str, str],
+        *,
+        payload_extra: dict[str, object] | None = None,
+        log_text: str | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str], str]:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             run = tmp / "run"
             run.mkdir()
+            (run / "build.resolved.json").write_text(
+                json.dumps({
+                    "run": "run",
+                    "hypothesis": "Continue accepted uho-native-1.0.33 using the next UHO data window",
+                }),
+                encoding="utf-8",
+            )
             validate = run / "validate"
             validate.mkdir()
             log_path = run / "deploy.log"
             log_path.write_text(
-                "2026-06-04 Enyo NNUE SPRT finished diagnostic rc=0 "
-                "[64/64] Elo 1.0 +/- 10.0 | LLR 0.10/2.94 ( 3%) "
-                "| LOS 55.0% | draw 25.0% | ETA 0s\n",
+                log_text
+                or "Crucible run-sprt tasks=8/8 games=400/400 elo=+5.2 "
+                   "ci=27.7 llr=0.04/2.20 (2%) los=52.3% draw=36.5%\n",
                 encoding="utf-8",
             )
             (validate / "move_gate.summary.json").write_text(
@@ -47,12 +60,15 @@ class NnueEventNtfyTests(unittest.TestCase):
             payload = {
                 "event": "done",
                 "run": str(run),
-                "stage": "validate_crucible_sprt",
+                "stage": "iterate",
                 "status": "ok",
                 "rc": 0,
                 "log": str(log_path),
                 "host": "test-host",
+                "message": "accepted run: Crucible run-sprt tasks=8/8 games=400/400 elo=+5.2 ci=27.7 llr=0.04/2.20 (2%) los=52.3% draw=36.5%",
             }
+            if payload_extra:
+                payload.update(payload_extra)
             env = os.environ.copy()
             env.update({
                 "HOME": tmp_name,
@@ -90,14 +106,45 @@ class NnueEventNtfyTests(unittest.TestCase):
         })
 
         self.assertEqual(0, proc.returncode, proc.stderr)
-        self.assertIn("NNUE status", proc.stdout)
+        self.assertIn("NNUE done", proc.stdout)
+        self.assertIn("Run: run", proc.stdout)
         self.assertIn(
-            "Move gate: candidate=1144/2487 baseline=1137/2487 "
-            "fixed=25 regressed=18 delta_avg=+2.1cp weighted=+1.5cp",
+            "Hypothesis: Continue accepted uho-native-1.0.33 using the next UHO data window",
             proc.stdout,
         )
+        self.assertIn(
+            "Status: tasks=8/8 games=400/400 elo=+5.2 ci=27.7 "
+            "llr=0.04/2.20 (2%) los=52.3% draw=36.5%",
+            proc.stdout,
+        )
+        self.assertNotIn("What ran", proc.stdout)
+        self.assertNotIn("Next", proc.stdout)
         self.assertNotIn("nnue_sent", log)
         self.assertIn("ai_stdout_sent", log)
+
+    def test_fail_event_reports_single_error_line(self) -> None:
+        proc, log = self.run_hook(
+            {
+                "NNUE_NTFY_EVENTS": "fail",
+                "NNUE_AI_STDOUT_EVENTS": "",
+                "NNUE_AI_STDIN_EVENTS": "",
+            },
+            payload_extra={
+                "event": "fail",
+                "stage": "train",
+                "status": "fail",
+                "critical_failure": True,
+                "message": "train/export failed for run",
+            },
+            log_text="thread main panicked\nFAILED: train/export failed for run train\n",
+        )
+
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertIn("NNUE fail", proc.stdout)
+        self.assertIn("Run: run", proc.stdout)
+        self.assertIn("Error: FAILED: train/export failed for run train", proc.stdout)
+        self.assertNotIn("Result", proc.stdout)
+        self.assertIn("nnue_sent", log)
 
 
 if __name__ == "__main__":
