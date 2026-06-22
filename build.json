@@ -1,7 +1,6 @@
 {
-  "run": "uho-native-1.0.35",
+  "run": "uho-native-1.0.36",
   "lineage": "scratch-native",
-  "continue_from": "uho-native-1.0.33",
   "wdl": 0.75,
   "hypothesis": "Continue accepted uho-native-1.0.33 using the next UHO data window",
   "data": {
