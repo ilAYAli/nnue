@@ -284,7 +284,7 @@ full_sprt_pass() {
     full_sprt_label="positive at cap"
     return 0
   fi
-  fail "SPRT not positive at $GAMES games: elo=$last_sprt_elo llr=$last_sprt_llr" sprt
+  return 1
 }
 
 quote_cmd() {
@@ -536,7 +536,7 @@ sprt_gate() {
   fi
   local smoke_rc
   if smoke_sprt_failed "$last_sprt_elo" "$last_sprt_llr"; then
-    fail "smoke SPRT negative: elo=$last_sprt_elo <= $SMOKE_FAIL_ELO or llr=$last_sprt_llr <= $SMOKE_FAIL_LLR" sprt
+    return 1
   else
     smoke_rc=$?
     if (( smoke_rc == 2 )); then
@@ -550,7 +550,7 @@ sprt_gate() {
   notify phase_done sprt_smoke "SPRT smoke inconclusive for $run: $last_sprt_line" "$last_sprt_log" 0
 
   run_sprt_once sprt "$GAMES" sprt
-  full_sprt_pass
+  full_sprt_pass || return 1
   printf '  ┌─────────────────────────────────────\n'
   printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
@@ -565,7 +565,7 @@ full_sprt_gate() {
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
 
   run_sprt_once sprt "$GAMES" sprt
-  full_sprt_pass
+  full_sprt_pass || return 1
   printf '  ┌─────────────────────────────────────\n'
   printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
@@ -583,13 +583,18 @@ next_run_name() {
   fi
 }
 
-bump_build_json() {
-  local accepted=$1 elo=$2 llr=$3 command=$4 details=$5
-  local next
+commit_and_bump_build_json() {
+  local result=$1 accepted=$2 elo=$3 llr=$4 command=$5 details=$6
+  local next subject
   next=$(next_run_name "$accepted")
+  if [[ "$result" == PASS ]]; then
+    subject="${accepted}.nn: Elo ${elo},LLR ${llr}"
+  else
+    subject="fail: ${accepted}.nn: Elo ${elo},LLR ${llr}"
+  fi
 
   git commit --only \
-    -m "${accepted}.nn: Elo ${elo},LLR ${llr}" \
+    -m "$subject" \
     -m "Forge command:
 $command
 
@@ -602,6 +607,11 @@ $details" \
   jq \
     --arg run "$next" \
     '.run = $run
+     | if ((.data.offset? | type) == "number") and ((.data.limit? | type) == "number") then
+         .data.offset = (.data.offset + .data.limit)
+       else
+         .
+       end
      | del(.continue_from)
      | del(.reference)
      | del(.init_net)
@@ -609,6 +619,23 @@ $details" \
     "$BUILD" > "$tmp"
   mv "$tmp" "$BUILD"
   echo "updated $BUILD: run=$next"
+}
+
+bump_build_json() {
+  commit_and_bump_build_json PASS "$@"
+}
+
+fail_build_json() {
+  commit_and_bump_build_json FAIL "$@"
+}
+
+commit_failed_iteration() {
+  fail_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-failed sprt}" \
+    || fail "failed build.json commit failed for $run" iterate
+  record_iteration FAIL "rejected; build.json advanced"
+  notify fail iterate "rejected $run: ${last_sprt_line:-sprt failed}" "$summary_file" 1
+  print_summary || true
+  exit 1
 }
 
 record_iteration() {
@@ -639,11 +666,11 @@ iterate() {
     require_crucible_idle iterate
     notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
     if (( FULL_SPRT_FIRST == 1 && i == 1 )); then
-      full_sprt_gate
+      full_sprt_gate || commit_failed_iteration
     else
       train || fail "train failed for $run" train
       gates || fail "gates failed for $run" gates
-      sprt_gate
+      sprt_gate || commit_failed_iteration
     fi
     bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
       || fail "build.json commit failed for $run" iterate
