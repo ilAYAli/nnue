@@ -416,6 +416,11 @@ run_sprt_once() {
       --reference-nnue "$reference_net"
       --verify
       --run "$crucible_run"
+    )
+    local hypothesis
+    hypothesis=$(json '.hypothesis // empty')
+    [[ -z "$hypothesis" ]] || forge_cmd+=(--comment "$hypothesis")
+    forge_cmd+=(
       --
       --games "$sprt_games"
       --elo0 "$SPRT_ELO0"
