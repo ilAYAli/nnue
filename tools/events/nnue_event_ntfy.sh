@@ -121,20 +121,21 @@ if [ -r "$HOME/.ntfy" ]; then
 fi
 
 rendered=$(
-    NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
+    NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY_RENDER'
 import json
 import os
 import re
 from pathlib import Path
 
+
 event = json.loads(os.environ["NNUE_EVENT_PAYLOAD"])
-name = Path(event.get("run", "")).name or str(event.get("run", ""))
-event_name = event.get("event", "unknown")
-stage = event.get("stage", "")
-status = event.get("status", "")
-log = event.get("log", "")
-why = str(event.get("why", "") or "")
-run_dir = Path(event.get("run", "")).expanduser()
+run_dir = Path(str(event.get("run", ""))).expanduser()
+name = run_dir.name or str(event.get("run", "")) or "unknown"
+event_name = str(event.get("event", "unknown"))
+stage = str(event.get("stage", "") or "")
+status = str(event.get("status", "") or "")
+log = str(event.get("log", "") or "")
+message = str(event.get("message", "") or "")
 
 
 def read_json(path):
@@ -158,190 +159,66 @@ def tail_text(path, size=700_000):
         return ""
 
 
-def last_matching(text, pattern):
-    found = [line.strip() for line in text.splitlines() if re.search(pattern, line)]
-    return found[-1] if found else ""
-
-
-def compact_metric_line(line):
-    if not line:
-        return ""
-    keys = ("rows", "mae", "sign", "wrong_sign", "bias", "corr", "slope")
-    parts = line.split()
-    out = []
-    for part in parts:
-        if any(part.startswith(f"{key}=") for key in keys):
-            out.append(part)
-    return " ".join(out) if out else line
-
-
-def fmt_cp(value):
-    try:
-        return f"{float(value):+.1f}cp"
-    except (TypeError, ValueError):
-        return ""
-
-
-def move_gate_line(summary):
-    if not isinstance(summary, dict):
-        return ""
-    cases = summary.get("cases")
-    if isinstance(cases, list):
-        cases_count = len(cases)
-    elif isinstance(cases, int):
-        cases_count = cases
-    else:
-        cases_count = 0
-    if cases_count <= 0:
-        by_source = summary.get("by_source")
-        if isinstance(by_source, dict) and by_source:
-            cases_count = sum(
-                int(item.get("cases", 0))
-                for item in by_source.values()
-                if isinstance(item, dict)
-            )
-    if cases_count <= 0:
-        return ""
-    baseline = summary.get("baseline_prefers_best")
-    candidate = summary.get("candidate_prefers_best")
-    fixed = summary.get("fixed")
-    regressed = summary.get("regressed")
-    delta_avg = fmt_cp(summary.get("delta_avg_margin"))
-    delta_weighted = fmt_cp(summary.get("delta_loss_weighted_margin"))
-    parts = []
-    if candidate is not None and baseline is not None:
-        parts.append(f"candidate={candidate}/{cases_count}")
-        parts.append(f"baseline={baseline}/{cases_count}")
-    if fixed is not None:
-        parts.append(f"fixed={fixed}")
-    if regressed is not None:
-        parts.append(f"regressed={regressed}")
-    if delta_avg:
-        parts.append(f"delta_avg={delta_avg}")
-    if delta_weighted:
-        parts.append(f"weighted={delta_weighted}")
-    return " ".join(parts)
-
-
-def count_rows(path):
-    p = Path(path)
-    if not p.exists():
-        return ""
-    try:
-        with p.open(encoding="utf-8", errors="replace") as handle:
-            return str(sum(1 for _ in handle))
-    except OSError:
-        return ""
-
-
-log_text = tail_text(log)
-message_text = str(event.get("message") or "")
-
-
-def message_result_line(message, prefixes):
-    for line in reversed(message.splitlines()):
-        stripped = line.strip()
-        if stripped.startswith("• "):
-            stripped = stripped[2:].strip()
-        for prefix in prefixes:
-            if stripped.startswith(prefix):
-                return stripped
+def hypothesis():
+    direct = str(event.get("hypothesis") or "").strip()
+    if direct:
+        return direct
+    for candidate in (
+        run_dir / "build.resolved.json",
+        run_dir / "build.json",
+        Path("build.json"),
+    ):
+        data = read_json(candidate)
+        if not data:
+            continue
+        if candidate == Path("build.json") and str(data.get("run") or "") != name:
+            continue
+        value = str(data.get("hypothesis") or "").strip()
+        if value:
+            return value
     return ""
 
 
-candidate_net = event.get("candidate_net", "")
-if not candidate_net and run_dir:
-    candidates = sorted(run_dir.glob("train/*/model.nn"))
-    if candidates:
-        candidate_net = str(candidates[-1])
+def final_status():
+    haystack = "\n".join(part for part in (message, tail_text(log)) if part)
+    for line in reversed(haystack.splitlines()):
+        stripped = line.strip()
+        if "tasks=" in stripped and "games=" in stripped and "elo=" in stripped:
+            return stripped[stripped.find("tasks="):]
+        if stripped.startswith("Crucible ") and " elo=" in stripped:
+            return stripped
+    return ""
 
-score_rows = ""
-wc_path = run_dir / "score" / "labeled.wc"
-try:
-    score_rows = wc_path.read_text(encoding="utf-8").split()[0]
-except OSError:
-    score_rows = count_rows(run_dir / "score" / "labeled.jsonl")
 
-provenance = last_matching(log_text, r"clean_enyo_owned=(yes|no)")
-static_all = compact_metric_line(last_matching(log_text, r"^all rows="))
-bucket_0_50 = compact_metric_line(last_matching(log_text, r"^bucket:0-50 "))
-bucket_50_100 = compact_metric_line(last_matching(log_text, r"^bucket:50-100 "))
-move_gate = move_gate_line(read_json(run_dir / "validate" / "move_gate.summary.json"))
-train_time = last_matching(log_text, r"Total Training Time:")
-sprt_done = last_matching(log_text, r"Enyo NNUE SPRT finished")
-sprt_line = last_matching(log_text, r"^\[\s*\d+/\d+\]")
-message_score = message_result_line(message_text, ("Score:",))
-message_elo = message_result_line(message_text, ("Elo:",))
-message_sprt = message_result_line(message_text, ("SPRT:",))
-failure_line = last_matching(log_text, r"^(failed .*|.*CUDA_ERROR.*|.*Traceback.*|.*ValueError:.*)")
+def failure_error():
+    text = tail_text(log)
+    patterns = (
+        r"^FAILED:\s*(.+)$",
+        r"^error:\s*(.+)$",
+        r"^thread .+ panicked .*$",
+        r"^.*No space left on device.*$",
+        r"^.*CUDA_ERROR.*$",
+        r"^.*Traceback.*$",
+        r"^.*ValueError:.*$",
+    )
+    for pattern in patterns:
+        matches = [line.strip() for line in text.splitlines() if re.search(pattern, line)]
+        if matches:
+            return matches[-1]
+    if message:
+        return message.strip()
+    return status or "failed"
 
-lines = ["NNUE status"]
-lines.append(f"  • Event: {event_name}")
-if stage:
-    lines.append(f"  • Stage: {stage}")
-if name:
-    lines.append(f"  • Run: {name}")
-if event.get("host"):
-    lines.append(f"  • Host: {event['host']}")
-if status:
-    lines.append(f"  • State: {status}")
-if "rc" in event:
-    lines.append(f"  • RC: {event['rc']}")
 
-lines.append("")
-lines.append("What ran")
-if why:
-    lines.append(f"  • Why: {why}")
-if score_rows:
-    lines.append(f"  • Scored rows: {score_rows}")
-if train_time:
-    lines.append(f"  • {train_time}")
-
-lines.append("")
-lines.append("Result")
-if provenance:
-    lines.append(f"  • Provenance: {provenance}")
-if static_all:
-    lines.append(f"  • Static: {static_all}")
-if bucket_0_50:
-    lines.append(f"  • Near-zero 0-50: {bucket_0_50}")
-if bucket_50_100:
-    lines.append(f"  • Near-zero 50-100: {bucket_50_100}")
-if move_gate:
-    lines.append(f"  • Move gate: {move_gate}")
-if message_score or message_elo or message_sprt:
-    if message_score:
-        lines.append(f"  • {message_score}")
-    if message_elo:
-        lines.append(f"  • {message_elo}")
-    if message_sprt:
-        lines.append(f"  • {message_sprt}")
-elif sprt_done:
-    lines.append(f"  • SPRT: {sprt_done}")
-elif sprt_line:
-    lines.append(f"  • SPRT: {sprt_line}")
-if event_name == "fail" and failure_line:
-    lines.append(f"  • Failure: {failure_line}")
-if candidate_net:
-    lines.append(f"  • Net: {candidate_net}")
-if log:
-    lines.append(f"  • Log: {log}")
-
-lines.append("")
-lines.append("Next")
+title = f"NNUE {event_name}"
+lines = [title, f"  • Run: {name}"]
+hyp = hypothesis()
+if hyp:
+    lines.append(f"  • Hypothesis: {hyp}")
 if event_name == "fail":
-    lines.append("  • Inspect the failing phase and fix the blocker.")
-elif event_name == "done":
-    if message_score or message_elo or message_sprt or sprt_done or sprt_line:
-        lines.append("  • Decide from the SPRT result.")
-    elif static_all:
-        lines.append("  • Run a game smoke if static/provenance are sane.")
-    else:
-        lines.append("  • Inspect result and choose the next gate.")
-elif event_name == "phase_done":
-    lines.append("  • Continue the current pipeline.")
+    lines.append(f"  • Error: {failure_error()}")
 else:
-    lines.append("  • No action unless this was unexpected.")
+    lines.append(f"  • Status: {final_status() or status or event_name}")
 
 if event_name == "fail":
     prompt = f"NNUE phase failed: run={name} stage={stage or 'n/a'} status={status or 'failed'} log={log}. Inspect the log and fix the failed phase."
@@ -354,9 +231,8 @@ else:
 
 print("\n".join(lines))
 print("__AI_PROMPT__" + prompt)
-PY
+PY_RENDER
 )
-
 body=$(printf '%s\n' "$rendered" | sed '/^__AI_PROMPT__/d')
 ai_prompt=$(printf '%s\n' "$rendered" | sed -n 's/^__AI_PROMPT__//p' | tail -1)
 stdout_body=$(printf '<output>\n%s\n</output>\n' "$body")
