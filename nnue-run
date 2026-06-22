@@ -569,6 +569,16 @@ bump_build_json() {
   local accepted=$1 elo=$2 llr=$3 command=$4 details=$5
   local next
   next=$(next_run_name "$accepted")
+
+  git commit --only \
+    -m "${accepted}.nn: Elo ${elo},LLR ${llr}" \
+    -m "Forge command:
+$command
+
+Result:
+$details" \
+    -- "$BUILD" "$ARCH" || return
+
   local tmp
   tmp=$(mktemp)
   jq \
@@ -581,16 +591,8 @@ bump_build_json() {
     "$BUILD" > "$tmp"
   mv "$tmp" "$BUILD"
   echo "updated $BUILD: run=$next"
-
-  git commit --only \
-    -m "${accepted}.nn: Elo ${elo},LLR ${llr}" \
-    -m "Forge command:
-$command
-
-Result:
-$details" \
-    -- "$BUILD" "$ARCH"
 }
+
 record_iteration() {
   local result=$1
   local detail=$2
