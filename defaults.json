@@ -8,7 +8,7 @@
   "wdl": 0.3,
   "lr": 0.001,
   "final_lr": 0.000005,
-  "save_rate": 64,
+  "save_rate": 7600,
   "trainable": "all",
   "weight_decay": 0.0,
   "sfbinpack": {
