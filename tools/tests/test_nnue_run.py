@@ -112,6 +112,42 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
             self.assertIn('+  "run": "uho-native-1.0.36"', diff)
             self.assertIn('-  "continue_from": "uho-native-1.0.33"', diff)
 
+
+    def test_smoke_gate_rejects_bad_elo_or_negative_llr(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+SMOKE_FAIL_ELO=-15.0
+SMOKE_FAIL_LLR=-0.20
+check_smoke() {
+  if smoke_sprt_failed "$1" "$2"; then
+    printf '%s=fail\n' "$3"
+  else
+    printf '%s=pass:%s\n' "$3" "$?"
+  fi
+}
+check_smoke -25.2 -0.32/2.20 bad_elo
+check_smoke -5.0 -0.20/2.20 negative_llr
+check_smoke -5.0 -0.10/2.20 mild_negative
+check_smoke 4.0 -0.22/2.20 positive_elo
+"""
+            harness_path = tmp / "smoke_gate.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            )
+
+            self.assertIn("bad_elo=fail", proc.stdout)
+            self.assertIn("negative_llr=fail", proc.stdout)
+            self.assertIn("mild_negative=pass:1", proc.stdout)
+            self.assertIn("positive_elo=pass:1", proc.stdout)
+
     def test_sprt_refuses_to_queue_when_crucible_is_busy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
