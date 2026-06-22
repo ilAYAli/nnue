@@ -553,7 +553,7 @@ $command
 
 Result:
 $details" \
-    -- "$BUILD"
+    -- "$BUILD" "$ARCH"
 }
 record_iteration() {
   local result=$1
