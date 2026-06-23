@@ -54,6 +54,46 @@ const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
     14, 14, 15, 15, 14, 14, 15, 15,
 ];
 
+const TRAINING_DEFAULT_KEYS: &[&str] = &[
+    "loader",
+    "net_id",
+    "batches",
+    "batch_size",
+    "superbatches",
+    "threads",
+    "wdl",
+    "lr",
+    "final_lr",
+    "save_rate",
+    "trainable",
+    "weight_decay",
+    "sfbinpack",
+];
+
+const SFBINPACK_DEFAULT_KEYS: &[&str] =
+    &["buffer_mb", "offset", "min_ply", "max_abs_cp", "quiet_only"];
+
+const BUILD_METADATA_KEYS: &[&str] = &[
+    "run",
+    "lineage",
+    "continue_from",
+    "init_net",
+    "reference",
+    "hypothesis",
+    "data",
+    "net",
+    "out",
+    "changed_variables",
+];
+
+const BUILD_DATA_KEYS: &[&str] = &[
+    "source_binpack",
+    "bullet_output",
+    "limit",
+    "offset",
+    "threads",
+];
+
 #[derive(Clone)]
 struct Config {
     arch: Value,
@@ -189,6 +229,256 @@ fn object_at<'a>(value: &'a Value, key: &str) -> &'a Value {
     value.get(key).unwrap_or(&Value::Null)
 }
 
+fn json_kind(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
+fn config_type_error(path: &str, expected: &str, value: &Value) -> ! {
+    eprintln!("error: {path} must be {expected}, got {}", json_kind(value));
+    process::exit(2);
+}
+
+fn same_scalar_kind(left: &Value, right: &Value) -> bool {
+    matches!(
+        (left, right),
+        (Value::Bool(_), Value::Bool(_))
+            | (Value::Number(_), Value::Number(_))
+            | (Value::String(_), Value::String(_))
+            | (Value::Array(_), Value::Array(_))
+            | (Value::Null, Value::Null)
+    )
+}
+
+fn validate_override_shape(
+    build_value: &Value,
+    default_value: &Value,
+    path: &str,
+    errors: &mut Vec<String>,
+) {
+    match (build_value, default_value) {
+        (Value::Object(build), Value::Object(defaults)) => {
+            for (key, child) in build {
+                let child_path = format!("{path}.{key}");
+                match defaults.get(key) {
+                    Some(default_child) => {
+                        validate_override_shape(child, default_child, &child_path, errors)
+                    }
+                    None => errors.push(format!(
+                        "{child_path}: build override has no matching defaults.json key"
+                    )),
+                }
+            }
+        }
+        (Value::Object(_), _) | (_, Value::Object(_)) => errors.push(format!(
+            "{path}: build/defaults shape mismatch (build {}, defaults {})",
+            json_kind(build_value),
+            json_kind(default_value)
+        )),
+        _ if !same_scalar_kind(build_value, default_value) => errors.push(format!(
+            "{path}: build/defaults type mismatch (build {}, defaults {})",
+            json_kind(build_value),
+            json_kind(default_value)
+        )),
+        _ => {}
+    }
+}
+
+fn validate_build_data(value: &Value, errors: &mut Vec<String>) {
+    let Some(data) = value.as_object() else {
+        errors.push(format!(
+            "build.data: expected object, got {}",
+            json_kind(value)
+        ));
+        return;
+    };
+    for key in data.keys() {
+        if !BUILD_DATA_KEYS.contains(&key.as_str()) {
+            errors.push(format!(
+                "build.data.{key}: not an allowed data key; put Bullet training knobs in build.sfbinpack or top-level build.json"
+            ));
+        }
+    }
+}
+
+fn config_contract_errors(config: &Config) -> Vec<String> {
+    let mut errors = Vec::new();
+    for key in TRAINING_DEFAULT_KEYS {
+        if config.defaults.get(*key).is_none() {
+            errors.push(format!(
+                "defaults.{key}: missing Bullet training parameter default"
+            ));
+        }
+    }
+    let sfbinpack = object_at(&config.defaults, "sfbinpack");
+    if !sfbinpack.is_object() {
+        errors.push(format!(
+            "defaults.sfbinpack: expected object, got {}",
+            json_kind(sfbinpack)
+        ));
+    } else {
+        for key in SFBINPACK_DEFAULT_KEYS {
+            if sfbinpack.get(*key).is_none() {
+                errors.push(format!(
+                    "defaults.sfbinpack.{key}: missing Bullet training parameter default"
+                ));
+            }
+        }
+    }
+
+    let Some(build) = config.build.as_object() else {
+        errors.push(format!(
+            "build.json root must be object, got {}",
+            json_kind(&config.build)
+        ));
+        return errors;
+    };
+    let Some(defaults) = config.defaults.as_object() else {
+        errors.push(format!(
+            "defaults.json root must be object, got {}",
+            json_kind(&config.defaults)
+        ));
+        return errors;
+    };
+
+    for (key, value) in build {
+        if BUILD_METADATA_KEYS.contains(&key.as_str()) {
+            if key == "data" {
+                validate_build_data(value, &mut errors);
+            }
+            continue;
+        }
+        match defaults.get(key) {
+            Some(default_value) => {
+                validate_override_shape(value, default_value, &format!("build.{key}"), &mut errors)
+            }
+            None => errors.push(format!(
+                "build.{key}: no matching defaults.json key and not allowed build metadata"
+            )),
+        }
+    }
+    errors
+}
+
+fn validate_config_contract(config: &Config) {
+    let errors = config_contract_errors(config);
+    if !errors.is_empty() {
+        eprintln!("config contract rejected:");
+        for error in errors {
+            eprintln!("  {error}");
+        }
+        process::exit(2);
+    }
+}
+
+fn resolved_training_value<'a>(config: &'a Config, key: &str) -> Option<(&'a Value, String)> {
+    if let Some(value) = config.build.get(key) {
+        return Some((value, format!("build.{key}")));
+    }
+    config
+        .defaults
+        .get(key)
+        .map(|value| (value, format!("defaults.{key}")))
+}
+
+fn resolved_training_nested_value<'a>(
+    config: &'a Config,
+    parent: &str,
+    key: &str,
+) -> Option<(&'a Value, String)> {
+    if let Some(parent_value) = config.build.get(parent) {
+        let path = format!("build.{parent}");
+        let object = parent_value
+            .as_object()
+            .unwrap_or_else(|| config_type_error(&path, "object", parent_value));
+        if let Some(value) = object.get(key) {
+            return Some((value, format!("{path}.{key}")));
+        }
+    }
+    let parent_value = config.defaults.get(parent)?;
+    let path = format!("defaults.{parent}");
+    let object = parent_value
+        .as_object()
+        .unwrap_or_else(|| config_type_error(&path, "object", parent_value));
+    object
+        .get(key)
+        .map(|value| (value, format!("{path}.{key}")))
+}
+
+fn value_string(value: &Value, path: &str) -> String {
+    value
+        .as_str()
+        .unwrap_or_else(|| config_type_error(path, "string", value))
+        .to_owned()
+}
+
+fn value_usize(value: &Value, path: &str) -> usize {
+    value
+        .as_u64()
+        .map(|v| v as usize)
+        .unwrap_or_else(|| config_type_error(path, "integer", value))
+}
+
+fn value_u64(value: &Value, path: &str) -> u64 {
+    value
+        .as_u64()
+        .unwrap_or_else(|| config_type_error(path, "integer", value))
+}
+
+fn value_f64(value: &Value, path: &str) -> f64 {
+    value
+        .as_f64()
+        .unwrap_or_else(|| config_type_error(path, "number", value))
+}
+
+fn value_bool(value: &Value, path: &str) -> bool {
+    value
+        .as_bool()
+        .unwrap_or_else(|| config_type_error(path, "bool", value))
+}
+
+fn training_string(config: &Config, key: &str, default: &str) -> String {
+    resolved_training_value(config, key)
+        .map(|(value, path)| value_string(value, &path))
+        .unwrap_or_else(|| default.to_owned())
+}
+
+fn training_usize(config: &Config, key: &str, default: usize) -> usize {
+    resolved_training_value(config, key)
+        .map(|(value, path)| value_usize(value, &path))
+        .unwrap_or(default)
+}
+
+fn training_f64(config: &Config, key: &str, default: f64) -> f64 {
+    resolved_training_value(config, key)
+        .map(|(value, path)| value_f64(value, &path))
+        .unwrap_or(default)
+}
+
+fn training_nested_usize(config: &Config, parent: &str, key: &str, default: usize) -> usize {
+    resolved_training_nested_value(config, parent, key)
+        .map(|(value, path)| value_usize(value, &path))
+        .unwrap_or(default)
+}
+
+fn training_nested_u64(config: &Config, parent: &str, key: &str, default: u64) -> u64 {
+    resolved_training_nested_value(config, parent, key)
+        .map(|(value, path)| value_u64(value, &path))
+        .unwrap_or(default)
+}
+
+fn training_nested_bool(config: &Config, parent: &str, key: &str, default: bool) -> bool {
+    resolved_training_nested_value(config, parent, key)
+        .map(|(value, path)| value_bool(value, &path))
+        .unwrap_or(default)
+}
+
 fn walk_poison(value: &Value, path: &str, hits: &mut Vec<String>) {
     match value {
         Value::Object(map) => {
@@ -269,6 +559,7 @@ fn load_config(args: &[String]) -> (String, Config, bool) {
         build: load_json(&build),
     };
     reject_poison(&config);
+    validate_config_contract(&config);
 
     if string_at(&config.arch, "lineage") != Some("scratch-native")
         || string_at(&config.build, "lineage") != Some("scratch-native")
@@ -282,19 +573,22 @@ fn load_config(args: &[String]) -> (String, Config, bool) {
 
 fn data_config(config: &Config) -> DataConfig {
     let data = object_at(&config.build, "data");
-    let sf = object_at(&config.defaults, "sfbinpack");
     DataConfig {
         source_binpack: required_string(data, "source_binpack"),
         bullet_output: string_at(data, "bullet_output")
             .map(str::to_owned)
             .unwrap_or_else(|| format!("data/bullet/{}.bullet", run_name(config))),
-        offset: u64_at(data, "offset", u64_at(sf, "offset", 0)),
+        offset: u64_at(
+            data,
+            "offset",
+            training_nested_u64(config, "sfbinpack", "offset", 0),
+        ),
         limit: u64_at(data, "limit", 0),
-        threads: usize_at(data, "threads", usize_at(&config.defaults, "threads", 4)),
-        buffer_mb: usize_at(data, "buffer_mb", usize_at(sf, "buffer_mb", 1024)),
-        min_ply: usize_at(data, "min_ply", usize_at(sf, "min_ply", 16)) as u16,
-        max_abs_cp: usize_at(data, "max_abs_cp", usize_at(sf, "max_abs_cp", 10000)) as u32,
-        quiet_only: bool_at(data, "quiet_only", bool_at(sf, "quiet_only", true)),
+        threads: usize_at(data, "threads", training_usize(config, "threads", 4)),
+        buffer_mb: training_nested_usize(config, "sfbinpack", "buffer_mb", 1024),
+        min_ply: training_nested_usize(config, "sfbinpack", "min_ply", 16) as u16,
+        max_abs_cp: training_nested_usize(config, "sfbinpack", "max_abs_cp", 10000) as u32,
+        quiet_only: training_nested_bool(config, "sfbinpack", "quiet_only", true),
     }
 }
 
@@ -315,9 +609,7 @@ fn net_path(config: &Config) -> String {
 }
 
 fn net_id(config: &Config) -> String {
-    string_at(&config.defaults, "net_id")
-        .unwrap_or("scratch_native")
-        .to_owned()
+    training_string(config, "net_id", "scratch_native")
 }
 
 fn continue_from(config: &Config) -> Option<String> {
@@ -409,20 +701,48 @@ fn convert_init_net(config: &Config, init_net: &str) -> PathBuf {
     }
     output
 }
+fn training_loader(config: &Config) -> String {
+    training_string(config, "loader", "direct")
+}
+
 fn training_lr(config: &Config) -> f64 {
-    f64_at(&config.build, "lr", f64_at(&config.defaults, "lr", 1e-3))
+    training_f64(config, "lr", 1e-3)
 }
 
 fn training_final_lr(config: &Config) -> f64 {
-    f64_at(&config.build, "final_lr", f64_at(&config.defaults, "final_lr", 1e-4))
+    training_f64(config, "final_lr", 1e-4)
 }
 
 fn training_wdl(config: &Config) -> f64 {
-    f64_at(&config.build, "wdl", f64_at(&config.defaults, "wdl", 0.3))
+    training_f64(config, "wdl", 0.3)
 }
 
 fn training_superbatches(config: &Config) -> usize {
-    usize_at(&config.build, "superbatches", usize_at(&config.defaults, "superbatches", 64))
+    training_usize(config, "superbatches", 64)
+}
+
+fn training_batch_size(config: &Config) -> usize {
+    training_usize(config, "batch_size", 2048)
+}
+
+fn training_batches(config: &Config) -> usize {
+    training_usize(config, "batches", 64)
+}
+
+fn training_threads(config: &Config) -> usize {
+    training_usize(config, "threads", 4)
+}
+
+fn training_save_rate(config: &Config) -> usize {
+    training_usize(config, "save_rate", 64)
+}
+
+fn training_trainable(config: &Config) -> String {
+    training_string(config, "trainable", "all")
+}
+
+fn training_weight_decay(config: &Config) -> f64 {
+    training_f64(config, "weight_decay", 0.0)
 }
 
 fn validate_layout(config: &Config) {
@@ -493,16 +813,33 @@ fn cmd_plan(config: &Config) {
         usize_at(&config.arch, "output_buckets", 1),
     );
     println!(
-        "  dose={} superbatches, batch_size={}, batches={}",
-        training_superbatches(config),
-        usize_at(&config.defaults, "batch_size", 2048),
-        usize_at(&config.defaults, "batches", 64),
+        "  loader={}, net_id={}, threads={}, save_rate={}",
+        training_loader(config),
+        net_id(config),
+        training_threads(config),
+        training_save_rate(config),
     );
     println!(
-        "  wdl={}, lr={}, final_lr={}",
+        "  dose={} superbatches, batch_size={}, batches={}",
+        training_superbatches(config),
+        training_batch_size(config),
+        training_batches(config),
+    );
+    println!(
+        "  wdl={}, lr={}, final_lr={}, trainable={}, weight_decay={}",
         training_wdl(config),
         training_lr(config),
         training_final_lr(config),
+        training_trainable(config),
+        training_weight_decay(config),
+    );
+    println!(
+        "  sfbinpack buffer_mb={}, offset={}, min_ply={}, max_abs_cp={}, quiet_only={}",
+        training_nested_usize(config, "sfbinpack", "buffer_mb", 1024),
+        training_nested_u64(config, "sfbinpack", "offset", 0),
+        training_nested_usize(config, "sfbinpack", "min_ply", 16),
+        training_nested_usize(config, "sfbinpack", "max_abs_cp", 10000),
+        training_nested_bool(config, "sfbinpack", "quiet_only", true),
     );
 }
 
@@ -710,7 +1047,7 @@ fn cmd_run(config: &Config) {
     });
 
     set_env("ENYO_BULLET_DATA", bullet_output.display());
-    set_env("ENYO_BULLET_LOADER", string_at(&config.defaults, "loader").unwrap_or("direct"));
+    set_env("ENYO_BULLET_LOADER", training_loader(config));
     set_env("ENYO_BULLET_OUT", output.display());
     set_env("ENYO_BULLET_NET_ID", net_id(config));
     if let Some(net) = init_net(config) {
@@ -722,10 +1059,10 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_MODE", string_at(&config.arch, "mode").unwrap_or("enyo"));
     set_env("ENYO_BULLET_HIDDEN", usize_at(&config.arch, "hidden", 1024));
     set_env("ENYO_BULLET_L2", usize_at(&config.arch, "l2_size", 16));
-    set_env("ENYO_BULLET_BATCH_SIZE", usize_at(&config.defaults, "batch_size", 2048));
-    set_env("ENYO_BULLET_BATCHES", usize_at(&config.defaults, "batches", 64));
+    set_env("ENYO_BULLET_BATCH_SIZE", training_batch_size(config));
+    set_env("ENYO_BULLET_BATCHES", training_batches(config));
     set_env("ENYO_BULLET_SUPERBATCHES", training_superbatches(config));
-    set_env("ENYO_BULLET_THREADS", usize_at(&config.defaults, "threads", 4));
+    set_env("ENYO_BULLET_THREADS", training_threads(config));
     set_env("ENYO_BULLET_WDL", training_wdl(config));
     set_env("ENYO_BULLET_LR", training_lr(config));
     set_env("ENYO_BULLET_FINAL_LR", training_final_lr(config));
@@ -747,10 +1084,10 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_ENYO_FEATURE_CHANNELS", usize_at(&config.arch, "feature_channels", 12));
     set_env("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", usize_at(&config.arch, "output_buckets", 1));
     set_env("ENYO_BULLET_EVAL_SCALE", f64_at(&config.arch, "eval_scale", 400.0));
-    set_env("ENYO_BULLET_SAVE_RATE", usize_at(&config.defaults, "save_rate", 64));
+    set_env("ENYO_BULLET_SAVE_RATE", training_save_rate(config));
     set_env("ENYO_BULLET_EXPORT_INIT_ONLY", 0);
-    set_env("ENYO_BULLET_TRAINABLE", string_at(&config.defaults, "trainable").unwrap_or("all"));
-    set_env("ENYO_BULLET_WEIGHT_DECAY", f64_at(&config.defaults, "weight_decay", 0.0));
+    set_env("ENYO_BULLET_TRAINABLE", training_trainable(config));
+    set_env("ENYO_BULLET_WEIGHT_DECAY", training_weight_decay(config));
     set_env("ENYO_BULLET_SFBINPACK_BUFFER_MB", data.buffer_mb);
     set_env("ENYO_BULLET_SFBINPACK_MIN_PLY", data.min_ply);
     set_env("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", data.max_abs_cp);
@@ -994,6 +1331,177 @@ fn cmd_export(config: &Config, force: bool) {
     });
     let size = net.metadata().map(|m| m.len()).unwrap_or(0);
     println!("wrote {} ({} bytes)", net.display(), size);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn defaults() -> Value {
+        json!({
+            "loader": "direct",
+            "net_id": "scratch_native",
+            "batches": 64,
+            "batch_size": 2048,
+            "superbatches": 7600,
+            "threads": 16,
+            "wdl": 0.3,
+            "lr": 0.001,
+            "final_lr": 0.000005,
+            "save_rate": 7600,
+            "trainable": "all",
+            "weight_decay": 0.0,
+            "sfbinpack": {
+                "buffer_mb": 1024,
+                "offset": 0,
+                "min_ply": 16,
+                "max_abs_cp": 10000,
+                "quiet_only": true
+            }
+        })
+    }
+
+    fn config(build: Value) -> Config {
+        Config {
+            arch: json!({"lineage": "scratch-native"}),
+            defaults: defaults(),
+            build,
+        }
+    }
+
+    #[test]
+    fn build_overrides_top_level_training_defaults() {
+        let config = config(json!({
+            "run": "candidate",
+            "lineage": "scratch-native",
+            "loader": "sfbinpack",
+            "net_id": "override_id",
+            "batches": 32,
+            "batch_size": 4096,
+            "superbatches": 3800,
+            "threads": 8,
+            "wdl": 0.25,
+            "lr": 0.0005,
+            "final_lr": 0.000001,
+            "save_rate": 1900,
+            "trainable": "output",
+            "weight_decay": 0.00001,
+            "data": {"source_binpack": "data.binpack", "limit": 100, "offset": 20}
+        }));
+
+        assert!(config_contract_errors(&config).is_empty());
+        assert_eq!(training_loader(&config), "sfbinpack");
+        assert_eq!(net_id(&config), "override_id");
+        assert_eq!(training_batches(&config), 32);
+        assert_eq!(training_batch_size(&config), 4096);
+        assert_eq!(training_superbatches(&config), 3800);
+        assert_eq!(training_threads(&config), 8);
+        assert_eq!(training_wdl(&config), 0.25);
+        assert_eq!(training_lr(&config), 0.0005);
+        assert_eq!(training_final_lr(&config), 0.000001);
+        assert_eq!(training_save_rate(&config), 1900);
+        assert_eq!(training_trainable(&config), "output");
+        assert_eq!(training_weight_decay(&config), 0.00001);
+    }
+
+    #[test]
+    fn build_overrides_nested_sfbinpack_defaults() {
+        let config = config(json!({
+            "run": "candidate",
+            "lineage": "scratch-native",
+            "sfbinpack": {
+                "buffer_mb": 2048,
+                "offset": 500,
+                "min_ply": 20,
+                "max_abs_cp": 2000,
+                "quiet_only": false
+            },
+            "data": {"source_binpack": "data.binpack", "limit": 100}
+        }));
+
+        assert!(config_contract_errors(&config).is_empty());
+        assert_eq!(
+            training_nested_usize(&config, "sfbinpack", "buffer_mb", 0),
+            2048
+        );
+        assert_eq!(training_nested_u64(&config, "sfbinpack", "offset", 0), 500);
+        assert_eq!(
+            training_nested_usize(&config, "sfbinpack", "min_ply", 0),
+            20
+        );
+        assert_eq!(
+            training_nested_usize(&config, "sfbinpack", "max_abs_cp", 0),
+            2000
+        );
+        assert!(!training_nested_bool(
+            &config,
+            "sfbinpack",
+            "quiet_only",
+            true
+        ));
+    }
+
+    #[test]
+    fn data_offset_overrides_sfbinpack_offset_for_data_selection() {
+        let config = config(json!({
+            "run": "candidate",
+            "lineage": "scratch-native",
+            "sfbinpack": {"offset": 500},
+            "data": {"source_binpack": "data.binpack", "limit": 100, "offset": 900, "threads": 3}
+        }));
+
+        assert!(config_contract_errors(&config).is_empty());
+        let data = data_config(&config);
+        assert_eq!(data.offset, 900);
+        assert_eq!(data.threads, 3);
+    }
+
+    #[test]
+    fn unknown_build_training_key_is_rejected() {
+        let config = config(json!({
+            "run": "candidate",
+            "lineage": "scratch-native",
+            "new_training_knob": 1,
+            "data": {"source_binpack": "data.binpack"}
+        }));
+
+        let errors = config_contract_errors(&config);
+        assert!(
+            errors
+                .iter()
+                .any(|err| err.contains("build.new_training_knob"))
+        );
+    }
+
+    #[test]
+    fn data_training_knobs_are_rejected() {
+        let config = config(json!({
+            "run": "candidate",
+            "lineage": "scratch-native",
+            "data": {"source_binpack": "data.binpack", "buffer_mb": 2048}
+        }));
+
+        let errors = config_contract_errors(&config);
+        assert!(
+            errors
+                .iter()
+                .any(|err| err.contains("build.data.buffer_mb"))
+        );
+    }
+
+    #[test]
+    fn missing_default_training_parameter_is_rejected() {
+        let mut config = config(json!({
+            "run": "candidate",
+            "lineage": "scratch-native",
+            "data": {"source_binpack": "data.binpack"}
+        }));
+        config.defaults.as_object_mut().unwrap().remove("wdl");
+
+        let errors = config_contract_errors(&config);
+        assert!(errors.iter().any(|err| err.contains("defaults.wdl")));
+    }
 }
 
 fn main() {
