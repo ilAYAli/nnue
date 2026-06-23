@@ -233,6 +233,115 @@ check_smoke 4.0 -0.22/2.20 positive_elo
             self.assertIn("mild_negative=pass:1", proc.stdout)
             self.assertIn("positive_elo=pass:1", proc.stdout)
 
+    def test_sprt_retries_existing_crucible_run_from_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            forge = home / "code" / "cpp" / "chess" / "crucible" / "scripts" / "forge"
+            forge.parent.mkdir(parents=True)
+            forge.write_text(
+                "#!/usr/bin/env bash\n"
+                "echo forge-should-not-run >&2\n"
+                "exit 9\n",
+                encoding="utf-8",
+            )
+            forge.chmod(0o755)
+            (home / "assets" / "nets").mkdir(parents=True)
+            (home / "assets" / "nets" / "candidate.nn").write_bytes(b"candidate")
+            (home / "assets" / "nets" / "reference.nn").write_bytes(b"reference")
+
+            log_dir = tmp / "runs" / "candidate" / "logs"
+            log_dir.mkdir(parents=True)
+            (log_dir / "05-sprt-3000.log").write_text(
+                "+ forge nnue 91ede5f --verify --run existing-run -- --games 3000\n"
+                "start: wait failed rc=1\n",
+                encoding="utf-8",
+            )
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","continue_from":"reference","hypothesis":"retry existing"}\n',
+                encoding="utf-8",
+            )
+
+            fake_crucible = tmp / "crucible"
+            fake_crucible.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"$1\" == status ]]; then\n"
+                "  if [[ \"${2:-}\" == --json ]]; then\n"
+                "    printf '%s\\n' '{\"runs\":[]}'\n"
+                "    exit 0\n"
+                "  fi\n"
+                "  if [[ -f \"$FAKE_DONE\" ]]; then\n"
+                "    printf '%s\\n' '{\"state\":\"done\",\"progress_fields\":[\"games=3000/3000\",\"elo=+4.2\",\"llr=0.31/2.20 (14%)\"]}'\n"
+                "  else\n"
+                "    printf '%s\\n' '{\"state\":\"current\",\"progress_fields\":[\"games=1200/3000\",\"elo=+1.0\",\"llr=0.01/2.20 (0%)\"]}'\n"
+                "  fi\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == resume ]]; then\n"
+                "  printf '%s\\n' \"$*\" >> \"$FAKE_CALLS\"\n"
+                "  exit 1\n"
+                "fi\n"
+                "if [[ \"$1\" == retry ]]; then\n"
+                "  printf '%s\\n' \"$*\" >> \"$FAKE_CALLS\"\n"
+                "  touch \"$FAKE_DONE\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "echo unexpected crucible call: $* >&2\n"
+                "exit 2\n",
+                encoding="utf-8",
+            )
+            fake_crucible.chmod(0o755)
+            calls = tmp / "calls.txt"
+            done = tmp / "done"
+
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+SOLO=0
+BUILD="$TEST_BUILD"
+CRUCIBLE="$TEST_CRUCIBLE"
+HOME="$TEST_HOME"
+ENGINE="$HOME/assets/engines/enyo_91ede5f"
+run=candidate
+continue_from=reference
+reference_net="$HOME/assets/nets/reference.nn"
+candidate_net="$HOME/assets/nets/candidate.nn"
+log_dir="runs/candidate/logs"
+run_sprt_once sprt 3000 sprt
+printf 'elo=%s\n' "$last_sprt_elo"
+printf 'llr=%s\n' "$last_sprt_llr"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_CRUCIBLE": str(fake_crucible),
+                "TEST_HOME": str(home),
+                "FAKE_CALLS": str(calls),
+                "FAKE_DONE": str(done),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertIn("elo=4.2", proc.stdout)
+            self.assertIn("llr=0.31/2.20 (14%)", proc.stdout)
+            self.assertNotIn("forge-should-not-run", proc.stderr)
+            self.assertEqual(
+                "resume existing-run --verify\nretry existing-run --verify\n",
+                calls.read_text(encoding="utf-8"),
+            )
+
     def test_sprt_refuses_to_queue_when_crucible_is_busy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
@@ -253,7 +362,7 @@ check_smoke 4.0 -0.22/2.20 positive_elo
                 "  printf '%s\\n' "
                 "'{\"runs\":[{\"run\":\"busy-run\",\"state\":\"running\","
                 "\"done\":1,\"tasks\":2,\"progress_fields\":[\"games=50/100\",\"elo=+1.0\"]}]}'\n"
-                "  exit 0\n"
+                "  exit 1\n"
                 "fi\n"
                 "echo \"unexpected crucible call: $*\" >&2\n"
                 "exit 2\n",
