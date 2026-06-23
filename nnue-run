@@ -44,6 +44,7 @@ SPRT_ELO0=${SPRT_ELO0:-0.0}
 SPRT_ELO1=${SPRT_ELO1:-3.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.10}
 SPRT_BETA=${SPRT_BETA:-0.10}
+SPRT_INFRA_RETRIES=${SPRT_INFRA_RETRIES:-5}
 
 # Loose broken-net gates. These stop obviously bad exports/training before SPRT.
 # They are not promotion criteria; SPRT decides whether an iteration is accepted.
@@ -89,8 +90,12 @@ require_crucible_idle() {
   [[ "$SOLO" == 1 ]] && return 0
   command -v "$CRUCIBLE" >/dev/null 2>&1 || fail "missing command: $CRUCIBLE" "${1:-sprt}"
 
-  local busy
-  busy=$("$CRUCIBLE" status --json | jq -r '
+  local status_json busy
+  status_json=$("$CRUCIBLE" status --json) || {
+    [[ -n "$status_json" ]] && jq -e . >/dev/null <<< "$status_json" \
+      || fail "could not read Crucible active status" "${1:-sprt}"
+  }
+  busy=$(jq -r '
     (.runs // [])
     | map(select(((.tasks // 0) > 0) and ((.done // 0) < (.tasks // 0))))
     | .[0]? as $run
@@ -101,7 +106,7 @@ require_crucible_idle() {
           (($run.progress_fields // []) | join(" "))
         ] | @tsv
       end
-  ') || fail "could not read Crucible active status" "${1:-sprt}"
+  ' <<< "$status_json") || fail "could not read Crucible active status" "${1:-sprt}"
 
   [[ -z "$busy" ]] && return 0
 
@@ -445,9 +450,74 @@ gates() {
   move_gate
 }
 
+crucible_run_from_log() {
+  local log=$1
+  [[ -f "$log" ]] || return 1
+  sed -nE 's/.* --run ([^ ]+).*/\1/p' "$log" | tail -1
+}
+
+command_from_log() {
+  local log=$1
+  [[ -f "$log" ]] || return 1
+  sed -nE 's/^\+ //p' "$log" | head -1
+}
+
+read_crucible_sprt_status() {
+  local crucible_run=$1 status_json state fields
+  status_json=$("$CRUCIBLE" status "$crucible_run" --json) || return 1
+  state=$(jq -r '.state // empty' <<< "$status_json") || return 1
+  case "$state" in
+    done|ok|completed) ;;
+    *) return 1 ;;
+  esac
+  fields=$(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json") || return 1
+  last_sprt_elo=$(jq -r '.progress_fields[]? | select(startswith("elo=")) | sub("^elo="; "") | sub("^\\+"; "")' <<< "$status_json" | tail -1)
+  last_sprt_llr=$(jq -r '.progress_fields[]? | select(startswith("llr=")) | sub("^llr="; "")' <<< "$status_json" | tail -1)
+  [[ -n "$last_sprt_elo" && -n "$last_sprt_llr" ]] || return 1
+  last_sprt_line="Crucible $crucible_run $fields"
+}
+
+read_completed_crucible_sprt_log() {
+  local crucible_run=$1 line games done total
+  [[ -f "$last_sprt_log" ]] || return 1
+  line=$(grep -E 'games=[0-9]+/[0-9]+.*elo=.*llr=' "$last_sprt_log" | tail -1) || return 1
+  games=$(sed -nE 's/.*games=([0-9]+)\/([0-9]+).*/\1 \2/p' <<< "$line")
+  [[ -n "$games" ]] || return 1
+  read -r done total <<< "$games"
+  [[ "$done" == "$total" ]] || return 1
+  last_sprt_elo=$(sed -nE 's/.*elo=\+?([^ ]+).*/\1/p' <<< "$line")
+  last_sprt_llr=$(sed -nE 's/.*llr=([^ ]+( [^ ]+)?) .*/\1/p' <<< "$line")
+  [[ -n "$last_sprt_elo" && -n "$last_sprt_llr" ]] || return 1
+  last_sprt_line="Crucible $crucible_run $line"
+}
+
+retry_crucible_sprt() {
+  local crucible_run=$1 attempt=0 rc=1
+  while (( SPRT_INFRA_RETRIES <= 0 || attempt < SPRT_INFRA_RETRIES )); do
+    attempt=$((attempt + 1))
+    printf 'retrying Crucible SPRT infrastructure: %s attempt %d\n' "$crucible_run" "$attempt" | tee -a "$last_sprt_log"
+
+    set +e
+    "$CRUCIBLE" resume "$crucible_run" --verify 2>&1 | tee -a "$last_sprt_log"
+    rc=${PIPESTATUS[0]}
+    set -e
+    if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
+      return 0
+    fi
+
+    set +e
+    "$CRUCIBLE" retry "$crucible_run" --verify 2>&1 | tee -a "$last_sprt_log"
+    rc=${PIPESTATUS[0]}
+    set -e
+    if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 run_sprt_once() {
   local label=$1 sprt_games=$2 stage=$3
-  require_crucible_idle "$stage"
   last_sprt_log="$log_dir/05-${label}-${sprt_games}.log"
   notify phase_start "$stage" "SPRT $label $run vs $(reference_label)" "$last_sprt_log" 0
   section "$label"
@@ -455,7 +525,20 @@ run_sprt_once() {
   if [[ "$SOLO" != 1 ]]; then
     local forge="$HOME/code/cpp/chess/crucible/scripts/forge"
     local engine_hash="${ENGINE##*/}"
-    local crucible_run="${run}-${label}-${sprt_games}-$(date +%Y%m%d-%H%M%S)"
+    local crucible_run
+    crucible_run=$(crucible_run_from_log "$last_sprt_log" || true)
+    if [[ -n "$crucible_run" ]]; then
+      last_sprt_command=$(command_from_log "$last_sprt_log" || true)
+      if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
+        return 0
+      fi
+      retry_crucible_sprt "$crucible_run" \
+        || fail "Crucible SPRT infrastructure failed for $run ($crucible_run); rerun ./nnue-run iterate to retry the same run" sprt
+      return 0
+    fi
+
+    require_crucible_idle "$stage"
+    crucible_run="${run}-${label}-${sprt_games}-$(date +%Y%m%d-%H%M%S)"
     engine_hash="${engine_hash#enyo_}"
     [[ -x "$forge" ]] || fail "missing forge: $forge" sprt
     local forge_cmd=(
@@ -477,17 +560,15 @@ run_sprt_once() {
       --beta "$SPRT_BETA"
     )
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
-    "${forge_cmd[@]}" \
-      2>&1 | tee "$last_sprt_log" \
-      || fail "forge SPRT failed for $run" sprt
+    if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
+      retry_crucible_sprt "$crucible_run" \
+        || fail "Crucible SPRT infrastructure failed for $run ($crucible_run); rerun ./nnue-run iterate to retry the same run" sprt
+      return 0
+    fi
 
-    local status_json
-    status_json=$("$CRUCIBLE" status "$crucible_run" --json) || fail "could not read Crucible status for $crucible_run" sprt
-    last_sprt_elo=$(jq -r '.progress_fields[]? | select(startswith("elo=")) | sub("^elo="; "") | sub("^\\+"; "")' <<< "$status_json" | tail -1)
-    last_sprt_llr=$(jq -r '.progress_fields[]? | select(startswith("llr=")) | sub("^llr="; "")' <<< "$status_json" | tail -1)
-    last_sprt_line="Crucible $crucible_run $(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json")"
-    [[ -n "$last_sprt_elo" ]] || fail "could not parse Crucible SPRT Elo" sprt
-    [[ -n "$last_sprt_llr" ]] || fail "could not parse Crucible SPRT LLR" sprt
+    read_crucible_sprt_status "$crucible_run" \
+      || read_completed_crucible_sprt_log "$crucible_run" \
+      || fail "could not parse completed Crucible SPRT result for $crucible_run" sprt
     return 0
   fi
 
@@ -667,7 +748,6 @@ iterate() {
     load_config
     section "iteration $i"
     show_config
-    require_crucible_idle iterate
     notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
     if (( FULL_SPRT_FIRST == 1 && i == 1 )); then
       full_sprt_gate || commit_failed_iteration
