@@ -1,12 +1,14 @@
 {
-  "run": "uho-native-1.0.44",
+  "run": "uho-native-1.1.0",
   "lineage": "scratch-native",
   "continue_from": "uho-native-1.0.42",
   "wdl": 0.25,
-  "hypothesis": "Continue accepted uho-native using the next UHO data window",
+  "hypothesis": "Continue from uho-native-1.0.42 via converted init weights while increasing input king buckets from 8 to 16",
   "data": {
     "source_binpack": "data/nodes5000pv2_UHO.binpack",
     "limit": 100000000,
     "offset": 1200000000
-  }
+  },
+  "init_net": "~/assets/nets/uho-native-1.0.42.nn",
+  "reference": "uho-native-1.0.42"
 }
