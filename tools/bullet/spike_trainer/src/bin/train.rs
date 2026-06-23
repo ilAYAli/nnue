@@ -417,6 +417,10 @@ fn training_final_lr(config: &Config) -> f64 {
     f64_at(&config.build, "final_lr", f64_at(&config.defaults, "final_lr", 1e-4))
 }
 
+fn training_wdl(config: &Config) -> f64 {
+    f64_at(&config.build, "wdl", f64_at(&config.defaults, "wdl", 0.3))
+}
+
 fn training_superbatches(config: &Config) -> usize {
     usize_at(&config.build, "superbatches", usize_at(&config.defaults, "superbatches", 64))
 }
@@ -495,7 +499,8 @@ fn cmd_plan(config: &Config) {
         usize_at(&config.defaults, "batches", 64),
     );
     println!(
-        "  lr={}, final_lr={}",
+        "  wdl={}, lr={}, final_lr={}",
+        training_wdl(config),
         training_lr(config),
         training_final_lr(config),
     );
@@ -721,7 +726,7 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_BATCHES", usize_at(&config.defaults, "batches", 64));
     set_env("ENYO_BULLET_SUPERBATCHES", training_superbatches(config));
     set_env("ENYO_BULLET_THREADS", usize_at(&config.defaults, "threads", 4));
-    set_env("ENYO_BULLET_WDL", f64_at(&config.defaults, "wdl", 0.3));
+    set_env("ENYO_BULLET_WDL", training_wdl(config));
     set_env("ENYO_BULLET_LR", training_lr(config));
     set_env("ENYO_BULLET_FINAL_LR", training_final_lr(config));
     set_env("ENYO_BULLET_ENYO_L0_STD", f64_at(&config.arch, "l0_std", 8.0));
