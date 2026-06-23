@@ -1,11 +1,11 @@
 {
-  "name": "scratch-native-8bucket-12ch-1024-v1",
+  "name": "scratch-native-16bucket-12ch-1024-v2",
   "lineage": "scratch-native",
   "mode": "enyo",
   "hidden": 1024,
   "l2_size": 16,
   "feature_channels": 12,
-  "input_buckets": 8,
+  "input_buckets": 16,
   "output_buckets": 1,
   "input_factoriser": false,
   "eval_scale": 400.0,
