@@ -289,6 +289,7 @@ if [ "$send_ai_stdout" = "1" ]; then
 fi
 
 publish_ai() {
+    return
     local prompt="$1"
     local title="$2"
     local priority="$3"
