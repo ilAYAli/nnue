@@ -44,7 +44,6 @@ SPRT_ELO0=${SPRT_ELO0:-0.0}
 SPRT_ELO1=${SPRT_ELO1:-3.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.10}
 SPRT_BETA=${SPRT_BETA:-0.10}
-SPRT_INFRA_RETRIES=${SPRT_INFRA_RETRIES:-5}
 
 # Loose broken-net gates. These stop obviously bad exports/training before SPRT.
 # They are not promotion criteria; SPRT decides whether an iteration is accepted.
@@ -96,8 +95,16 @@ require_crucible_idle() {
       || fail "could not read Crucible active status" "${1:-sprt}"
   }
   busy=$(jq -r '
+    def inactive_state:
+      (.state // "") as $state
+      | $state == "done"
+        or $state == "ok"
+        or $state == "completed"
+        or $state == "stopped"
+        or $state == "failed"
+        or $state == "fail";
     (.runs // [])
-    | map(select(((.tasks // 0) > 0) and ((.done // 0) < (.tasks // 0))))
+    | map(select((inactive_state | not) and ((.tasks // 0) > 0) and ((.done // 0) < (.tasks // 0))))
     | .[0]? as $run
     | if $run == null then empty else
         [
@@ -491,29 +498,57 @@ read_completed_crucible_sprt_log() {
   last_sprt_line="Crucible $crucible_run $line"
 }
 
-retry_crucible_sprt() {
-  local crucible_run=$1 attempt=0 rc=1
-  while (( SPRT_INFRA_RETRIES <= 0 || attempt < SPRT_INFRA_RETRIES )); do
-    attempt=$((attempt + 1))
-    printf 'retrying Crucible SPRT infrastructure: %s attempt %d\n' "$crucible_run" "$attempt" | tee -a "$last_sprt_log"
+crucible_incomplete_run_for_current_sprt() {
+  local label=$1 sprt_games=$2 status_json
+  status_json=$("$CRUCIBLE" status --json) || {
+    [[ -n "$status_json" ]] && jq -e . >/dev/null <<< "$status_json" \
+      || fail "could not read Crucible active status" sprt
+  }
+  jq -r --arg prefix "${run}-${label}-${sprt_games}-" '
+    def task_count: (.tasks // 0);
+    def done_count: (.done // .counts.done // 0);
+    (.runs // [])
+    | map(select(((.run // "") | startswith($prefix))
+        and ((task_count) > 0)
+        and ((done_count) < (task_count))))
+    | sort_by(.run)
+    | last? // {}
+    | .run // empty
+  ' <<< "$status_json"
+}
 
-    set +e
-    "$CRUCIBLE" resume "$crucible_run" --verify 2>&1 | tee -a "$last_sprt_log"
-    rc=${PIPESTATUS[0]}
-    set -e
-    if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
-      return 0
-    fi
+wait_for_existing_crucible_sprt() {
+  local crucible_run=$1 status_json state manifest progress rc
+  if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
+    return 0
+  fi
 
-    set +e
-    "$CRUCIBLE" retry "$crucible_run" --verify 2>&1 | tee -a "$last_sprt_log"
-    rc=${PIPESTATUS[0]}
-    set -e
-    if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
-      return 0
-    fi
-  done
-  return 1
+  status_json=$("$CRUCIBLE" status "$crucible_run" --json) \
+    || fail "could not read Crucible SPRT status for $crucible_run" sprt
+  state=$(jq -r '.state // empty' <<< "$status_json") || fail "could not parse Crucible SPRT status for $crucible_run" sprt
+  manifest=$(jq -r '.manifest // empty' <<< "$status_json") || fail "could not parse Crucible SPRT manifest for $crucible_run" sprt
+  progress=$(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json") || progress=
+
+  case "$state" in
+    stopped|failed|fail)
+      local message="Crucible SPRT for $run is $state and incomplete: $crucible_run"
+      [[ -z "$progress" ]] || message+=" $progress"
+      message+="; resume or retry it manually, then rerun ./nnue-run iterate"
+      fail "$message" sprt
+      ;;
+  esac
+  [[ -n "$manifest" ]] || fail "cannot wait for Crucible SPRT $crucible_run: missing manifest" sprt
+
+  printf 'waiting for active Crucible SPRT: %s\n' "$crucible_run" | tee -a "$last_sprt_log"
+  [[ -n "${last_sprt_command:-}" ]] || last_sprt_command="$CRUCIBLE wait --manifest $manifest"
+  set +e
+  "$CRUCIBLE" wait --manifest "$manifest" 2>&1 | tee -a "$last_sprt_log"
+  rc=${PIPESTATUS[0]}
+  set -e
+  if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
+    return 0
+  fi
+  return "$rc"
 }
 
 run_sprt_once() {
@@ -527,13 +562,11 @@ run_sprt_once() {
     local engine_hash="${ENGINE##*/}"
     local crucible_run
     crucible_run=$(crucible_run_from_log "$last_sprt_log" || true)
+    [[ -n "$crucible_run" ]] || crucible_run=$(crucible_incomplete_run_for_current_sprt "$label" "$sprt_games" || true)
     if [[ -n "$crucible_run" ]]; then
       last_sprt_command=$(command_from_log "$last_sprt_log" || true)
-      if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
-        return 0
-      fi
-      retry_crucible_sprt "$crucible_run" \
-        || fail "Crucible SPRT infrastructure failed for $run ($crucible_run); rerun ./nnue-run iterate to retry the same run" sprt
+      wait_for_existing_crucible_sprt "$crucible_run" \
+        || fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue-run iterate" sprt
       return 0
     fi
 
@@ -561,9 +594,7 @@ run_sprt_once() {
     )
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
-      retry_crucible_sprt "$crucible_run" \
-        || fail "Crucible SPRT infrastructure failed for $run ($crucible_run); rerun ./nnue-run iterate to retry the same run" sprt
-      return 0
+      fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue-run iterate" sprt
     fi
 
     read_crucible_sprt_status "$crucible_run" \
