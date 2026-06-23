@@ -165,9 +165,6 @@ load_config() {
   continue_from=$(json '.continue_from // empty')
   init_net=$(json '.init_net // empty')
   reference_name=$(json '.reference // empty')
-  if [[ -n "$init_net" && -n "$continue_from" ]]; then
-    fail "init_net conflicts with continue_from; use reference to override the SPRT reference" config
-  fi
   if [[ -z "$continue_from" ]]; then
     continue_from=$(previous_run_name "$run") || fail "cannot infer previous run from run=$run" config
   fi
@@ -188,7 +185,7 @@ reference_label() {
 training_build() {
   train_build="$run_dir/build.resolved.json"
   jq --arg prev "$continue_from" \
-    'if (.init_net // "") != "" then del(.continue_from) else .continue_from = $prev end
+    '.continue_from = $prev
      | del(.reference)
      | del(.changed_variables.reference)' \
     "$BUILD" > "$train_build"

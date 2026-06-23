@@ -88,6 +88,62 @@ class NnueRunTests(unittest.TestCase):
         self.assertNotEqual(0, proc.returncode)
 
 
+    def test_training_build_keeps_continue_from_with_init_net(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            home.mkdir()
+            build = tmp / "build.json"
+            build.write_text(
+                json.dumps({
+                    "run": "uho-native-1.1.0",
+                    "lineage": "scratch-native",
+                    "continue_from": "uho-native-1.0.42",
+                    "init_net": "~/assets/nets/uho-native-1.0.42.nn",
+                    "reference": "uho-native-1.0.42",
+                    "changed_variables": {"reference": "old"},
+                    "data": {
+                        "source_binpack": "data/nodes5000pv2_UHO.binpack",
+                        "limit": 100000000,
+                        "offset": 1200000000,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+load_config
+training_build >/dev/null
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "BUILD": str(build),
+                "HOME": str(home),
+                "NNUE_NTFY": "0",
+            })
+
+            subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            resolved = json.loads(
+                (tmp / "runs" / "uho-native-1.1.0" / "build.resolved.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("uho-native-1.0.42", resolved["continue_from"])
+            self.assertEqual("~/assets/nets/uho-native-1.0.42.nn", resolved["init_net"])
+            self.assertNotIn("reference", resolved)
+            self.assertNotIn("reference", resolved["changed_variables"])
+
     def test_iteration_commit_keeps_accepted_build_and_leaves_next_diff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

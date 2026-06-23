@@ -620,13 +620,6 @@ fn init_net(config: &Config) -> Option<String> {
     string_at(&config.build, "init_net").map(str::to_owned)
 }
 
-fn reject_conflicting_init(config: &Config) {
-    if continue_from(config).is_some() && init_net(config).is_some() {
-        eprintln!("error: init_net conflicts with continue_from");
-        process::exit(2);
-    }
-}
-
 fn init_weights_path(config: &Config) -> PathBuf {
     expand_path(&format!(
         "runs/{}/init/optimiser_state/weights.bin",
@@ -776,17 +769,19 @@ fn validate_layout(config: &Config) {
 
 fn cmd_plan(config: &Config) {
     let data = data_config(config);
-    reject_conflicting_init(config);
+    let init_net = init_net(config);
     println!("run={}", run_name(config));
     println!("lineage={}", required_string(&config.build, "lineage"));
     if let Some(previous_run) = continue_from(config) {
         println!("continue_from={previous_run}");
-        println!(
-            "init_weights={}",
-            latest_weight_checkpoint(config, &previous_run).display()
-        );
+        if init_net.is_none() {
+            println!(
+                "init_weights={}",
+                latest_weight_checkpoint(config, &previous_run).display()
+            );
+        }
     }
-    if let Some(net) = init_net(config) {
+    if let Some(net) = init_net {
         println!("init_net={net}");
         println!("init_weights={}", init_weights_path(config).display());
     }
@@ -1029,7 +1024,6 @@ fn set_env(key: &str, value: impl ToString) {
 }
 
 fn cmd_run(config: &Config) {
-    reject_conflicting_init(config);
     validate_layout(config);
     let data = data_config(config);
     let bullet_output = expand_path(&data.bullet_output);
@@ -1472,6 +1466,22 @@ mod tests {
                 .iter()
                 .any(|err| err.contains("build.new_training_knob"))
         );
+    }
+
+    #[test]
+    fn init_net_and_continue_from_are_accepted_together() {
+        let config = config(json!({
+            "run": "uho-native-1.1.0",
+            "lineage": "scratch-native",
+            "continue_from": "uho-native-1.0.42",
+            "init_net": "~/assets/nets/uho-native-1.0.42.nn",
+            "reference": "uho-native-1.0.42",
+            "data": {"source_binpack": "data.binpack", "limit": 100}
+        }));
+
+        assert!(config_contract_errors(&config).is_empty());
+        assert_eq!(continue_from(&config).as_deref(), Some("uho-native-1.0.42"));
+        assert_eq!(init_net(&config).as_deref(), Some("~/assets/nets/uho-native-1.0.42.nn"));
     }
 
     #[test]
