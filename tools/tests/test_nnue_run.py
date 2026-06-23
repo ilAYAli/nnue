@@ -61,6 +61,32 @@ class NnueRunTests(unittest.TestCase):
         self.assertIn("stale trainer helper", proc.stderr)
         self.assertIn("tools/bullet/spike_trainer/", proc.stderr)
 
+    def test_full_sprt_accepts_positive_at_cap(self) -> None:
+        proc = self.run_sourced(
+            "NNUE_NTFY=0; GAMES=3000; "
+            "last_sprt_elo=16.0; last_sprt_llr='1.40/2.20 (64%)'; "
+            "full_sprt_pass"
+        )
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+
+    def test_full_sprt_accepts_h1(self) -> None:
+        proc = self.run_sourced(
+            "NNUE_NTFY=0; GAMES=3000; "
+            "last_sprt_elo=16.0; last_sprt_llr='2.20/2.20 (100%)'; "
+            "full_sprt_pass"
+        )
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+
+    def test_full_sprt_rejects_negative_at_cap(self) -> None:
+        proc = self.run_sourced(
+            "NNUE_NTFY=0; GAMES=3000; "
+            "last_sprt_elo=-1.0; last_sprt_llr='-0.01/2.20 (0%)'; "
+            "full_sprt_pass"
+        )
+        self.assertNotEqual(0, proc.returncode)
+
 
     def test_iteration_commit_keeps_accepted_build_and_leaves_next_diff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
