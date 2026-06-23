@@ -305,6 +305,28 @@ fn validate_build_data(value: &Value, errors: &mut Vec<String>) {
             ));
         }
     }
+    if let Some(output) = data.get("bullet_output").and_then(Value::as_str) {
+        if !path_string_has_extension(output, "bullet") {
+            errors.push(format!(
+                "build.data.bullet_output: must end in .bullet, got {output}"
+            ));
+        }
+    }
+    if let Some(source) = data.get("source_binpack").and_then(Value::as_str) {
+        if source
+            .split(';')
+            .any(|path| path_string_has_extension(path.trim(), "data"))
+        {
+            errors.push(
+                "build.data.source_binpack: .data BulletFormat inputs are deprecated; rename them to .bullet"
+                    .to_string(),
+            );
+        }
+    }
+}
+
+fn path_string_has_extension(path: &str, extension: &str) -> bool {
+    Path::new(path).extension().and_then(OsStr::to_str) == Some(extension)
 }
 
 fn config_contract_errors(config: &Config) -> Vec<String> {
@@ -849,7 +871,11 @@ fn write_chunk(writer: &mut BufWriter<File>, chunk: &[ChessBoard]) -> std::io::R
 }
 
 fn is_bullet_data_path(path: &Path) -> bool {
-    matches!(path.extension().and_then(OsStr::to_str), Some("bullet" | "data"))
+    matches!(path.extension().and_then(OsStr::to_str), Some("bullet"))
+}
+
+fn is_deprecated_bullet_data_path(path: &Path) -> bool {
+    matches!(path.extension().and_then(OsStr::to_str), Some("data"))
 }
 
 fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
@@ -920,11 +946,25 @@ fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
 fn cmd_data(config: &Config) {
     let data = data_config(config);
     let source = expand_path(&data.source_binpack);
+    let output = expand_path(&data.bullet_output);
+    if !is_bullet_data_path(&output) {
+        eprintln!(
+            "error: build.data.bullet_output must end in .bullet: {}",
+            output.display()
+        );
+        process::exit(2);
+    }
+    if is_deprecated_bullet_data_path(&source) {
+        eprintln!(
+            "error: deprecated BulletFormat extension .data is not accepted: {}; rename it to .bullet",
+            source.display()
+        );
+        process::exit(2);
+    }
     if !source.exists() {
         eprintln!("error: missing source binpack: {}", source.display());
         process::exit(1);
     }
-    let output = expand_path(&data.bullet_output);
     if is_bullet_data_path(&source) {
         copy_bullet_data(&source, &output, data.offset, data.limit);
         return;
@@ -1497,6 +1537,30 @@ mod tests {
             errors
                 .iter()
                 .any(|err| err.contains("build.data.buffer_mb"))
+        );
+    }
+
+    #[test]
+    fn deprecated_data_extension_is_rejected() {
+        let config = config(json!({
+            "run": "candidate",
+            "lineage": "scratch-native",
+            "data": {
+                "source_binpack": "rows.data",
+                "bullet_output": "data/bullet/candidate.data"
+            }
+        }));
+
+        let errors = config_contract_errors(&config);
+        assert!(
+            errors
+                .iter()
+                .any(|err| err.contains("build.data.source_binpack"))
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|err| err.contains("build.data.bullet_output"))
         );
     }
 
