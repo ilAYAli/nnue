@@ -26,6 +26,7 @@ BUILD=${BUILD:-build.json}
 ARCH=${ARCH:-architecture.json}
 DEFAULTS=${DEFAULTS:-defaults.json}
 PYTHON=${PYTHON:-.venv/bin/python}
+TRAIN_HELPER=${TRAIN_HELPER:-tools/bullet/train}
 CRUCIBLE=${CRUCIBLE:-crucible}
 
 ENGINE=${ENGINE:-$HOME/assets/engines/enyo_91ede5f}
@@ -304,6 +305,25 @@ quote_cmd() {
   printf '\n'
 }
 
+ensure_train_helper_current() {
+  [[ -x "$TRAIN_HELPER" ]] || fail "missing trainer helper: $TRAIN_HELPER" train
+  [[ "${ALLOW_STALE_TRAIN_HELPER:-0}" == 1 ]] && return 0
+
+  local helper
+  helper=$(abs_path "$TRAIN_HELPER")
+  local source
+  for source in \
+    tools/bullet/spike_trainer/Cargo.toml \
+    tools/bullet/spike_trainer/src/bin/train.rs \
+    tools/bullet/spike_trainer/src/main.rs
+  do
+    [[ -e "$source" ]] || continue
+    if [[ "$source" -nt "$helper" ]]; then
+      fail "stale trainer helper: $TRAIN_HELPER is older than $source; rebuild it on the CUDA host" train
+    fi
+  done
+}
+
 ensure_git_identity() {
   git config user.name "Petter Wahlman"
   git config user.email "petter@wahlman.no"
@@ -315,7 +335,8 @@ metric() {
 
 plan() {
   load_config
-  tools/bullet/train plan --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS"
+  ensure_train_helper_current
+  "$TRAIN_HELPER" plan --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS"
 }
 
 train() {
@@ -348,10 +369,11 @@ train() {
     train_args+=(--force)
   fi
   notify phase_start train "training $run" "$log_dir/01-train-export.log" 0
+  ensure_train_helper_current
   section plan
-  tools/bullet/train plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" | tee "$log_dir/00-plan.log" || fail "plan failed for $run" plan
+  "$TRAIN_HELPER" plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" | tee "$log_dir/00-plan.log" || fail "plan failed for $run" plan
   section train
-  tools/bullet/train "${train_args[@]}" \
+  "$TRAIN_HELPER" "${train_args[@]}" \
     2>&1 | tee "$log_dir/01-train-export.log" \
     || fail "train/export failed for $run" train
   notify phase_done train "training/export passed for $run" "$log_dir/01-train-export.log" 0
