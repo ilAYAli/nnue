@@ -173,6 +173,23 @@ def expand_data_paths(value: str) -> str:
     )
 
 
+def reject_deprecated_data_paths(value: str, option: str) -> None:
+    for raw_path in str(value).split(";"):
+        if not raw_path.strip():
+            continue
+        path = expand_path(raw_path)
+        if path.suffix == ".data":
+            raise SystemExit(
+                f"{option} uses deprecated BulletFormat extension .data: {path}; "
+                "rename it to .bullet"
+            )
+
+
+def require_bullet_output(path: Path, option: str) -> None:
+    if path.suffix != ".bullet":
+        raise SystemExit(f"{option} must end in .bullet: {path}")
+
+
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -327,6 +344,7 @@ def patch_bullet_cuda_arch(manifest: Path, arch: str) -> None:
 def cmd_format(args: argparse.Namespace) -> int:
     input_path = expand_path(args.input)
     output_path = expand_path(args.output)
+    require_bullet_output(output_path, "--output")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     manifest = expand_path(args.bullet_manifest)
 
@@ -356,7 +374,9 @@ def cmd_format(args: argparse.Namespace) -> int:
 
 
 def cmd_convert(args: argparse.Namespace) -> int:
+    reject_deprecated_data_paths(args.data, "--data")
     output_path = expand_path(args.output)
+    require_bullet_output(output_path, "--output")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     target_dir = expand_path(args.cargo_target_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -383,6 +403,7 @@ def cmd_convert(args: argparse.Namespace) -> int:
 
 
 def cmd_train(args: argparse.Namespace) -> int:
+    reject_deprecated_data_paths(args.data, "--data")
     data = expand_data_paths(args.data)
     out_dir = expand_path(args.out_dir)
     target_dir = expand_path(args.cargo_target_dir)

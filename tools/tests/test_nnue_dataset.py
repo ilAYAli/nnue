@@ -84,6 +84,16 @@ class NNueDatasetTests(unittest.TestCase):
             self.assertEqual(wdls.tolist(), [0.0])
             self.assertEqual(source_ids.tolist(), [0])
 
+    def test_rejects_deprecated_data_extension(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / "rows.data"
+            data.write_bytes(b"")
+
+            with self.assertRaisesRegex(ValueError, "deprecated BulletFormat extension"):
+                count_rows(data)
+            with self.assertRaisesRegex(ValueError, "deprecated BulletFormat extension"):
+                load_score_dataset(data)
+
 
 
 if __name__ == "__main__":
