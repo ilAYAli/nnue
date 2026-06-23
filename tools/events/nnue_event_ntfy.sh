@@ -334,16 +334,16 @@ publish_ai() {
         return 0
     fi
 
-    if publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"; then
-        printf '%s event=%s ai_stdin_ntfy_ok\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-    else
-        rc=$?
-        printf '%s event=%s ai_stdin_ntfy_failed rc=%s\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" \
-            >>"$LOG"
-        return "$rc"
-    fi
+    #if publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"; then
+    #    printf '%s event=%s ai_stdin_ntfy_ok\n' \
+    #        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+    #else
+    #    rc=$?
+    #    printf '%s event=%s ai_stdin_ntfy_failed rc=%s\n' \
+    #        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" \
+    #        >>"$LOG"
+    #    return "$rc"
+    #fi
 }
 
 if [ "$send_ai_stdin" = "1" ] && [ -n "$ai_prompt" ]; then
