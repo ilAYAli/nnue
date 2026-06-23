@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,17 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 class NnueRunTests(unittest.TestCase):
+    def run_sourced(self, body: str) -> subprocess.CompletedProcess[str]:
+        text = (REPO / "nnue-run").read_text(encoding="utf-8")
+        prefix = text.split(chr(10) + 'case "$cmd" in' + chr(10), 1)[0]
+        return subprocess.run(
+            ["bash", "-s"],
+            input=f"{prefix}\n{body}\n",
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
     def test_shell_syntax_is_valid(self) -> None:
         subprocess.run(["bash", "-n", str(REPO / "nnue-run")], check=True)
 
@@ -32,6 +44,22 @@ class NnueRunTests(unittest.TestCase):
         self.assertIn("./nnue-run status", text)
         self.assertNotIn("start", text)
         self.assertNotIn("doctor", text)
+
+    def test_train_helper_rejects_stale_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            helper = Path(tmp) / "train"
+            helper.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            helper.chmod(0o755)
+            os.utime(helper, (1, 1))
+
+            proc = self.run_sourced(
+                f"NNUE_NTFY=0; TRAIN_HELPER={shlex.quote(str(helper))}; "
+                "ensure_train_helper_current"
+            )
+
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn("stale trainer helper", proc.stderr)
+        self.assertIn("tools/bullet/spike_trainer/", proc.stderr)
 
 
     def test_iteration_commit_keeps_accepted_build_and_leaves_next_diff(self) -> None:
