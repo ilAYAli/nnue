@@ -103,6 +103,97 @@ class NnueRunTests(unittest.TestCase):
                 proc.stdout,
             )
 
+    def test_load_config_defaults_reference_to_continue_from(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "uho-native-1.0.42.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"uho-native-1.0.43","continue_from":"uho-native-1.0.42"}\n',
+                encoding="utf-8",
+            )
+
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+load_config
+printf 'label=%s\n' "$(reference_label)"
+printf 'net=%s\n' "$reference_net"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "BUILD": str(build),
+                "HOME": str(home),
+                "NNUE_NTFY": "0",
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(
+                f"label=uho-native-1.0.42\nnet={nets}/uho-native-1.0.42.nn\n",
+                proc.stdout,
+            )
+
+    def test_reference_net_env_overrides_continue_from(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "uho-native-1.0.42.nn").write_bytes(b"parent")
+            (nets / "default.net").write_bytes(b"default")
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"uho-native-1.0.43","continue_from":"uho-native-1.0.42"}\n',
+                encoding="utf-8",
+            )
+
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+load_config
+printf 'label=%s\n' "$(reference_label)"
+printf 'net=%s\n' "$reference_net"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "BUILD": str(build),
+                "HOME": str(home),
+                "NNUE_NTFY": "0",
+                "REFERENCE_NET": "~/assets/nets/default.net",
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(
+                f"label=~/assets/nets/default.net\nnet={nets}/default.net\n",
+                proc.stdout,
+            )
 
     def test_training_build_keeps_continue_from_with_init_net(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
@@ -315,6 +406,7 @@ training_build >/dev/null
                     "run": "uho-native-1.0.35",
                     "lineage": "scratch-native",
                     "continue_from": "uho-native-1.0.33",
+                    "reference": "uho-native-1.0.33",
                     "wdl": 0.75,
                     "hypothesis": "Continue accepted uho-native-1.0.33 using the next UHO data window",
                     "data": {
@@ -377,6 +469,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
             working_json = json.loads(build.read_text(encoding="utf-8"))
             self.assertEqual("uho-native-1.0.36", working_json["run"])
             self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
+            self.assertNotIn("reference", working_json)
             self.assertEqual(600000000, working_json["data"]["offset"])
 
             diff = subprocess.run(
@@ -424,6 +517,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
                     "run": "uho-native-1.0.36",
                     "lineage": "scratch-native",
                     "continue_from": "uho-native-1.0.35",
+                    "reference": "uho-native-1.0.35",
                     "wdl": 0.75,
                     "hypothesis": "Continue accepted uho-native-1.0.35 using the next UHO data window",
                     "data": {
@@ -486,6 +580,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             working_json = json.loads(build.read_text(encoding="utf-8"))
             self.assertEqual("uho-native-1.0.37", working_json["run"])
             self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
+            self.assertNotIn("reference", working_json)
             self.assertEqual(600000000, working_json["data"]["offset"])
 
     def test_failed_scratch_rc_does_not_invent_continue_from(self) -> None:
@@ -584,6 +679,7 @@ fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "
                     "run": "uho-native-1.0.36",
                     "lineage": "scratch-native",
                     "continue_from": "uho-native-1.0.35",
+                    "reference": "uho-native-1.0.35",
                     "hypothesis": "candidate",
                     "data": {
                         "source_binpack": "data/nodes5000pv2_UHO.binpack",
@@ -651,6 +747,7 @@ iterate
             working_json = json.loads(build.read_text(encoding="utf-8"))
             self.assertEqual("uho-native-1.0.38", working_json["run"])
             self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
+            self.assertNotIn("reference", working_json)
             self.assertEqual(700000000, working_json["data"]["offset"])
 
     def test_smoke_gate_rejects_bad_elo_or_negative_llr(self) -> None:
