@@ -1,7 +1,7 @@
 {
-  "run": "native-2.0.0-rc8",
+  "run": "native-2.0.0-rc9",
   "lineage": "scratch-native",
-  "continue_from": "native-2.0.0-rc7",
+  "continue_from": "native-2.0.0-rc8",
   "hypothesis": "Continue clean scratch-native baseline after fixed feature mapping; judge same-line improvement against previous scratch net",
   "superbatches": 4096,
   "lr": 0.0003,
@@ -9,6 +9,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 100000000,
-    "offset": 700000000
+    "offset": 800000000
   }
 }
