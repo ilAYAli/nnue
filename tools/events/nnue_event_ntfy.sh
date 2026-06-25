@@ -3,24 +3,15 @@ set -euo pipefail
 
 # NNUE event hook.
 #
-# Routing contract:
-# - AI_stdin wakes the agent and is controlled by NNUE_AI_STDIN_EVENTS.
-# - AI_stdout gets concise done/fail/test summaries for user-visible progress.
-# - The nnue topic is filtered to good-news/conclusion events unless
-#   NNUE_USER_NOTIFY_GENERIC=1.
+# Routing:
+#   fail            → AI_stdin + ping
+#   iteration_done  → nnue (phone notification)
+#   everything else → AI_stdout
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
-EVENTS=${NNUE_NTFY_EVENTS-done,fail,test}
-AI_EVENTS=${NNUE_AI_STDIN_EVENTS-phase_done,done,fail}
-AI_STDOUT_EVENTS=${NNUE_AI_STDOUT_EVENTS-done,fail}
-USER_GENERIC=${NNUE_USER_NOTIFY_GENERIC:-0}
-AI_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
-AI_STDIN_NTFY_ENABLE=${NNUE_AI_STDIN_NTFY_ENABLE:-1}
-AI_STDOUT_ENABLE=${NNUE_AI_STDOUT_ENABLE:-1}
-NOTIFAI=${NNUE_NOTIFAI:-$HOME/scripts/notifai.sh}
-NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-${NOTIFAI_TARGET:-codex_1}}
+PING_URL=${NNUE_PING_URL:-https://ntfy.wahlman.no/ping}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -29,92 +20,9 @@ if [ -z "$payload" ]; then
     payload=$(cat)
 fi
 
-event_name=$(NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
-import json
-import os
-print(json.loads(os.environ["NNUE_EVENT_PAYLOAD"]).get("event", "event"))
-PY
-)
-
-user_worthy=$(NNUE_EVENT_PAYLOAD="$payload" python3 - <<'PY'
-import json
-import os
-import re
-from pathlib import Path
-
-event = json.loads(os.environ["NNUE_EVENT_PAYLOAD"])
-name = str(event.get("event", ""))
-if name == "test":
-    print("1")
-elif any(event.get(key) for key in (
-        "user_notify", "good_news", "promotion_candidate", "improved",
-        "critical", "critical_failure")):
-    print("1")
-elif name == "done":
-    message = str(event.get("message") or "")
-    log = event.get("log", "")
-    try:
-        path = Path(str(log)).expanduser()
-        with path.open("rb") as handle:
-            handle.seek(0, 2)
-            end = handle.tell()
-            handle.seek(max(0, end - 700_000))
-            text = handle.read().decode("utf-8", errors="replace")
-    except OSError:
-        text = ""
-    text = text + "\n" + message
-    sprt_lines = [
-        line.strip()
-        for line in text.splitlines()
-        if (
-            "Enyo NNUE SPRT finished" in line
-            or re.match(r"^\[\s*\d+/\d+\]", line)
-            or re.search(r"\bElo(?: difference|:)?\s+[+-]?\d", line)
-        )
-    ]
-    worthy = False
-    if sprt_lines:
-        line = sprt_lines[-1]
-        elo_match = re.search(r"Elo(?: difference|:)?\s+([+-]?\d+(?:\.\d+)?)", line)
-        llr_match = re.search(r"LLR\s+([+-]?\d+(?:\.\d+)?)/", line)
-        los_match = re.search(r"LOS\s+([0-9.]+)%", line)
-        if elo_match:
-            elo = float(elo_match.group(1))
-            llr = float(llr_match.group(1)) if llr_match else 0.0
-            los = float(los_match.group(1)) if los_match else 0.0
-            worthy = elo > 0.0 and (los >= 80.0 or llr > 0.0)
-    print("1" if worthy else "0")
-else:
-    print("0")
-PY
-)
+event_name=$(printf '%s' "$payload" | python3 -c "import json,sys; print(json.load(sys.stdin).get('event',''))")
 
 mkdir -p "$(dirname "$LOG")"
-send_nnue=0
-send_ai_stdout=0
-send_ai_stdin=0
-
-case ",$EVENTS," in
-    *,"$event_name",*) send_nnue=1 ;;
-esac
-if [ "$AI_STDOUT_ENABLE" = "1" ]; then
-    case ",$AI_STDOUT_EVENTS," in
-        *,"$event_name",*) send_ai_stdout=1 ;;
-    esac
-fi
-if [ "$AI_ENABLE" = "1" ]; then
-    case ",$AI_EVENTS," in
-        *,"$event_name",*) send_ai_stdin=1 ;;
-    esac
-fi
-if [ "$USER_GENERIC" != "1" ] && [ "$user_worthy" != "1" ]; then
-    send_nnue=0
-fi
-
-if [ "$send_nnue" = "0" ] && [ "$send_ai_stdout" = "0" ] && [ "$send_ai_stdin" = "0" ]; then
-    printf '%s event=%s skipped\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-    exit 0
-fi
 
 if [ -r "$HOME/.ntfy" ]; then
     source "$HOME/.ntfy"
@@ -126,7 +34,6 @@ import json
 import os
 import re
 from pathlib import Path
-
 
 event = json.loads(os.environ["NNUE_EVENT_PAYLOAD"])
 run_dir = Path(str(event.get("run", ""))).expanduser()
@@ -210,35 +117,126 @@ def failure_error():
     return status or "failed"
 
 
-title = f"NNUE {event_name}"
+def first_match(patterns, text):
+    for pattern in patterns:
+        found = re.search(pattern, text, re.IGNORECASE)
+        if found:
+            return found.group(1).strip()
+    return ""
+
+
+def percent(value):
+    if not value:
+        return ""
+    return value if value.endswith("%") else f"{value}%"
+
+
+def parse_sprt_line(line):
+    metrics = {}
+    metrics["games"] = first_match((
+        r"\bgames=([0-9]+/[0-9]+)",
+        r"^\[\s*([0-9]+/[0-9]+)\]",
+    ), line)
+    metrics["tasks"] = first_match((r"\btasks=([0-9]+/[0-9]+)",), line)
+    metrics["elo"] = first_match((
+        r"\belo=([+-]?[0-9]+(?:\.[0-9]+)?)",
+        r"\bElo\s+([+-]?[0-9]+(?:\.[0-9]+)?)",
+    ), line)
+    metrics["ci"] = first_match((
+        r"\bci=([0-9]+(?:\.[0-9]+)?)",
+        r"\+/-\s*([0-9]+(?:\.[0-9]+)?)",
+    ), line)
+    metrics["llr"] = first_match((
+        r"\bllr=([+-]?[0-9]+(?:\.[0-9]+)?/[+-]?[0-9]+(?:\.[0-9]+)?(?:\s*\([^)]+\))?)",
+        r"\bLLR\s+([+-]?[0-9]+(?:\.[0-9]+)?/[+-]?[0-9]+(?:\.[0-9]+)?(?:\s*\([^)]+\))?)",
+    ), line)
+    metrics["los"] = percent(first_match((
+        r"\blos=([0-9]+(?:\.[0-9]+)?%?)",
+        r"\bLOS\s+([0-9]+(?:\.[0-9]+)?%?)",
+    ), line))
+    metrics["draw"] = percent(first_match((
+        r"\bdraw=([0-9]+(?:\.[0-9]+)?%?)",
+        r"\bdraw\s+([0-9]+(?:\.[0-9]+)?%?)",
+    ), line))
+    return {key: value for key, value in metrics.items() if value}
+
+
+def sprt_metrics():
+    sprt = event.get("sprt") if isinstance(event.get("sprt"), dict) else {}
+    sources = [
+        str(sprt.get("line") or ""),
+        message,
+        status,
+        tail_text(log),
+    ]
+    for source in sources:
+        for line in reversed(str(source).splitlines()):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if "games=" in stripped or re.match(r"^\[\s*[0-9]+/[0-9]+\]", stripped):
+                parsed = parse_sprt_line(stripped)
+                if parsed:
+                    break
+        else:
+            continue
+        if parsed:
+            break
+    else:
+        parsed = {}
+
+    for key in ("elo", "llr"):
+        value = str(sprt.get(key) or "").strip()
+        if value and key not in parsed:
+            parsed[key] = value
+    return parsed
+
+
+def sprt_status_text():
+    lowered = message.lower()
+    if "passed" in lowered:
+        return "passed"
+    if "inconclusive" in lowered:
+        return "inconclusive"
+    if "rejected" in lowered or "failed" in lowered:
+        return "failed"
+    return status or event_name
+
+
+is_sprt = bool(event.get("sprt")) or stage.startswith("sprt") or "SPRT" in message
+title = "NNUE SPRT" if is_sprt else f"NNUE {event_name}"
 lines = [title, f"  • Run: {name}"]
+if stage:
+    lines.append(f"  • Stage: {stage}")
 hyp = hypothesis()
 if hyp:
     lines.append(f"  • Hypothesis: {hyp}")
 if event_name == "fail":
     lines.append(f"  • Error: {failure_error()}")
+elif is_sprt:
+    metrics = sprt_metrics()
+    if metrics.get("tasks"):
+        lines.append(f"  • Tasks: {metrics['tasks']}")
+    if metrics.get("games"):
+        lines.append(f"  • Games: {metrics['games']}")
+    if metrics.get("elo"):
+        elo = metrics["elo"]
+        if metrics.get("ci"):
+            elo = f"{elo} +/- {metrics['ci']}"
+        lines.append(f"  • Elo: {elo}")
+    if metrics.get("llr"):
+        lines.append(f"  • LLR: {metrics['llr']}")
+    if metrics.get("los"):
+        lines.append(f"  • LOS: {metrics['los']}")
+    if metrics.get("draw"):
+        lines.append(f"  • Draw: {metrics['draw']}")
+    lines.append(f"  • Status: {sprt_status_text()}")
 else:
     lines.append(f"  • Status: {final_status() or status or event_name}")
 
-if event_name == "fail":
-    prompt = f"NNUE phase failed: run={name} stage={stage or 'n/a'} status={status or 'failed'} log={log}. Inspect the log and fix the failed phase."
-elif event_name == "done":
-    prompt = f"NNUE run complete: run={name} status={status or 'ok'} log={log}. Inspect the result and start the next task."
-elif event_name == "phase_done":
-    prompt = f"NNUE phase complete: run={name} stage={stage or 'n/a'} status={status or 'ok'} log={log}. Inspect the result and continue the next task."
-else:
-    prompt = ""
-
 print("\n".join(lines))
-print("__AI_PROMPT__" + prompt)
 PY_RENDER
 )
-body=$(printf '%s\n' "$rendered" | sed '/^__AI_PROMPT__/d')
-ai_prompt=$(printf '%s\n' "$rendered" | sed -n 's/^__AI_PROMPT__//p' | tail -1)
-stdout_body=$(printf '<output>\n%s\n</output>\n' "$body")
-if [ -n "$ai_prompt" ]; then
-    stdout_body=$(printf '%s\n\n<summary>\n%s\n</summary>\n' "$stdout_body" "$ai_prompt")
-fi
 
 publish() {
     local url="$1"
@@ -247,7 +245,7 @@ publish() {
     local priority="$4"
 
     if [ "$DRY_RUN" = "1" ]; then
-        printf '%s\n' "$data"
+        printf '%s → %s\n' "$url" "$data"
         return
     fi
 
@@ -262,94 +260,17 @@ publish() {
     fi
 }
 
-is_worker_target() {
-    case "$1" in
-        nnue_native|nnue_native:*|nnue_reckless|nnue_reckless:*|\
-        nnue_training|nnue_training:*|nnue_test|nnue_test:*)
-            return 0
-            ;;
-    esac
-    return 1
-}
-
-priority=3
 case "$event_name" in
-    fail) priority=5 ;;
-    done) priority=4 ;;
+    fail)
+        publish "$PING_URL" "$rendered" "Enyo NNUE fail" "5"
+        printf '%s event=fail → ping\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
+        ;;
+    iteration_done)
+        publish "$NNUE_URL" "$rendered" "Enyo NNUE iteration done" "4"
+        printf '%s event=iteration_done → nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
+        ;;
+    *)
+        publish "$AI_STDOUT_URL" "$rendered" "Enyo NNUE $event_name" "3"
+        printf '%s event=%s → AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+        ;;
 esac
-
-if [ "$send_nnue" = "1" ]; then
-    publish "$NNUE_URL" "$body" "Enyo NNUE $event_name" "$priority"
-    printf '%s event=%s nnue_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-fi
-
-if [ "$send_ai_stdout" = "1" ]; then
-    publish "$AI_STDOUT_URL" "$stdout_body" "Enyo NNUE $event_name" "$priority"
-    printf '%s event=%s ai_stdout_sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-fi
-
-publish_ai() {
-    return
-    local prompt="$1"
-    local title="$2"
-    local priority="$3"
-    local rc=0
-    local notifai_delivered=0
-
-    if [ "$DRY_RUN" = "1" ]; then
-        printf '%s\n' "$prompt"
-        return
-    fi
-
-    if is_worker_target "$NOTIFAI_TARGET"; then
-        printf '%s event=%s notifai_refused_worker target=%s\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" \
-            "$NOTIFAI_TARGET" >>"$LOG"
-    elif [ -x "$NOTIFAI" ]; then
-        if "$NOTIFAI" "$prompt" "$NOTIFAI_TARGET" >/dev/null 2>&1; then
-            notifai_delivered=1
-            printf '%s event=%s notifai_ok target=%s\n' \
-                "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" \
-                "$NOTIFAI_TARGET" >>"$LOG"
-        else
-            rc=$?
-            printf '%s event=%s notifai_failed rc=%s target=%s\n' \
-                "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" \
-                "$NOTIFAI_TARGET" >>"$LOG"
-        fi
-    else
-        printf '%s event=%s notifai_missing path=%s target=%s\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI" \
-            "$NOTIFAI_TARGET" >>"$LOG"
-    fi
-
-    if [ "$AI_STDIN_NTFY_ENABLE" != "1" ]; then
-        printf '%s event=%s ai_stdin_ntfy_skipped\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-        return 0
-    fi
-
-    if [ "$notifai_delivered" = "1" ]; then
-        printf '%s event=%s ai_stdin_ntfy_skipped_notifai_ok\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-        return 0
-    fi
-
-    #if publish "$AI_STDIN_URL" "$prompt" "$title" "$priority"; then
-    #    printf '%s event=%s ai_stdin_ntfy_ok\n' \
-    #        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-    #else
-    #    rc=$?
-    #    printf '%s event=%s ai_stdin_ntfy_failed rc=%s\n' \
-    #        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" \
-    #        >>"$LOG"
-    #    return "$rc"
-    #fi
-}
-
-if [ "$send_ai_stdin" = "1" ] && [ -n "$ai_prompt" ]; then
-    publish_ai "$ai_prompt" "Enyo NNUE $event_name" "$priority"
-    printf '%s event=%s ai_wakeup_processed\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-fi
-
-printf '%s event=%s sent\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"

@@ -87,18 +87,7 @@ class NnueEventNtfyTests(unittest.TestCase):
             )
             return proc, hook_log.read_text(encoding="utf-8")
 
-    def test_empty_event_lists_disable_all_routes(self) -> None:
-        proc, log = self.run_hook({
-            "NNUE_NTFY_EVENTS": "",
-            "NNUE_AI_STDOUT_EVENTS": "",
-            "NNUE_AI_STDIN_EVENTS": "",
-        })
-
-        self.assertEqual(0, proc.returncode, proc.stderr)
-        self.assertEqual("", proc.stdout)
-        self.assertIn("event=done skipped", log)
-
-    def test_empty_nnue_events_do_not_disable_ai_stdout(self) -> None:
+    def test_done_event_renders_status_to_ai_stdout(self) -> None:
         proc, log = self.run_hook({
             "NNUE_NTFY_EVENTS": "",
             "NNUE_AI_STDOUT_EVENTS": "done",
@@ -120,7 +109,39 @@ class NnueEventNtfyTests(unittest.TestCase):
         self.assertNotIn("What ran", proc.stdout)
         self.assertNotIn("Next", proc.stdout)
         self.assertNotIn("nnue_sent", log)
-        self.assertIn("ai_stdout_sent", log)
+        self.assertIn("event=done → AI_stdout", log)
+
+    def test_sprt_phase_done_reports_metrics(self) -> None:
+        line = (
+            "Crucible uho-native-1.1.11-smoke-400-20260624-225641 "
+            "games=400/400 elo=-14.8 ci=28.8 llr=-0.21/2.20 (-10%) "
+            "los=42.8% draw=34.3%"
+        )
+        proc, log = self.run_hook(
+            {},
+            payload_extra={
+                "event": "phase_done",
+                "stage": "sprt_smoke",
+                "status": "phase_done",
+                "message": f"SPRT smoke inconclusive for uho-native-1.1.11: {line}",
+                "sprt": {
+                    "line": line,
+                    "elo": "-14.8",
+                    "llr": "-0.21/2.20 (-10%)",
+                },
+            },
+        )
+
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertIn("NNUE SPRT", proc.stdout)
+        self.assertIn("Stage: sprt_smoke", proc.stdout)
+        self.assertIn("Games: 400/400", proc.stdout)
+        self.assertIn("Elo: -14.8 +/- 28.8", proc.stdout)
+        self.assertIn("LLR: -0.21/2.20 (-10%)", proc.stdout)
+        self.assertIn("LOS: 42.8%", proc.stdout)
+        self.assertIn("Draw: 34.3%", proc.stdout)
+        self.assertIn("Status: inconclusive", proc.stdout)
+        self.assertIn("event=phase_done → AI_stdout", log)
 
     def test_fail_event_reports_single_error_line(self) -> None:
         proc, log = self.run_hook(
@@ -144,7 +165,7 @@ class NnueEventNtfyTests(unittest.TestCase):
         self.assertIn("Run: run", proc.stdout)
         self.assertIn("Error: FAILED: train/export failed for run train", proc.stdout)
         self.assertNotIn("Result", proc.stdout)
-        self.assertIn("nnue_sent", log)
+        self.assertIn("event=fail → ping", log)
 
 
 if __name__ == "__main__":
