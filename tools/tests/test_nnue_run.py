@@ -196,6 +196,48 @@ printf 'net=%s\n' "$reference_net"
                 proc.stdout,
             )
 
+    def test_load_config_infers_previous_release_candidate_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "native-2.0.0-rc13.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text('{"run":"native-2.0.0-rc14"}\n', encoding="utf-8")
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+load_config
+printf 'label=%s\n' "$(reference_label)"
+printf 'net=%s\n' "$reference_net"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "BUILD": str(build),
+                "HOME": str(home),
+                "NNUE_NTFY": "0",
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(
+                f"label=native-2.0.0-rc13\nnet={nets}/native-2.0.0-rc13.nn\n",
+                proc.stdout,
+            )
+
     def test_training_build_keeps_continue_from_with_init_net(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

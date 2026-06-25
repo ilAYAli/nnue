@@ -152,6 +152,10 @@ previous_run_name() {
     local n=$((10#${BASH_REMATCH[2]} - 1))
     (( n >= 0 )) || return 1
     printf '%s%d\n' "${BASH_REMATCH[1]}" "$n"
+  elif [[ "$1" =~ ^(.+-rc)([0-9]+)$ ]]; then
+    local n=$((10#${BASH_REMATCH[2]} - 1))
+    (( n >= 1 )) || return 1
+    printf '%s%d\n' "${BASH_REMATCH[1]}" "$n"
   elif [[ "$1" =~ ^(.+-)([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
     local patch=$((10#${BASH_REMATCH[4]} - 1))
     (( patch >= 0 )) || return 1
