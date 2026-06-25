@@ -15,7 +15,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 class NnueRunTests(unittest.TestCase):
     def run_sourced(self, body: str) -> subprocess.CompletedProcess[str]:
-        text = (REPO / "nnue-run").read_text(encoding="utf-8")
+        text = (REPO / "nnue").read_text(encoding="utf-8")
         prefix = text.split(chr(10) + 'case "$cmd" in' + chr(10), 1)[0]
         return subprocess.run(
             ["bash", "-s"],
@@ -26,22 +26,22 @@ class NnueRunTests(unittest.TestCase):
         )
 
     def test_shell_syntax_is_valid(self) -> None:
-        subprocess.run(["bash", "-n", str(REPO / "nnue-run")], check=True)
+        subprocess.run(["bash", "-n", str(REPO / "nnue")], check=True)
 
     def test_help_documents_thin_interface(self) -> None:
         proc = subprocess.run(
-            [str(REPO / "nnue-run"), "help"],
+            [str(REPO / "nnue"), "help"],
             check=True,
             text=True,
             stdout=subprocess.PIPE,
         )
         text = proc.stdout
-        self.assertIn("./nnue-run iterate", text)
-        self.assertIn("./nnue-run plan", text)
-        self.assertIn("./nnue-run train", text)
-        self.assertIn("./nnue-run gates", text)
-        self.assertIn("./nnue-run sprt", text)
-        self.assertIn("./nnue-run status", text)
+        self.assertIn("./nnue iterate", text)
+        self.assertIn("./nnue plan", text)
+        self.assertIn("./nnue train", text)
+        self.assertIn("./nnue gates", text)
+        self.assertIn("./nnue sprt", text)
+        self.assertIn("./nnue status", text)
         self.assertNotIn("start", text)
         self.assertNotIn("doctor", text)
 
@@ -116,7 +116,7 @@ class NnueRunTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 NNUE_NTFY=0
 load_config
@@ -162,7 +162,7 @@ printf 'net=%s\n' "$reference_net"
                 encoding="utf-8",
             )
 
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 NNUE_NTFY=0
 load_config
@@ -218,7 +218,7 @@ printf 'net=%s\n' "$reference_net"
                 encoding="utf-8",
             )
 
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 NNUE_NTFY=0
 load_config
@@ -271,7 +271,7 @@ training_build >/dev/null
                 encoding="utf-8",
             )
 
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 NNUE_NTFY=0
 load_config
@@ -351,7 +351,7 @@ training_build >/dev/null
             helper.chmod(0o755)
 
             proc = subprocess.run(
-                [str(REPO / "nnue-run"), "plan"],
+                [str(REPO / "nnue"), "plan"],
                 cwd=tmp,
                 env={
                     **os.environ,
@@ -417,7 +417,7 @@ training_build >/dev/null
                 }, indent=2) + "\n",
                 encoding="utf-8",
             )
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + '''
 BUILD=build.json
 ARCH=architecture.json
@@ -528,7 +528,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
                 }, indent=2) + "\n",
                 encoding="utf-8",
             )
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
@@ -622,7 +622,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
                 encoding="utf-8",
             )
 
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
@@ -689,7 +689,7 @@ fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "
                 }, indent=2) + "\n",
                 encoding="utf-8",
             )
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
@@ -753,7 +753,7 @@ iterate
     def test_smoke_gate_rejects_bad_elo_or_negative_llr(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 SMOKE_FAIL_ELO=-15.0
 SMOKE_FAIL_LLR=-0.20
@@ -838,7 +838,7 @@ check_smoke 4.0 -0.22/2.20 positive_elo
             calls = tmp / "calls.txt"
             done = tmp / "done"
 
-            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 NNUE_NTFY=0
 SOLO=0
@@ -920,7 +920,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
             })
 
             proc = subprocess.run(
-                [str(REPO / "nnue-run"), "sprt"],
+                [str(REPO / "nnue"), "sprt"],
                 cwd=REPO,
                 env=env,
                 text=True,

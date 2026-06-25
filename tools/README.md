@@ -1,6 +1,6 @@
 # NNUE Tools
 
-These are lower-level phase tools. Use `../nnue-run` with `../build.json` for
+These are lower-level phase tools. Use `../nnue` with `../build.json` for
 the normal net build workflow.
 
 ## Phase Tools

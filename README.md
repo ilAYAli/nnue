@@ -1,12 +1,12 @@
 # Enyo NNUE Training
 
-Current native NNUE iteration is driven by `./nnue-run` and `build.json`.
+Current native NNUE iteration is driven by `./nnue` and `build.json`.
 The normal loop is:
 
 ```sh
-./nnue-run status
-./nnue-run plan
-ITERATIONS=1 ./nnue-run iterate
+./nnue status
+./nnue plan
+ITERATIONS=1 ./nnue iterate
 ```
 
 `iterate` trains one candidate, runs gates, runs Forge/Crucible SPRT by
@@ -49,7 +49,7 @@ keep them in `build.json` when they match `defaults.json`.
 
 
 `continue_from` optional: Parent run for non-interactive or non-standard starts.
-If omitted, `nnue-run` infers the previous version from `run`.
+If omitted, `nnue` infers the previous version from `run`.
 
 `reference` optional: SPRT reference net/run when it should differ from
 `continue_from`. If omitted, the reference is `continue_from`.
@@ -132,7 +132,7 @@ Do not change architecture parameters during a normal continuation run. If
 same-lane continuation stops gaining, change training/data first. Architecture
 changes need matching engine support and parity checks.
 
-## `nnue-run` Validation Controls
+## `nnue` Validation Controls
 
 These are shell overrides, not persistent training parameters:
 

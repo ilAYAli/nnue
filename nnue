@@ -2,13 +2,13 @@
 set -Eeuo pipefail
 
 # Thin native NNUE loop:
-#   ./nnue-run iterate   train, gate, SPRT, bump build.json on success, stop on failure
-#   ./nnue-run iterate --full-sprt-first  run full SPRT directly for iteration 1 only
-#   ./nnue-run plan      show resolved tools/bullet/train plan
-#   ./nnue-run train     data + train + export
-#   ./nnue-run gates     startpos + static eval + move gate
-#   ./nnue-run sprt      candidate vs reference games
-#   ./nnue-run status    print current run/reference and latest logs
+#   ./nnue iterate   train, gate, SPRT, bump build.json on success, stop on failure
+#   ./nnue iterate --full-sprt-first  run full SPRT directly for iteration 1 only
+#   ./nnue plan      show resolved tools/bullet/train plan
+#   ./nnue train     data + train + export
+#   ./nnue gates     startpos + static eval + move gate
+#   ./nnue sprt      candidate vs reference games
+#   ./nnue status    print current run/reference and latest logs
 
 cmd=iterate
 SOLO=0
@@ -179,7 +179,7 @@ load_config() {
   else
     reference_net=
   fi
-  summary_file=${summary_file:-runs/logs/nnue-run-iterate-$(date +%Y%m%d_%H%M%S).txt}
+  summary_file=${summary_file:-runs/logs/nnue-iterate-$(date +%Y%m%d_%H%M%S).txt}
 }
 
 reference_label() {
@@ -568,7 +568,7 @@ wait_for_existing_crucible_sprt() {
     stopped|failed|fail)
       local message="Crucible SPRT for $run is $state and incomplete: $crucible_run"
       [[ -z "$progress" ]] || message+=" $progress"
-      message+="; resume or retry it manually, then rerun ./nnue-run iterate"
+      message+="; resume or retry it manually, then rerun ./nnue iterate"
       fail "$message" sprt
       ;;
   esac
@@ -601,7 +601,7 @@ run_sprt_once() {
     if [[ -n "$crucible_run" ]]; then
       last_sprt_command=$(command_from_log "$last_sprt_log" || true)
       wait_for_existing_crucible_sprt "$crucible_run" \
-        || fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue-run iterate" sprt
+        || fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue iterate" sprt
       return 0
     fi
 
@@ -629,7 +629,7 @@ run_sprt_once() {
     )
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
-      fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue-run iterate" sprt
+      fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue iterate" sprt
     fi
 
     read_crucible_sprt_status "$crucible_run" \
@@ -844,7 +844,7 @@ status() {
   load_config
   show_config
   echo
-  pgrep -af 'nnue-run|tools/bullet/train|enyo-bullet-spike|sprt|fastchess' || true
+  pgrep -af '(^|[[:space:]])\.?/nnue([[:space:]]|$)|tools/bullet/train|enyo-bullet-spike|sprt|fastchess' || true
   echo
   find "$log_dir" -maxdepth 1 -type f 2>/dev/null | sort | tail -10
 }
@@ -852,23 +852,23 @@ status() {
 help() {
   cat <<'EOF'
 Usage:
-  ./nnue-run iterate   # main command: train, gate, SPRT, bump build.json on pass
-  ./nnue-run iterate --full-sprt-first
-  ./nnue-run plan
-  ./nnue-run train
-  ./nnue-run gates
-  ./nnue-run sprt
-  ./nnue-run sprt --solo
-  ./nnue-run status
+  ./nnue iterate   # main command: train, gate, SPRT, bump build.json on pass
+  ./nnue iterate --full-sprt-first
+  ./nnue plan
+  ./nnue train
+  ./nnue gates
+  ./nnue sprt
+  ./nnue sprt --solo
+  ./nnue status
 
 Useful overrides:
-  ITERATIONS=5 ./nnue-run iterate
-  ./nnue-run iterate --full-sprt-first  # first iteration skips train/gates/smoke
-  REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue-run sprt
-  SMOKE_GAMES=400 SMOKE_FAIL_ELO=-15 SMOKE_FAIL_LLR=-0.20 ./nnue-run sprt
-  GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue-run sprt
-  FORCE=1 ./nnue-run train
-  MOVE_GATE_STRICT=1 ./nnue-run gates
+  ITERATIONS=5 ./nnue iterate
+  ./nnue iterate --full-sprt-first  # first iteration skips train/gates/smoke
+  REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
+  SMOKE_GAMES=400 SMOKE_FAIL_ELO=-15 SMOKE_FAIL_LLR=-0.20 ./nnue sprt
+  GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue sprt
+  FORCE=1 ./nnue train
+  MOVE_GATE_STRICT=1 ./nnue gates
 EOF
 }
 
