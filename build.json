@@ -1,12 +1,15 @@
 {
-  "run": "native-2.0.0-rc1",
+  "run": "native-2.0.0-rc2",
   "lineage": "scratch-native",
-  "reference": "~/assets/nets/default.net",
-  "hypothesis": "Fresh baseline after fixing Bullet-to-Enyo feature square mapping; train all weights from scratch on farseerT76",
-  "superbatches": 2048,
+  "continue_from": "native-2.0.0-rc1",
+  "reference": "native-2.0.0-rc1",
+  "hypothesis": "Continue clean scratch-native baseline after fixed feature mapping; judge same-line improvement against previous scratch net",
+  "superbatches": 4096,
+  "lr": 0.0003,
+  "final_lr": 0.000005,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 100000000,
-    "offset": 0
+    "offset": 100000000
   }
 }
