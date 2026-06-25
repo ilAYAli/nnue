@@ -160,6 +160,10 @@ fn enyo_feature<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize>(
     enyo_bucket::<INPUT_BUCKETS>(ok) * FEATURE_CHANNELS * 64 + op * 64 + osq
 }
 
+fn bullet_square_to_enyo_net(square: u8) -> u8 {
+    square ^ 56
+}
+
 impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize> SparseInputType
     for EnyoInputs<INPUT_BUCKETS, FEATURE_CHANNELS>
 {
@@ -177,7 +181,7 @@ impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize> SparseInputType
         let stm_king = pos.our_ksq() ^ 56;
         let ntm_king = pos.opp_ksq();
         for (piece, square) in pos.into_iter() {
-            let sq = square ^ 63;
+            let sq = bullet_square_to_enyo_net(square);
             f(
                 enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, stm_king, 0),
                 enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, ntm_king, 1),
@@ -191,6 +195,38 @@ impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize> SparseInputType
 
     fn description(&self) -> String {
         format!("Enyo {INPUT_BUCKETS}-king-bucket {FEATURE_CHANNELS}-channel exported NNUE inputs")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stm_feature(piece: u8, square: u8, own_king: u8) -> usize {
+        enyo_feature::<16, 12>(
+            piece,
+            bullet_square_to_enyo_net(square),
+            own_king ^ 56,
+            0,
+        )
+    }
+
+    fn ntm_feature(piece: u8, square: u8, opp_king: u8) -> usize {
+        enyo_feature::<16, 12>(
+            piece,
+            bullet_square_to_enyo_net(square),
+            opp_king ^ 56,
+            1,
+        )
+    }
+
+    #[test]
+    fn enyo_inputs_match_runtime_feature_indices() {
+        assert_eq!(bullet_square_to_enyo_net(12), 52); // e2, a1=0 -> a8=0
+        assert_eq!(stm_feature(0, 12, 4), 52); // white pawn e2, white view
+        assert_eq!(ntm_feature(0, 12, 60), 396); // white pawn e2, black view
+        assert_eq!(stm_feature(8, 52, 4), 396); // black pawn e7, white view
+        assert_eq!(ntm_feature(8, 52, 60), 52); // black pawn e7, black view
     }
 }
 
