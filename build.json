@@ -1,14 +1,14 @@
 {
-  "run": "native-2.0.0-rc10",
+  "run": "native-2.0.0-rc11",
   "lineage": "scratch-native",
-  "continue_from": "native-2.0.0-rc8",
-  "hypothesis": "Continue clean scratch-native baseline after fixed feature mapping; judge same-line improvement against previous scratch net",
+  "continue_from": "native-2.0.0-rc10",
+  "hypothesis": "Continue rc10 with higher lr=0.0005 to test whether the scratch-native line is saturating",
   "superbatches": 4096,
   "lr": 0.0005,
   "final_lr": 0.000005,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 100000000,
-    "offset": 900000000
+    "offset": 1000000000
   }
 }
