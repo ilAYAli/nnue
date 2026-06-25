@@ -196,7 +196,7 @@ printf 'net=%s\n' "$reference_net"
                 proc.stdout,
             )
 
-    def test_load_config_infers_previous_release_candidate_reference(self) -> None:
+    def test_load_config_does_not_infer_previous_release_candidate_reference(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
@@ -234,7 +234,7 @@ printf 'net=%s\n' "$reference_net"
 
             self.assertEqual("", proc.stderr)
             self.assertEqual(
-                f"label=native-2.0.0-rc13\nnet={nets}/native-2.0.0-rc13.nn\n",
+                "label=\nnet=\n",
                 proc.stdout,
             )
 
@@ -294,7 +294,7 @@ training_build >/dev/null
             self.assertNotIn("reference", resolved)
             self.assertNotIn("reference", resolved["changed_variables"])
 
-    def test_training_build_allows_scratch_run_without_continue_from(self) -> None:
+    def test_training_build_rejects_missing_continue_from_non_interactive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
@@ -329,40 +329,38 @@ training_build >/dev/null
                 "NNUE_NTFY": "0",
             })
 
-            subprocess.run(
+            proc = subprocess.run(
                 ["bash", str(harness_path)],
                 cwd=tmp,
                 env=env,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                check=True,
+                check=False,
             )
 
-            resolved = json.loads(
-                (tmp / "runs" / "native-2.0.0-rc1" / "build.resolved.json").read_text(encoding="utf-8")
-            )
-            self.assertNotIn("continue_from", resolved)
-            self.assertNotIn("init_net", resolved)
-            self.assertNotIn("reference", resolved)
+            self.assertNotEqual(0, proc.returncode)
+            self.assertIn("continue_from not found", proc.stderr)
 
-    def test_train_rebuilds_missing_data_when_candidate_net_already_exists(self) -> None:
+    def test_train_rejects_existing_candidate_without_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
             nets = home / "assets" / "nets"
             nets.mkdir(parents=True)
             (nets / "candidate.nn").write_bytes(b"net")
+            previous = tmp / "runs" / "base" / "checkpoints" / "scratch_native-1" / "optimiser_state"
+            previous.mkdir(parents=True)
+            (previous / "weights.bin").write_bytes(b"weights")
             build = tmp / "build.json"
-            build.write_text('{"run":"candidate"}\n', encoding="utf-8")
+            build.write_text('{"run":"candidate","continue_from":"base"}\n', encoding="utf-8")
             calls = tmp / "calls.txt"
             helper = tmp / "train-helper"
             helper.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '%s\\n' \"$*\" >> \"$CALLS\"\n"
-                "if [[ \"$1\" == data ]]; then\n"
-                "  mkdir -p data/bullet\n"
-                "  printf data > data/bullet/candidate.bullet\n"
+                "if [[ \"$1\" == plan ]]; then\n"
+                "  printf '%s\\n' 'init_weights=runs/base/checkpoints/scratch_native-1/optimiser_state/weights.bin'\n"
                 "  exit 0\n"
                 "fi\n"
                 "exit 9\n",
@@ -395,15 +393,143 @@ train
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(0, proc.returncode)
+            self.assertIn("stale train/export artifacts for candidate", proc.stderr)
+
+    def test_train_rejects_continuation_without_loaded_init_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            (home / "assets" / "nets").mkdir(parents=True)
+            previous = tmp / "runs" / "base" / "checkpoints" / "scratch_native-1" / "optimiser_state"
+            previous.mkdir(parents=True)
+            expected = previous / "weights.bin"
+            expected.write_bytes(b"weights")
+            build = tmp / "build.json"
+            build.write_text('{"run":"candidate","continue_from":"base"}\n', encoding="utf-8")
+            helper = tmp / "train-helper"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"$1\" == plan ]]; then\n"
+                f"  printf '%s\\n' 'init_weights={expected}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == all ]]; then\n"
+                "  mkdir -p runs/candidate \"$HOME/assets/nets\"\n"
+                "  printf model > runs/candidate/model.nn\n"
+                "  printf candidate > \"$HOME/assets/nets/candidate.nn\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "exit 9\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+TRAIN_HELPER="$TEST_HELPER"
+NNUE_NTFY=0
+train
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_HELPER": str(helper),
+                "TEST_HOME": str(home),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(0, proc.returncode)
+            self.assertIn(f"training did not load expected init weights: {expected}", proc.stderr)
+
+    def test_train_writes_and_reuses_matching_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            (home / "assets" / "nets").mkdir(parents=True)
+            previous = tmp / "runs" / "base" / "checkpoints" / "scratch_native-1" / "optimiser_state"
+            previous.mkdir(parents=True)
+            expected = previous / "weights.bin"
+            expected.write_bytes(b"weights")
+            build = tmp / "build.json"
+            build.write_text('{"run":"candidate","continue_from":"base"}\n', encoding="utf-8")
+            calls = tmp / "calls.txt"
+            helper = tmp / "train-helper"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "printf '%s\\n' \"$1\" >> \"$CALLS\"\n"
+                "if [[ \"$1\" == plan ]]; then\n"
+                f"  printf '%s\\n' 'init_weights={expected}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == all ]]; then\n"
+                "  mkdir -p runs/candidate \"$HOME/assets/nets\"\n"
+                "  printf model > runs/candidate/model.nn\n"
+                "  printf candidate > \"$HOME/assets/nets/candidate.nn\"\n"
+                f"  printf '%s\\n' 'loaded_init_weights={expected}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == data ]]; then\n"
+                "  mkdir -p data/bullet\n"
+                "  printf data > data/bullet/candidate.bullet\n"
+                "  exit 0\n"
+                "fi\n"
+                "exit 9\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+TRAIN_HELPER="$TEST_HELPER"
+NNUE_NTFY=0
+train
+train
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "CALLS": str(calls),
+                "TEST_BUILD": str(build),
+                "TEST_HELPER": str(helper),
+                "TEST_HOME": str(home),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 check=True,
             )
 
-            self.assertEqual("", proc.stderr)
-            self.assertTrue((tmp / "data" / "bullet" / "candidate.bullet").exists())
-            self.assertEqual(
-                "data --build runs/candidate/build.resolved.json --arch architecture.json --defaults defaults.json\n",
-                calls.read_text(encoding="utf-8"),
-            )
+            provenance = json.loads((tmp / "runs" / "candidate" / "train.provenance.json").read_text(encoding="utf-8"))
+            self.assertEqual("base", provenance["continue_from"])
+            self.assertEqual(str(expected), provenance["expected_init_weights"])
+            self.assertEqual("plan\nall\nplan\ndata\n", calls.read_text(encoding="utf-8"))
 
     def test_next_run_name_bumps_release_candidates(self) -> None:
         proc = self.run_sourced('NNUE_NTFY=0; next_run_name "native-2.0.0-rc1"')
@@ -425,6 +551,7 @@ train
                 json.dumps({
                     "run": "native-2.0.0-rc1",
                     "lineage": "scratch-native",
+                    "continue_from": "native-2.0.0-rc0",
                     "reference": "~/assets/nets/default.net",
                     "hypothesis": "fresh scratch candidate",
                     "data": {
@@ -475,7 +602,7 @@ train
             self.assertEqual("", proc.stderr)
             resolved = json.loads(captured.read_text(encoding="utf-8"))
             self.assertNotIn("reference", resolved)
-            self.assertNotIn("continue_from", resolved)
+            self.assertEqual("native-2.0.0-rc0", resolved["continue_from"])
 
     def test_iteration_commit_keeps_accepted_build_and_leaves_next_diff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
