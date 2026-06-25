@@ -1236,6 +1236,102 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 calls.read_text(encoding="utf-8"),
             )
 
+    def test_sprt_ignores_stale_logged_crucible_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            forge = home / "code" / "cpp" / "chess" / "crucible" / "scripts" / "forge"
+            forge.parent.mkdir(parents=True)
+            forge.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >> \"$FORGE_CALLS\"\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            forge.chmod(0o755)
+            (home / "assets" / "nets").mkdir(parents=True)
+            (home / "assets" / "nets" / "candidate.nn").write_bytes(b"candidate")
+            (home / "assets" / "nets" / "reference.nn").write_bytes(b"reference")
+
+            log_dir = tmp / "runs" / "candidate" / "logs"
+            log_dir.mkdir(parents=True)
+            (log_dir / "05-sprt-800.log").write_text(
+                "+ crucible run nnue --run candidate-sprt-800-old --games 800\n",
+                encoding="utf-8",
+            )
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","continue_from":"reference","hypothesis":"fresh after stale"}\n',
+                encoding="utf-8",
+            )
+
+            fake_crucible = tmp / "crucible"
+            fake_crucible.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"$1\" == status && \"${2:-}\" == candidate-sprt-800-old ]]; then\n"
+                "  echo 'run not found' >&2\n"
+                "  exit 1\n"
+                "fi\n"
+                "if [[ \"$1\" == status && \"${2:-}\" == --json ]]; then\n"
+                "  printf '%s\\n' '{\"runs\":[]}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == status && \"${2:-}\" == candidate-sprt-800-* ]]; then\n"
+                "  printf '%s\\n' '{\"state\":\"done\",\"progress_fields\":[\"games=800/800\",\"elo=+7.5\",\"llr=0.40/2.20 (18%)\"]}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "echo unexpected crucible call: $* >&2\n"
+                "exit 2\n",
+                encoding="utf-8",
+            )
+            fake_crucible.chmod(0o755)
+            forge_calls = tmp / "forge-calls.txt"
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+SOLO=0
+BUILD="$TEST_BUILD"
+CRUCIBLE="$TEST_CRUCIBLE"
+HOME="$TEST_HOME"
+ENGINE="$HOME/assets/engines/enyo_91ede5f"
+run=candidate
+continue_from=reference
+reference_net="$HOME/assets/nets/reference.nn"
+candidate_net="$HOME/assets/nets/candidate.nn"
+log_dir="runs/candidate/logs"
+run_sprt_once sprt 800 sprt
+printf 'elo=%s\n' "$last_sprt_elo"
+printf 'llr=%s\n' "$last_sprt_llr"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_CRUCIBLE": str(fake_crucible),
+                "TEST_HOME": str(home),
+                "FORGE_CALLS": str(forge_calls),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertIn("ignoring stale Crucible run from log: candidate-sprt-800-old", proc.stdout)
+            self.assertIn("elo=7.5", proc.stdout)
+            self.assertIn("llr=0.40/2.20 (18%)", proc.stdout)
+            calls = forge_calls.read_text(encoding="utf-8")
+            self.assertIn("--run candidate-sprt-800-", calls)
+            self.assertNotIn("--run candidate-sprt-800-old", calls)
+
     def test_sprt_refuses_to_queue_when_crucible_is_busy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

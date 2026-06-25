@@ -534,6 +534,11 @@ command_from_log() {
   sed -nE 's/^\+ //p' "$log" | head -1
 }
 
+crucible_run_exists() {
+  local crucible_run=$1
+  "$CRUCIBLE" status "$crucible_run" --json >/dev/null 2>&1
+}
+
 read_crucible_sprt_status() {
   local crucible_run=$1 status_json state fields
   status_json=$("$CRUCIBLE" status "$crucible_run" --json) || return 1
@@ -627,6 +632,10 @@ run_sprt_once() {
     local engine_hash="${ENGINE##*/}"
     local crucible_run
     crucible_run=$(crucible_run_from_log "$last_sprt_log" || true)
+    if [[ -n "$crucible_run" ]] && ! crucible_run_exists "$crucible_run"; then
+      printf 'ignoring stale Crucible run from log: %s\n' "$crucible_run" | tee -a "$last_sprt_log"
+      crucible_run=
+    fi
     [[ -n "$crucible_run" ]] || crucible_run=$(crucible_incomplete_run_for_current_sprt "$label" "$sprt_games" || true)
     if [[ -n "$crucible_run" ]]; then
       last_sprt_command=$(command_from_log "$last_sprt_log" || true)
