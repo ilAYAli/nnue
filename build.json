@@ -1,8 +1,8 @@
 {
-  "run": "native-2.0.0-rc13",
+  "run": "native-2.0.0-rc15",
   "lineage": "scratch-native",
-  "continue_from": "native-2.0.0-rc12",
-  "hypothesis": "Continue rc10 with higher lr=0.0005 to test whether the scratch-native line is saturating",
+  "continue_from": "native-2.0.0-rc13",
+  "hypothesis": "continue farseerT76 iteration",
   "superbatches": 4096,
   "lr": 0.0005,
   "final_lr": 0.000005,
