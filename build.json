@@ -1,7 +1,7 @@
 {
-  "run": "native-2.0.0-rc16",
+  "run": "native-2.0.0-rc17",
   "lineage": "scratch-native",
-  "continue_from": "native-2.0.0-rc15",
+  "continue_from": "native-2.0.0-rc16",
   "hypothesis": "continue farseerT76 iteration",
   "superbatches": 4096,
   "lr": 0.0005,
