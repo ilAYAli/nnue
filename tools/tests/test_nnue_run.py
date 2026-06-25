@@ -87,6 +87,22 @@ class NnueRunTests(unittest.TestCase):
         )
         self.assertNotEqual(0, proc.returncode)
 
+    def test_net_for_name_or_path_expands_literal_home_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            home = Path(tmp_name) / "home"
+            home.mkdir()
+            proc = self.run_sourced(
+                f"HOME={shlex.quote(str(home))}; "
+                "net_for_name_or_path '~/assets/nets/default.net'"
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(0, proc.returncode)
+            self.assertEqual(
+                f"{home}/assets/nets/default.net\n",
+                proc.stdout,
+            )
+
 
     def test_training_build_keeps_continue_from_with_init_net(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
@@ -143,6 +159,130 @@ training_build >/dev/null
             self.assertEqual("~/assets/nets/uho-native-1.0.42.nn", resolved["init_net"])
             self.assertNotIn("reference", resolved)
             self.assertNotIn("reference", resolved["changed_variables"])
+
+    def test_training_build_allows_scratch_run_without_continue_from(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            home.mkdir()
+            build = tmp / "build.json"
+            build.write_text(
+                json.dumps({
+                    "run": "native-2.0.0-rc1",
+                    "lineage": "scratch-native",
+                    "hypothesis": "fresh scratch candidate",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+                        "limit": 100000000,
+                        "offset": 0,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+load_config
+training_build >/dev/null
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "BUILD": str(build),
+                "HOME": str(home),
+                "NNUE_NTFY": "0",
+            })
+
+            subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            resolved = json.loads(
+                (tmp / "runs" / "native-2.0.0-rc1" / "build.resolved.json").read_text(encoding="utf-8")
+            )
+            self.assertNotIn("continue_from", resolved)
+            self.assertNotIn("init_net", resolved)
+            self.assertNotIn("reference", resolved)
+
+    def test_next_run_name_bumps_release_candidates(self) -> None:
+        proc = self.run_sourced('NNUE_NTFY=0; next_run_name "native-2.0.0-rc1"')
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+        self.assertEqual("native-2.0.0-rc2\n", proc.stdout)
+
+    def test_plan_uses_training_build_without_validation_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            home.mkdir()
+            build = tmp / "build.json"
+            arch = tmp / "architecture.json"
+            defaults = tmp / "defaults.json"
+            captured = tmp / "captured-build.json"
+            helper = tmp / "train"
+            build.write_text(
+                json.dumps({
+                    "run": "native-2.0.0-rc1",
+                    "lineage": "scratch-native",
+                    "reference": "~/assets/nets/default.net",
+                    "hypothesis": "fresh scratch candidate",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+                        "limit": 100000000,
+                        "offset": 0,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            arch.write_text('{"input_buckets":16}\n', encoding="utf-8")
+            defaults.write_text("{}\n", encoding="utf-8")
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "build=\n"
+                "while (($#)); do\n"
+                "  case \"$1\" in\n"
+                "    --build) build=$2; shift 2 ;;\n"
+                "    *) shift ;;\n"
+                "  esac\n"
+                "done\n"
+                "cp \"$build\" \"$CAPTURED_BUILD\"\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+
+            proc = subprocess.run(
+                [str(REPO / "nnue-run"), "plan"],
+                cwd=tmp,
+                env={
+                    **os.environ,
+                    "BUILD": str(build),
+                    "ARCH": str(arch),
+                    "DEFAULTS": str(defaults),
+                    "HOME": str(home),
+                    "TRAIN_HELPER": str(helper),
+                    "ALLOW_STALE_TRAIN_HELPER": "1",
+                    "NNUE_NTFY": "0",
+                    "CAPTURED_BUILD": str(captured),
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            resolved = json.loads(captured.read_text(encoding="utf-8"))
+            self.assertNotIn("reference", resolved)
+            self.assertNotIn("continue_from", resolved)
 
     def test_iteration_commit_keeps_accepted_build_and_leaves_next_diff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
@@ -347,6 +487,72 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             self.assertEqual("uho-native-1.0.37", working_json["run"])
             self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
             self.assertEqual(600000000, working_json["data"]["offset"])
+
+    def test_failed_scratch_rc_does_not_invent_continue_from(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            build = tmp / "build.json"
+            arch = tmp / "architecture.json"
+            build.write_text(
+                json.dumps({
+                    "run": "native-1.9.0",
+                    "lineage": "scratch-native",
+                    "hypothesis": "previous candidate",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+                        "limit": 100000000,
+                        "offset": 0,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            arch.write_text('{"input_buckets":16}\n', encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.name", "Petter Wahlman"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.email", "petter@wahlman.no"], cwd=tmp, check=True)
+            subprocess.run(["git", "add", "build.json", "architecture.json"], cwd=tmp, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=tmp, check=True)
+
+            build.write_text(
+                json.dumps({
+                    "run": "native-2.0.0-rc1",
+                    "lineage": "scratch-native",
+                    "hypothesis": "fresh scratch candidate",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+                        "limit": 100000000,
+                        "offset": 0,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD=build.json
+ARCH=architecture.json
+continue_from=
+fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Crucible result"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+
+            subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
+
+            committed_json = json.loads(subprocess.run(
+                ["git", "show", "HEAD:build.json"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout)
+            self.assertEqual("native-2.0.0-rc1", committed_json["run"])
+            self.assertNotIn("continue_from", committed_json)
+
+            working_json = json.loads(build.read_text(encoding="utf-8"))
+            self.assertEqual("native-2.0.0-rc2", working_json["run"])
+            self.assertNotIn("continue_from", working_json)
+            self.assertEqual(100000000, working_json["data"]["offset"])
 
     def test_rejected_smoke_advances_and_continues_iteration_loop(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:

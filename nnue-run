@@ -132,7 +132,7 @@ json() {
 
 abs_path() {
   case "$1" in
-    ~/*) printf '%s/%s\n' "$HOME" "${1#~/}" ;;
+    "~"/*) printf '%s/%s\n' "$HOME" "${1#\~/}" ;;
     /*) printf '%s\n' "$1" ;;
     *) printf '%s/%s\n' "$PWD" "$1" ;;
   esac
@@ -141,7 +141,7 @@ abs_path() {
 net_for_name_or_path() {
   [[ -z "$1" || "$1" == "null" ]] && return 1
   case "$1" in
-    ~/*|/*|*.nn) abs_path "$1" ;;
+    "~"/*|/*|*.nn|*.net) abs_path "$1" ;;
     *) echo "$HOME/assets/nets/$1.nn" ;;
   esac
 }
@@ -165,8 +165,8 @@ load_config() {
   continue_from=$(json '.continue_from // empty')
   init_net=$(json '.init_net // empty')
   reference_name=$(json '.reference // empty')
-  if [[ -z "$continue_from" ]]; then
-    continue_from=$(previous_run_name "$run") || fail "cannot infer previous run from run=$run" config
+  if [[ -z "$continue_from" && -z "$init_net" && -z "$reference_name" ]]; then
+    continue_from=$(previous_run_name "$run") || continue_from=
   fi
   run_dir="runs/$run"
   log_dir="$run_dir/logs"
@@ -174,7 +174,11 @@ load_config() {
   data_file="data/bullet/$run.bullet"
   mkdir -p "$log_dir" runs/logs
   local ref_source="${REFERENCE_NET:-${reference_name:-$continue_from}}"
-  reference_net=$(net_for_name_or_path "$ref_source")
+  if [[ -n "$ref_source" ]]; then
+    reference_net=$(net_for_name_or_path "$ref_source")
+  else
+    reference_net=
+  fi
   summary_file=${summary_file:-runs/logs/nnue-run-iterate-$(date +%Y%m%d_%H%M%S).txt}
 }
 
@@ -185,7 +189,7 @@ reference_label() {
 training_build() {
   train_build="$run_dir/build.resolved.json"
   jq --arg prev "$continue_from" \
-    '.continue_from = $prev
+    'if $prev == "" then del(.continue_from) else .continue_from = $prev end
      | del(.reference)
      | del(.changed_variables.reference)' \
     "$BUILD" > "$train_build"
@@ -343,7 +347,9 @@ metric() {
 plan() {
   load_config
   ensure_train_helper_current
-  "$TRAIN_HELPER" plan --build "$BUILD" --arch "$ARCH" --defaults "$DEFAULTS"
+  local build_for_train
+  build_for_train=$(training_build)
+  "$TRAIN_HELPER" plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS"
 }
 
 train() {
@@ -717,6 +723,8 @@ full_sprt_gate() {
 next_run_name() {
   if [[ "$1" =~ ^(.*-v|.*v)([0-9]+)$ ]]; then
     printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
+  elif [[ "$1" =~ ^(.+-rc)([0-9]+)$ ]]; then
+    printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
   elif [[ "$1" =~ ^(.+-)([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
     printf '%s%d.%d.%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]}))" "$((10#${BASH_REMATCH[4]} + 1))"
   else
@@ -734,7 +742,6 @@ commit_and_bump_build_json() {
   else
     subject="${accepted}.nn: rejected: Elo ${elo},LLR ${llr}"
     next_base=${continue_from:-}
-    [[ -n "$next_base" ]] || next_base=$(previous_run_name "$accepted") || return
   fi
   hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
 
@@ -756,7 +763,7 @@ $details" \
     --arg run "$next" \
     --arg continue_from "$next_base" \
     '.run = $run
-     | .continue_from = $continue_from
+     | if $continue_from == "" then del(.continue_from) else .continue_from = $continue_from end
      | if ((.data.offset? | type) == "number") and ((.data.limit? | type) == "number") then
          .data.offset = (.data.offset + .data.limit)
        else
