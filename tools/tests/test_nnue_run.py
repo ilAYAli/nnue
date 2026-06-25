@@ -42,6 +42,7 @@ class NnueRunTests(unittest.TestCase):
         self.assertIn("./nnue gates", text)
         self.assertIn("./nnue sprt", text)
         self.assertIn("./nnue status", text)
+        self.assertIn("SKIP_SMOKE=1 GAMES=800 ./nnue iterate", text)
         self.assertNotIn("start", text)
         self.assertNotIn("doctor", text)
 
@@ -784,6 +785,172 @@ check_smoke 4.0 -0.22/2.20 positive_elo
             self.assertIn("negative_llr=fail", proc.stdout)
             self.assertIn("mild_negative=pass:1", proc.stdout)
             self.assertIn("positive_elo=pass:1", proc.stdout)
+
+    def test_sprt_gate_runs_full_sprt_after_inconclusive_smoke(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "candidate.nn").write_bytes(b"candidate")
+            (nets / "reference.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","continue_from":"reference"}\n',
+                encoding="utf-8",
+            )
+            trace = tmp / "trace.txt"
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+NNUE_NTFY=0
+GAMES=800
+run_sprt_once() {
+  printf '%s:%s:%s\n' "$1" "$2" "$3" >> "$TRACE"
+  if [[ "$1" == smoke ]]; then
+    last_sprt_elo=4.0
+    last_sprt_llr='0.10/2.20 (5%)'
+    last_sprt_line='smoke inconclusive'
+    return 0
+  fi
+  last_sprt_elo=5.0
+  last_sprt_llr='0.20/2.20 (9%)'
+  last_sprt_line='full positive'
+}
+sprt_gate
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_HOME": str(home),
+                "TRACE": str(trace),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(
+                "smoke:400:sprt_smoke\nsprt:800:sprt\n",
+                trace.read_text(encoding="utf-8"),
+            )
+
+    def test_skip_smoke_runs_full_sprt_directly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "candidate.nn").write_bytes(b"candidate")
+            (nets / "reference.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","continue_from":"reference"}\n',
+                encoding="utf-8",
+            )
+            trace = tmp / "trace.txt"
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+NNUE_NTFY=0
+SKIP_SMOKE=1
+GAMES=800
+run_sprt_once() {
+  printf '%s:%s:%s\n' "$1" "$2" "$3" >> "$TRACE"
+  [[ "$1" == sprt ]] || return 9
+  last_sprt_elo=5.0
+  last_sprt_llr='0.20/2.20 (9%)'
+  last_sprt_line='full positive'
+}
+sprt_gate
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_HOME": str(home),
+                "TRACE": str(trace),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual("sprt:800:sprt\n", trace.read_text(encoding="utf-8"))
+
+    def test_skip_smoke_rejects_failed_full_sprt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "candidate.nn").write_bytes(b"candidate")
+            (nets / "reference.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","continue_from":"reference"}\n',
+                encoding="utf-8",
+            )
+            trace = tmp / "trace.txt"
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+NNUE_NTFY=0
+SKIP_SMOKE=1
+GAMES=800
+run_sprt_once() {
+  printf '%s:%s:%s\n' "$1" "$2" "$3" >> "$TRACE"
+  [[ "$1" == sprt ]] || return 9
+  last_sprt_elo=-1.0
+  last_sprt_llr='-0.01/2.20 (0%)'
+  last_sprt_line='full failed'
+}
+sprt_gate
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_HOME": str(home),
+                "TRACE": str(trace),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(0, proc.returncode)
+            self.assertEqual("sprt:800:sprt\n", trace.read_text(encoding="utf-8"))
 
     def test_sprt_waits_matching_active_crucible_run_for_build_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:

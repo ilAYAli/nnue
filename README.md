@@ -143,7 +143,11 @@ These are shell overrides, not persistent training parameters:
 `SMOKE_GAMES`: Cheap SPRT smoke game count before the full gate. Default is
 `400`.
 
-`SMOKE_FAIL_LLR`: Smoke rejection threshold. Default is `-0.5`; smoke fails
+`SKIP_SMOKE`: Set to `1` to skip the smoke gate and run the full SPRT gate
+directly. Useful while parent-vs-child Elo is improving rapidly:
+`SKIP_SMOKE=1 GAMES=800 ./nnue iterate`.
+
+`SMOKE_FAIL_LLR`: Smoke rejection threshold. Default is `-0.20`; smoke fails
 early only when Elo is negative and the current LLR is at or below this value.
 Negative Elo alone continues to the full SPRT.
 
