@@ -193,7 +193,7 @@ training_build() {
 }
 
 notify() {
-  local event=$1 phase=$2 message=$3 log=${4:-} user_notify=${5:-0}
+  local event=$1 phase=$2 message=$3 log=${4:-} user_notify=${5:-0} sprt_json=${6:-null}
   [[ "$NNUE_NTFY" == 1 ]] || return 0
   [[ -x "$EVENT_HOOK" ]] || return 0
   local payload
@@ -206,6 +206,7 @@ notify() {
     --arg log "$log" \
     --arg summary "${summary_file:-}" \
     --argjson user_notify "$user_notify" \
+    --argjson sprt "$sprt_json" \
     '{
       event:$event,
       run:$run,
@@ -216,12 +217,21 @@ notify() {
       summary:$summary,
       user_notify:$user_notify,
       critical_failure:($event == "fail"),
-      good_news:($event == "done" and $user_notify)
-    }')
-  NNUE_NTFY_EVENTS=${NNUE_NTFY_EVENTS:-done,fail,test} \
-  NNUE_AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-phase_done,done,fail} \
-  NNUE_USER_NOTIFY_GENERIC=${NNUE_USER_NOTIFY_GENERIC:-0} \
+      good_news:($event == "iteration_done" and $user_notify)
+    }
+    | if $sprt == null then . else .sprt = $sprt end')
   NNUE_RUN_EVENT_JSON=$payload "$EVENT_HOOK" >/dev/null 2>&1 || true
+}
+
+notify_sprt() {
+  local event=$1 phase=$2 message=$3 log=${4:-} user_notify=${5:-0}
+  local sprt_json
+  sprt_json=$(jq -cn \
+    --arg line "${last_sprt_line:-}" \
+    --arg elo "${last_sprt_elo:-}" \
+    --arg llr "${last_sprt_llr:-}" \
+    '{line:$line, elo:$elo, llr:$llr}')
+  notify "$event" "$phase" "$message" "$log" "$user_notify" "$sprt_json"
 }
 
 section() {
@@ -662,7 +672,7 @@ sprt_gate() {
     printf '  │ \033[1;32m✓ PASS\033[0m  smoke (H1 reached)\n'
     result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
     printf '  └─────────────────────────────────────\n'
-    notify phase_done sprt "SPRT smoke passed for $run: $last_sprt_line" "$last_sprt_log" 0
+    notify_sprt phase_done sprt "SPRT smoke passed for $run: $last_sprt_line" "$last_sprt_log" 0
     return 0
   fi
   local smoke_rc
@@ -678,7 +688,7 @@ sprt_gate() {
   printf '  │ \033[1;33m→ CONTINUE\033[0m  smoke → full SPRT\n'
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
   printf '  └─────────────────────────────────────\n'
-  notify phase_done sprt_smoke "SPRT smoke inconclusive for $run: $last_sprt_line" "$last_sprt_log" 0
+  notify_sprt phase_done sprt_smoke "SPRT smoke inconclusive for $run: $last_sprt_line" "$last_sprt_log" 0
 
   run_sprt_once sprt "$GAMES" sprt
   full_sprt_pass || return 1
@@ -686,7 +696,7 @@ sprt_gate() {
   printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
   printf '  └─────────────────────────────────────\n'
-  notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
+  notify_sprt phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
 }
 full_sprt_gate() {
   load_config
@@ -701,7 +711,7 @@ full_sprt_gate() {
   printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
   printf '  └─────────────────────────────────────\n'
-  notify phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
+  notify_sprt phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
 }
 
 next_run_name() {
@@ -716,20 +726,24 @@ next_run_name() {
 
 commit_and_bump_build_json() {
   local result=$1 accepted=$2 elo=$3 llr=$4 command=$5 details=$6
-  local next next_base subject
+  local next next_base subject hypothesis
   next=$(next_run_name "$accepted")
   if [[ "$result" == PASS ]]; then
     subject="${accepted}.nn: Elo ${elo},LLR ${llr}"
     next_base=$accepted
   else
-    subject="fail: ${accepted}.nn: Elo ${elo},LLR ${llr}"
+    subject="${accepted}.nn: rejected: Elo ${elo},LLR ${llr}"
     next_base=${continue_from:-}
     [[ -n "$next_base" ]] || next_base=$(previous_run_name "$accepted") || return
   fi
+  hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
 
   git commit --only \
     -m "$subject" \
-    -m "Forge command:
+    -m "Hypothesis:
+$hypothesis
+
+Forge command:
 $command
 
 Result:
@@ -770,7 +784,6 @@ commit_failed_iteration() {
   record_iteration FAIL "rejected; build.json advanced"
   notify fail iterate "rejected $run: ${last_sprt_line:-sprt failed}" "$summary_file" 1
   print_summary || true
-  exit 1
 }
 
 record_iteration() {
@@ -800,16 +813,22 @@ iterate() {
     show_config
     notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
     if (( FULL_SPRT_FIRST == 1 && i == 1 )); then
-      full_sprt_gate || commit_failed_iteration
+      if ! full_sprt_gate; then
+        commit_failed_iteration
+        continue
+      fi
     else
       train || fail "train failed for $run" train
       gates || fail "gates failed for $run" gates
-      sprt_gate || commit_failed_iteration
+      if ! sprt_gate; then
+        commit_failed_iteration
+        continue
+      fi
     fi
     bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
       || fail "build.json commit failed for $run" iterate
     record_iteration PASS "accepted; build.json advanced"
-    notify done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
+    notify iteration_done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
   done
   print_summary
 }

@@ -196,6 +196,32 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
 
             subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
 
+            subject = subprocess.run(
+                ["git", "show", "--no-patch", "--format=%s", "HEAD"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout.strip()
+            self.assertEqual(
+                "uho-native-1.0.35.nn: Elo 6.0,LLR 0.49/2.20 (22%)",
+                subject,
+            )
+
+            body = subprocess.run(
+                ["git", "show", "--no-patch", "--format=%B", "HEAD"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout
+            self.assertIn(
+                "Hypothesis:\nContinue accepted uho-native-1.0.33 using the next UHO data window",
+                body,
+            )
+            self.assertIn("Forge command:\nforge command", body)
+            self.assertIn("Result:\nCrucible result", body)
+
             committed = subprocess.run(
                 ["git", "show", "HEAD:build.json"],
                 cwd=tmp,
@@ -288,9 +314,23 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
                 stdout=subprocess.PIPE,
             ).stdout.strip()
             self.assertEqual(
-                "fail: uho-native-1.0.36.nn: Elo -25.2,LLR -0.32/2.20 (-15%)",
+                "uho-native-1.0.36.nn: rejected: Elo -25.2,LLR -0.32/2.20 (-15%)",
                 subject,
             )
+
+            body = subprocess.run(
+                ["git", "show", "--no-patch", "--format=%B", "HEAD"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout
+            self.assertIn(
+                "Hypothesis:\nContinue accepted uho-native-1.0.35 using the next UHO data window",
+                body,
+            )
+            self.assertIn("Forge command:\nforge command", body)
+            self.assertIn("Result:\nCrucible result", body)
 
             committed_json = json.loads(subprocess.run(
                 ["git", "show", "HEAD:build.json"],
@@ -307,6 +347,105 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             self.assertEqual("uho-native-1.0.37", working_json["run"])
             self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
             self.assertEqual(600000000, working_json["data"]["offset"])
+
+    def test_rejected_smoke_advances_and_continues_iteration_loop(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            build = tmp / "build.json"
+            arch = tmp / "architecture.json"
+            trace = tmp / "trace.txt"
+            build.write_text(
+                json.dumps({
+                    "run": "uho-native-1.0.35",
+                    "lineage": "scratch-native",
+                    "data": {
+                        "source_binpack": "data/nodes5000pv2_UHO.binpack",
+                        "limit": 100000000,
+                        "offset": 500000000,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            arch.write_text('{"input_buckets":8}\n', encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.name", "Petter Wahlman"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.email", "petter@wahlman.no"], cwd=tmp, check=True)
+            subprocess.run(["git", "add", "build.json", "architecture.json"], cwd=tmp, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=tmp, check=True)
+
+            build.write_text(
+                json.dumps({
+                    "run": "uho-native-1.0.36",
+                    "lineage": "scratch-native",
+                    "continue_from": "uho-native-1.0.35",
+                    "hypothesis": "candidate",
+                    "data": {
+                        "source_binpack": "data/nodes5000pv2_UHO.binpack",
+                        "limit": 100000000,
+                        "offset": 500000000,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            source = (REPO / "nnue-run").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD=build.json
+ARCH=architecture.json
+NNUE_NTFY=0
+ITERATIONS=2
+train() { printf 'train:%s\n' "$run" >> "$TRACE"; }
+gates() { printf 'gates:%s\n' "$run" >> "$TRACE"; }
+sprt_gate() {
+  printf 'sprt:%s\n' "$run" >> "$TRACE"
+  last_sprt_elo=-25.2
+  last_sprt_llr='-0.32/2.20 (-15%)'
+  last_sprt_command='forge command'
+  last_sprt_line='Crucible smoke games=400/400 elo=-25.2 ci=28.8 llr=-0.32/2.20 (-15%) los=30.0% draw=35.0%'
+  return 1
+}
+iterate
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env["TRACE"] = str(trace)
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(0, proc.returncode, proc.stderr)
+            self.assertEqual(
+                "train:uho-native-1.0.36\n"
+                "gates:uho-native-1.0.36\n"
+                "sprt:uho-native-1.0.36\n"
+                "train:uho-native-1.0.37\n"
+                "gates:uho-native-1.0.37\n"
+                "sprt:uho-native-1.0.37\n",
+                trace.read_text(encoding="utf-8"),
+            )
+            subjects = subprocess.run(
+                ["git", "log", "--format=%s", "--reverse"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout.splitlines()
+            self.assertEqual([
+                "base",
+                "uho-native-1.0.36.nn: rejected: Elo -25.2,LLR -0.32/2.20 (-15%)",
+                "uho-native-1.0.37.nn: rejected: Elo -25.2,LLR -0.32/2.20 (-15%)",
+            ], subjects)
+            working_json = json.loads(build.read_text(encoding="utf-8"))
+            self.assertEqual("uho-native-1.0.38", working_json["run"])
+            self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
+            self.assertEqual(700000000, working_json["data"]["offset"])
 
     def test_smoke_gate_rejects_bad_elo_or_negative_llr(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
