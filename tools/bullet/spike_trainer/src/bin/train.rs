@@ -870,6 +870,77 @@ fn write_chunk(writer: &mut BufWriter<File>, chunk: &[ChessBoard]) -> std::io::R
     writer.write_all(bytes)
 }
 
+fn bullet_output_tmp_path(output: &Path) -> PathBuf {
+    let file_name = output
+        .file_name()
+        .and_then(OsStr::to_str)
+        .unwrap_or("bullet-output");
+    output.with_file_name(format!("{file_name}.tmp.{}", process::id()))
+}
+
+fn create_bullet_output(output: &Path) -> (PathBuf, BufWriter<File>) {
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|err| {
+            eprintln!("error: cannot create {}: {err}", parent.display());
+            process::exit(1);
+        });
+    }
+    let tmp = bullet_output_tmp_path(output);
+    let _ = fs::remove_file(&tmp);
+    let out_file = File::create(&tmp).unwrap_or_else(|err| {
+        eprintln!("error: cannot create {}: {err}", tmp.display());
+        process::exit(1);
+    });
+    (tmp, BufWriter::new(out_file))
+}
+
+fn publish_bullet_output(
+    tmp: PathBuf,
+    mut writer: BufWriter<File>,
+    output: &Path,
+    records: u64,
+) {
+    writer.flush().unwrap_or_else(|err| {
+        let _ = fs::remove_file(&tmp);
+        eprintln!("error: cannot flush {}: {err}", tmp.display());
+        process::exit(1);
+    });
+    writer.get_ref().sync_all().unwrap_or_else(|err| {
+        let _ = fs::remove_file(&tmp);
+        eprintln!("error: cannot sync {}: {err}", tmp.display());
+        process::exit(1);
+    });
+    drop(writer);
+
+    let expected = records * mem::size_of::<ChessBoard>() as u64;
+    let actual = tmp
+        .metadata()
+        .unwrap_or_else(|err| {
+            let _ = fs::remove_file(&tmp);
+            eprintln!("error: cannot stat {}: {err}", tmp.display());
+            process::exit(1);
+        })
+        .len();
+    if actual != expected {
+        let _ = fs::remove_file(&tmp);
+        eprintln!(
+            "error: wrote {actual} bytes to {}, expected {expected}",
+            tmp.display()
+        );
+        process::exit(1);
+    }
+
+    fs::rename(&tmp, output).unwrap_or_else(|err| {
+        let _ = fs::remove_file(&tmp);
+        eprintln!(
+            "error: cannot publish {} to {}: {err}",
+            tmp.display(),
+            output.display()
+        );
+        process::exit(1);
+    });
+}
+
 fn is_bullet_data_path(path: &Path) -> bool {
     matches!(path.extension().and_then(OsStr::to_str), Some("bullet"))
 }
@@ -913,12 +984,6 @@ fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
         eprintln!("using existing Bullet data: {} records from {}", records, source.display());
         return;
     }
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent).unwrap_or_else(|err| {
-            eprintln!("error: cannot create {}: {err}", parent.display());
-            process::exit(1);
-        });
-    }
     let mut input = BufReader::new(File::open(source).unwrap_or_else(|err| {
         eprintln!("error: cannot open {}: {err}", source.display());
         process::exit(1);
@@ -927,19 +992,19 @@ fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
         eprintln!("error: cannot seek {}: {err}", source.display());
         process::exit(1);
     });
-    let mut output_file = BufWriter::new(File::create(output).unwrap_or_else(|err| {
-        eprintln!("error: cannot create {}: {err}", output.display());
-        process::exit(1);
-    }));
+    let (tmp, mut output_file) = create_bullet_output(output);
     let bytes = records * record_size;
     let copied = std::io::copy(&mut input.take(bytes), &mut output_file).unwrap_or_else(|err| {
+        let _ = fs::remove_file(&tmp);
         eprintln!("error: copy failed: {err}");
         process::exit(1);
     });
     if copied != bytes {
+        let _ = fs::remove_file(&tmp);
         eprintln!("error: copied {copied} bytes, expected {bytes}");
         process::exit(1);
     }
+    publish_bullet_output(tmp, output_file, output, records);
     eprintln!("copied {} Bullet data records to {}", records, output.display());
 }
 
@@ -970,17 +1035,7 @@ fn cmd_data(config: &Config) {
         return;
     }
 
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent).unwrap_or_else(|err| {
-            eprintln!("error: cannot create {}: {err}", parent.display());
-            process::exit(1);
-        });
-    }
-    let out_file = File::create(&output).unwrap_or_else(|err| {
-        eprintln!("error: cannot create {}: {err}", output.display());
-        process::exit(1);
-    });
-    let mut writer = BufWriter::new(out_file);
+    let (tmp, mut writer) = create_bullet_output(&output);
     let paths = data
         .source_binpack
         .split(';')
@@ -1032,6 +1087,7 @@ fn cmd_data(config: &Config) {
         }
         let chunk = &chunk[..remaining];
         write_chunk(&mut writer, chunk).unwrap_or_else(|err| {
+            let _ = fs::remove_file(&tmp);
             eprintln!("error: write failed: {err}");
             process::exit(1);
         });
@@ -1046,6 +1102,7 @@ fn cmd_data(config: &Config) {
         }
         data.limit != 0 && written >= data.limit
     });
+    publish_bullet_output(tmp, writer, &output, written);
     let secs = start.elapsed().as_secs_f32();
     eprintln!(
         "done: skipped {} positions, converted {} positions to {} in {:.1}s ({:.1}M/s)",

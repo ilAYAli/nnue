@@ -304,6 +304,65 @@ training_build >/dev/null
             self.assertNotIn("init_net", resolved)
             self.assertNotIn("reference", resolved)
 
+    def test_train_rebuilds_missing_data_when_candidate_net_already_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "candidate.nn").write_bytes(b"net")
+            build = tmp / "build.json"
+            build.write_text('{"run":"candidate"}\n', encoding="utf-8")
+            calls = tmp / "calls.txt"
+            helper = tmp / "train-helper"
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" >> \"$CALLS\"\n"
+                "if [[ \"$1\" == data ]]; then\n"
+                "  mkdir -p data/bullet\n"
+                "  printf data > data/bullet/candidate.bullet\n"
+                "  exit 0\n"
+                "fi\n"
+                "exit 9\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+TRAIN_HELPER="$TEST_HELPER"
+NNUE_NTFY=0
+train
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "CALLS": str(calls),
+                "TEST_BUILD": str(build),
+                "TEST_HELPER": str(helper),
+                "TEST_HOME": str(home),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertTrue((tmp / "data" / "bullet" / "candidate.bullet").exists())
+            self.assertEqual(
+                "data --build runs/candidate/build.resolved.json --arch architecture.json --defaults defaults.json\n",
+                calls.read_text(encoding="utf-8"),
+            )
+
     def test_next_run_name_bumps_release_candidates(self) -> None:
         proc = self.run_sourced('NNUE_NTFY=0; next_run_name "native-2.0.0-rc1"')
         self.assertEqual("", proc.stderr)
@@ -785,6 +844,90 @@ check_smoke 4.0 -0.22/2.20 positive_elo
             self.assertIn("negative_llr=fail", proc.stdout)
             self.assertIn("mild_negative=pass:1", proc.stdout)
             self.assertIn("positive_elo=pass:1", proc.stdout)
+
+    def test_move_gate_skips_missing_cases_when_not_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "candidate.nn").write_bytes(b"candidate")
+            (nets / "reference.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text('{"run":"candidate","continue_from":"reference"}\n', encoding="utf-8")
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+NNUE_NTFY=0
+CASES="$MISSING_CASES"
+MOVE_GATE_STRICT=0
+move_gate
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "MISSING_CASES": str(tmp / "missing.jsonl"),
+                "TEST_BUILD": str(build),
+                "TEST_HOME": str(home),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertIn("SKIP", proc.stdout)
+
+    def test_move_gate_fails_missing_cases_when_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "candidate.nn").write_bytes(b"candidate")
+            (nets / "reference.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text('{"run":"candidate","continue_from":"reference"}\n', encoding="utf-8")
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+NNUE_NTFY=0
+CASES="$MISSING_CASES"
+MOVE_GATE_STRICT=1
+move_gate
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "MISSING_CASES": str(tmp / "missing.jsonl"),
+                "TEST_BUILD": str(build),
+                "TEST_HOME": str(home),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(0, proc.returncode)
+            self.assertIn("missing move gate cases", proc.stderr)
 
     def test_sprt_gate_runs_full_sprt_after_inconclusive_smoke(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
