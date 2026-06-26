@@ -149,6 +149,17 @@ def convert_input_weights(
     return target
 
 
+def source_output_bucket_for_target(target_bucket: int, source_buckets: int, target_buckets: int) -> int:
+    if source_buckets == target_buckets:
+        return target_bucket
+    if source_buckets == 1:
+        return 0
+    if target_buckets > source_buckets and target_buckets % source_buckets == 0:
+        return target_bucket * source_buckets // target_buckets
+    raise SystemExit(
+        f"cannot map output buckets {source_buckets} -> {target_buckets}")
+
+
 def expand_output_head(net, output_buckets: int):
     weights = np.asarray(net.output_weights, dtype=np.float32)
     if weights.shape == (N_L3,):
@@ -157,11 +168,14 @@ def expand_output_head(net, output_buckets: int):
     current = int(getattr(net, "output_buckets", weights.shape[0]))
     if current == output_buckets:
         return weights, biases
-    if current == 1:
-        return np.repeat(weights, output_buckets, axis=0), np.repeat(biases, output_buckets)
-    raise SystemExit(
-        f"cannot expand {current} output buckets to {output_buckets}; "
-        "only single-head init can be repeated")
+
+    target_weights = np.empty((output_buckets, N_L3), dtype=np.float32)
+    target_biases = np.empty(output_buckets, dtype=np.float32)
+    for target_bucket in range(output_buckets):
+        source_bucket = source_output_bucket_for_target(target_bucket, current, output_buckets)
+        target_weights[target_bucket] = weights[source_bucket]
+        target_biases[target_bucket] = biases[source_bucket]
+    return target_weights, target_biases
 
 
 def bullet_l3_weights(output_weights: np.ndarray) -> np.ndarray:

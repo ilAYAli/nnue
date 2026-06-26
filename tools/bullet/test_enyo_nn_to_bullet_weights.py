@@ -7,6 +7,7 @@ from enyo_nn_to_bullet_weights import (
     bullet_l3_weights,
     expand_output_head,
     source_bucket_for_target,
+    source_output_bucket_for_target,
     source_channel_for_target,
 )
 from lib.enyo_nnue import N_L3
@@ -16,6 +17,12 @@ class SingleHeadNet:
     output_weights = np.arange(N_L3, dtype=np.float32).reshape(1, N_L3)
     output_biases = np.asarray([7.0], dtype=np.float32)
     output_buckets = 1
+
+
+class FourHeadNet:
+    output_weights = np.arange(4 * N_L3, dtype=np.float32).reshape(4, N_L3)
+    output_biases = np.asarray([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+    output_buckets = 4
 
 
 def test_expanded_l3_weights_use_bullet_internal_orientation() -> None:
@@ -31,6 +38,20 @@ def test_expanded_l3_weights_use_bullet_internal_orientation() -> None:
         bullet_weights[:, 0],
         np.arange(N_L3, dtype=np.float32),
     )
+
+
+def test_expanded_multi_bucket_head_repeats_parent_ranges() -> None:
+    output_weights, output_biases = expand_output_head(FourHeadNet(), 8)
+
+    assert [source_output_bucket_for_target(bucket, 4, 8) for bucket in range(8)] == [
+        0, 0, 1, 1, 2, 2, 3, 3,
+    ]
+    assert output_weights.shape == (8, N_L3)
+    np.testing.assert_array_equal(output_biases, np.asarray([1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0]))
+    np.testing.assert_array_equal(output_weights[0], FourHeadNet.output_weights[0])
+    np.testing.assert_array_equal(output_weights[1], FourHeadNet.output_weights[0])
+    np.testing.assert_array_equal(output_weights[6], FourHeadNet.output_weights[3])
+    np.testing.assert_array_equal(output_weights[7], FourHeadNet.output_weights[3])
 
 
 def test_32_bucket_init_uses_legacy_parent_buckets() -> None:
@@ -65,6 +86,7 @@ def test_halfka_v2_init_merges_king_channels_by_square_legality() -> None:
 
 def main() -> None:
     test_expanded_l3_weights_use_bullet_internal_orientation()
+    test_expanded_multi_bucket_head_repeats_parent_ranges()
     test_32_bucket_init_uses_legacy_parent_buckets()
     test_clean_bucket_expansion_repeats_parent_buckets()
     test_unsupported_bucket_mapping_fails()
