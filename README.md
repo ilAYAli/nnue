@@ -25,8 +25,8 @@ architecture experiment and requires matching engine support and parity checks.
 
 ```json
 {
-  "name": "scratch-native-16bucket-12ch-1024-v2",
-  "lineage": "scratch-native",
+  "name": "native-16bucket-12ch-1024-v2",
+  "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
   "l2_size": 16,
@@ -88,7 +88,7 @@ parent, hypothesis, and the few parameters that intentionally differ from
 ```json
 {
   "run": "native-3.0.0-rc7",
-  "lineage": "scratch-native",
+  "lineage": "native",
   "continue_from": "native-3.0.0-rc5",
   "hypothesis": "farseerT74, 4 output buckets, lr: 0.0002",
   "superbatches": 4096,

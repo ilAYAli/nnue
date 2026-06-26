@@ -277,7 +277,7 @@ load_config
             build.write_text(
                 json.dumps({
                     "run": "uho-native-1.1.0",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "continue_from": "uho-native-1.0.42",
                     "initialize_from": "~/assets/nets/uho-native-1.0.42.nn",
                     "reference": "uho-native-1.0.42",
@@ -333,7 +333,7 @@ training_build >/dev/null
             build.write_text(
                 json.dumps({
                     "run": "native-2.0.0-rc1",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "hypothesis": "fresh scratch candidate",
                     "data": {
                         "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
@@ -586,7 +586,7 @@ train
             build.write_text(
                 json.dumps({
                     "run": "native-2.0.0-rc1",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "continue_from": "native-2.0.0-rc0",
                     "reference": "~/assets/nets/default.net",
                     "hypothesis": "fresh scratch candidate",
@@ -648,7 +648,7 @@ train
             build.write_text(
                 json.dumps({
                     "run": "uho-native-1.0.34",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "wdl": 0.75,
                     "hypothesis": "previous",
                     "data": {
@@ -669,7 +669,7 @@ train
             build.write_text(
                 json.dumps({
                     "run": "uho-native-1.0.35",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "continue_from": "uho-native-1.0.33",
                     "reference": "uho-native-1.0.33",
                     "wdl": 0.75,
@@ -759,7 +759,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
             build.write_text(
                 json.dumps({
                     "run": "native-3.0.0-rc6",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "continue_from": "native-3.0.0-rc5",
                     "hypothesis": "previous",
                     "data": {
@@ -780,7 +780,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
             build.write_text(
                 json.dumps({
                     "run": "native-3.0.0-rc7",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "continue_from": "native-3.0.0-rc5",
                     "reference": "native-3.0.0-rc5",
                     "hypothesis": "accepted four-bucket candidate",
@@ -828,7 +828,7 @@ bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Cru
             build.write_text(
                 json.dumps({
                     "run": "uho-native-1.0.35",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "wdl": 0.75,
                     "hypothesis": "previous",
                     "data": {
@@ -849,7 +849,7 @@ bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Cru
             build.write_text(
                 json.dumps({
                     "run": "uho-native-1.0.36",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "continue_from": "uho-native-1.0.35",
                     "reference": "uho-native-1.0.35",
                     "wdl": 0.75,
@@ -925,7 +925,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             build.write_text(
                 json.dumps({
                     "run": "native-1.9.0",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "hypothesis": "previous candidate",
                     "data": {
                         "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
@@ -945,7 +945,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             build.write_text(
                 json.dumps({
                     "run": "native-2.0.0-rc1",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "hypothesis": "fresh scratch candidate",
                     "data": {
                         "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
@@ -992,7 +992,7 @@ fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "
             build.write_text(
                 json.dumps({
                     "run": "uho-native-1.0.35",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "data": {
                         "source_binpack": "data/nodes5000pv2_UHO.binpack",
                         "limit": 100000000,
@@ -1011,7 +1011,7 @@ fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "
             build.write_text(
                 json.dumps({
                     "run": "uho-native-1.0.36",
-                    "lineage": "scratch-native",
+                    "lineage": "native",
                     "continue_from": "uho-native-1.0.35",
                     "reference": "uho-native-1.0.35",
                     "hypothesis": "candidate",

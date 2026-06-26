@@ -583,10 +583,10 @@ fn load_config(args: &[String]) -> (String, Config, bool) {
     reject_poison(&config);
     validate_config_contract(&config);
 
-    if string_at(&config.arch, "lineage") != Some("scratch-native")
-        || string_at(&config.build, "lineage") != Some("scratch-native")
+    if string_at(&config.arch, "lineage") != Some("native")
+        || string_at(&config.build, "lineage") != Some("native")
     {
-        eprintln!("error: architecture.json and build.json lineage must be scratch-native");
+        eprintln!("error: architecture.json and build.json lineage must be native");
         process::exit(2);
     }
 
@@ -1455,7 +1455,7 @@ mod tests {
 
     fn config(build: Value) -> Config {
         Config {
-            arch: json!({"lineage": "scratch-native"}),
+            arch: json!({"lineage": "native"}),
             defaults: defaults(),
             build,
         }
@@ -1465,7 +1465,7 @@ mod tests {
     fn build_overrides_top_level_training_defaults() {
         let config = config(json!({
             "run": "candidate",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "loader": "sfbinpack",
             "net_id": "override_id",
             "batches": 32,
@@ -1500,7 +1500,7 @@ mod tests {
     fn build_overrides_nested_sfbinpack_defaults() {
         let config = config(json!({
             "run": "candidate",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "sfbinpack": {
                 "buffer_mb": 2048,
                 "offset": 500,
@@ -1537,7 +1537,7 @@ mod tests {
     fn data_offset_overrides_sfbinpack_offset_for_data_selection() {
         let config = config(json!({
             "run": "candidate",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "sfbinpack": {"offset": 500},
             "data": {"source_binpack": "data.binpack", "limit": 100, "offset": 900, "threads": 3}
         }));
@@ -1552,7 +1552,7 @@ mod tests {
     fn unknown_build_training_key_is_rejected() {
         let config = config(json!({
             "run": "candidate",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "new_training_knob": 1,
             "data": {"source_binpack": "data.binpack"}
         }));
@@ -1569,7 +1569,7 @@ mod tests {
     fn initialize_from_and_continue_from_are_accepted_together() {
         let config = config(json!({
             "run": "uho-native-1.1.0",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "continue_from": "uho-native-1.0.42",
             "initialize_from": "~/assets/nets/uho-native-1.0.42.nn",
             "reference": "uho-native-1.0.42",
@@ -1585,7 +1585,7 @@ mod tests {
     fn data_training_knobs_are_rejected() {
         let config = config(json!({
             "run": "candidate",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "data": {"source_binpack": "data.binpack", "buffer_mb": 2048}
         }));
 
@@ -1601,7 +1601,7 @@ mod tests {
     fn deprecated_data_extension_is_rejected() {
         let config = config(json!({
             "run": "candidate",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "data": {
                 "source_binpack": "rows.data",
                 "bullet_output": "data/bullet/candidate.data"
@@ -1625,7 +1625,7 @@ mod tests {
     fn missing_default_training_parameter_is_rejected() {
         let mut config = config(json!({
             "run": "candidate",
-            "lineage": "scratch-native",
+            "lineage": "native",
             "data": {"source_binpack": "data.binpack"}
         }));
         config.defaults.as_object_mut().unwrap().remove("wdl");
