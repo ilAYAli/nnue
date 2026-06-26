@@ -1,14 +1,13 @@
 {
-  "run": "native-4.0.0-rc4",
+  "run": "native-4.1.0-rc4",
   "lineage": "native",
   "continue_from": "native-4.0.0-rc2",
-  "hypothesis": "8 output buckets, small cp-only nudge on Enyo self-play positions labeled by Stockfish depth 20",
-  "superbatches": 32,
-  "lr": 1e-05,
-  "wdl": 0.0,
+  "hypothesis": "8 output buckets, continue Stockfish farseerT74 training from accepted native-4.0.0-rc2 after rejecting Enyo self-play D20 fine-tune",
+  "superbatches": 4096,
+  "lr": 0.0001,
   "data": {
-    "source_binpack": "data/run-assets/native-1.30.1-rc1-v29self-d20search600k-v23init-lr2e7-sb512-20260609/score/labeled.bullet",
-    "limit": 0,
-    "offset": 0
+    "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
+    "limit": 200000000,
+    "offset": 1400000000
   }
 }
