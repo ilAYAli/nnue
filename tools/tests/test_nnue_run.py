@@ -537,6 +537,12 @@ train
         self.assertEqual(0, proc.returncode)
         self.assertEqual("native-2.0.0-rc2\n", proc.stdout)
 
+    def test_next_promoted_run_name_advances_minor_for_release_candidate(self) -> None:
+        proc = self.run_sourced('NNUE_NTFY=0; next_promoted_run_name "native-3.0.0-rc7"')
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+        self.assertEqual("native-3.1.0-rc1\n", proc.stdout)
+
     def test_plan_uses_training_build_without_validation_reference(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
@@ -714,6 +720,75 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
             self.assertIn('+  "continue_from": "uho-native-1.0.35"', diff)
             self.assertIn('-    "offset": 500000000', diff)
             self.assertIn('+    "offset": 600000000', diff)
+
+    def test_passed_release_candidate_prepares_next_minor_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            build = tmp / "build.json"
+            arch = tmp / "architecture.json"
+            build.write_text(
+                json.dumps({
+                    "run": "native-3.0.0-rc6",
+                    "lineage": "scratch-native",
+                    "continue_from": "native-3.0.0-rc5",
+                    "hypothesis": "previous",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
+                        "limit": 100000000,
+                        "offset": 900000000,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            arch.write_text('{"output_buckets":4}\n', encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.name", "Petter Wahlman"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.email", "petter@wahlman.no"], cwd=tmp, check=True)
+            subprocess.run(["git", "add", "build.json", "architecture.json"], cwd=tmp, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=tmp, check=True)
+
+            build.write_text(
+                json.dumps({
+                    "run": "native-3.0.0-rc7",
+                    "lineage": "scratch-native",
+                    "continue_from": "native-3.0.0-rc5",
+                    "reference": "native-3.0.0-rc5",
+                    "hypothesis": "accepted four-bucket candidate",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
+                        "limit": 100000000,
+                        "offset": 1000000000,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD=build.json
+ARCH=architecture.json
+bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Crucible result"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+
+            subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
+
+            committed_json = json.loads(subprocess.run(
+                ["git", "show", "HEAD:build.json"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout)
+            self.assertEqual("native-3.0.0-rc7", committed_json["run"])
+            self.assertEqual("native-3.0.0-rc5", committed_json["continue_from"])
+            self.assertEqual(1000000000, committed_json["data"]["offset"])
+
+            working_json = json.loads(build.read_text(encoding="utf-8"))
+            self.assertEqual("native-3.1.0-rc1", working_json["run"])
+            self.assertEqual("native-3.0.0-rc7", working_json["continue_from"])
+            self.assertNotIn("reference", working_json)
+            self.assertEqual(1100000000, working_json["data"]["offset"])
 
     def test_failed_iteration_commit_keeps_previous_good_base(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
