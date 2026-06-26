@@ -1,7 +1,7 @@
 {
-  "run": "native-2.0.0-rc26",
+  "run": "native-2.0.0-rc27",
   "lineage": "scratch-native",
-  "continue_from": "native-2.0.0-rc25",
+  "continue_from": "native-2.0.0-rc26",
   "hypothesis": "continue farseerT76 iteration",
   "superbatches": 4096,
   "lr": 0.0005,
@@ -9,6 +9,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 100000000,
-    "offset": 2100000000
+    "offset": 2200000000
   }
 }
