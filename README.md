@@ -1,5 +1,11 @@
 # Enyo NNUE Training
 
+* Current weights initialized at git:
+cd743e1 "native-2.0.0-rc1.nn"
+
+* Trained positions to git:
+8cd6332 = 16,642,998,272.
+
 Current native NNUE iteration is driven by `./nnue` and `build.json`.
 The normal loop is:
 

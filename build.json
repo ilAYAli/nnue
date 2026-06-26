@@ -1,14 +1,15 @@
 {
-  "run": "native-2.0.0-rc31",
+  "run": "native-3.0.0-rc1",
   "lineage": "scratch-native",
-  "continue_from": "native-2.0.0-rc29",
-  "hypothesis": "continue farseerT76 iteration",
+  "continue_from": "native-2.0.0-rc32",
+  "init_net": "~/assets/nets/native-2.0.0-rc32.nn",
+  "hypothesis": "farseerT74, 4 output buckets",
   "superbatches": 4096,
-  "lr": 0.0005,
+  "lr": 0.0003,
   "final_lr": 0.000005,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 100000000,
-    "offset": 2600000000
+    "offset": 0
   }
 }
