@@ -1,13 +1,13 @@
 {
-  "run": "native-2.1.0-rc1",
+  "run": "native-2.2.0-rc1",
   "lineage": "native",
-  "continue_from": "native-2.0.0-rc32",
+  "continue_from": "native-2.1.0-rc1",
   "hypothesis": "16 input buckets, 1 output bucket; resume latest one-head native line after 4/8 output-head continuations saturated",
   "superbatches": 4096,
   "lr": 0.0002,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
-    "offset": 1800000000
+    "offset": 2000000000
   }
 }
