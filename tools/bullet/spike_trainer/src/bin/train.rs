@@ -676,8 +676,32 @@ fn python_command() -> PathBuf {
     }
 }
 
+fn initialize_from_path(value: &str) -> PathBuf {
+    if value.starts_with("~/")
+        || value.starts_with('/')
+        || value.starts_with("./")
+        || value.starts_with("../")
+        || value.ends_with(".nn")
+        || value.ends_with(".net")
+    {
+        return expand_path(value);
+    }
+
+    for candidate in [
+        format!("~/assets/nets/{value}.nn"),
+        format!("runs/{value}/model.nn"),
+    ] {
+        let path = expand_path(&candidate);
+        if path.exists() {
+            return path;
+        }
+    }
+
+    expand_path(value)
+}
+
 fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
-    let input = expand_path(initialize_from);
+    let input = initialize_from_path(initialize_from);
     if !input.exists() {
         eprintln!("error: missing initialize_from: {}", input.display());
         process::exit(1);
@@ -1578,7 +1602,22 @@ mod tests {
 
         assert!(config_contract_errors(&config).is_empty());
         assert_eq!(continue_from(&config).as_deref(), Some("uho-native-1.0.42"));
-        assert_eq!(initialize_from(&config).as_deref(), Some("~/assets/nets/uho-native-1.0.42.nn"));
+        assert_eq!(
+            initialize_from(&config).as_deref(),
+            Some("~/assets/nets/uho-native-1.0.42.nn")
+        );
+    }
+
+    #[test]
+    fn initialize_from_bare_name_resolves_to_exported_net() {
+        let home = env::var("HOME").expect("HOME");
+        let net = Path::new(&home).join("assets/nets/native-test-init.nn");
+        fs::create_dir_all(net.parent().expect("net parent")).expect("create net parent");
+        fs::write(&net, b"net").expect("write net");
+
+        assert_eq!(initialize_from_path("native-test-init"), net);
+
+        let _ = fs::remove_file(net);
     }
 
     #[test]

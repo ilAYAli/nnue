@@ -123,7 +123,7 @@ against the parent:
 {
   "run": "native-4.0.0-rc1",
   "reference": "native-3.1.0-rc1",
-  "initialize_from": "~/assets/nets/native-3.1.0-rc1.nn"
+  "initialize_from": "native-3.1.0-rc1"
 }
 ```
 
