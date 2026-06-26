@@ -1,13 +1,14 @@
 {
-  "run": "native-3.0.0-rc7",
+  "run": "native-4.0.0-rc1",
   "lineage": "scratch-native",
-  "continue_from": "native-3.0.0-rc5",
-  "hypothesis": "farseerT74, 4 output buckets, lr: 0.0002",
+  "initialize_from": "~/assets/nets/native-3.0.0-rc5.nn",
+  "reference": "native-3.0.0-rc5",
+  "hypothesis": "8 output buckets initialized from best 4-bucket native net",
   "superbatches": 4096,
   "lr": 0.0002,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 100000000,
-    "offset": 1000000000
+    "offset": 600000000
   }
 }
