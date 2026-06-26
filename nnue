@@ -910,20 +910,41 @@ $details" \
 
   local tmp
   tmp=$(mktemp)
-  jq \
-    --arg run "$next" \
-    --arg continue_from "$next_base" \
-    '.run = $run
-     | if $continue_from == "" then del(.continue_from) else .continue_from = $continue_from end
-     | if ((.data.offset? | type) == "number") and ((.data.limit? | type) == "number") then
-         .data.offset = (.data.offset + .data.limit)
-       else
-         .
-       end
-     | del(.reference)
-     | del(.initialize_from)
-     | del(.changed_variables.reference)' \
-    "$BUILD" > "$tmp"
+  if [[ "$result" == PASS ]]; then
+    jq \
+      --arg run "$next" \
+      --arg continue_from "$next_base" \
+      '.run = $run
+       | if $continue_from == "" then del(.continue_from) else .continue_from = $continue_from end
+       | if ((.data.offset? | type) == "number") and ((.data.limit? | type) == "number") then
+           .data.offset = (.data.offset + .data.limit)
+         else
+           .
+         end
+       | del(.reference)
+       | del(.initialize_from)
+       | del(.changed_variables.reference)' \
+      "$BUILD" > "$tmp"
+  else
+    jq \
+      --arg run "$next" \
+      --arg continue_from "$next_base" \
+      '.run = $run
+       | if $continue_from == "" then
+           .
+         else
+           .continue_from = $continue_from
+           | del(.reference)
+           | del(.initialize_from)
+           | del(.changed_variables.reference)
+         end
+       | if ((.data.offset? | type) == "number") and ((.data.limit? | type) == "number") then
+           .data.offset = (.data.offset + .data.limit)
+         else
+           .
+         end' \
+      "$BUILD" > "$tmp"
+  fi
   mv "$tmp" "$BUILD"
   echo "updated $BUILD: run=$next"
 }

@@ -917,6 +917,79 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             self.assertNotIn("reference", working_json)
             self.assertEqual(600000000, working_json["data"]["offset"])
 
+    def test_failed_initialized_candidate_preserves_origin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            build = tmp / "build.json"
+            arch = tmp / "architecture.json"
+            build.write_text(
+                json.dumps({
+                    "run": "native-3.3.0-rc0",
+                    "lineage": "native",
+                    "reference": "native-2.1.0-rc1",
+                    "initialize_from": "native-2.1.0-rc1",
+                    "hypothesis": "previous initialized candidate",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
+                        "limit": 200000000,
+                        "offset": 2000000000,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            arch.write_text('{"output_buckets":4}\n', encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.name", "Petter Wahlman"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.email", "petter@wahlman.no"], cwd=tmp, check=True)
+            subprocess.run(["git", "add", "build.json", "architecture.json"], cwd=tmp, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=tmp, check=True)
+
+            build.write_text(
+                json.dumps({
+                    "run": "native-3.3.0-rc1",
+                    "lineage": "native",
+                    "reference": "native-2.1.0-rc1",
+                    "initialize_from": "native-2.1.0-rc1",
+                    "hypothesis": "four output heads from one-head parent",
+                    "data": {
+                        "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
+                        "limit": 200000000,
+                        "offset": 2200000000,
+                    },
+                }, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD=build.json
+ARCH=architecture.json
+continue_from=
+fail_build_json "native-3.3.0-rc1" "-6.1" "-0.17/2.20 (-8%)" "forge command" "Crucible result"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+
+            subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
+
+            committed_json = json.loads(subprocess.run(
+                ["git", "show", "HEAD:build.json"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout)
+            self.assertEqual("native-3.3.0-rc1", committed_json["run"])
+            self.assertEqual("native-2.1.0-rc1", committed_json["reference"])
+            self.assertEqual("native-2.1.0-rc1", committed_json["initialize_from"])
+            self.assertNotIn("continue_from", committed_json)
+
+            working_json = json.loads(build.read_text(encoding="utf-8"))
+            self.assertEqual("native-3.3.0-rc2", working_json["run"])
+            self.assertEqual("native-2.1.0-rc1", working_json["reference"])
+            self.assertEqual("native-2.1.0-rc1", working_json["initialize_from"])
+            self.assertNotIn("continue_from", working_json)
+            self.assertEqual(2400000000, working_json["data"]["offset"])
+
     def test_failed_scratch_rc_does_not_invent_continue_from(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
