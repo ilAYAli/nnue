@@ -1,13 +1,13 @@
 {
-  "run": "native-3.1.0-rc2",
+  "run": "native-3.2.0-rc1",
   "lineage": "native",
-  "continue_from": "native-3.0.0-rc5",
+  "continue_from": "native-3.1.0-rc2",
   "hypothesis": "4 output buckets, continue Stockfish farseerT74 training after 8-bucket continuation saturated",
   "superbatches": 4096,
   "lr": 0.0002,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
-    "offset": 1400000000
+    "offset": 1600000000
   }
 }
