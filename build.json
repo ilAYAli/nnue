@@ -1,13 +1,13 @@
 {
-  "run": "native-4.1.0-rc1",
+  "run": "native-4.1.0-rc2",
   "continue_from": "native-4.0.0-rc2",
-  "hypothesis": "8 output buckets initialized from best 4-bucket native net",
+  "hypothesis": "8 output buckets initialized from best 4-bucket native net, dec lr",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
     "offset": 1200000000
   },
-  "lr": 0.0002,
+  "lr": 0.0001,
   "superbatches": 4096,
   "lineage": "native"
 }
