@@ -1,10 +1,10 @@
 {
-  "run": "native-4.1.0-rc4",
+  "run": "native-3.1.0-rc2",
   "lineage": "native",
-  "continue_from": "native-4.0.0-rc2",
-  "hypothesis": "8 output buckets, continue Stockfish farseerT74 training from accepted native-4.0.0-rc2 after rejecting Enyo self-play D20 fine-tune",
+  "continue_from": "native-3.0.0-rc5",
+  "hypothesis": "4 output buckets, continue Stockfish farseerT74 training after 8-bucket continuation saturated",
   "superbatches": 4096,
-  "lr": 0.0001,
+  "lr": 0.0002,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
