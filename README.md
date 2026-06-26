@@ -1,235 +1,115 @@
-# Enyo NNUE Training
+# Enyo Native NNUE
 
-* Current weights initialized at git:
-cd743e1 "native-2.0.0-rc1.nn"
+This repository trains Enyo-native NNUE networks. The current native line began
+from newly initialized Enyo weights.
 
-* Trained positions to git:
-8cd6332 = 16,642,998,272.
+The normal experiment interface is `build.json`; shared training defaults live
+in `defaults.json`; runtime/trainer shape lives in `architecture.json`.
 
-Current native NNUE iteration is driven by `./nnue` and `build.json`.
-The normal loop is:
+## Provenance
 
-```sh
-./nnue status
-./nnue plan
-ITERATIONS=1 ./nnue iterate
-```
+Training data currently comes from a combination of selfplay and the
+`official-stockfish/master-binpacks` dataset:
 
-`iterate` trains one candidate, runs gates, runs Forge/Crucible SPRT by
-default, and advances `build.json` only after an accepted SPRT. It stops on a
-failed gate or failed SPRT.
+The dataset is licensed as ODbL-1.0. If a trained net is published, include
+provenance/notice that Stockfish master binpacks under ODbL-1.0 were used.
 
-## Files
+Training uses Bullet through the local `tools/bullet/spike_trainer` wrapper.
+The pinned dependency is `bullet_lib` from https://github.com/jw1912/bullet at
+commit `d372d487aedfeb8bdc256b9f694dbcd41016bf82`. Bullet is MIT licensed.
 
-`build.json` is the experiment interface. For normal automatic iteration, keep
-it small: `run`, current hypothesis notes, and only values that intentionally
-override lane defaults for this experiment.
+## Architecture
 
-`architecture.json` describes the engine/runtime net shape. Changing it is an
-architecture experiment, not a normal same-lane iteration.
-
-`defaults.json` holds training defaults that are shared by runs. Do not copy
-matching default values into `build.json`; override them there only when that
-is the experiment.
-
-## `build.json` Parameters
-
-`run`: Candidate name. Automatic iteration increments names like
-`pwa-native-v16` to `pwa-native-v17` after a pass.
-
-`lineage`: Candidate family. Current native runs use `scratch-native`.
-
-`hypothesis`: Short reason for the run. Keep it current, not historical log
-spam.
-
-`changed_variables`: Human-readable notes for the one variable family being
-tested. Do not put derived reference state here.
-
-`data.source_binpack`: Training source file. Changing this is a data experiment.
-
-`data.limit`: Maximum rows/games consumed from the source. Increasing this adds
-more data from the same source.
-
-Optional one-run overrides: `superbatches`, `lr`, and `final_lr`. Do not
-keep them in `build.json` when they match `defaults.json`.
-
-
-`continue_from` optional: Parent run for non-interactive or non-standard starts.
-If omitted, `nnue` infers the previous version from `run`.
-
-`reference` optional: SPRT reference net/run when it should differ from
-`continue_from`. If omitted, the reference is `continue_from`.
-
-For normal iteration, omit `continue_from` and `reference` unless you explicitly
-need a non-previous parent or a non-parent comparison.
-
-## `defaults.json` Training Parameters
-
-`loader`: Bullet data loader. Current value is `direct`.
-
-`net_id`: Bullet checkpoint/export id. Current native lane uses
-`scratch_native`.
-
-`batches`: Batches per superbatch.
-
-`batch_size`: Positions per batch.
-
-`superbatches`: Default training dose. Override it in `build.json` only for
-a deliberate dose experiment.
-
-`threads`: CPU data-loading threads for training.
-
-`wdl`: WDL target mixture. Higher values weight WDL/game-result style signal
-more; lower values weight centipawn regression more.
-
-`lr`: Default starting learning rate. Override it in `build.json` only for a
-deliberate learning-rate experiment.
-
-`final_lr`: Default final learning rate. Override it in `build.json` only for
-a deliberate learning-rate experiment.
-
-`save_rate`: Checkpoint frequency in superbatches.
-
-`trainable`: Which weights may change. Current value `all` trains the full net.
-
-`weight_decay`: Optimizer regularization. Current value `0.0` disables it.
-
-`sfbinpack.buffer_mb`: Read buffer size for binpack sources.
-
-`sfbinpack.min_ply`: Minimum ply kept from binpack data.
-
-`sfbinpack.max_abs_cp`: Maximum absolute centipawn target kept.
-
-`sfbinpack.quiet_only`: Whether to keep only quiet positions.
-
-`validation.static_rows`: Rows used by static eval gate.
-
-`validation.engine_threads`: Engine threads used by validation.
-
-`validation.engine_hash_mb`: Engine hash size for validation.
-
-`validation.sprt_games_smoke`: Smoke game count for non-iteration validation.
-
-`validation.sprt_concurrency`: Default SPRT concurrency for validation helpers.
-
-## `architecture.json` Parameters
-
-`hidden`: L1 hidden width.
-
-`l2_size`: Size of the small post-accumulator layer used by this native layout.
-
-`input_buckets`: Number of input/king buckets.
-
-`feature_channels`: Feature channels per bucket.
-
-`output_buckets`: Number of output buckets.
-
-`input_factoriser`: Whether input factorization is enabled.
-
-`eval_scale`: Scale from network output to centipawns.
-
-`l0_std`, `l1_std`: Initialization scales.
-
-`l1_export_scale`: Export-time scale for L1 weights.
-
-`export_format`: Engine-compatible net format.
-
-Do not change architecture parameters during a normal continuation run. If
-same-lane continuation stops gaining, change training/data first. Architecture
-changes need matching engine support and parity checks.
-
-## `nnue` Validation Controls
-
-These are shell overrides, not persistent training parameters:
-
-`ITERATIONS`: Number of accepted iterations to attempt.
-
-`ROWS`: Rows sampled by static eval gate.
-
-`SMOKE_GAMES`: Cheap SPRT smoke game count before the full gate. Default is
-`400`.
-
-`SKIP_SMOKE`: Set to `1` to skip the smoke gate and run the full SPRT gate
-directly. Useful while parent-vs-child Elo is improving rapidly:
-`SKIP_SMOKE=1 GAMES=800 ./nnue iterate`.
-
-`SMOKE_FAIL_LLR`: Smoke rejection threshold. Default is `-0.20`; smoke fails
-early only when Elo is negative and the current LLR is at or below this value.
-Negative Elo alone continues to the full SPRT.
-
-`GAMES`: Full SPRT game cap. Reaching this without H1 is a failed SPRT.
-
-`CONCURRENCY`: Game concurrency for local `--solo` SPRT.
-
-`THREADS`: Engine threads per game.
-
-`SPRT_ELO0`, `SPRT_ELO1`, `SPRT_ALPHA`, `SPRT_BETA`: Passed to Forge/SPRT.
-Default H1 is `SPRT_ELO1=3.0`; iteration accepts only when LLR reaches
-the H1 upper bound.
-
-`MOVE_GATE_STRICT`: Set to `1` to make move-gate regressions fail hard.
-
-`REFERENCE_NET`: Temporary override for manual SPRT/reference testing.
-
-`FORCE`: Set to `1` to rebuild training/export even if outputs already exist.
-
-## When Elo Stops Improving
-
-Change one variable family at a time. Always bump `run`. Keep `continue_from`
-and `reference` omitted unless the run intentionally starts from or compares
-against a non-previous net.
-
-First same-lane retry after a flat/negative iteration, using temporary
-`build.json` overrides:
+`architecture.json` is the trainer/export/runtime contract. Changing it is an
+architecture experiment and requires matching engine support and parity checks.
 
 ```json
 {
-  "run": "pwa-native-v17",
-  "lr": 0.0003,
-  "final_lr": 0.00003
+  "name": "scratch-native-16bucket-12ch-1024-v2",
+  "lineage": "scratch-native",
+  "mode": "enyo",
+  "hidden": 1024,
+  "l2_size": 16,
+  "feature_channels": 12,
+  "input_buckets": 16,
+  "output_buckets": 4,
+  "input_factoriser": false,
+  "eval_scale": 400.0,
+  "l0_std": 8.0,
+  "l1_std": 1.0,
+  "l1_export_scale": 1.0,
+  "export_format": "enyo-native-v1"
 }
 ```
 
-Use this when gates pass but SPRT is flat or negative. The theory is that the
-current parent is already close to a local optimum and `0.001 -> 0.0001` updates
-are too large for fine tuning.
+## Defaults
 
-If lower LR is still flat, change dose with a temporary override:
-
-```json
-{
-  "run": "pwa-native-v18",
-  "superbatches": 10000
-}
-```
-
-Use more dose only when static metrics still look healthy and there is no clear
-overfit/regression signal. Do not keep extending dose after repeated flat SPRTs.
-
-If continuation remains flat, change data:
+`defaults.json` contains the complete shared training configuration. A value in
+`build.json` overrides the same value from `defaults.json`; keep overrides in
+`build.json` only when they are part of the active experiment.
 
 ```json
 {
-  "run": "pwa-native-v19",
-  "data": {
-    "source_binpack": "data/nodes5000pv2_UHO.binpack",
-    "limit": 150000000
+  "loader": "direct",
+  "net_id": "scratch_native",
+  "batches": 64,
+  "batch_size": 2048,
+  "superbatches": 7600,
+  "threads": 16,
+  "wdl": 0.3,
+  "lr": 0.001,
+  "final_lr": 0.000005,
+  "save_rate": 7600,
+  "trainable": "all",
+  "weight_decay": 0.0,
+  "sfbinpack": {
+    "buffer_mb": 1024,
+    "offset": 0,
+    "min_ply": 16,
+    "max_abs_cp": 10000,
+    "quiet_only": true
+  },
+  "validation": {
+    "static_rows": 50000,
+    "engine_threads": 1,
+    "engine_hash_mb": 64,
+    "sprt_games_smoke": 100,
+    "sprt_concurrency": 16
   }
 }
 ```
 
-Changing `source_binpack`, `limit`, or binpack filtering is a data experiment.
-Record the data reason in `hypothesis`/`changed_variables`.
+## Active Build
 
-If several same-lane training/data attempts fail, stop continuation. The next
-planned architecture lever is output buckets, then input buckets, then L2/L3.
-Those are not build.json-only tweaks; they require engine/runtime parity.
+`build.json` describes the next candidate. It should stay small: run name,
+parent, hypothesis, and the few parameters that intentionally differ from
+`defaults.json`.
 
-## Rejection Rules
+```json
+{
+  "run": "native-3.0.0-rc7",
+  "lineage": "scratch-native",
+  "continue_from": "native-3.0.0-rc5",
+  "hypothesis": "farseerT74, 4 output buckets, lr: 0.0002",
+  "superbatches": 4096,
+  "lr": 0.0002,
+  "data": {
+    "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
+    "limit": 100000000,
+    "offset": 1000000000
+  }
+}
+```
 
-Reject immediately if export or engine parity fails, the engine does not load
-the intended `.nn`, move-gate coverage is incomplete, static eval is obviously
-broken, smoke SPRT is below the rejection floor, or full SPRT does not pass H1
-before the configured game cap.
+## Iteration
 
-Static metrics are rejection filters only. Elo comes from games.
+Use `./nnue` as the wrapper for planning, training, gates, and SPRT iteration:
+
+```sh
+./nnue plan
+./nnue iterate
+```
+
+For continuation candidates, `continue_from` must name the parent net unless the
+run is intentionally starting a new native lineage. Game results, not static
+metrics, decide promotion; static and move gates are rejection filters.
