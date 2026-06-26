@@ -379,7 +379,7 @@ training_build >/dev/null
             nets = home / "assets" / "nets"
             nets.mkdir(parents=True)
             (nets / "candidate.nn").write_bytes(b"net")
-            previous = tmp / "runs" / "base" / "checkpoints" / "scratch_native-1" / "optimiser_state"
+            previous = tmp / "runs" / "base" / "checkpoints" / "native-1" / "optimiser_state"
             previous.mkdir(parents=True)
             (previous / "weights.bin").write_bytes(b"weights")
             build = tmp / "build.json"
@@ -390,7 +390,7 @@ training_build >/dev/null
                 "#!/usr/bin/env bash\n"
                 "printf '%s\\n' \"$*\" >> \"$CALLS\"\n"
                 "if [[ \"$1\" == plan ]]; then\n"
-                "  printf '%s\\n' 'init_weights=runs/base/checkpoints/scratch_native-1/optimiser_state/weights.bin'\n"
+                "  printf '%s\\n' 'init_weights=runs/base/checkpoints/native-1/optimiser_state/weights.bin'\n"
                 "  exit 0\n"
                 "fi\n"
                 "exit 9\n",
@@ -434,7 +434,7 @@ train
             tmp = Path(tmp_name)
             home = tmp / "home"
             (home / "assets" / "nets").mkdir(parents=True)
-            previous = tmp / "runs" / "base" / "checkpoints" / "scratch_native-1" / "optimiser_state"
+            previous = tmp / "runs" / "base" / "checkpoints" / "native-1" / "optimiser_state"
             previous.mkdir(parents=True)
             expected = previous / "weights.bin"
             expected.write_bytes(b"weights")
@@ -494,7 +494,7 @@ train
             tmp = Path(tmp_name)
             home = tmp / "home"
             (home / "assets" / "nets").mkdir(parents=True)
-            previous = tmp / "runs" / "base" / "checkpoints" / "scratch_native-1" / "optimiser_state"
+            previous = tmp / "runs" / "base" / "checkpoints" / "native-1" / "optimiser_state"
             previous.mkdir(parents=True)
             expected = previous / "weights.bin"
             expected.write_bytes(b"weights")

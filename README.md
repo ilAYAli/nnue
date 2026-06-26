@@ -51,7 +51,7 @@ architecture experiment and requires matching engine support and parity checks.
 ```json
 {
   "loader": "direct",
-  "net_id": "scratch_native",
+  "net_id": "native",
   "batches": 64,
   "batch_size": 2048,
   "superbatches": 7600,

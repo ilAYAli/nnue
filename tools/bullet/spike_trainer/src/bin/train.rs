@@ -631,7 +631,7 @@ fn net_path(config: &Config) -> String {
 }
 
 fn net_id(config: &Config) -> String {
-    training_string(config, "net_id", "scratch_native")
+    training_string(config, "net_id", "native")
 }
 
 fn continue_from(config: &Config) -> Option<String> {
@@ -1456,7 +1456,7 @@ mod tests {
     fn defaults() -> Value {
         json!({
             "loader": "direct",
-            "net_id": "scratch_native",
+            "net_id": "native",
             "batches": 64,
             "batch_size": 2048,
             "superbatches": 7600,
