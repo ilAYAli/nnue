@@ -3,7 +3,7 @@
   "desc": "Stockfish-static labels written directly to Bullet training data",
   "source": "runs/source/source.jsonl",
   "stockfish_net": "nets/stockfish.nnue",
-  "init_net": "runs/parent/train/parent/model.nn",
+  "initialize_from": "runs/parent/train/parent/model.nn",
   "workers": "workers.json",
   "score": {
     "shards": 8,

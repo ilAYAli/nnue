@@ -77,7 +77,7 @@ const BUILD_METADATA_KEYS: &[&str] = &[
     "run",
     "lineage",
     "continue_from",
-    "init_net",
+    "initialize_from",
     "reference",
     "hypothesis",
     "data",
@@ -638,8 +638,8 @@ fn continue_from(config: &Config) -> Option<String> {
     string_at(&config.build, "continue_from").map(str::to_owned)
 }
 
-fn init_net(config: &Config) -> Option<String> {
-    string_at(&config.build, "init_net").map(str::to_owned)
+fn initialize_from(config: &Config) -> Option<String> {
+    string_at(&config.build, "initialize_from").map(str::to_owned)
 }
 
 fn init_weights_path(config: &Config) -> PathBuf {
@@ -676,10 +676,10 @@ fn python_command() -> PathBuf {
     }
 }
 
-fn convert_init_net(config: &Config, init_net: &str) -> PathBuf {
-    let input = expand_path(init_net);
+fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
+    let input = expand_path(initialize_from);
     if !input.exists() {
-        eprintln!("error: missing init_net: {}", input.display());
+        eprintln!("error: missing initialize_from: {}", input.display());
         process::exit(1);
     }
     let output = init_weights_path(config);
@@ -707,11 +707,11 @@ fn convert_init_net(config: &Config, init_net: &str) -> PathBuf {
         .arg(usize_at(&config.arch, "output_buckets", 1).to_string())
         .status()
         .unwrap_or_else(|err| {
-            eprintln!("error: cannot run init_net converter: {err}");
+            eprintln!("error: cannot run initialize_from converter: {err}");
             process::exit(1);
         });
     if !status.success() {
-        eprintln!("error: init_net conversion failed");
+        eprintln!("error: initialize_from conversion failed");
         process::exit(1);
     }
     output
@@ -791,20 +791,20 @@ fn validate_layout(config: &Config) {
 
 fn cmd_plan(config: &Config) {
     let data = data_config(config);
-    let init_net = init_net(config);
+    let initialize_from = initialize_from(config);
     println!("run={}", run_name(config));
     println!("lineage={}", required_string(&config.build, "lineage"));
     if let Some(previous_run) = continue_from(config) {
         println!("continue_from={previous_run}");
-        if init_net.is_none() {
+        if initialize_from.is_none() {
             println!(
                 "init_weights={}",
                 latest_weight_checkpoint(config, &previous_run).display()
             );
         }
     }
-    if let Some(net) = init_net {
-        println!("init_net={net}");
+    if let Some(net) = initialize_from {
+        println!("initialize_from={net}");
         println!("init_weights={}", init_weights_path(config).display());
     }
     println!("source_binpack={}", data.source_binpack);
@@ -1141,8 +1141,8 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_LOADER", training_loader(config));
     set_env("ENYO_BULLET_OUT", output.display());
     set_env("ENYO_BULLET_NET_ID", net_id(config));
-    if let Some(net) = init_net(config) {
-        let init_weights = convert_init_net(config, &net);
+    if let Some(net) = initialize_from(config) {
+        let init_weights = convert_initialize_from(config, &net);
         set_env("ENYO_BULLET_INIT_WEIGHTS", init_weights.display());
     } else if let Some(previous_run) = continue_from(config) {
         set_env("ENYO_BULLET_INIT_WEIGHTS", latest_weight_checkpoint(config, &previous_run).display());
@@ -1349,7 +1349,7 @@ fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
         let net = expand_path(&net);
         if net.exists() {
             let net = net.to_string_lossy().into_owned();
-            return convert_init_net(config, &net);
+            return convert_initialize_from(config, &net);
         }
     }
 
@@ -1566,19 +1566,19 @@ mod tests {
     }
 
     #[test]
-    fn init_net_and_continue_from_are_accepted_together() {
+    fn initialize_from_and_continue_from_are_accepted_together() {
         let config = config(json!({
             "run": "uho-native-1.1.0",
             "lineage": "scratch-native",
             "continue_from": "uho-native-1.0.42",
-            "init_net": "~/assets/nets/uho-native-1.0.42.nn",
+            "initialize_from": "~/assets/nets/uho-native-1.0.42.nn",
             "reference": "uho-native-1.0.42",
             "data": {"source_binpack": "data.binpack", "limit": 100}
         }));
 
         assert!(config_contract_errors(&config).is_empty());
         assert_eq!(continue_from(&config).as_deref(), Some("uho-native-1.0.42"));
-        assert_eq!(init_net(&config).as_deref(), Some("~/assets/nets/uho-native-1.0.42.nn"));
+        assert_eq!(initialize_from(&config).as_deref(), Some("~/assets/nets/uho-native-1.0.42.nn"));
     }
 
     #[test]

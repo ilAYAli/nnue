@@ -101,6 +101,41 @@ parent, hypothesis, and the few parameters that intentionally differ from
 }
 ```
 
+## Build Patterns
+
+Examples below show only the origin/reference fields. Add the normal data and
+training overrides for the experiment.
+
+Same-architecture iteration resumes the previous run checkpoint and compares
+against it by default:
+
+```json
+{
+  "run": "native-3.1.0-rc2",
+  "continue_from": "native-3.1.0-rc1"
+}
+```
+
+New architecture from existing weights converts an exported net and compares
+against the parent:
+
+```json
+{
+  "run": "native-4.0.0-rc1",
+  "reference": "native-3.1.0-rc1",
+  "initialize_from": "~/assets/nets/native-3.1.0-rc1.nn"
+}
+```
+
+New net with no existing weights omits both training origins. `./nnue` asks for
+interactive confirmation before starting scratch training:
+
+```json
+{
+  "run": "native-5.0.0-rc1"
+}
+```
+
 ## Iteration
 
 Use `./nnue` as the wrapper for planning, training, gates, and SPRT iteration:
@@ -110,6 +145,5 @@ Use `./nnue` as the wrapper for planning, training, gates, and SPRT iteration:
 ./nnue iterate
 ```
 
-For continuation candidates, `continue_from` must name the parent net unless the
-run is intentionally starting a new native lineage. Game results, not static
-metrics, decide promotion; static and move gates are rejection filters.
+Game results, not static metrics, decide promotion; static and move gates are
+rejection filters.

@@ -62,7 +62,7 @@ NNUE_NTFY=${NNUE_NTFY:-1}
 
 run=
 continue_from=
-init_net=
+initialize_from=
 reference_name=
 run_dir=
 log_dir=
@@ -151,9 +151,11 @@ net_for_name_or_path() {
 }
 
 load_config() {
+  [[ $(jq -r 'has("init_net")' "$BUILD") != true ]] \
+    || fail "build.json init_net was renamed to initialize_from" config
   run=$(json '.run')
   continue_from=$(json '.continue_from // empty')
-  init_net=$(json '.init_net // empty')
+  initialize_from=$(json '.initialize_from // empty')
   reference_name=$(json '.reference // empty')
   run_dir="runs/$run"
   log_dir="$run_dir/logs"
@@ -176,7 +178,7 @@ reference_label() {
 
 require_training_origin() {
   local stage=${1:-train}
-  [[ -n "$continue_from" || -n "$init_net" ]] && return 0
+  [[ -n "$continue_from" || -n "$initialize_from" ]] && return 0
   [[ "$scratch_confirmed" == 1 ]] && return 0
 
   if [[ -t 0 ]]; then
@@ -222,7 +224,7 @@ plan_init_weights() {
 
 verify_loaded_init_weights() {
   local train_log=$1 expected=$2
-  [[ -n "$continue_from" || -n "$init_net" ]] || return 0
+  [[ -n "$continue_from" || -n "$initialize_from" ]] || return 0
   [[ -n "$expected" ]] || fail "training origin did not resolve init_weights" train
   grep -Fxq "loaded_init_weights=$expected" "$train_log" \
     || fail "training did not load expected init weights: $expected" train
@@ -233,7 +235,7 @@ write_training_provenance() {
   jq -n \
     --arg run "$run" \
     --arg continue_from "$continue_from" \
-    --arg init_net "$init_net" \
+    --arg initialize_from "$initialize_from" \
     --arg expected_init_weights "$expected" \
     --arg expected_init_weights_sha256 "$(sha256_file "$expected")" \
     --arg resolved_build_sha256 "$(sha256_file "$build_for_train")" \
@@ -246,7 +248,7 @@ write_training_provenance() {
     '{
       run: $run,
       continue_from: $continue_from,
-      init_net: $init_net,
+      initialize_from: $initialize_from,
       expected_init_weights: $expected_init_weights,
       expected_init_weights_sha256: $expected_init_weights_sha256,
       resolved_build_sha256: $resolved_build_sha256,
@@ -265,7 +267,7 @@ training_provenance_matches() {
   jq -e \
     --arg run "$run" \
     --arg continue_from "$continue_from" \
-    --arg init_net "$init_net" \
+    --arg initialize_from "$initialize_from" \
     --arg expected_init_weights "$expected" \
     --arg expected_init_weights_sha256 "$(sha256_file "$expected")" \
     --arg resolved_build_sha256 "$(sha256_file "$build_for_train")" \
@@ -274,7 +276,7 @@ training_provenance_matches() {
     --arg artifact_sha256 "$(sha256_file "$artifact")" \
     '.run == $run
      and .continue_from == $continue_from
-     and .init_net == $init_net
+     and .initialize_from == $initialize_from
      and .expected_init_weights == $expected_init_weights
      and .expected_init_weights_sha256 == $expected_init_weights_sha256
      and .resolved_build_sha256 == $resolved_build_sha256
@@ -919,7 +921,7 @@ $details" \
          .
        end
      | del(.reference)
-     | del(.init_net)
+     | del(.initialize_from)
      | del(.changed_variables.reference)' \
     "$BUILD" > "$tmp"
   mv "$tmp" "$BUILD"
