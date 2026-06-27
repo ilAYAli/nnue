@@ -992,14 +992,14 @@ iterate() {
     if (( FULL_SPRT_FIRST == 1 && i == 1 )); then
       if ! full_sprt_gate; then
         commit_failed_iteration
-        continue
+        break
       fi
     else
       train || fail "train failed for $run" train
       gates || fail "gates failed for $run" gates
       if ! sprt_gate; then
         commit_failed_iteration
-        continue
+        break
       fi
     fi
     bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \

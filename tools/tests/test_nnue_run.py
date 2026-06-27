@@ -1056,7 +1056,7 @@ fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "
             self.assertNotIn("continue_from", working_json)
             self.assertEqual(100000000, working_json["data"]["offset"])
 
-    def test_rejected_smoke_advances_and_continues_iteration_loop(self) -> None:
+    def test_rejected_smoke_advances_and_stops_iteration_loop(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             build = tmp / "build.json"
@@ -1133,10 +1133,7 @@ iterate
             self.assertEqual(
                 "train:uho-native-1.0.36\n"
                 "gates:uho-native-1.0.36\n"
-                "sprt:uho-native-1.0.36\n"
-                "train:uho-native-1.0.37\n"
-                "gates:uho-native-1.0.37\n"
-                "sprt:uho-native-1.0.37\n",
+                "sprt:uho-native-1.0.36\n",
                 trace.read_text(encoding="utf-8"),
             )
             subjects = subprocess.run(
@@ -1149,13 +1146,12 @@ iterate
             self.assertEqual([
                 "base",
                 "uho-native-1.0.36.nn: rejected: Elo -25.2,LLR -0.32/2.20 (-15%)",
-                "uho-native-1.0.37.nn: rejected: Elo -25.2,LLR -0.32/2.20 (-15%)",
             ], subjects)
             working_json = json.loads(build.read_text(encoding="utf-8"))
-            self.assertEqual("uho-native-1.0.38", working_json["run"])
+            self.assertEqual("uho-native-1.0.37", working_json["run"])
             self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
             self.assertNotIn("reference", working_json)
-            self.assertEqual(700000000, working_json["data"]["offset"])
+            self.assertEqual(600000000, working_json["data"]["offset"])
 
     def test_smoke_gate_rejects_bad_elo_or_negative_llr(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
