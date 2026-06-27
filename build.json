@@ -1,13 +1,12 @@
 {
-  "run": "native-3.15.0-rc1",
-  "continue_from": "native-3.13.0-rc1",
-  "hypothesis": "4 output buckets, retry the rejected farseerT76 slice with a 1024-superbatch dose",
+  "run": "native-4.1.0-rc6",
+  "continue_from": "native-4.0.0-rc2",
+  "hypothesis": "8 output buckets, lower LR for a 1024-superbatch continuation from native-4.0.0-rc2",
   "superbatches": 1024,
-  "lr": 0.0001,
-  "wdl": 0.05,
+  "lr": 0.00005,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
-    "offset": 800000000
+    "offset": 1200000000
   }
 }
