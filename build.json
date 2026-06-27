@@ -1,13 +1,14 @@
 {
-  "run": "native-3.5.0-rc1",
-  "continue_from": "native-3.3.0-rc3",
-  "hypothesis": "4 output buckets, switch saturated parent continuation from farseerT74 to farseerT75",
+  "run": "native-4.2.0-rc1",
+  "reference": "native-3.3.0-rc3",
+  "initialize_from": "native-3.3.0-rc3",
+  "hypothesis": "8 output buckets initialized from accepted native-3.3.0-rc3 after 4-output continuation saturated",
   "superbatches": 4096,
   "lr": 0.0001,
   "wdl": 0.15,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT75.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 3200000000
   }
 }
