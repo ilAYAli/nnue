@@ -157,7 +157,7 @@ class NnueEventNtfyTests(unittest.TestCase):
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("https://ntfy.wahlman.no/nnue", proc.stdout)
         self.assertNotIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
-        self.assertIn("notifai:codex_1:1.1", proc.stdout)
+        self.assertIn("notifai:AI_stdin:1.1", proc.stdout)
         self.assertIn("event=iteration_done → nnue", log)
         self.assertNotIn("event=iteration_done → AI_stdin", log)
 
@@ -199,7 +199,7 @@ class NnueEventNtfyTests(unittest.TestCase):
 
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("https://ntfy.wahlman.no/ping", proc.stdout)
-        self.assertIn("notifai:codex_1:1.1", proc.stdout)
+        self.assertIn("notifai:AI_stdin:1.1", proc.stdout)
         self.assertNotIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
         self.assertIn("event=fail → ping", log)
         self.assertNotIn("event=fail → AI_stdin", log)
