@@ -1,8 +1,6 @@
 {
-  "run": "native-3.3.0-rc3",
+  "run": "native-3.4.0-rc1",
   "lineage": "native",
-  "reference": "native-2.1.0-rc1",
-  "initialize_from": "native-2.1.0-rc1",
   "hypothesis": "4 output buckets initialized from native-2.1.0-rc1 with lower lr after rc1 rejected",
   "superbatches": 4096,
   "lr": 0.0001,
@@ -10,6 +8,7 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
-    "offset": 2600000000
-  }
+    "offset": 2800000000
+  },
+  "continue_from": "native-3.3.0-rc3"
 }
