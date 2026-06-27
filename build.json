@@ -1,12 +1,12 @@
 {
-  "run": "native-3.8.0-rc1",
+  "run": "native-3.9.0-rc1",
   "continue_from": "native-3.3.0-rc3",
-  "hypothesis": "4 output buckets, switch saturated farseerT74 continuation to farseerT76 at offset zero",
+  "hypothesis": "4 output buckets, switch neutral farseerT76 continuation to fishpack32 at offset zero",
   "superbatches": 4096,
   "lr": 0.0001,
   "wdl": 0.15,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/fishpack32.binpack",
     "limit": 200000000,
     "offset": 0
   }
