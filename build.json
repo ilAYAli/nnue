@@ -1,8 +1,8 @@
 {
-  "run": "native-3.14.0-rc1",
+  "run": "native-3.15.0-rc1",
   "continue_from": "native-3.13.0-rc1",
-  "hypothesis": "4 output buckets, continue accepted native-3.13.0-rc1 on the next unused farseerT76 slice",
-  "superbatches": 4096,
+  "hypothesis": "4 output buckets, retry the rejected farseerT76 slice with a 1024-superbatch dose",
+  "superbatches": 1024,
   "lr": 0.0001,
   "wdl": 0.05,
   "data": {
