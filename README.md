@@ -88,15 +88,12 @@ parent, hypothesis, and the few parameters that intentionally differ from
 ```json
 {
   "run": "native-3.0.0-rc7",
-  "lineage": "native",
   "continue_from": "native-3.0.0-rc5",
   "hypothesis": "farseerT74, 4 output buckets, lr: 0.0002",
-  "superbatches": 4096,
-  "lr": 0.0002,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 100000000,
-    "offset": 1000000000
+    "offset": 0
   }
 }
 ```
