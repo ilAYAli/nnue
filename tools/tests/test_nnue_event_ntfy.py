@@ -143,6 +143,23 @@ class NnueEventNtfyTests(unittest.TestCase):
         self.assertIn("Status: inconclusive", proc.stdout)
         self.assertIn("event=phase_done → AI_stdout", log)
 
+    def test_iteration_done_can_wake_ai_stdin(self) -> None:
+        proc, log = self.run_hook(
+            {"NNUE_AI_STDIN_EVENTS": "done,fail"},
+            payload_extra={
+                "event": "iteration_done",
+                "stage": "iterate",
+                "status": "iteration_done",
+                "message": "accepted run",
+            },
+        )
+
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertIn("https://ntfy.wahlman.no/nnue", proc.stdout)
+        self.assertIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
+        self.assertIn("event=iteration_done → nnue", log)
+        self.assertIn("event=iteration_done → AI_stdin", log)
+
     def test_fail_event_reports_single_error_line(self) -> None:
         proc, log = self.run_hook(
             {
@@ -166,6 +183,24 @@ class NnueEventNtfyTests(unittest.TestCase):
         self.assertIn("Error: FAILED: train/export failed for run train", proc.stdout)
         self.assertNotIn("Result", proc.stdout)
         self.assertIn("event=fail → ping", log)
+
+    def test_fail_can_wake_ai_stdin(self) -> None:
+        proc, log = self.run_hook(
+            {"NNUE_AI_STDIN_EVENTS": "fail"},
+            payload_extra={
+                "event": "fail",
+                "stage": "train",
+                "status": "fail",
+                "message": "train/export failed for run",
+            },
+            log_text="FAILED: train/export failed for run train\n",
+        )
+
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertIn("https://ntfy.wahlman.no/ping", proc.stdout)
+        self.assertIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
+        self.assertIn("event=fail → ping", log)
+        self.assertIn("event=fail → AI_stdin", log)
 
 
 if __name__ == "__main__":

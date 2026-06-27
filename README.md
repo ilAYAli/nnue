@@ -145,5 +145,9 @@ Use `./nnue` as the wrapper for planning, training, gates, and SPRT iteration:
 ./nnue iterate
 ```
 
+nnue also supports several environment variables that affect behavior
+
+`NNUE_AI_STDIN_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=800 ./nnue iterate`
+
 Game results, not static metrics, decide promotion; static and move gates are
 rejection filters.

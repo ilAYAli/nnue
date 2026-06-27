@@ -4,14 +4,17 @@ set -euo pipefail
 # NNUE event hook.
 #
 # Routing:
-#   fail            → AI_stdin + ping
+#   fail            → ping
 #   iteration_done  → nnue (phone notification)
 #   everything else → AI_stdout
+#   AI_stdin        → opt-in via NNUE_AI_STDIN_EVENTS
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
 PING_URL=${NNUE_PING_URL:-https://ntfy.wahlman.no/ping}
+AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-}
+AI_STDIN_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -260,6 +263,23 @@ publish() {
     fi
 }
 
+event_selected() {
+    local event="$1"
+    local list
+    list=$(printf '%s' "${2:-}" | tr -d '[:space:]')
+    [ -n "$list" ] || return 1
+
+    case ",$list," in
+        *,"$event",*) return 0 ;;
+    esac
+    if [ "$event" = "iteration_done" ]; then
+        case ",$list," in
+            *,done,*) return 0 ;;
+        esac
+    fi
+    return 1
+}
+
 case "$event_name" in
     fail)
         publish "$PING_URL" "$rendered" "Enyo NNUE fail" "5"
@@ -274,3 +294,14 @@ case "$event_name" in
         printf '%s event=%s → AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         ;;
 esac
+
+if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$AI_STDIN_EVENTS"; then
+    priority=4
+    [ "$event_name" = "fail" ] && priority=5
+    if publish "$AI_STDIN_URL" "$rendered" "Enyo NNUE $event_name" "$priority"; then
+        printf '%s event=%s → AI_stdin\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+    else
+        rc=$?
+        printf '%s event=%s AI_stdin failed rc=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" >>"$LOG"
+    fi
+fi
