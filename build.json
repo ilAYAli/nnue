@@ -1,5 +1,5 @@
 {
-  "run": "native-3.3.0-rc2",
+  "run": "native-3.3.0-rc3",
   "lineage": "native",
   "reference": "native-2.1.0-rc1",
   "initialize_from": "native-2.1.0-rc1",
@@ -10,6 +10,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
-    "offset": 2400000000
+    "offset": 2600000000
   }
 }
