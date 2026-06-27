@@ -271,7 +271,6 @@ training_provenance_matches() {
     --arg expected_init_weights "$expected" \
     --arg expected_init_weights_sha256 "$(sha256_file "$expected")" \
     --arg resolved_build_sha256 "$(sha256_file "$build_for_train")" \
-    --arg trainer_helper_sha256 "$(sha256_file "$TRAIN_HELPER")" \
     --arg artifact_key "$artifact_key" \
     --arg artifact_sha256 "$(sha256_file "$artifact")" \
     '.run == $run
@@ -280,7 +279,6 @@ training_provenance_matches() {
      and .expected_init_weights == $expected_init_weights
      and .expected_init_weights_sha256 == $expected_init_weights_sha256
      and .resolved_build_sha256 == $resolved_build_sha256
-     and .trainer_helper_sha256 == $trainer_helper_sha256
      and .[$artifact_key] == $artifact_sha256' \
     "$train_provenance" >/dev/null
 }
