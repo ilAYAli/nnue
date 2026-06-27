@@ -1,13 +1,13 @@
 {
-  "run": "native-3.10.0-rc1",
-  "continue_from": "native-3.3.0-rc3",
-  "hypothesis": "4 output buckets, reduce WDL from 0.15 to 0.05 on the accepted parent data slice",
+  "run": "native-3.11.0-rc1",
+  "continue_from": "native-3.10.0-rc1",
+  "hypothesis": "4 output buckets, continue promoted WDL 0.05 parent on the second farseerT76 slice",
   "superbatches": 4096,
   "lr": 0.0001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
-    "offset": 2600000000
+    "offset": 200000000
   }
 }
