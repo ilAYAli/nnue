@@ -1,11 +1,10 @@
 {
-  "run": "native-4.2.0-rc1",
-  "reference": "native-3.3.0-rc3",
-  "initialize_from": "native-3.3.0-rc3",
-  "hypothesis": "8 output buckets initialized from accepted native-3.3.0-rc3 after 4-output continuation saturated",
+  "run": "native-3.6.0-rc1",
+  "continue_from": "native-3.3.0-rc3",
+  "hypothesis": "4 output buckets, increase WDL from 0.15 to 0.30 after data and output-bucket changes failed",
   "superbatches": 4096,
   "lr": 0.0001,
-  "wdl": 0.15,
+  "wdl": 0.3,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
