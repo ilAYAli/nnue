@@ -15,6 +15,9 @@ AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
 PING_URL=${NNUE_PING_URL:-https://ntfy.wahlman.no/ping}
 AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-}
 AI_STDIN_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
+NOTIFAI_ENABLE=${NNUE_NOTIFAI_ENABLE:-1}
+NOTIFAI_COMMAND=${NNUE_NOTIFAI_COMMAND:-notifai.sh}
+NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-codex_1}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -263,6 +266,31 @@ publish() {
     fi
 }
 
+wake_agent() {
+    [ "$NOTIFAI_ENABLE" = "1" ] || return 0
+
+    if [ "$DRY_RUN" = "1" ]; then
+        printf 'notifai:%s → %s\n' "$NOTIFAI_TARGET" "$rendered"
+        return 0
+    fi
+
+    if ! command -v "$NOTIFAI_COMMAND" >/dev/null 2>&1; then
+        printf '%s event=%s notifai missing command=%s\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI_COMMAND" >>"$LOG"
+        return 1
+    fi
+
+    if "$NOTIFAI_COMMAND" "$rendered" "$NOTIFAI_TARGET"; then
+        printf '%s event=%s → notifai target=%s\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI_TARGET" >>"$LOG"
+        return 0
+    fi
+
+    printf '%s event=%s notifai failed target=%s\n' \
+        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI_TARGET" >>"$LOG"
+    return 1
+}
+
 event_selected() {
     local event="$1"
     local list
@@ -304,4 +332,5 @@ if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$AI_STDIN_EVENT
         rc=$?
         printf '%s event=%s AI_stdin failed rc=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" >>"$LOG"
     fi
+    wake_agent || true
 fi
