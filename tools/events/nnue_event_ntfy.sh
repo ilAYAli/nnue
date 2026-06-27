@@ -17,7 +17,7 @@ AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-}
 AI_STDIN_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 NOTIFAI_ENABLE=${NNUE_NOTIFAI_ENABLE:-1}
 NOTIFAI_COMMAND=${NNUE_NOTIFAI_COMMAND:-notifai.sh}
-NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-codex_1}
+NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-codex_1:1.1}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -324,13 +324,14 @@ case "$event_name" in
 esac
 
 if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$AI_STDIN_EVENTS"; then
-    priority=4
-    [ "$event_name" = "fail" ] && priority=5
-    if publish "$AI_STDIN_URL" "$rendered" "Enyo NNUE $event_name" "$priority"; then
-        printf '%s event=%s → AI_stdin\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-    else
-        rc=$?
-        printf '%s event=%s AI_stdin failed rc=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" >>"$LOG"
+    if ! wake_agent; then
+        priority=4
+        [ "$event_name" = "fail" ] && priority=5
+        if publish "$AI_STDIN_URL" "$rendered" "Enyo NNUE $event_name" "$priority"; then
+            printf '%s event=%s → AI_stdin\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+        else
+            rc=$?
+            printf '%s event=%s AI_stdin failed rc=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" >>"$LOG"
+        fi
     fi
-    wake_agent || true
 fi

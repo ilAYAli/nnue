@@ -156,11 +156,10 @@ class NnueEventNtfyTests(unittest.TestCase):
 
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("https://ntfy.wahlman.no/nnue", proc.stdout)
-        self.assertIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
-        self.assertIn("notifai:codex_1", proc.stdout)
-        self.assertIn("notifai:codex_1", proc.stdout)
+        self.assertNotIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
+        self.assertIn("notifai:codex_1:1.1", proc.stdout)
         self.assertIn("event=iteration_done → nnue", log)
-        self.assertIn("event=iteration_done → AI_stdin", log)
+        self.assertNotIn("event=iteration_done → AI_stdin", log)
 
     def test_fail_event_reports_single_error_line(self) -> None:
         proc, log = self.run_hook(
@@ -200,10 +199,10 @@ class NnueEventNtfyTests(unittest.TestCase):
 
         self.assertEqual(0, proc.returncode, proc.stderr)
         self.assertIn("https://ntfy.wahlman.no/ping", proc.stdout)
-        self.assertIn("notifai:codex_1", proc.stdout)
-        self.assertIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
+        self.assertIn("notifai:codex_1:1.1", proc.stdout)
+        self.assertNotIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
         self.assertIn("event=fail → ping", log)
-        self.assertIn("event=fail → AI_stdin", log)
+        self.assertNotIn("event=fail → AI_stdin", log)
 
 
 if __name__ == "__main__":
