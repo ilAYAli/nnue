@@ -1,16 +1,13 @@
 {
-  "run": "native-4.5.0-rc3",
+  "run": "native-4.5.0-rc4",
   "continue_from": "native-4.4.0-rc4",
-  "hypothesis": "8 output buckets, include non-quiet positions on T76 offset 800M",
+  "hypothesis": "8 output buckets, switch the accepted quiet-only regimen from farseerT76 to farseerT75",
   "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
-  "sfbinpack": {
-    "quiet_only": false
-  },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/farseerT75.binpack",
     "limit": 200000000,
-    "offset": 800000000
+    "offset": 0
   }
 }
