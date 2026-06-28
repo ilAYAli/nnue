@@ -11,7 +11,7 @@ import tarfile
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Iterable
+from typing import BinaryIO, Iterable, Iterator
 
 import chess
 
@@ -238,11 +238,81 @@ def parse_record(raw: bytes, offset: int) -> Record:
     )
 
 
+INVENTORY_SCHEMA = "crucible.lc0-inventory.v1"
+
+
+def split_record_limit(total: int, shard_count: int, shard_index: int) -> int:
+    if shard_count <= 0 or not 0 <= shard_index < shard_count:
+        raise ValueError("invalid shard index/count")
+    if total <= 0:
+        return 0
+    base, remainder = divmod(total, shard_count)
+    return base + int(shard_index < remainder)
+
+
+def inventory_paths(inventory: Path, root: Path) -> list[Path]:
+    payload = json.loads(inventory.read_text(encoding="utf-8"))
+    if payload.get("schema") != INVENTORY_SCHEMA:
+        raise ValueError(f"unsupported inventory schema: {payload.get('schema')!r}")
+    files = payload.get("files")
+    if not isinstance(files, list):
+        raise ValueError("inventory files must be a list")
+    paths: list[Path] = []
+    previous = ""
+    for item in files:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            raise ValueError("invalid inventory file entry")
+        relative = item["path"]
+        candidate = Path(relative)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ValueError(f"inventory path is not relative: {relative!r}")
+        canonical = candidate.as_posix()
+        if canonical <= previous:
+            raise ValueError("inventory paths must be unique and sorted")
+        previous = canonical
+        paths.append(root / candidate)
+    return paths
+
+
+def selected_input_paths(
+    path: Path,
+    *,
+    inventory: Path | None = None,
+    shard_count: int = 1,
+    shard_index: int = 0,
+) -> list[Path]:
+    if shard_count <= 0 or not 0 <= shard_index < shard_count:
+        raise ValueError("invalid shard index/count")
+    if inventory is not None:
+        paths = inventory_paths(inventory, path)
+    elif path.is_dir():
+        paths = sorted(item for item in path.rglob("training.*") if item.is_file())
+    else:
+        paths = [path]
+    return [item for ordinal, item in enumerate(paths) if ordinal % shard_count == shard_index]
+
+
+def iter_stream_records(handle: BinaryIO) -> Iterator[tuple[int, bytes]]:
+    index = 0
+    while True:
+        raw = handle.read(RECORD_SIZE)
+        if not raw:
+            return
+        if len(raw) != RECORD_SIZE:
+            raise ValueError(f"truncated LC0 record at index {index}")
+        yield index, raw
+        index += 1
+
+
+def iter_file_records(path: Path) -> Iterator[tuple[int, bytes]]:
+    opener = gzip.open if path.name.endswith(".gz") else Path.open
+    with opener(path, "rb") as handle:
+        yield from iter_stream_records(handle)
+
+
 def read_member_payload(name: str, handle: BinaryIO) -> bytes:
     data = handle.read()
-    if name.endswith(".gz"):
-        return gzip.decompress(data)
-    return data
+    return gzip.decompress(data) if name.endswith(".gz") else data
 
 
 def iter_payloads(path: Path) -> Iterable[tuple[str, bytes]]:
@@ -269,7 +339,52 @@ def iter_payloads(path: Path) -> Iterable[tuple[str, bytes]]:
         return
 
     with path.open("rb") as handle:
-        yield str(path), read_member_payload(path.name, handle)
+        data = handle.read()
+        yield str(path), gzip.decompress(data) if path.name.endswith(".gz") else data
+
+
+def iter_rows(
+    input_path: Path,
+    *,
+    inventory: Path | None = None,
+    shard_count: int = 1,
+    shard_index: int = 0,
+    max_records: int = 0,
+    top_policy: int = 8,
+    stats: Stats | None = None,
+) -> Iterator[tuple[dict, int]]:
+    stats = stats or Stats()
+    quota = split_record_limit(max_records, shard_count, shard_index)
+    for source in selected_input_paths(
+        input_path,
+        inventory=inventory,
+        shard_count=shard_count,
+        shard_index=shard_index,
+    ):
+        stats.files += 1
+        try:
+            records = iter_file_records(source)
+            for file_record_index, raw in records:
+                if quota > 0 and stats.records >= quota:
+                    return
+                stats.records += 1
+                try:
+                    record = parse_record(raw, 0)
+                except struct.error:
+                    stats.invalid_records += 1
+                    continue
+                row = record_to_row(
+                    record,
+                    source_file=source.as_posix(),
+                    record_index=file_record_index,
+                    top_policy=top_policy,
+                    stats=stats,
+                )
+                if row is not None:
+                    stats.rows += 1
+                    yield row, file_record_index
+        except (EOFError, OSError, ValueError):
+            stats.invalid_records += 1
 
 
 def top_policy_indices(policy: tuple[float, ...], count: int) -> list[int]:
@@ -384,6 +499,7 @@ def record_to_row(
         "id": f"lc0-{Path(source_file).name}-{record_index}",
         "fen": board.fen(),
         "source": "lc0_training_data",
+        "wdl": max(0.0, min(1.0, (1.0 - values["result_d"] + values["result_q"]) / 2.0)),
         "source_file": source_file,
         "record_index": record_index,
         "license": "ODbL-1.0",
@@ -416,36 +532,18 @@ def record_to_row(
 def convert(args: argparse.Namespace) -> Stats:
     stats = Stats()
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    record_limit = args.max_records if args.max_records > 0 else None
     with args.out.open("w", encoding="utf-8") as out:
-        for source_file, payload in iter_payloads(args.input):
-            stats.files += 1
-            if len(payload) % RECORD_SIZE != 0:
-                stats.invalid_records += 1
-                continue
-            count = len(payload) // RECORD_SIZE
-            for file_record_index in range(count):
-                if record_limit is not None and stats.records >= record_limit:
-                    return stats
-                offset = file_record_index * RECORD_SIZE
-                try:
-                    record = parse_record(payload, offset)
-                except struct.error:
-                    stats.invalid_records += 1
-                    continue
-                stats.records += 1
-                row = record_to_row(
-                    record,
-                    source_file=source_file,
-                    record_index=file_record_index,
-                    top_policy=args.top_policy,
-                    stats=stats,
-                )
-                if row is None:
-                    continue
-                out.write(json.dumps(row, sort_keys=True, separators=(",", ":")))
-                out.write("\n")
-                stats.rows += 1
+        for row, _ply in iter_rows(
+            args.input,
+            inventory=args.inventory,
+            shard_count=args.shard_count,
+            shard_index=args.shard_index,
+            max_records=args.max_records,
+            top_policy=args.top_policy,
+            stats=stats,
+        ):
+            out.write(json.dumps(row, sort_keys=True, separators=(",", ":")))
+            out.write("\n")
     return stats
 
 
@@ -496,9 +594,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Convert LCZero V6 training records into Enyo JSONL rows.")
     parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--inventory", type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--summary", required=True, type=Path)
     parser.add_argument("--max-records", type=int, default=0)
+    parser.add_argument("--shard-count", type=int, default=1)
+    parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--top-policy", type=int, default=8)
     parser.add_argument("--min-rows", type=int, default=1)
     parser.add_argument("--min-played-legal-pct", type=float, default=99.0)
