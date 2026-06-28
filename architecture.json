@@ -1,5 +1,5 @@
 {
-  "name": "native-16bucket-12ch-1024-v2",
+  "name": "native-16bucket-12ch-1024-scale450-v3",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
@@ -8,7 +8,7 @@
   "input_buckets": 16,
   "output_buckets": 8,
   "input_factoriser": false,
-  "eval_scale": 400.0,
+  "eval_scale": 450.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
