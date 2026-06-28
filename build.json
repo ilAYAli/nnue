@@ -1,6 +1,6 @@
 {
-  "run": "native-4.5.0-rc5",
-  "continue_from": "native-4.4.0-rc4",
+  "run": "native-4.6.0-rc1",
+  "continue_from": "native-4.5.0-rc5",
   "hypothesis": "8 output buckets, switch the accepted quiet-only regimen to T60T70wIsRightFarseer",
   "superbatches": 256,
   "lr": 0.0001,
@@ -8,6 +8,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 200000000
   }
 }
