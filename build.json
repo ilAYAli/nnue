@@ -1,10 +1,13 @@
 {
-  "run": "native-4.5.0-rc2",
+  "run": "native-4.5.0-rc3",
   "continue_from": "native-4.4.0-rc4",
-  "hypothesis": "8 output buckets, retry T76 offset 800M with a 128-superbatch dose",
-  "superbatches": 128,
+  "hypothesis": "8 output buckets, include non-quiet positions on T76 offset 800M",
+  "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
+  "sfbinpack": {
+    "quiet_only": false
+  },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
