@@ -1,13 +1,13 @@
 {
-  "run": "native-5.0.0-rc1",
+  "run": "native-4.4.0-rc3",
   "continue_from": "native-4.3.0-rc8",
-  "hypothesis": "Increase eval scale from 400 to 450 while preserving native-4.3.0-rc8 weights",
-  "superbatches": 1,
-  "lr": 0.000005,
-  "wdl": 0.05,
+  "hypothesis": "8 output buckets, reduce WDL from 0.05 to 0.0 on T76 offset 400M",
+  "superbatches": 256,
+  "lr": 0.0002,
+  "wdl": 0.0,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
-    "limit": 1000000,
-    "offset": 0
+    "limit": 200000000,
+    "offset": 400000000
   }
 }
