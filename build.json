@@ -1,12 +1,13 @@
 {
-  "run": "native-4.3.0-rc6",
+  "run": "native-4.3.0-rc7",
   "continue_from": "native-4.2.0-rc2",
-  "hypothesis": "8 output buckets, switch the 256-superbatch continuation from farseerT76 to farseerT75",
+  "hypothesis": "8 output buckets, reduce WDL from 0.30 to 0.15 on the rejected T76 offset 400M",
   "superbatches": 256,
   "lr": 0.0002,
+  "wdl": 0.15,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT75.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 400000000
   }
 }
