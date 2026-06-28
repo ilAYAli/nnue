@@ -1,12 +1,12 @@
 {
-  "run": "native-4.2.0-rc2",
-  "continue_from": "native-4.1.0-rc8",
+  "run": "native-4.3.0-rc2",
+  "continue_from": "native-4.2.0-rc2",
   "hypothesis": "8 output buckets, continue the successful 256-superbatch T76 regimen on the next slice",
   "superbatches": 256,
   "lr": 0.0002,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 400000000
   }
 }
