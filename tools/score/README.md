@@ -26,6 +26,22 @@ tools/score/score.py uci \
   --hash 128
 ```
 
+LC0 V6 gzip records can be labeled directly without JSONL intermediates:
+
+```sh
+python3 tools/score/label_lc0.py \
+  --input ~/.cache/crucible/inputs/DIGEST \
+  --inventory ~/.cache/crucible/inputs/DIGEST/inventory.json \
+  --output shard.bullet \
+  --stats shard.stats.json \
+  --shard-count 152 \
+  --shard-index 0
+```
+
+Files are assigned by sorted inventory ordinal modulo shard count. The global
+raw-record limit is split exactly across shards, and the Bullet/stat outputs
+are validated and atomically renamed.
+
 ## Binpack count
 
 Build the C++ score tools out of tree:
