@@ -1,9 +1,9 @@
 {
-  "run": "native-4.1.0-rc6",
+  "run": "native-4.1.0-rc7",
   "continue_from": "native-4.0.0-rc2",
-  "hypothesis": "8 output buckets, lower LR for a 1024-superbatch continuation from native-4.0.0-rc2",
-  "superbatches": 1024,
-  "lr": 0.00005,
+  "hypothesis": "8 output buckets, shorten the native-4.0.0-rc2 continuation to 256 superbatches",
+  "superbatches": 256,
+  "lr": 0.0002,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT74.binpack",
     "limit": 200000000,
