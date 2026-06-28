@@ -14,10 +14,11 @@ import chess
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(TOOLS / "posgen"))
+sys.path.insert(0, str(TOOLS / "score"))
 
 from lib import bullet_format, bullet_text  # noqa: E402
 import lc0_to_jsonl  # noqa: E402
-from score.label_with_uci import EngineTimeout, UciEngine  # noqa: E402
+from label_with_uci import EngineTimeout, UciEngine  # noqa: E402
 
 
 def is_quiet(row: dict) -> bool:

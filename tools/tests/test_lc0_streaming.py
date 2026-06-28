@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,6 +41,17 @@ def row(move: str = "a2a3") -> dict:
 
 
 class Lc0StreamingTests(unittest.TestCase):
+    def test_script_entrypoint_loads(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(REPO / "tools" / "score" / "label_lc0.py"), "--help"],
+            cwd=REPO,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+
     def test_inventory_partition_happens_before_open(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
