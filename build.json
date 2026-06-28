@@ -1,10 +1,10 @@
 {
-  "run": "native-6.0.0-rc1",
+  "run": "native-6.1.0-rc1",
   "continue_from": "native-4.6.0-rc1",
-  "hypothesis": "8 output buckets, one-pass continuation on quiet LC0 self-play positions labeled by Stockfish depth 12",
+  "hypothesis": "8 output buckets, raise WDL from 0.05 to 0.30 on the quiet LC0 depth-12 pilot",
   "superbatches": 5,
   "lr": 0.0001,
-  "wdl": 0.05,
+  "wdl": 0.30,
   "data": {
     "source_binpack": "data/bullet/lc0-test91-sf-d12-1m.bullet",
     "limit": 0,
