@@ -37,7 +37,7 @@ class NnueEventNtfyTests(unittest.TestCase):
             log_path = run / "deploy.log"
             log_path.write_text(
                 log_text
-                or "Crucible run-sprt tasks=8/8 games=400/400 elo=+5.2 "
+                or "Forge run-sprt tasks=8/8 games=400/400 elo=+5.2 "
                    "ci=27.7 llr=0.04/2.20 (2%) los=52.3% draw=36.5%\n",
                 encoding="utf-8",
             )
@@ -65,7 +65,7 @@ class NnueEventNtfyTests(unittest.TestCase):
                 "rc": 0,
                 "log": str(log_path),
                 "host": "test-host",
-                "message": "accepted run: Crucible run-sprt tasks=8/8 games=400/400 elo=+5.2 ci=27.7 llr=0.04/2.20 (2%) los=52.3% draw=36.5%",
+                "message": "accepted run: Forge run-sprt tasks=8/8 games=400/400 elo=+5.2 ci=27.7 llr=0.04/2.20 (2%) los=52.3% draw=36.5%",
             }
             if payload_extra:
                 payload.update(payload_extra)
@@ -113,7 +113,7 @@ class NnueEventNtfyTests(unittest.TestCase):
 
     def test_sprt_phase_done_reports_metrics(self) -> None:
         line = (
-            "Crucible uho-native-1.1.11-smoke-400-20260624-225641 "
+            "Forge uho-native-1.1.11-smoke-400-20260624-225641 "
             "games=400/400 elo=-14.8 ci=28.8 llr=-0.21/2.20 (-10%) "
             "los=42.8% draw=34.3%"
         )

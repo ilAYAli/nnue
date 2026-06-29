@@ -238,7 +238,7 @@ def parse_record(raw: bytes, offset: int) -> Record:
     )
 
 
-INVENTORY_SCHEMA = "crucible.lc0-inventory.v1"
+INVENTORY_SCHEMA = "forge.lc0-inventory.v1"
 
 
 def split_record_limit(total: int, shard_count: int, shard_index: int) -> int:

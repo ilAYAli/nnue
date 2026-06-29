@@ -1,5 +1,5 @@
 {
-  "schema": "crucible.workers.v1",
+  "schema": "forge.workers.v1",
   "workers": [
     {
       "host": "pwa-5090",

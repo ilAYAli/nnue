@@ -12,7 +12,7 @@ tools/validate/validate.py static --help
 tools/validate/validate.py failure-suite --help
 tools/validate/validate.py move-gate --help
 tools/validate/validate.py sprt --help
-tools/validate/run_crucible_sprt.py --help
+tools/validate/run_forge_sprt.py --help
 ```
 
 Examples:
@@ -55,7 +55,7 @@ tools/validate/validate.py sprt \
   --tag candidate_smoke \
   --event-command "$HOME/scripts/nnue_event_ntfy.sh"
 
-tools/validate/run_crucible_sprt.py \
+tools/validate/run_forge_sprt.py \
   --net run/candidate/model.nn \
   --reference-net reference/native-1.5.0.nn \
   --tag candidate-vs-native15-confirm4000 \

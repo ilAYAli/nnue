@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run an NNUE SPRT through Crucible and aggregate the shard logs."""
+"""Run an NNUE SPRT through Forge and aggregate the shard logs."""
 from __future__ import annotations
 
 import argparse
@@ -156,8 +156,8 @@ def worker_cache_dir(worker: dict[str, Any]) -> str:
         return cache
     host = str(worker.get("host") or "").strip()
     if host in ("localhost", "127.0.0.1") or bool(worker.get("local", False)):
-        return "~/.cache/crucible"
-    return ".cache/crucible"
+        return "~/.cache/forge"
+    return ".cache/forge"
 
 
 def worker_profiles(path: Path) -> dict[str, str]:
@@ -173,7 +173,7 @@ def worker_profiles(path: Path) -> dict[str, str]:
         if isinstance(item, str):
             host, _, profile = item.partition("=")
             profile = profile or host
-            cache = "~/.cache/crucible"
+            cache = "~/.cache/forge"
         elif isinstance(item, dict):
             if not bool(item.get("enabled", True)):
                 continue
@@ -190,7 +190,7 @@ def worker_profiles(path: Path) -> dict[str, str]:
 def worker_path_maps(args: argparse.Namespace) -> dict[str, dict[str, str]]:
     maps: dict[str, dict[str, str]] = {}
     workers = worker_profiles(expand_path(args.workers))
-    coordinator_runs = str(expand_path(args.crucible_runs_dir))
+    coordinator_runs = str(expand_path(args.forge_runs_dir))
     coordinator_cache = str(expand_path(args.cache_dir))
     cache_text = str(args.cache_dir)
     cache_tilde = tilde_path(expand_path(args.cache_dir))
@@ -383,11 +383,11 @@ def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
     )
 
     manifest: dict[str, Any] = {
-        "schema": "crucible.task.v1",
+        "schema": "forge.task.v1",
         "name": args.tag,
         "kind": "sprt",
         "description": args.description or f"{args.tag}: distributed SPRT",
-        "work_dir": str(expand_path(args.crucible_runs_dir) / run_name),
+        "work_dir": str(expand_path(args.forge_runs_dir) / run_name),
         "requirements": {
             "python_min": "3.11",
             "git_min": "2.38",
@@ -435,8 +435,8 @@ def build_manifest(args: argparse.Namespace, run_dir: Path) -> dict[str, Any]:
     return manifest
 
 
-def status_json(crucible: str, run_name: str) -> dict[str, Any]:
-    result = run_capture([crucible, "status", run_name, "--json"])
+def status_json(forge: str, run_name: str) -> dict[str, Any]:
+    result = run_capture([forge, "status", run_name, "--json"])
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError:
@@ -468,7 +468,7 @@ def is_transient_startup_failure(text: str) -> bool:
 
 
 def retry_transient_failures(args: argparse.Namespace, run_name: str, run_dir: Path) -> int:
-    status = status_json(args.crucible, run_name)
+    status = status_json(args.forge, run_name)
     rows = failed_rows(status)
     if not rows:
         return 0
@@ -483,7 +483,7 @@ def retry_transient_failures(args: argparse.Namespace, run_name: str, run_dir: P
         print(f"{task_id}: retrying transient engine startup failure", flush=True)
         rc = run_streamed(
             [
-                args.crucible,
+                args.forge,
                 "run",
                 "--manifest", str(manifest),
                 "--index", str(row["index"]),
@@ -603,7 +603,7 @@ def emit_completion_event(
     emit_event(
         args.nnue_run or run_dir,
         "done" if rc == 0 else "fail",
-        stage="validate_crucible_sprt",
+        stage="validate_forge_sprt",
         status="ok" if rc == 0 else "failed",
         rc=rc,
         log=log_path or (run_dir / "deploy.log"),
@@ -622,7 +622,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     build_manifest(args, local_run_dir)
 
     command = [
-        args.crucible,
+        args.forge,
         "deploy",
         str(expand_path(args.workers)),
         str(local_run_dir / "manifest.template.json"),
@@ -630,8 +630,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         "--jobs", str(args.jobs),
         "--remote-timeout-seconds", str(args.remote_timeout_seconds),
     ]
-    if args.crucible_notify:
-        command.extend(["--notify-command", str(args.crucible_notify_command)])
+    if args.forge_notify:
+        command.extend(["--notify-command", str(args.forge_notify_command)])
     if args.replace:
         command.append("--replace")
     elif args.resume:
@@ -643,21 +643,21 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     deploy_log = local_run_dir / "deploy.log"
     rc = run_streamed(command, deploy_log)
-    run_dir = expand_path(args.crucible_runs_dir) / run_name
+    run_dir = expand_path(args.forge_runs_dir) / run_name
 
     if rc != 0:
         try:
-            status = status_json(args.crucible, run_name)
+            status = status_json(args.forge, run_name)
             counts = status.get("counts", {})
             if counts.get("done") == args.task_count and counts.get("fail", 0) == 0:
                 rc = 0
         except Exception as exc:
-            print(f"{run_name}: cannot read Crucible status after deploy failure: {exc}", flush=True)
+            print(f"{run_name}: cannot read Forge status after deploy failure: {exc}", flush=True)
 
     if rc != 0 and args.retry_startup_failures:
         retried = retry_transient_failures(args, run_name, run_dir)
         if retried:
-            status = status_json(args.crucible, run_name)
+            status = status_json(args.forge, run_name)
             counts = status.get("counts", {})
             rc = 0 if counts.get("done") == args.task_count and counts.get("fail", 0) == 0 else 1
 
@@ -668,7 +668,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         emit_completion_event(args, rc, run_dir, message, log_path=deploy_log)
         return rc
 
-    status = status_json(args.crucible, run_name)
+    status = status_json(args.forge, run_name)
     counts = status.get("counts", {})
     if counts.get("done") != args.task_count or counts.get("fail", 0) != 0:
         message = (
@@ -721,24 +721,24 @@ def validate_game_counts(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Run a distributed NNUE SPRT through Crucible."
+        description="Run a distributed NNUE SPRT through Forge."
     )
     parser.add_argument("--net", required=True, help="Candidate NNUE file.")
     parser.add_argument("--reference-net", required=True, help="Reference NNUE file.")
-    parser.add_argument("--tag", required=True, help="Crucible run name and SPRT tag.")
+    parser.add_argument("--tag", required=True, help="Forge run name and SPRT tag.")
     parser.add_argument("--description", default="")
-    parser.add_argument("--workers", default="~/code/cpp/chess/crucible/runs/workers.json")
-    parser.add_argument("--crucible", default="crucible")
-    parser.add_argument("--crucible-runs-dir", default="~/code/cpp/chess/crucible/runs")
+    parser.add_argument("--workers", default="~/code/cpp/chess/forge/runs/workers.json")
+    parser.add_argument("--forge", default="forge")
+    parser.add_argument("--forge-runs-dir", default="~/code/cpp/chess/forge/runs")
     parser.add_argument(
-        "--crucible-notify-command",
-        default="~/code/cpp/chess/crucible/scripts/crucible_event_ntfy.sh",
+        "--forge-notify-command",
+        default="~/code/cpp/chess/forge/scripts/forge_event_ntfy.sh",
     )
     parser.add_argument("--work-dir", default="~/code/cpp/chess/nnue")
     parser.add_argument("--output-dir")
     parser.add_argument("--nnue-run", help="NNUE run dir used for done/fail wake events.")
     parser.add_argument("--event-command", help="Event hook command for done/fail wake events.")
-    parser.add_argument("--cache-dir", default="~/.cache/crucible")
+    parser.add_argument("--cache-dir", default="~/.cache/forge")
     parser.add_argument("--book", default="~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd")
     parser.add_argument("--games", type=positive_int, default=4000)
     parser.add_argument(
@@ -746,7 +746,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=positive_int,
         default=100,
         help=(
-            "Games per Crucible task. Must be even, at least 50, and divide --games."
+            "Games per Forge task. Must be even, at least 50, and divide --games."
         ),
     )
     parser.add_argument("--chunk-concurrency", type=positive_int, default=4)
@@ -765,7 +765,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--replace", action="store_true")
     parser.add_argument("--verbose", action="store_true")
-    parser.add_argument("--crucible-notify", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--forge-notify", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--retry-startup-failures", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--notify", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
@@ -779,7 +779,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    args.crucible_notify_command = str(expand_path(args.crucible_notify_command))
+    args.forge_notify_command = str(expand_path(args.forge_notify_command))
     validate_game_counts(args)
     args.task_count = (args.games + args.chunk_games - 1) // args.chunk_games
     if args.resume and args.replace:

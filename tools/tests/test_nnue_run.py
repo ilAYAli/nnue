@@ -686,7 +686,7 @@ train
             harness = source.split('case "$cmd" in', 1)[0] + '''
 BUILD=build.json
 ARCH=architecture.json
-bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Crucible result"
+bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Forge result"
 '''
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
@@ -717,7 +717,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
                 body,
             )
             self.assertIn("Forge command:\nforge command", body)
-            self.assertIn("Result:\nCrucible result", body)
+            self.assertIn("Result:\nForge result", body)
 
             committed = subprocess.run(
                 ["git", "show", "HEAD:build.json"],
@@ -796,7 +796,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Cru
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
-bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Crucible result"
+bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Forge result"
 """
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
@@ -867,7 +867,7 @@ bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Cru
 BUILD=build.json
 ARCH=architecture.json
 continue_from=uho-native-1.0.35
-fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Crucible result"
+fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Forge result"
 """
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
@@ -898,7 +898,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
                 body,
             )
             self.assertIn("Forge command:\nforge command", body)
-            self.assertIn("Result:\nCrucible result", body)
+            self.assertIn("Result:\nForge result", body)
 
             committed_json = json.loads(subprocess.run(
                 ["git", "show", "HEAD:build.json"],
@@ -964,7 +964,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
 BUILD=build.json
 ARCH=architecture.json
 continue_from=
-fail_build_json "native-3.3.0-rc1" "-6.1" "-0.17/2.20 (-8%)" "forge command" "Crucible result"
+fail_build_json "native-3.3.0-rc1" "-6.1" "-0.17/2.20 (-8%)" "forge command" "Forge result"
 """
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
@@ -1034,7 +1034,7 @@ fail_build_json "native-3.3.0-rc1" "-6.1" "-0.17/2.20 (-8%)" "forge command" "Cr
 BUILD=build.json
 ARCH=architecture.json
 continue_from=
-fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Crucible result"
+fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Forge result"
 """
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
@@ -1109,7 +1109,7 @@ sprt_gate() {
   last_sprt_elo=-25.2
   last_sprt_llr='-0.32/2.20 (-15%)'
   last_sprt_command='forge command'
-  last_sprt_line='Crucible smoke games=400/400 elo=-25.2 ci=28.8 llr=-0.32/2.20 (-15%) los=30.0% draw=35.0%'
+  last_sprt_line='Forge smoke games=400/400 elo=-25.2 ci=28.8 llr=-0.32/2.20 (-15%) los=30.0% draw=35.0%'
   return 1
 }
 iterate
@@ -1438,11 +1438,11 @@ sprt_gate
             self.assertNotEqual(0, proc.returncode)
             self.assertEqual("sprt:800:sprt\n", trace.read_text(encoding="utf-8"))
 
-    def test_sprt_waits_matching_active_crucible_run_for_build_run(self) -> None:
+    def test_sprt_waits_matching_active_forge_run_for_build_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
-            forge = home / "code" / "cpp" / "chess" / "crucible" / "scripts" / "forge"
+            forge = home / "code" / "cpp" / "chess" / "forge" / "scripts" / "forge"
             forge.parent.mkdir(parents=True)
             forge.write_text(
                 "#!/usr/bin/env bash\n"
@@ -1462,8 +1462,8 @@ sprt_gate
                 encoding="utf-8",
             )
 
-            fake_crucible = tmp / "crucible"
-            fake_crucible.write_text(
+            fake_forge = tmp / "forge"
+            fake_forge.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
                 "if [[ \"$1\" == status && \"${2:-}\" == --json ]]; then\n"
@@ -1483,11 +1483,11 @@ sprt_gate
                 "  touch \"$FAKE_DONE\"\n"
                 "  exit 0\n"
                 "fi\n"
-                "echo unexpected crucible call: $* >&2\n"
+                "echo unexpected forge call: $* >&2\n"
                 "exit 2\n",
                 encoding="utf-8",
             )
-            fake_crucible.chmod(0o755)
+            fake_forge.chmod(0o755)
             calls = tmp / "calls.txt"
             done = tmp / "done"
 
@@ -1496,7 +1496,7 @@ sprt_gate
 NNUE_NTFY=0
 SOLO=0
 BUILD="$TEST_BUILD"
-CRUCIBLE="$TEST_CRUCIBLE"
+FORGE="$TEST_FORGE"
 HOME="$TEST_HOME"
 ENGINE="$HOME/assets/engines/enyo_91ede5f"
 run=candidate
@@ -1513,7 +1513,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
             env = os.environ.copy()
             env.update({
                 "TEST_BUILD": str(build),
-                "TEST_CRUCIBLE": str(fake_crucible),
+                "TEST_FORGE": str(fake_forge),
                 "TEST_HOME": str(home),
                 "FAKE_CALLS": str(calls),
                 "FAKE_DONE": str(done),
@@ -1537,11 +1537,11 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 calls.read_text(encoding="utf-8"),
             )
 
-    def test_sprt_ignores_stale_logged_crucible_run(self) -> None:
+    def test_sprt_ignores_stale_logged_forge_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
-            forge = home / "code" / "cpp" / "chess" / "crucible" / "scripts" / "forge"
+            forge = home / "code" / "cpp" / "chess" / "forge" / "scripts" / "forge"
             forge.parent.mkdir(parents=True)
             forge.write_text(
                 "#!/usr/bin/env bash\n"
@@ -1557,7 +1557,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
             log_dir = tmp / "runs" / "candidate" / "logs"
             log_dir.mkdir(parents=True)
             (log_dir / "05-sprt-800.log").write_text(
-                "+ crucible run nnue --run candidate-sprt-800-old --games 800\n",
+                "+ forge run nnue --run candidate-sprt-800-old --games 800\n",
                 encoding="utf-8",
             )
             build = tmp / "build.json"
@@ -1566,8 +1566,8 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 encoding="utf-8",
             )
 
-            fake_crucible = tmp / "crucible"
-            fake_crucible.write_text(
+            fake_forge = tmp / "forge"
+            fake_forge.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
                 "if [[ \"$1\" == status && \"${2:-}\" == candidate-sprt-800-old ]]; then\n"
@@ -1582,11 +1582,11 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 "  printf '%s\\n' '{\"state\":\"done\",\"progress_fields\":[\"games=800/800\",\"elo=+7.5\",\"llr=0.40/2.20 (18%)\"]}'\n"
                 "  exit 0\n"
                 "fi\n"
-                "echo unexpected crucible call: $* >&2\n"
+                "echo unexpected forge call: $* >&2\n"
                 "exit 2\n",
                 encoding="utf-8",
             )
-            fake_crucible.chmod(0o755)
+            fake_forge.chmod(0o755)
             forge_calls = tmp / "forge-calls.txt"
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
@@ -1594,7 +1594,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
 NNUE_NTFY=0
 SOLO=0
 BUILD="$TEST_BUILD"
-CRUCIBLE="$TEST_CRUCIBLE"
+FORGE="$TEST_FORGE"
 HOME="$TEST_HOME"
 ENGINE="$HOME/assets/engines/enyo_91ede5f"
 run=candidate
@@ -1611,7 +1611,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
             env = os.environ.copy()
             env.update({
                 "TEST_BUILD": str(build),
-                "TEST_CRUCIBLE": str(fake_crucible),
+                "TEST_FORGE": str(fake_forge),
                 "TEST_HOME": str(home),
                 "FORGE_CALLS": str(forge_calls),
             })
@@ -1626,14 +1626,14 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 check=True,
             )
 
-            self.assertIn("ignoring stale Crucible run from log: candidate-sprt-800-old", proc.stdout)
+            self.assertIn("ignoring stale Forge run from log: candidate-sprt-800-old", proc.stdout)
             self.assertIn("elo=7.5", proc.stdout)
             self.assertIn("llr=0.40/2.20 (18%)", proc.stdout)
             calls = forge_calls.read_text(encoding="utf-8")
             self.assertIn("--run candidate-sprt-800-", calls)
             self.assertNotIn("--run candidate-sprt-800-old", calls)
 
-    def test_sprt_refuses_to_queue_when_crucible_is_busy(self) -> None:
+    def test_sprt_refuses_to_queue_when_forge_is_busy(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
@@ -1646,8 +1646,8 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 '{"run":"candidate","continue_from":"reference"}\n',
                 encoding="utf-8",
             )
-            fake_crucible = tmp / "crucible"
-            fake_crucible.write_text(
+            fake_forge = tmp / "forge"
+            fake_forge.write_text(
                 "#!/usr/bin/env bash\n"
                 "if [[ \"$1\" == \"status\" && \"$2\" == \"--json\" ]]; then\n"
                 "  printf '%s\\n' "
@@ -1655,15 +1655,15 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 "\"done\":1,\"tasks\":2,\"progress_fields\":[\"games=50/100\",\"elo=+1.0\"]}]}'\n"
                 "  exit 1\n"
                 "fi\n"
-                "echo \"unexpected crucible call: $*\" >&2\n"
+                "echo \"unexpected forge call: $*\" >&2\n"
                 "exit 2\n",
                 encoding="utf-8",
             )
-            fake_crucible.chmod(0o755)
+            fake_forge.chmod(0o755)
             env = os.environ.copy()
             env.update({
                 "BUILD": str(build),
-                "CRUCIBLE": str(fake_crucible),
+                "FORGE": str(fake_forge),
                 "HOME": str(home),
                 "NNUE_NTFY": "0",
             })
@@ -1680,7 +1680,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
 
             self.assertNotEqual(0, proc.returncode)
             self.assertIn(
-                "refusing to start Crucible SPRT while Crucible is busy: "
+                "refusing to start Forge SPRT while Forge is busy: "
                 "busy-run running games=50/100 elo=+1.0",
                 proc.stderr,
             )

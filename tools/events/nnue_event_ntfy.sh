@@ -98,7 +98,7 @@ def final_status():
         stripped = line.strip()
         if "tasks=" in stripped and "games=" in stripped and "elo=" in stripped:
             return stripped[stripped.find("tasks="):]
-        if stripped.startswith("Crucible ") and " elo=" in stripped:
+        if stripped.startswith("Forge ") and " elo=" in stripped:
             return stripped
     return ""
 

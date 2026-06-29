@@ -30,8 +30,8 @@ LC0 V6 gzip records can be labeled directly without JSONL intermediates:
 
 ```sh
 python3 tools/score/label.py \
-  --input ~/.cache/crucible/inputs/DIGEST \
-  --inventory ~/.cache/crucible/inputs/DIGEST/inventory.json \
+  --input ~/.cache/forge/inputs/DIGEST \
+  --inventory ~/.cache/forge/inputs/DIGEST/inventory.json \
   --output shard.bullet \
   --stats shard.stats.json \
   --shard-count 152 \

@@ -27,7 +27,7 @@ ARCH=${ARCH:-architecture.json}
 DEFAULTS=${DEFAULTS:-defaults.json}
 PYTHON=${PYTHON:-.venv/bin/python}
 TRAIN_HELPER=${TRAIN_HELPER:-tools/bullet/train}
-CRUCIBLE=${CRUCIBLE:-crucible}
+FORGE=${FORGE:-forge}
 
 ENGINE=${ENGINE:-$HOME/assets/engines/enyo_91fd903}
 REFERENCE_NET=${REFERENCE_NET:-}
@@ -90,14 +90,14 @@ need() {
   command -v "$1" >/dev/null 2>&1 || fail "missing command: $1"
 }
 
-require_crucible_idle() {
+require_forge_idle() {
   [[ "$SOLO" == 1 ]] && return 0
-  command -v "$CRUCIBLE" >/dev/null 2>&1 || fail "missing command: $CRUCIBLE" "${1:-sprt}"
+  command -v "$FORGE" >/dev/null 2>&1 || fail "missing command: $FORGE" "${1:-sprt}"
 
   local status_json busy
-  status_json=$("$CRUCIBLE" status --json) || {
+  status_json=$("$FORGE" status --json) || {
     [[ -n "$status_json" ]] && jq -e . >/dev/null <<< "$status_json" \
-      || fail "could not read Crucible active status" "${1:-sprt}"
+      || fail "could not read Forge active status" "${1:-sprt}"
   }
   busy=$(jq -r '
     def inactive_state:
@@ -118,13 +118,13 @@ require_crucible_idle() {
           (($run.progress_fields // []) | join(" "))
         ] | @tsv
       end
-  ' <<< "$status_json") || fail "could not read Crucible active status" "${1:-sprt}"
+  ' <<< "$status_json") || fail "could not read Forge active status" "${1:-sprt}"
 
   [[ -z "$busy" ]] && return 0
 
   local busy_run busy_state busy_progress
   IFS=$'	' read -r busy_run busy_state busy_progress <<< "$busy"
-  local message="refusing to start Crucible SPRT while Crucible is busy: $busy_run"
+  local message="refusing to start Forge SPRT while Forge is busy: $busy_run"
   [[ -z "$busy_state" || "$busy_state" == "null" ]] || message+=" $busy_state"
   [[ -z "$busy_progress" || "$busy_progress" == "null" ]] || message+=" $busy_progress"
   fail "$message" "${1:-sprt}"
@@ -617,7 +617,7 @@ gates() {
   move_gate
 }
 
-crucible_run_from_log() {
+forge_run_from_log() {
   local log=$1
   [[ -f "$log" ]] || return 1
   sed -nE 's/.* --run ([^ ]+).*/\1/p' "$log" | tail -1
@@ -629,14 +629,14 @@ command_from_log() {
   sed -nE 's/^\+ //p' "$log" | head -1
 }
 
-crucible_run_exists() {
-  local crucible_run=$1
-  "$CRUCIBLE" status "$crucible_run" --json >/dev/null 2>&1
+forge_run_exists() {
+  local forge_run=$1
+  "$FORGE" status "$forge_run" --json >/dev/null 2>&1
 }
 
-read_crucible_sprt_status() {
-  local crucible_run=$1 status_json state fields
-  status_json=$("$CRUCIBLE" status "$crucible_run" --json) || return 1
+read_forge_sprt_status() {
+  local forge_run=$1 status_json state fields
+  status_json=$("$FORGE" status "$forge_run" --json) || return 1
   state=$(jq -r '.state // empty' <<< "$status_json") || return 1
   case "$state" in
     done|ok|completed) ;;
@@ -646,11 +646,11 @@ read_crucible_sprt_status() {
   last_sprt_elo=$(jq -r '.progress_fields[]? | select(startswith("elo=")) | sub("^elo="; "") | sub("^\\+"; "")' <<< "$status_json" | tail -1)
   last_sprt_llr=$(jq -r '.progress_fields[]? | select(startswith("llr=")) | sub("^llr="; "")' <<< "$status_json" | tail -1)
   [[ -n "$last_sprt_elo" && -n "$last_sprt_llr" ]] || return 1
-  last_sprt_line="Crucible $crucible_run $fields"
+  last_sprt_line="Forge $forge_run $fields"
 }
 
-read_completed_crucible_sprt_log() {
-  local crucible_run=$1 line games done total
+read_completed_forge_sprt_log() {
+  local forge_run=$1 line games done total
   [[ -f "$last_sprt_log" ]] || return 1
   line=$(grep -E 'games=[0-9]+/[0-9]+.*elo=.*llr=' "$last_sprt_log" | tail -1) || return 1
   games=$(sed -nE 's/.*games=([0-9]+)\/([0-9]+).*/\1 \2/p' <<< "$line")
@@ -660,14 +660,14 @@ read_completed_crucible_sprt_log() {
   last_sprt_elo=$(sed -nE 's/.*elo=\+?([^ ]+).*/\1/p' <<< "$line")
   last_sprt_llr=$(sed -nE 's/.*llr=([^ ]+( [^ ]+)?) .*/\1/p' <<< "$line")
   [[ -n "$last_sprt_elo" && -n "$last_sprt_llr" ]] || return 1
-  last_sprt_line="Crucible $crucible_run $line"
+  last_sprt_line="Forge $forge_run $line"
 }
 
-crucible_incomplete_run_for_current_sprt() {
+forge_incomplete_run_for_current_sprt() {
   local label=$1 sprt_games=$2 status_json
-  status_json=$("$CRUCIBLE" status --json) || {
+  status_json=$("$FORGE" status --json) || {
     [[ -n "$status_json" ]] && jq -e . >/dev/null <<< "$status_json" \
-      || fail "could not read Crucible active status" sprt
+      || fail "could not read Forge active status" sprt
   }
   jq -r --arg prefix "${run}-${label}-${sprt_games}-" '
     def task_count: (.tasks // 0);
@@ -682,35 +682,35 @@ crucible_incomplete_run_for_current_sprt() {
   ' <<< "$status_json"
 }
 
-wait_for_existing_crucible_sprt() {
-  local crucible_run=$1 status_json state manifest progress rc
-  if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
+wait_for_existing_forge_sprt() {
+  local forge_run=$1 status_json state manifest progress rc
+  if read_forge_sprt_status "$forge_run" || read_completed_forge_sprt_log "$forge_run"; then
     return 0
   fi
 
-  status_json=$("$CRUCIBLE" status "$crucible_run" --json) \
-    || fail "could not read Crucible SPRT status for $crucible_run" sprt
-  state=$(jq -r '.state // empty' <<< "$status_json") || fail "could not parse Crucible SPRT status for $crucible_run" sprt
-  manifest=$(jq -r '.manifest // empty' <<< "$status_json") || fail "could not parse Crucible SPRT manifest for $crucible_run" sprt
+  status_json=$("$FORGE" status "$forge_run" --json) \
+    || fail "could not read Forge SPRT status for $forge_run" sprt
+  state=$(jq -r '.state // empty' <<< "$status_json") || fail "could not parse Forge SPRT status for $forge_run" sprt
+  manifest=$(jq -r '.manifest // empty' <<< "$status_json") || fail "could not parse Forge SPRT manifest for $forge_run" sprt
   progress=$(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json") || progress=
 
   case "$state" in
     stopped|failed|fail)
-      local message="Crucible SPRT for $run is $state and incomplete: $crucible_run"
+      local message="Forge SPRT for $run is $state and incomplete: $forge_run"
       [[ -z "$progress" ]] || message+=" $progress"
       message+="; resume or retry it manually, then rerun ./nnue iterate"
       fail "$message" sprt
       ;;
   esac
-  [[ -n "$manifest" ]] || fail "cannot wait for Crucible SPRT $crucible_run: missing manifest" sprt
+  [[ -n "$manifest" ]] || fail "cannot wait for Forge SPRT $forge_run: missing manifest" sprt
 
-  printf 'waiting for active Crucible SPRT: %s\n' "$crucible_run" | tee -a "$last_sprt_log"
-  [[ -n "${last_sprt_command:-}" ]] || last_sprt_command="$CRUCIBLE wait --manifest $manifest"
+  printf 'waiting for active Forge SPRT: %s\n' "$forge_run" | tee -a "$last_sprt_log"
+  [[ -n "${last_sprt_command:-}" ]] || last_sprt_command="$FORGE wait --manifest $manifest"
   set +e
-  "$CRUCIBLE" wait --manifest "$manifest" 2>&1 | tee -a "$last_sprt_log"
+  "$FORGE" wait --manifest "$manifest" 2>&1 | tee -a "$last_sprt_log"
   rc=${PIPESTATUS[0]}
   set -e
-  if read_crucible_sprt_status "$crucible_run" || read_completed_crucible_sprt_log "$crucible_run"; then
+  if read_forge_sprt_status "$forge_run" || read_completed_forge_sprt_log "$forge_run"; then
     return 0
   fi
   return "$rc"
@@ -723,24 +723,24 @@ run_sprt_once() {
   section "$label"
 
   if [[ "$SOLO" != 1 ]]; then
-    local forge="$HOME/code/cpp/chess/crucible/scripts/forge"
+    local forge="$HOME/code/cpp/chess/forge/scripts/forge"
     local engine_hash="${ENGINE##*/}"
-    local crucible_run
-    crucible_run=$(crucible_run_from_log "$last_sprt_log" || true)
-    if [[ -n "$crucible_run" ]] && ! crucible_run_exists "$crucible_run"; then
-      printf 'ignoring stale Crucible run from log: %s\n' "$crucible_run" | tee -a "$last_sprt_log"
-      crucible_run=
+    local forge_run
+    forge_run=$(forge_run_from_log "$last_sprt_log" || true)
+    if [[ -n "$forge_run" ]] && ! forge_run_exists "$forge_run"; then
+      printf 'ignoring stale Forge run from log: %s\n' "$forge_run" | tee -a "$last_sprt_log"
+      forge_run=
     fi
-    [[ -n "$crucible_run" ]] || crucible_run=$(crucible_incomplete_run_for_current_sprt "$label" "$sprt_games" || true)
-    if [[ -n "$crucible_run" ]]; then
+    [[ -n "$forge_run" ]] || forge_run=$(forge_incomplete_run_for_current_sprt "$label" "$sprt_games" || true)
+    if [[ -n "$forge_run" ]]; then
       last_sprt_command=$(command_from_log "$last_sprt_log" || true)
-      wait_for_existing_crucible_sprt "$crucible_run" \
-        || fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue iterate" sprt
+      wait_for_existing_forge_sprt "$forge_run" \
+        || fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue iterate" sprt
       return 0
     fi
 
-    require_crucible_idle "$stage"
-    crucible_run="${run}-${label}-${sprt_games}-$(date +%Y%m%d-%H%M%S)"
+    require_forge_idle "$stage"
+    forge_run="${run}-${label}-${sprt_games}-$(date +%Y%m%d-%H%M%S)"
     engine_hash="${engine_hash#enyo_}"
     [[ -x "$forge" ]] || fail "missing forge: $forge" sprt
     local forge_cmd=(
@@ -748,7 +748,7 @@ run_sprt_once() {
       --candidate-nnue "$candidate_net"
       --reference-nnue "$reference_net"
       --verify
-      --run "$crucible_run"
+      --run "$forge_run"
     )
     local hypothesis
     hypothesis=$(json '.hypothesis // empty')
@@ -763,12 +763,12 @@ run_sprt_once() {
     )
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
-      fail "Crucible SPRT did not complete for $run ($crucible_run); resume or retry it manually, then rerun ./nnue iterate" sprt
+      fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue iterate" sprt
     fi
 
-    read_crucible_sprt_status "$crucible_run" \
-      || read_completed_crucible_sprt_log "$crucible_run" \
-      || fail "could not parse completed Crucible SPRT result for $crucible_run" sprt
+    read_forge_sprt_status "$forge_run" \
+      || read_completed_forge_sprt_log "$forge_run" \
+      || fail "could not parse completed Forge SPRT result for $forge_run" sprt
     return 0
   fi
 
