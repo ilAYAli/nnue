@@ -1,13 +1,13 @@
 {
-  "run": "native-4.7.0-rc2",
+  "run": "native-4.7.0-rc3",
   "continue_from": "native-4.6.0-rc1",
-  "hypothesis": "8 output buckets, apply the accepted native regimen to wrongIsRight nodes-5000 PV2 data",
+  "hypothesis": "8 output buckets, retry the neutral wrongIsRight nodes-5000 PV2 lane on the second 200M slice",
   "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 200000000
   }
 }
