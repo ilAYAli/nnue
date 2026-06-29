@@ -24,6 +24,7 @@ from pathlib import Path
 # Add tools/lib to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from bullet.bullet import enyo_network_size, expand_enyo_input_buckets
 from lib import enyo_nnue as nn2
 from lib.nnue_model import EnyoNNUE, load_model_from_nn
 
@@ -41,7 +42,7 @@ def run_spike_trainer(
     rows: int,
     superbatches: int,
 ) -> Path:
-    """Run spike_trainer to train a tiny net. Returns path to exported .nn."""
+    """Train a tiny net and return a normalized runtime .nn path."""
     if rows <= 0:
         raise ValueError(f"rows must be positive, got {rows}")
 
@@ -94,18 +95,44 @@ def run_spike_trainer(
         print(result.stderr, file=sys.stderr)
         raise RuntimeError(f"spike_trainer failed with exit code {result.returncode}")
 
-    # spike_trainer exports to $ENYO_BULLET_OUT/parity-{superbatches}/quantised.bin
+    # Select the Bullet checkpoint, then normalize it for the Enyo runtime.
     net_id = "parity"
-    nn_path = output_dir / f"{net_id}-{superbatches}" / "quantised.bin"
-    if not nn_path.exists():
+    checkpoint_path = output_dir / f"{net_id}-{superbatches}" / "quantised.bin"
+    if not checkpoint_path.exists():
         # Try checkpoint-0 if final doesn't exist
-        nn_path = output_dir / f"{net_id}-0" / "quantised.bin"
+        checkpoint_path = output_dir / f"{net_id}-0" / "quantised.bin"
 
-    if not nn_path.exists():
-        raise FileNotFoundError(f"Expected .nn at {nn_path} but not found. spike_trainer output:\n{result.stdout}")
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(
+            f"Expected checkpoint at {checkpoint_path} but not found. "
+            f"spike_trainer output:\n{result.stdout}"
+        )
 
-    print(f"Exported to {nn_path}", flush=True)
-    return nn_path
+    runtime_net = expand_enyo_input_buckets(
+        checkpoint_path.read_bytes(),
+        16,
+        feature_channels=12,
+        runtime_input_buckets=16,
+        output_buckets=1,
+        hidden=1024,
+        l2=16,
+    )
+    expected_size = enyo_network_size(
+        16,
+        feature_channels=12,
+        output_buckets=1,
+        hidden=1024,
+        l2=16,
+    )
+    if len(runtime_net) != expected_size:
+        raise RuntimeError(
+            f"runtime net is {len(runtime_net)} bytes, expected {expected_size}"
+        )
+
+    runtime_path = output_dir / "parity-runtime.nn"
+    runtime_path.write_bytes(runtime_net)
+    print(f"Exported runtime net to {runtime_path}", flush=True)
+    return runtime_path
 
 
 def eval_python(nn_path: Path, fen: str) -> int:

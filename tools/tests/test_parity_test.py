@@ -87,7 +87,7 @@ class ParityTestRegressionTests(unittest.TestCase):
                 self.assertTrue(text)
                 nn_path = output / "parity-3" / "quantised.bin"
                 nn_path.parent.mkdir(parents=True)
-                nn_path.write_bytes(b"net")
+                nn_path.write_bytes(b"checkpoint")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
 
             with (
@@ -97,6 +97,16 @@ class ParityTestRegressionTests(unittest.TestCase):
                     "which",
                     return_value="/fake/enyo-bullet-spike",
                 ),
+                mock.patch.object(
+                    parity_test,
+                    "expand_enyo_input_buckets",
+                    return_value=b"runtime",
+                ) as expand,
+                mock.patch.object(
+                    parity_test,
+                    "enyo_network_size",
+                    return_value=7,
+                ) as network_size,
             ):
                 result = parity_test.run_spike_trainer(
                     data,
@@ -107,7 +117,26 @@ class ParityTestRegressionTests(unittest.TestCase):
 
             self.assertEqual(
                 result,
-                output / "parity-3" / "quantised.bin",
+                output / "parity-runtime.nn",
+            )
+            self.assertEqual(result.read_bytes(), b"runtime")
+            checkpoint = output / "parity-3" / "quantised.bin"
+            self.assertEqual(checkpoint.read_bytes(), b"checkpoint")
+            expand.assert_called_once_with(
+                b"checkpoint",
+                16,
+                feature_channels=12,
+                runtime_input_buckets=16,
+                output_buckets=1,
+                hidden=1024,
+                l2=16,
+            )
+            network_size.assert_called_once_with(
+                16,
+                feature_channels=12,
+                output_buckets=1,
+                hidden=1024,
+                l2=16,
             )
             expected_env = {
                 "ENYO_BULLET_DATA": str(data),
@@ -144,6 +173,57 @@ class ParityTestRegressionTests(unittest.TestCase):
                 "ENYO_BULLET_EXPORT_INIT_ONLY",
             ):
                 self.assertNotIn(obsolete, expected_env)
+
+    def test_runtime_export_trims_bullet_trailer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data = root / "real.bullet"
+            data.write_bytes(b"data")
+            output = root / "output"
+            expected_size = parity_test.enyo_network_size(
+                16,
+                feature_channels=12,
+                output_buckets=1,
+                hidden=1024,
+                l2=16,
+            )
+            self.assertEqual(expected_size, 25_203_012)
+            payload = b"\x5a" * expected_size
+            trailer = b"bullet" * 10
+
+            def fake_run(
+                command: list[str],
+                *,
+                env: dict[str, str],
+                capture_output: bool,
+                text: bool,
+            ) -> SimpleNamespace:
+                del command, env, capture_output, text
+                checkpoint = output / "parity-2" / "quantised.bin"
+                checkpoint.parent.mkdir(parents=True)
+                checkpoint.write_bytes(payload + trailer)
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(parity_test.subprocess, "run", fake_run),
+                mock.patch.object(
+                    parity_test.shutil,
+                    "which",
+                    return_value="/fake/enyo-bullet-spike",
+                ),
+            ):
+                runtime = parity_test.run_spike_trainer(
+                    data,
+                    output,
+                    rows=1,
+                    superbatches=2,
+                )
+
+            self.assertEqual(runtime, output / "parity-runtime.nn")
+            self.assertEqual(runtime.stat().st_size, 25_203_012)
+            self.assertEqual(runtime.read_bytes(), payload)
+            checkpoint = output / "parity-2" / "quantised.bin"
+            self.assertEqual(checkpoint.read_bytes(), payload + trailer)
 
     def test_run_spike_trainer_rejects_nonpositive_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
