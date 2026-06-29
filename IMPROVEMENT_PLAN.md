@@ -2,10 +2,11 @@
 
 ## Next experiment
 
-- Candidate: `native-4.15.0-rc1`; parent: `native-4.14.0-rc4`.
-- Continue the successful 128-superbatch factorised regimen unchanged on the
-  next pylon slice.
-- Keep 16 input buckets, 8 output buckets, LR 0.0001, and WDL 0.05.
+- Candidate: `native-4.15.0-rc2`; parent: `native-4.14.0-rc4`.
+- Retry the rejected 800M-offset pylon slice with LR reduced from 0.0001 to
+  0.00005.
+- Keep 16 input buckets, 8 output buckets, 128 superbatches, WDL 0.05, and all
+  other training parameters unchanged.
 - Train on `training_data_pylon.binpack`, offset 800M, limit 200M.
 - Judge with a 1500-game SPRT; reject unless Elo and LLR are both positive at
   the cap.
@@ -25,6 +26,8 @@
   1500 games using 128 superbatches on the 400M-offset pylon slice.
 - `native-4.14.0-rc4`: accepted at +5.3 +/-14.6 Elo and LLR +0.17/2.20 over
   1500 games using the same regimen on the 600M-offset pylon slice.
+- `native-4.15.0-rc1`: rejected at -2.6 +/-14.7 Elo and LLR -0.14/2.20 over
+  1500 games using the proven regimen on the 800M-offset pylon slice.
 - The accepted lineage uses 8 output buckets and Stockfish binpacks. LC0,
   nodes5000 PV2 UHO, and PV2 difference-100 nodes-5000 data regressed and are
   closed pending a demonstrated data-quality correction.

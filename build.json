@@ -1,6 +1,6 @@
 {
-  "run": "native-4.14.0-rc4",
-  "continue_from": "native-4.13.0-rc1",
+  "run": "native-4.15.0-rc1",
+  "continue_from": "native-4.14.0-rc4",
   "hypothesis": "retry the 128-superbatch factorised continuation on the next pylon slice after offset 400M rejected",
   "superbatches": 128,
   "lr": 0.0001,
@@ -8,6 +8,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 600000000
+    "offset": 800000000
   }
 }
