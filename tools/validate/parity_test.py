@@ -42,24 +42,33 @@ def run_spike_trainer(
     superbatches: int,
 ) -> Path:
     """Run spike_trainer to train a tiny net. Returns path to exported .nn."""
+    if rows <= 0:
+        raise ValueError(f"rows must be positive, got {rows}")
+
     output_dir.mkdir(parents=True, exist_ok=True)
+    batch_size = min(rows, 2048)
+    batches = (rows + batch_size - 1) // batch_size
 
     env = {
-        "ENYO_BULLET_DATASET": str(data_path),
-        "ENYO_BULLET_OUTPUT": str(output_dir),
-        "ENYO_BULLET_LIMIT": str(rows),
+        "ENYO_BULLET_DATA": str(data_path),
+        "ENYO_BULLET_OUT": str(output_dir),
+        "ENYO_BULLET_NET_ID": "parity",
+        "ENYO_BULLET_MODE": "enyo",
+        "ENYO_BULLET_HIDDEN": "1024",
+        "ENYO_BULLET_L2": "16",
+        "ENYO_BULLET_BATCH_SIZE": str(batch_size),
+        "ENYO_BULLET_BATCHES": str(batches),
         "ENYO_BULLET_SUPERBATCHES": str(superbatches),
+        "ENYO_BULLET_THREADS": "4",
         "ENYO_BULLET_LR": "1e-3",
         "ENYO_BULLET_FINAL_LR": "1e-4",
-        "ENYO_BULLET_HIDDEN": "256",  # Small for speed
-        "ENYO_BULLET_L2_SIZE": "8",
-        "ENYO_BULLET_L3_SIZE": "8",
-        "ENYO_BULLET_OUTPUT_BUCKETS": "1",
-        "ENYO_BULLET_INPUT_BUCKETS": "16",
-        "ENYO_BULLET_FEATURE_CHANNELS": "12",
-        "ENYO_BULLET_THREADS": "4",
-        "ENYO_BULLET_WDL_LAMBDA": "0.3",
-        "ENYO_BULLET_EXPORT_INIT_ONLY": "0",
+        "ENYO_BULLET_WDL": "0.3",
+        "ENYO_BULLET_ENYO_INPUT_BUCKETS": "16",
+        "ENYO_BULLET_ENYO_FEATURE_CHANNELS": "12",
+        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS": "1",
+        "ENYO_BULLET_ENYO_INPUT_FACTORISER": "0",
+        "ENYO_BULLET_EVAL_SCALE": "400",
+        "ENYO_BULLET_SAVE_RATE": str(superbatches),
     }
 
     spike_trainer = Path(__file__).resolve().parents[1] / "bullet" / "spike_trainer" / "target" / "release" / "enyo-bullet-spike"
@@ -85,7 +94,7 @@ def run_spike_trainer(
         print(result.stderr, file=sys.stderr)
         raise RuntimeError(f"spike_trainer failed with exit code {result.returncode}")
 
-    # spike_trainer exports to $ENYO_BULLET_OUTPUT/parity-{superbatches}/quantised.bin
+    # spike_trainer exports to $ENYO_BULLET_OUT/parity-{superbatches}/quantised.bin
     net_id = "parity"
     nn_path = output_dir / f"{net_id}-{superbatches}" / "quantised.bin"
     if not nn_path.exists():
@@ -114,8 +123,8 @@ def eval_python(nn_path: Path, fen: str) -> int:
     import torch
     with torch.no_grad():
         score = model(
-            torch.tensor([w_feats], dtype=torch.long),
-            torch.tensor([b_feats], dtype=torch.long),
+            torch.tensor(w_feats, dtype=torch.long),
+            torch.tensor(b_feats, dtype=torch.long),
             torch.tensor([0], dtype=torch.long),  # offset 0
             torch.tensor([0], dtype=torch.long),  # offset 0
             torch.tensor([stm], dtype=torch.long),
@@ -191,7 +200,7 @@ def main() -> int:
 
     try:
         # Train tiny net
-        nn_path = run_spike_trainer(output_dir, output_dir, args.rows, args.superbatches)
+        nn_path = run_spike_trainer(data_path, output_dir, args.rows, args.superbatches)
 
         # Eval in Python
         print(f"Evaluating {args.fen} in Python...", flush=True)
