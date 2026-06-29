@@ -1,9 +1,9 @@
 {
-  "run": "native-6.2.0-rc1",
+  "run": "native-6.2.0-rc2",
   "continue_from": "native-4.6.0-rc1",
-  "hypothesis": "8 output buckets, scale the neutral WDL 0.30 quiet LC0 depth-12 pilot from 614k to about 5M positions",
+  "hypothesis": "8 output buckets, retry the 5.6M quiet LC0 depth-12 pass with LR reduced 10x after the full-rate update collapsed",
   "superbatches": 38,
-  "lr": 0.0001,
+  "lr": 0.00001,
   "wdl": 0.30,
   "data": {
     "source_binpack": "data/labeled/test91-depth12.bullet",
