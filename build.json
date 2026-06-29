@@ -1,13 +1,13 @@
 {
-  "run": "native-4.12.0-rc1",
+  "run": "native-4.13.0-rc1",
   "continue_from": "native-4.11.0-rc1",
-  "hypothesis": "8 output buckets, apply the accepted native regimen to the first 200M nodes5000 PV2 UHO slice",
+  "hypothesis": "enable the zero-initialized shared input factoriser on a controlled replay of the parent-producing pylon slice",
   "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 200000000
   }
 }

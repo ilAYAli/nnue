@@ -1,5 +1,5 @@
 {
-  "name": "native-16bucket-12ch-1024-v2",
+  "name": "native-16bucket-12ch-1024-v3-factorised",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
@@ -7,7 +7,7 @@
   "feature_channels": 12,
   "input_buckets": 16,
   "output_buckets": 8,
-  "input_factoriser": false,
+  "input_factoriser": true,
   "eval_scale": 400.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
