@@ -1,6 +1,6 @@
 {
-  "run": "native-4.13.0-rc1",
-  "continue_from": "native-4.11.0-rc1",
+  "run": "native-4.14.0-rc1",
+  "continue_from": "native-4.13.0-rc1",
   "hypothesis": "enable the zero-initialized shared input factoriser on a controlled replay of the parent-producing pylon slice",
   "superbatches": 256,
   "lr": 0.0001,
@@ -8,6 +8,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 400000000
   }
 }
