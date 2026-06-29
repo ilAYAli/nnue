@@ -29,7 +29,7 @@ tools/score/score.py uci \
 LC0 V6 gzip records can be labeled directly without JSONL intermediates:
 
 ```sh
-python3 tools/score/label_lc0.py \
+python3 tools/score/label.py \
   --input ~/.cache/crucible/inputs/DIGEST \
   --inventory ~/.cache/crucible/inputs/DIGEST/inventory.json \
   --output shard.bullet \

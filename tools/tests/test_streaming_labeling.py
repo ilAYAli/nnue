@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import sys
 import subprocess
@@ -15,7 +16,13 @@ sys.path.insert(0, str(REPO / "tools"))
 sys.path.insert(0, str(REPO / "tools" / "posgen"))
 
 import lc0_to_jsonl  # noqa: E402
-from score import label_lc0  # noqa: E402
+
+LABEL_PATH = REPO / "tools" / "score" / "label.py"
+LABEL_SPEC = importlib.util.spec_from_file_location("streaming_label", LABEL_PATH)
+if LABEL_SPEC is None or LABEL_SPEC.loader is None:
+    raise RuntimeError(f"cannot load {LABEL_PATH}")
+labeler = importlib.util.module_from_spec(LABEL_SPEC)
+LABEL_SPEC.loader.exec_module(labeler)
 
 
 class FakeEngine:
@@ -40,10 +47,10 @@ def row(move: str = "a2a3") -> dict:
     }
 
 
-class Lc0StreamingTests(unittest.TestCase):
+class StreamingLabelingTests(unittest.TestCase):
     def test_script_entrypoint_loads(self) -> None:
         result = subprocess.run(
-            [sys.executable, str(REPO / "tools" / "score" / "label_lc0.py"), "--help"],
+            [sys.executable, str(LABEL_PATH), "--help"],
             cwd=REPO,
             text=True,
             stdout=subprocess.PIPE,
@@ -99,8 +106,8 @@ class Lc0StreamingTests(unittest.TestCase):
                 lc0_to_jsonl.inventory_paths(inventory, root)
 
     def test_quiet_filter(self) -> None:
-        self.assertTrue(label_lc0.is_quiet(row()))
-        self.assertFalse(label_lc0.is_quiet(row("a2a3q")))
+        self.assertTrue(labeler.is_quiet(row()))
+        self.assertFalse(labeler.is_quiet(row("a2a3q")))
 
     def test_streams_to_atomic_bullet_and_stats(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -135,12 +142,13 @@ class Lc0StreamingTests(unittest.TestCase):
                 yield row(), 2
 
             with mock.patch.object(lc0_to_jsonl, "iter_rows", rows):
-                stats = label_lc0.label(args, engine_type=FakeEngine)
+                stats = labeler.label(args, engine_type=FakeEngine)
 
             self.assertEqual(64, output.stat().st_size)
             self.assertEqual(3, stats["read"])
             self.assertEqual(2, stats["selected"])
             self.assertEqual(2, stats["written"])
+            self.assertEqual("enyo.label-stats.v1", stats["schema"])
             self.assertEqual(stats, json.loads(stats_path.read_text(encoding="utf-8")))
             self.assertEqual([], list(root.glob("*.partial.*")))
 

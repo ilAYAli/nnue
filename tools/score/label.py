@@ -62,7 +62,7 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
 
     decode = lc0_to_jsonl.Stats()
     stats: dict[str, object] = {
-        "schema": "enyo.lc0-label-stats.v1",
+        "schema": "enyo.label-stats.v1",
         "input": str(args.input),
         "inventory": str(args.inventory),
         "output": str(output),
