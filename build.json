@@ -1,13 +1,13 @@
 {
-  "run": "native-4.11.0-rc1",
-  "continue_from": "native-4.10.0-rc1",
-  "hypothesis": "8 output buckets, revisit the skipped second 200M pylon slice after three later slices were promoted",
+  "run": "native-4.12.0-rc1",
+  "continue_from": "native-4.11.0-rc1",
+  "hypothesis": "8 output buckets, apply the accepted native regimen to the first 200M nodes5000 PV2 UHO slice",
   "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 0
   }
 }
