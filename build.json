@@ -1,13 +1,13 @@
 {
-  "run": "native-4.9.0-rc1",
-  "continue_from": "native-4.8.0-rc2",
-  "hypothesis": "8 output buckets, continue the promoted pylon-data line on the fourth 200M slice",
+  "run": "native-4.10.0-rc1",
+  "continue_from": "native-4.9.0-rc1",
+  "hypothesis": "8 output buckets, continue the promoted pylon-data line on the fifth 200M slice",
   "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 600000000
+    "offset": 800000000
   }
 }
