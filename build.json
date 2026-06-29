@@ -1,13 +1,13 @@
 {
-  "run": "native-6.2.0-rc2",
+  "run": "native-4.7.0-rc2",
   "continue_from": "native-4.6.0-rc1",
-  "hypothesis": "8 output buckets, retry the 5.6M quiet LC0 depth-12 pass with LR reduced 10x after the full-rate update collapsed",
-  "superbatches": 38,
-  "lr": 0.00001,
-  "wdl": 0.30,
+  "hypothesis": "8 output buckets, apply the accepted native regimen to wrongIsRight nodes-5000 PV2 data",
+  "superbatches": 256,
+  "lr": 0.0001,
+  "wdl": 0.05,
   "data": {
-    "source_binpack": "data/labeled/test91-depth12.bullet",
-    "limit": 0,
+    "source_binpack": "data/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack",
+    "limit": 200000000,
     "offset": 0
   }
 }
