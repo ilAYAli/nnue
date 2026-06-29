@@ -1,13 +1,14 @@
 {
-  "run": "native-4.14.0-rc1",
+  "run": "native-4.14.0-rc2",
   "continue_from": "native-4.13.0-rc1",
-  "hypothesis": "enable the zero-initialized shared input factoriser on a controlled replay of the parent-producing pylon slice",
+  "initialize_from": "native-4.13.0-rc1",
+  "hypothesis": "refine the accepted factorised network from 16 to 32 input king buckets while preserving an equivalent initialization",
   "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 400000000
+    "offset": 200000000
   }
 }
