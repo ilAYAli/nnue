@@ -723,9 +723,10 @@ run_sprt_once() {
   section "$label"
 
   if [[ "$SOLO" != 1 ]]; then
-    local forge="$HOME/code/cpp/chess/forge/scripts/forge"
-    local engine_hash="${ENGINE##*/}"
     local forge_run
+    local remote_engine="~/assets/engines/${ENGINE##*/}"
+    local remote_candidate_net="~/assets/nets/${candidate_net##*/}"
+    local remote_reference_net="~/assets/nets/${reference_net##*/}"
     forge_run=$(forge_run_from_log "$last_sprt_log" || true)
     if [[ -n "$forge_run" ]] && ! forge_run_exists "$forge_run"; then
       printf 'ignoring stale Forge run from log: %s\n' "$forge_run" | tee -a "$last_sprt_log"
@@ -741,34 +742,32 @@ run_sprt_once() {
 
     require_forge_idle "$stage"
     forge_run="${run}-${label}-${sprt_games}-$(date +%Y%m%d-%H%M%S)"
-    engine_hash="${engine_hash#enyo_}"
-    [[ -x "$forge" ]] || fail "missing forge: $forge" sprt
+    [[ -x "$ENGINE" ]] || fail "missing engine: $ENGINE" sprt
+    [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
+    [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" sprt
     local forge_cmd=(
-      "$forge" nnue "$engine_hash"
-      --candidate-nnue "$candidate_net"
-      --reference-nnue "$reference_net"
-      --verify
+      "$FORGE" sprt
       --run "$forge_run"
-    )
-    local hypothesis
-    hypothesis=$(json '.hypothesis // empty')
-    [[ -z "$hypothesis" ]] || forge_cmd+=(--comment "$hypothesis")
-    forge_cmd+=(
-      --
+      --candidate "$remote_engine"
+      --reference "$remote_engine"
+      --candidate-uci "nnue_file=$remote_candidate_net"
+      --reference-uci "nnue_file=$remote_reference_net"
       --games "$sprt_games"
       --elo0 "$SPRT_ELO0"
       --elo1 "$SPRT_ELO1"
       --alpha "$SPRT_ALPHA"
       --beta "$SPRT_BETA"
     )
+    local hypothesis
+    hypothesis=$(json '.hypothesis // empty')
+    [[ -z "$hypothesis" ]] || forge_cmd+=(--comment "$hypothesis")
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
-      fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue iterate" sprt
+      fail "could not launch Forge SPRT for $run ($forge_run)" sprt
     fi
 
-    read_forge_sprt_status "$forge_run" \
-      || read_completed_forge_sprt_log "$forge_run" \
-      || fail "could not parse completed Forge SPRT result for $forge_run" sprt
+    wait_for_existing_forge_sprt "$forge_run" \
+      || fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue iterate" sprt
     return 0
   fi
 

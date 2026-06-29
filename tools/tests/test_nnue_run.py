@@ -1541,16 +1541,11 @@ printf 'llr=%s\n' "$last_sprt_llr"
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
-            forge = home / "code" / "cpp" / "chess" / "forge" / "scripts" / "forge"
-            forge.parent.mkdir(parents=True)
-            forge.write_text(
-                "#!/usr/bin/env bash\n"
-                "printf '%s\\n' \"$*\" >> \"$FORGE_CALLS\"\n"
-                "exit 0\n",
-                encoding="utf-8",
-            )
-            forge.chmod(0o755)
             (home / "assets" / "nets").mkdir(parents=True)
+            engine = home / "assets" / "engines" / "enyo_91ede5f"
+            engine.parent.mkdir(parents=True)
+            engine.write_text("#!/bin/sh\n", encoding="utf-8")
+            engine.chmod(0o755)
             (home / "assets" / "nets" / "candidate.nn").write_bytes(b"candidate")
             (home / "assets" / "nets" / "reference.nn").write_bytes(b"reference")
 
@@ -1576,6 +1571,10 @@ printf 'llr=%s\n' "$last_sprt_llr"
                 "fi\n"
                 "if [[ \"$1\" == status && \"${2:-}\" == --json ]]; then\n"
                 "  printf '%s\\n' '{\"runs\":[]}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == sprt ]]; then\n"
+                "  printf '%s\\n' \"$*\" >> \"$FORGE_CALLS\"\n"
                 "  exit 0\n"
                 "fi\n"
                 "if [[ \"$1\" == status && \"${2:-}\" == candidate-sprt-800-* ]]; then\n"
@@ -1630,6 +1629,11 @@ printf 'llr=%s\n' "$last_sprt_llr"
             self.assertIn("elo=7.5", proc.stdout)
             self.assertIn("llr=0.40/2.20 (18%)", proc.stdout)
             calls = forge_calls.read_text(encoding="utf-8")
+            self.assertIn("sprt --run candidate-sprt-800-", calls)
+            self.assertIn("--candidate ~/assets/engines/enyo_91ede5f", calls)
+            self.assertIn("--reference ~/assets/engines/enyo_91ede5f", calls)
+            self.assertIn("--candidate-uci nnue_file=~/assets/nets/candidate.nn", calls)
+            self.assertIn("--reference-uci nnue_file=~/assets/nets/reference.nn", calls)
             self.assertIn("--run candidate-sprt-800-", calls)
             self.assertNotIn("--run candidate-sprt-800-old", calls)
 
