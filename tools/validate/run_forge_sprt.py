@@ -514,7 +514,6 @@ def aggregate_sprt_logs(run_dir: Path) -> SprtAggregate:
 
 def conclusion_text(args: argparse.Namespace, aggregate: SprtAggregate, run_dir: Path) -> str:
     return "\n".join([
-        "<output>",
         "Distributed SPRT",
         f"  • Run: {args.tag}",
         f"  • Candidate: {args.net}",
@@ -522,7 +521,6 @@ def conclusion_text(args: argparse.Namespace, aggregate: SprtAggregate, run_dir:
         f"  • Score: {aggregate.wins} - {aggregate.losses} - {aggregate.draws} [{aggregate.score:.4f}] {aggregate.games}",
         f"  • Elo: {aggregate.elo:.2f} +/- {aggregate.ci95:.2f}, LOS: {aggregate.los:.1f}%",
         f"  • Run dir: {run_dir}",
-        "</output>",
     ])
 
 
