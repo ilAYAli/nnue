@@ -1,8 +1,8 @@
 {
-  "run": "native-4.17.0-rc1",
+  "run": "native-4.17.0-rc2",
   "continue_from": "native-4.16.0-rc1",
-  "hypothesis": "retry rejected pylon offset 800M with LR reduced from 0.0001 to 0.00005",
-  "superbatches": 128,
+  "hypothesis": "retry neutral pylon offset 1.2B with dose reduced from 128 to 64 superbatches",
+  "superbatches": 64,
   "lr": 0.00005,
   "wdl": 0.05,
   "data": {

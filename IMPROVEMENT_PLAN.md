@@ -2,14 +2,14 @@
 
 ## Next experiment
 
-- Candidate: `native-4.17.0-rc2`; parent: `native-4.16.0-rc1`.
-- Retry the neutral 1.2B-offset pylon slice with the dose reduced from 128 to
-  64 superbatches.
-- Keep 16 input buckets, 8 output buckets, LR 0.00005, WDL 0.05, and all other
-  training parameters unchanged.
-- Train on `training_data_pylon.binpack`, offset 1.2B, limit 200M.
-- Judge with a 1500-game SPRT; reject unless Elo and LLR are both positive at
-  the cap.
+- Benchmark promoted `native-4.17.0-rc2` against `default.net` with the pinned
+  1000-game `qsprt.sh` protocol.
+- After the benchmark, continue with `native-4.18.0-rc1` from
+  `native-4.17.0-rc2` on the 1.4B-offset pylon slice.
+- Keep 16 input buckets, 8 output buckets, 64 superbatches, LR 0.00005, WDL
+  0.05, and all other training parameters unchanged.
+- Judge training candidates with a 1500-game SPRT; reject unless Elo and LLR
+  are both positive at the cap.
 
 ## Durable results
 
@@ -34,6 +34,8 @@
   1500 games using the lower-LR regimen on the 1B-offset pylon slice.
 - `native-4.17.0-rc1`: rejected at -0.2 +/-14.3 Elo and LLR -0.04/2.20 over
   1500 games using 128 superbatches on the 1.2B-offset pylon slice.
+- `native-4.17.0-rc2`: accepted at +13.9 +/-14.8 Elo and LLR +0.65/2.20 over
+  1500 games after reducing the dose to 64 superbatches on the same slice.
 - The accepted lineage uses 8 output buckets and Stockfish binpacks. LC0,
   nodes5000 PV2 UHO, and PV2 difference-100 nodes-5000 data regressed and are
   closed pending a demonstrated data-quality correction.
