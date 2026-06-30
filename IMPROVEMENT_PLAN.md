@@ -2,11 +2,9 @@
 
 ## Next experiment
 
-- Candidate: `native-4.19.0-rc3`; parent: `native-4.17.0-rc2`.
-- Correct the lineage after direct replay disproved the `native-4.18.0-rc4`
-  promotion.
-- Switch the saturated pylon continuation to `farseerT76.binpack`, offset 0,
-  limit 200M.
+- Candidate: `native-4.19.0-rc4`; parent: `native-4.17.0-rc2`.
+- Continue the corrected parent on the second `farseerT76.binpack` slice at
+  offset 200M after the first slice was neutral.
 - Keep 16 input buckets, 8 output buckets, 64 superbatches, LR 0.00005, WDL
   0.05, and all other training parameters unchanged.
 - Judge with a 1500-game SPRT; reject unless Elo and LLR are both positive at
@@ -27,5 +25,7 @@
   parent, were rejected at -1.4 and -4.2 Elo respectively.
 - Pylon offsets 1.4B through 2B are closed after repeated neutral or negative
   results across dose and LR changes.
+- `native-4.19.0-rc3`: rejected at -0.7 +/-14.7 Elo and LLR -0.06/2.20 on
+  `farseerT76` offset 0.
 - The accepted lineage uses 8 output buckets and Stockfish binpacks. LC0 and
   the tested PV2 data lanes regressed and remain closed.

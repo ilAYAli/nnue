@@ -1,13 +1,13 @@
 {
-  "run": "native-4.19.0-rc2",
-  "continue_from": "native-4.18.0-rc4",
-  "hypothesis": "continue accepted 64-superbatch LR 0.00005 regimen on pylon offset 2B after 1.8B was neutral",
+  "run": "native-4.19.0-rc3",
+  "continue_from": "native-4.17.0-rc2",
+  "hypothesis": "switch the corrected native-4.17.0-rc2 parent from saturated pylon slices to farseerT76",
   "superbatches": 64,
   "lr": 0.00005,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
-    "offset": 2000000000
+    "offset": 0
   }
 }
