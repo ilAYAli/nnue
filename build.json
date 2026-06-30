@@ -1,6 +1,6 @@
 {
-  "run": "native-4.18.0-rc4",
-  "continue_from": "native-4.17.0-rc2",
+  "run": "native-4.19.0-rc1",
+  "continue_from": "native-4.18.0-rc4",
   "hypothesis": "return to accepted 64-superbatch LR 0.00005 regimen on pylon offset 1.6B after closing 1.4B",
   "superbatches": 64,
   "lr": 0.00005,
@@ -8,6 +8,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 1600000000
+    "offset": 1800000000
   }
 }
