@@ -1,6 +1,6 @@
 {
-  "run": "native-4.17.0-rc2",
-  "continue_from": "native-4.16.0-rc1",
+  "run": "native-4.18.0-rc1",
+  "continue_from": "native-4.17.0-rc2",
   "hypothesis": "retry neutral pylon offset 1.2B with dose reduced from 128 to 64 superbatches",
   "superbatches": 64,
   "lr": 0.00005,
@@ -8,6 +8,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 1200000000
+    "offset": 1400000000
   }
 }
