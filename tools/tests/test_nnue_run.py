@@ -573,6 +573,80 @@ train
         self.assertEqual(0, proc.returncode)
         self.assertEqual("native-3.1.0-rc1\n", proc.stdout)
 
+    def test_default_net_checkpoint_runs_after_three_promotions_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            ledger = tmp / "default-net.jsonl"
+            trace = tmp / "trace"
+            ledger.write_text('{"candidate":"native-1.0.0-rc1"}\n', encoding="utf-8")
+
+            proc = self.run_sourced(
+                f"""
+NNUE_NTFY=0
+HOME={shlex.quote(str(tmp))}
+DEFAULT_NET_LEDGER={shlex.quote(str(ledger))}
+DEFAULT_NET_EVERY=3
+DEFAULT_NET_GAMES=1000
+QSPRT=qsprt_mock
+TRACE={shlex.quote(str(trace))}
+PROMOTIONS=2
+git() {{
+  if [[ "$1" == rev-list ]]; then
+    echo "$PROMOTIONS"
+  elif [[ "$*" == *"--format=%H"* ]]; then
+    printf 'abc\\tnative-1.0.0-rc1.nn: Elo 1.0,LLR 0.1/2.2\\n'
+  else
+    echo "native-1.3.0-rc1.nn: Elo 3.0,LLR 0.1/2.2"
+  fi
+}}
+qsprt_mock() {{
+  printf '%s\\n' "$*" >> "$TRACE"
+  printf '{{"candidate":"native-1.3.0-rc1"}}\\n' >> "$DEFAULT_NET_LEDGER"
+}}
+run_default_net_checkpoint_if_due
+[[ ! -e "$TRACE" ]]
+PROMOTIONS=3
+run_default_net_checkpoint_if_due
+run_default_net_checkpoint_if_due
+"""
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(0, proc.returncode)
+            self.assertEqual(
+                f"{tmp}/assets/nets/native-1.3.0-rc1.nn "
+                f"{tmp}/assets/nets/default.net 1000\n",
+                trace.read_text(encoding="utf-8"),
+            )
+
+    def test_default_net_checkpoint_propagates_qsprt_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            ledger = tmp / "default-net.jsonl"
+            ledger.write_text('{"candidate":"native-1.0.0-rc1"}\n', encoding="utf-8")
+
+            proc = self.run_sourced(
+                f"""
+NNUE_NTFY=0
+DEFAULT_NET_LEDGER={shlex.quote(str(ledger))}
+DEFAULT_NET_EVERY=3
+QSPRT=qsprt_mock
+git() {{
+  if [[ "$1" == rev-list ]]; then
+    echo 3
+  elif [[ "$*" == *"--format=%H"* ]]; then
+    printf 'abc\\tnative-1.0.0-rc1.nn: Elo 1.0,LLR 0.1/2.2\\n'
+  else
+    echo "native-1.3.0-rc1.nn: Elo 3.0,LLR 0.1/2.2"
+  fi
+}}
+qsprt_mock() {{ return 9; }}
+run_default_net_checkpoint_if_due
+"""
+            )
+
+            self.assertEqual(9, proc.returncode)
+
     def test_plan_uses_training_build_without_validation_reference(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
