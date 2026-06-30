@@ -9,6 +9,47 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
+CANDIDATE_NET="$1"
+REFERENCE_NET="${2:-~/assets/nets/native-4.0.0-rc2.nn}"
+GAMES="${3:-1500}"
+CANDIDATE_FILE=$(basename "$CANDIDATE_NET")
+CANDIDATE=${CANDIDATE_FILE%.nn}
+OUTPUT=
+EVENT_SENT=0
+
+notify_ai() {
+    local event="$1"
+    local status="$2"
+    local message="$3"
+    EVENT_SENT=1
+    jq -cn \
+        --arg event "$event" \
+        --arg run "$CANDIDATE" \
+        --arg stage qsprt \
+        --arg status "$status" \
+        --arg message "$message" \
+        '{event:$event,run:$run,stage:$stage,status:$status,message:$message}' \
+        | NNUE_AI_STDIN_EVENTS=done,fail \
+            "$SCRIPT_DIR/tools/events/nnue_event_ntfy.sh" || true
+}
+
+on_exit() {
+    local rc=$?
+    trap - EXIT
+    [[ -z "$OUTPUT" ]] || rm -f "$OUTPUT"
+    if ((EVENT_SENT == 0)); then
+        if ((rc == 0)); then
+            notify_ai done done \
+                "qsprt completed: $CANDIDATE vs $(basename "$REFERENCE_NET"), games=$GAMES"
+        else
+            notify_ai fail fail \
+                "qsprt failed: $CANDIDATE vs $(basename "$REFERENCE_NET"), rc=$rc"
+        fi
+    fi
+    exit "$rc"
+}
+trap on_exit EXIT
+
 exec 9>/tmp/sprt_default_net.lock
 if ! flock -n 9; then
     echo "Error: another default-net SPRT is already running" >&2
@@ -30,10 +71,6 @@ if [[ -n "$BUSY_RUN" ]]; then
     echo "Error: forge is busy: $BUSY_RUN" >&2
     exit 1
 fi
-
-CANDIDATE_NET="$1"
-REFERENCE_NET="${2:-~/assets/nets/native-4.0.0-rc2.nn}"
-GAMES="${3:-1500}"
 
 # Expand ~ manually for validation
 CANDIDATE_NET_EXPANDED="${CANDIDATE_NET/#\~/$HOME}"
@@ -73,7 +110,6 @@ CANDIDATE_NET_UCI=$(portable_home_path "$CANDIDATE_NET_EXPANDED")
 REFERENCE_NET_UCI=$(portable_home_path "$REFERENCE_NET_EXPANDED")
 
 OUTPUT=$(mktemp)
-trap 'rm -f "$OUTPUT"' EXIT
 
 set -x
 forge \
@@ -122,9 +158,6 @@ if [[ "$(basename "$REFERENCE_NET_EXPANDED")" == "default.net" ]]; then
         echo "Error: refusing to log partial default-net result: $ACTUAL_GAMES/$GAMES games" >&2
         exit 1
     fi
-
-    CANDIDATE_FILE=$(basename "$CANDIDATE_NET_EXPANDED")
-    CANDIDATE=${CANDIDATE_FILE%.nn}
 
     LEDGER="$SCRIPT_DIR/benchmarks/default-net.jsonl"
     mkdir -p "$(dirname "$LEDGER")"
