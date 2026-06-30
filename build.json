@@ -1,6 +1,6 @@
 {
-  "run": "enyo-4.20.0-rc2",
-  "continue_from": "native-4.19.0-rc5",
+  "run": "enyo-4.21.0-rc1",
+  "continue_from": "enyo-4.20.0-rc2",
   "hypothesis": "continue the promoted pylon line under the enyo prefix on the 2.6B slice",
   "superbatches": 64,
   "lr": 0.00005,
@@ -8,6 +8,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 2600000000
+    "offset": 2800000000
   }
 }
