@@ -1,13 +1,13 @@
 {
-  "run": "native-4.19.0-rc4",
+  "run": "native-4.19.0-rc5",
   "continue_from": "native-4.17.0-rc2",
-  "hypothesis": "continue the corrected parent on the second farseerT76 slice after offset 0 was neutral",
+  "hypothesis": "return the corrected parent to the first unused pylon slice after two neutral farseerT76 slices",
   "superbatches": 64,
   "lr": 0.00005,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 2200000000
   }
 }
