@@ -40,12 +40,10 @@ CANDIDATE_NET_EXPANDED="${CANDIDATE_NET/#\~/$HOME}"
 REFERENCE_NET_EXPANDED="${REFERENCE_NET/#\~/$HOME}"
 
 SPRT_EXTRA_ARGS=()
-PROTOCOL=qsprt-v1
 if [[ "$(basename "$REFERENCE_NET_EXPANDED")" == "default.net" ]]; then
     # Keep SPRT reporting, but make its bounds unreachable for a fixed-game
     # checkpoint. Forge and every shard therefore run the full game count.
     SPRT_EXTRA_ARGS=(--elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300)
-    PROTOCOL=qsprt-v2-fixed-games
 fi
 
 if [[ ! -f "$CANDIDATE_NET_EXPANDED" ]]; then
@@ -127,59 +125,35 @@ if [[ "$(basename "$REFERENCE_NET_EXPANDED")" == "default.net" ]]; then
 
     CANDIDATE_FILE=$(basename "$CANDIDATE_NET_EXPANDED")
     CANDIDATE=${CANDIDATE_FILE%.nn}
-    CANDIDATE_COMMIT=$(git -C "$SCRIPT_DIR" rev-list -n 1 \
-        "refs/tags/nnue/$CANDIDATE" 2>/dev/null || true)
-    if [[ -z "$CANDIDATE_COMMIT" ]]; then
-        CANDIDATE_COMMIT=$(git -C "$SCRIPT_DIR" log -1 --format=%H \
-            --grep="^${CANDIDATE}\\.nn:" 2>/dev/null || true)
-    fi
 
     LEDGER="$SCRIPT_DIR/benchmarks/default-net.jsonl"
     mkdir -p "$(dirname "$LEDGER")"
-    if [[ -f "$LEDGER" ]] \
-        && jq -e --arg run "$RUN" 'select(.forge_run == $run)' "$LEDGER" >/dev/null
-    then
-        echo "Default-net result already logged: $RUN"
-    else
-        jq -c \
-            --arg candidate "$CANDIDATE" \
-            --arg candidate_commit "$CANDIDATE_COMMIT" \
-            --arg candidate_sha256 "$(sha256sum "$CANDIDATE_NET_EXPANDED" | awk '{print $1}')" \
-            --arg engine "enyo_91fd903" \
-            --arg reference "default.net" \
-            --arg reference_sha256 "$(sha256sum "$REFERENCE_NET_EXPANDED" | awk '{print $1}')" \
-            --arg requested_games "$GAMES" \
-            --arg forge_run "$RUN" \
-            --arg protocol "$PROTOCOL" \
-            --arg protocol_sha256 "$(sha256sum "$0" | awk '{print $1}')" '
-                def value($name):
-                    ([.progress_fields[] | select(startswith($name + "="))][0]
-                     | sub("^[^=]+="; ""));
-                (value("games") | split("/")) as $games
-                | (value("llr") | split(" ")[0] | split("/")) as $llr
-                | {
-                    date: (.completed_at | split("T")[0]),
-                    candidate: $candidate,
-                    candidate_commit: $candidate_commit,
-                    candidate_sha256: $candidate_sha256,
-                    engine: $engine,
-                    reference: $reference,
-                    reference_sha256: $reference_sha256,
-                    requested_games: ($requested_games | tonumber),
-                    games: ($games[0] | tonumber),
-                    elo: (value("elo") | tonumber),
-                    ci: (value("ci") | tonumber),
-                    llr: ($llr[0] | tonumber),
-                    llr_bound: ($llr[1] | tonumber),
-                    los: (value("los") | sub("%$"; "") | tonumber),
-                    draw: (value("draw") | sub("%$"; "") | tonumber),
-                    forge_run: $forge_run,
-                    protocol: $protocol,
-                    protocol_sha256: $protocol_sha256
-                }
-            ' <<< "$STATUS_JSON" >> "$LEDGER"
-        echo "Logged default-net result: $LEDGER"
-    fi
+    jq -c \
+        --arg candidate "$CANDIDATE" \
+        --arg engine "enyo_91fd903" \
+        --arg reference "default.net" \
+        --arg requested_games "$GAMES" '
+            def value($name):
+                ([.progress_fields[] | select(startswith($name + "="))][0]
+                 | sub("^[^=]+="; ""));
+            (value("games") | split("/")) as $games
+            | (value("llr") | split(" ")[0] | split("/")) as $llr
+            | {
+                date: (.completed_at | split("T")[0]),
+                candidate: $candidate,
+                engine: $engine,
+                reference: $reference,
+                requested_games: ($requested_games | tonumber),
+                games: ($games[0] | tonumber),
+                elo: (value("elo") | tonumber),
+                ci: (value("ci") | tonumber),
+                llr: ($llr[0] | tonumber),
+                llr_bound: ($llr[1] | tonumber),
+                los: (value("los") | sub("%$"; "") | tonumber),
+                draw: (value("draw") | sub("%$"; "") | tonumber)
+            }
+        ' <<< "$STATUS_JSON" >> "$LEDGER"
+    echo "Logged default-net result: $LEDGER"
 fi
 
 forge status "$RUN" --verbose
