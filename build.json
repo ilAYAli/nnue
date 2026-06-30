@@ -1,6 +1,6 @@
 {
-  "run": "native-4.16.0-rc1",
-  "continue_from": "native-4.15.0-rc2",
+  "run": "native-4.17.0-rc1",
+  "continue_from": "native-4.16.0-rc1",
   "hypothesis": "retry rejected pylon offset 800M with LR reduced from 0.0001 to 0.00005",
   "superbatches": 128,
   "lr": 0.00005,
@@ -8,6 +8,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 1000000000
+    "offset": 1200000000
   }
 }
