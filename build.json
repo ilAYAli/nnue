@@ -1,13 +1,13 @@
 {
-  "run": "native-4.19.0-rc3",
+  "run": "native-4.19.0-rc4",
   "continue_from": "native-4.17.0-rc2",
-  "hypothesis": "switch the corrected native-4.17.0-rc2 parent from saturated pylon slices to farseerT76",
+  "hypothesis": "continue the corrected parent on the second farseerT76 slice after offset 0 was neutral",
   "superbatches": 64,
   "lr": 0.00005,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 200000000
   }
 }
