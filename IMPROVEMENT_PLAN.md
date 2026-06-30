@@ -2,12 +2,12 @@
 
 ## Next experiment
 
-- Candidate: `native-4.16.0-rc1`; parent: `native-4.15.0-rc2`.
+- Candidate: `native-4.17.0-rc1`; parent: `native-4.16.0-rc1`.
 - Continue the successful lower-LR factorised regimen unchanged on the next
   pylon slice.
 - Keep 16 input buckets, 8 output buckets, 128 superbatches, LR 0.00005, WDL
   0.05, and all other training parameters unchanged.
-- Train on `training_data_pylon.binpack`, offset 1B, limit 200M.
+- Train on `training_data_pylon.binpack`, offset 1.2B, limit 200M.
 - Judge with a 1500-game SPRT; reject unless Elo and LLR are both positive at
   the cap.
 
@@ -30,6 +30,8 @@
   1500 games using LR 0.0001 on the 800M-offset pylon slice.
 - `native-4.15.0-rc2`: accepted at +2.5 +/-14.9 Elo and LLR +0.09/2.20 over
   1500 games after reducing LR to 0.00005 on the same 800M slice.
+- `native-4.16.0-rc1`: accepted at +3.2 +/-14.8 Elo and LLR +0.14/2.20 over
+  1500 games using the lower-LR regimen on the 1B-offset pylon slice.
 - The accepted lineage uses 8 output buckets and Stockfish binpacks. LC0,
   nodes5000 PV2 UHO, and PV2 difference-100 nodes-5000 data regressed and are
   closed pending a demonstrated data-quality correction.
