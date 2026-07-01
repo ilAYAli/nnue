@@ -1,13 +1,14 @@
 {
-  "run": "enyo-4.28.0-rc1",
+  "run": "enyo-5.0.0-rc1",
   "continue_from": "enyo-4.27.0-rc2",
-  "hypothesis": "continue the successful 16-superbatch regimen on the next pylon slice after offset 4.8B regressed",
+  "initialize_from": "enyo-4.27.0-rc2",
+  "hypothesis": "migrate the accepted parent to 32 input buckets and 11 feature channels while holding training variables fixed",
   "superbatches": 16,
   "lr": 0.00005,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 5200000000
+    "offset": 5400000000
   }
 }
