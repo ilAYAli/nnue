@@ -1,16 +1,16 @@
 {
-  "run": "enyo-4.29.0-rc5",
+  "run": "enyo-4.29.0-rc6",
   "continue_from": "enyo-4.28.0-rc3",
-  "hypothesis": "double LR on the rejected ply-24 pylon slice after distribution and architecture changes failed",
+  "hypothesis": "switch from saturated pylon data to Stockfish multi-net PV-disagreement positions",
   "superbatches": 1024,
-  "lr": 0.0001,
+  "lr": 0.00005,
   "wdl": 0.05,
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/multinet_pv-2_diff-100_nodes-5000.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 0
   }
 }
