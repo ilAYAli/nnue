@@ -1,17 +1,17 @@
 {
-  "run": "enyo-4.29.0-rc4",
-  "continue_from": "enyo-4.28.0-rc3",
-  "hypothesis": "filter the rejected ply-24 pylon slice to positions within 1000 cp",
+  "run": "enyo-5.0.0-rc2",
+  "reference": "enyo-4.28.0-rc3",
+  "initialize_from": "enyo-4.28.0-rc3",
+  "hypothesis": "increase input king buckets from 16 to 32 while preserving all 12 feature channels",
   "superbatches": 1024,
   "lr": 0.00005,
   "wdl": 0.05,
   "sfbinpack": {
-    "min_ply": 24,
-    "max_abs_cp": 1000
+    "min_ply": 24
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 0
   }
 }
