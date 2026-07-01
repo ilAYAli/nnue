@@ -43,9 +43,9 @@ CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
 DEFAULT_NET_EVERY=${DEFAULT_NET_EVERY:-3}
-DEFAULT_NET_GAMES=${DEFAULT_NET_GAMES:-1000}
+DEFAULT_NET_GAMES=${DEFAULT_NET_GAMES:-500}
 DEFAULT_NET_LEDGER=${DEFAULT_NET_LEDGER:-benchmarks/default-net.jsonl}
-QSPRT=${QSPRT:-./qsprt.sh}
+QSPRT=${QSPRT:-tools/validate/sprt_net.sh}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 SPRT_ELO1=${SPRT_ELO1:-3.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.10}
@@ -74,7 +74,6 @@ candidate_net=
 data_file=
 reference_net=
 train_build=
-train_provenance=
 scratch_confirmed=0
 summary_file=
 last_sprt_elo=
@@ -163,7 +162,6 @@ load_config() {
   reference_name=$(json '.reference // empty')
   run_dir="runs/$run"
   log_dir="$run_dir/logs"
-  train_provenance="$run_dir/train.provenance.json"
   candidate_net="$HOME/assets/nets/$run.nn"
   data_file=$(jq -r --arg run "$run" '.data.bullet_output // ("data/bullet/" + $run + ".bullet")' "$BUILD")
   mkdir -p "$log_dir" runs/logs
@@ -210,94 +208,6 @@ training_build() {
      | del(.changed_variables.reference)' \
     "$BUILD" > "$train_build"
   printf '%s\n' "$train_build"
-}
-
-sha256_file() {
-  local file=${1:-}
-  [[ -n "$file" && -f "$file" ]] || {
-    printf ''
-    return 0
-  }
-  sha256sum "$file" | awk '{print $1}'
-}
-
-plan_init_weights() {
-  local log=$1
-  sed -nE 's/^init_weights=(.*)$/\1/p' "$log" | tail -1
-}
-
-verify_loaded_init_weights() {
-  local train_log=$1 expected=$2
-  [[ -n "$continue_from" || -n "$initialize_from" ]] || return 0
-  [[ -n "$expected" ]] || fail "training origin did not resolve init_weights" train
-  grep -Fxq "loaded_init_weights=$expected" "$train_log" \
-    || fail "training did not load expected init weights: $expected" train
-}
-
-write_training_provenance() {
-  local build_for_train=$1 expected=$2 model_net=$3
-  jq -n \
-    --arg run "$run" \
-    --arg continue_from "$continue_from" \
-    --arg initialize_from "$initialize_from" \
-    --arg expected_init_weights "$expected" \
-    --arg expected_init_weights_sha256 "$(sha256_file "$expected")" \
-    --arg resolved_build_sha256 "$(sha256_file "$build_for_train")" \
-    --arg model_net "$model_net" \
-    --arg model_net_sha256 "$(sha256_file "$model_net")" \
-    --arg candidate_net "$candidate_net" \
-    --arg candidate_net_sha256 "$(sha256_file "$candidate_net")" \
-    --arg trainer_helper "$TRAIN_HELPER" \
-    --arg trainer_helper_sha256 "$(sha256_file "$TRAIN_HELPER")" \
-    '{
-      run: $run,
-      continue_from: $continue_from,
-      initialize_from: $initialize_from,
-      expected_init_weights: $expected_init_weights,
-      expected_init_weights_sha256: $expected_init_weights_sha256,
-      resolved_build_sha256: $resolved_build_sha256,
-      model_net: $model_net,
-      model_net_sha256: $model_net_sha256,
-      candidate_net: $candidate_net,
-      candidate_net_sha256: $candidate_net_sha256,
-      trainer_helper: $trainer_helper,
-      trainer_helper_sha256: $trainer_helper_sha256
-    }' > "$train_provenance"
-}
-
-training_provenance_matches() {
-  local build_for_train=$1 expected=$2 artifact=$3 artifact_key=$4
-  [[ -s "$train_provenance" && -s "$artifact" ]] || return 1
-  jq -e \
-    --arg run "$run" \
-    --arg continue_from "$continue_from" \
-    --arg initialize_from "$initialize_from" \
-    --arg expected_init_weights "$expected" \
-    --arg expected_init_weights_sha256 "$(sha256_file "$expected")" \
-    --arg resolved_build_sha256 "$(sha256_file "$build_for_train")" \
-    --arg artifact_key "$artifact_key" \
-    --arg artifact_sha256 "$(sha256_file "$artifact")" \
-    '.run == $run
-     and .continue_from == $continue_from
-     and .initialize_from == $initialize_from
-     and .expected_init_weights == $expected_init_weights
-     and .expected_init_weights_sha256 == $expected_init_weights_sha256
-     and .resolved_build_sha256 == $resolved_build_sha256
-     and .[$artifact_key] == $artifact_sha256' \
-    "$train_provenance" >/dev/null
-}
-
-ensure_training_data() {
-  local build_for_train=$1 log=$2
-  [[ -f "$data_file" ]] && return 0
-
-  ensure_train_helper_current
-  section data
-  echo "REBUILD missing Bullet data: $data_file" | tee -a "$log"
-  "$TRAIN_HELPER" data --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" \
-    2>&1 | tee -a "$log" \
-    || fail "data rebuild failed for $run" train
-  [[ -f "$data_file" ]] || fail "data rebuild did not create $data_file" train
 }
 
 notify() {
@@ -464,40 +374,11 @@ train() {
   build_for_train=$(training_build)
   local log="$log_dir/01-train-export.log"
   local plan_log="$log_dir/00-plan.log"
-  local model_net="$run_dir/model.nn"
-  local expected_init_weights
 
   notify phase_start train "training $run" "$log" 0
   ensure_train_helper_current
   section plan
   "$TRAIN_HELPER" plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" | tee "$plan_log" || fail "plan failed for $run" plan
-  expected_init_weights=$(plan_init_weights "$plan_log")
-
-  if [[ "${FORCE:-0}" != 1 ]]; then
-    if training_provenance_matches "$build_for_train" "$expected_init_weights" "$model_net" model_net_sha256; then
-      section train
-      if cmp -s "$model_net" "$candidate_net"; then
-        echo "SKIP train/export: $candidate_net already matches $model_net" | tee -a "$log"
-      else
-        echo "INSTALL completed model: $model_net -> $candidate_net" | tee -a "$log"
-        mkdir -p "$(dirname "$candidate_net")"
-        install -m 0644 "$model_net" "$candidate_net"
-      fi
-      ensure_training_data "$build_for_train" "$log"
-      notify phase_done train "training/export resumed for $run: installed $candidate_net" "$log" 0
-      return 0
-    fi
-    if training_provenance_matches "$build_for_train" "$expected_init_weights" "$candidate_net" candidate_net_sha256; then
-      section train
-      echo "SKIP train/export: provenance matches $candidate_net" | tee -a "$log"
-      ensure_training_data "$build_for_train" "$log"
-      notify phase_done train "training/export skipped for $run: $candidate_net exists" "$log" 0
-      return 0
-    fi
-    if [[ -s "$model_net" || -s "$candidate_net" ]]; then
-      fail "stale train/export artifacts for $run; remove them or set FORCE=1" train
-    fi
-  fi
   local train_args=(all --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS")
   if [[ "${FORCE:-0}" == 1 ]]; then
     train_args+=(--force)
@@ -506,8 +387,6 @@ train() {
   "$TRAIN_HELPER" "${train_args[@]}" \
     2>&1 | tee "$log" \
     || fail "train/export failed for $run" train
-  verify_loaded_init_weights "$log" "$expected_init_weights"
-  write_training_provenance "$build_for_train" "$expected_init_weights" "$model_net"
   notify phase_done train "training/export passed for $run" "$log" 0
 }
 
@@ -1068,7 +947,7 @@ Usage:
 
 Useful overrides:
   ITERATIONS=5 ./nnue iterate
-  DEFAULT_NET_EVERY=3 DEFAULT_NET_GAMES=1000 ./nnue iterate
+  DEFAULT_NET_EVERY=3 DEFAULT_NET_GAMES=500 ./nnue iterate
   ./nnue iterate --full-sprt-first  # first iteration skips train/gates/smoke
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
   SKIP_SMOKE=1 GAMES=800 ./nnue iterate

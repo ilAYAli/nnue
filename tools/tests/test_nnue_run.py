@@ -372,7 +372,7 @@ training_build >/dev/null
             self.assertNotEqual(0, proc.returncode)
             self.assertIn("continue_from not found", proc.stderr)
 
-    def test_train_rejects_existing_candidate_without_provenance(self) -> None:
+    def test_train_propagates_helper_artifact_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
@@ -393,6 +393,7 @@ training_build >/dev/null
                 "  printf '%s\\n' 'init_weights=runs/base/checkpoints/native-1/optimiser_state/weights.bin'\n"
                 "  exit 0\n"
                 "fi\n"
+                "printf '%s\\n' 'error: stale train/export artifacts for candidate' >&2\n"
                 "exit 9\n",
                 encoding="utf-8",
             )
@@ -427,9 +428,12 @@ train
             )
 
             self.assertNotEqual(0, proc.returncode)
-            self.assertIn("stale train/export artifacts for candidate", proc.stderr)
+            self.assertIn(
+                "stale train/export artifacts for candidate",
+                proc.stdout + proc.stderr,
+            )
 
-    def test_train_rejects_continuation_without_loaded_init_proof(self) -> None:
+    def test_train_propagates_helper_init_rejection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
@@ -449,10 +453,8 @@ train
                 "  exit 0\n"
                 "fi\n"
                 "if [[ \"$1\" == all ]]; then\n"
-                "  mkdir -p runs/candidate \"$HOME/assets/nets\"\n"
-                "  printf model > runs/candidate/model.nn\n"
-                "  printf candidate > \"$HOME/assets/nets/candidate.nn\"\n"
-                "  exit 0\n"
+                f"  printf '%s\\n' 'error: training did not load expected init weights: {expected}' >&2\n"
+                "  exit 1\n"
                 "fi\n"
                 "exit 9\n",
                 encoding="utf-8",
@@ -487,9 +489,12 @@ train
             )
 
             self.assertNotEqual(0, proc.returncode)
-            self.assertIn(f"training did not load expected init weights: {expected}", proc.stderr)
+            self.assertIn(
+                f"training did not load expected init weights: {expected}",
+                proc.stdout + proc.stderr,
+            )
 
-    def test_train_writes_and_reuses_matching_provenance(self) -> None:
+    def test_train_delegates_resume_to_helper(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
@@ -556,10 +561,8 @@ train
                 check=True,
             )
 
-            provenance = json.loads((tmp / "runs" / "candidate" / "train.provenance.json").read_text(encoding="utf-8"))
-            self.assertEqual("base", provenance["continue_from"])
-            self.assertEqual(str(expected), provenance["expected_init_weights"])
-            self.assertEqual("plan\nall\nplan\ndata\n", calls.read_text(encoding="utf-8"))
+            self.assertFalse((tmp / "runs" / "candidate" / "train.provenance.json").exists())
+            self.assertEqual("plan\nall\nplan\nall\n", calls.read_text(encoding="utf-8"))
 
     def test_next_run_name_bumps_release_candidates(self) -> None:
         proc = self.run_sourced('NNUE_NTFY=0; next_run_name "native-2.0.0-rc1"')

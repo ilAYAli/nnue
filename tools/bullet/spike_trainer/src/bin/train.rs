@@ -20,6 +20,7 @@ use bullet_lib::{
     },
 };
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 mod trainer_main {
     include!("../main.rs");
@@ -53,6 +54,7 @@ const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
     12, 12, 13, 13, 12, 12, 13, 13,
     14, 14, 15, 15, 14, 14, 15, 15,
 ];
+const TRAIN_PROVENANCE_SCHEMA: u64 = 1;
 
 const TRAINING_DEFAULT_KEYS: &[&str] = &[
     "loader",
@@ -1383,6 +1385,249 @@ fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
     process::exit(1);
 }
 
+fn sha256_bytes(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let mut file =
+        File::open(path).map_err(|err| format!("cannot open {}: {err}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 1024 * 1024];
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|err| format!("cannot read {}: {err}", path.display()))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn config_sha256(config: &Config) -> Result<String, String> {
+    let resolved = serde_json::json!({
+        "architecture": &config.arch,
+        "defaults": &config.defaults,
+        "build": &config.build,
+    });
+    serde_json::to_vec(&resolved)
+        .map(|bytes| sha256_bytes(&bytes))
+        .map_err(|err| format!("cannot serialize resolved training config: {err}"))
+}
+
+fn resolved_init_weights(config: &Config) -> Option<PathBuf> {
+    if initialize_from(config).is_some() {
+        Some(init_weights_path(config))
+    } else {
+        continue_from(config).map(|run| latest_weight_checkpoint(config, &run))
+    }
+}
+
+fn training_inputs(
+    config: &Config,
+    init_weights: Option<&Path>,
+    trainer: &Path,
+) -> Result<Value, String> {
+    let init_weights_sha256 = init_weights.map(sha256_file).transpose()?;
+    Ok(serde_json::json!({
+        "config_sha256": config_sha256(config)?,
+        "init_weights": init_weights.map(|path| path.display().to_string()),
+        "init_weights_sha256": init_weights_sha256,
+        "trainer_sha256": sha256_file(trainer)?,
+    }))
+}
+
+fn model_path(config: &Config) -> PathBuf {
+    expand_path(&format!("runs/{}/model.nn", run_name(config)))
+}
+
+fn provenance_path(config: &Config) -> PathBuf {
+    expand_path(&format!("runs/{}/train.provenance.json", run_name(config)))
+}
+
+fn read_provenance(path: &Path) -> Option<Value> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+}
+
+fn write_json_atomic(path: &Path, value: &Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("cannot create {}: {err}", parent.display()))?;
+    }
+    let name = path
+        .file_name()
+        .and_then(OsStr::to_str)
+        .unwrap_or("provenance");
+    let tmp = path.with_file_name(format!("{name}.tmp.{}", process::id()));
+    let mut file =
+        File::create(&tmp).map_err(|err| format!("cannot create {}: {err}", tmp.display()))?;
+    serde_json::to_writer_pretty(&mut file, value)
+        .map_err(|err| format!("cannot write {}: {err}", tmp.display()))?;
+    file.write_all(b"\n")
+        .map_err(|err| format!("cannot write {}: {err}", tmp.display()))?;
+    file.sync_all()
+        .map_err(|err| format!("cannot sync {}: {err}", tmp.display()))?;
+    fs::rename(&tmp, path).map_err(|err| {
+        let _ = fs::remove_file(&tmp);
+        format!("cannot publish {}: {err}", path.display())
+    })
+}
+
+fn provenance_inputs_match(provenance: &Value, run: &str, inputs: &Value) -> bool {
+    provenance.get("schema").and_then(Value::as_u64) == Some(TRAIN_PROVENANCE_SCHEMA)
+        && provenance.get("run").and_then(Value::as_str) == Some(run)
+        && provenance.get("inputs") == Some(inputs)
+}
+
+fn provenance_artifact_matches(provenance: &Value, key: &str, path: &Path) -> bool {
+    path.is_file()
+        && sha256_file(path)
+            .is_ok_and(|hash| provenance.get(key).and_then(Value::as_str) == Some(hash.as_str()))
+}
+
+fn training_provenance(
+    config: &Config,
+    init_weights: Option<&Path>,
+    trainer: &Path,
+    model: &Path,
+    candidate: &Path,
+) -> Result<Value, String> {
+    Ok(serde_json::json!({
+        "schema": TRAIN_PROVENANCE_SCHEMA,
+        "run": run_name(config),
+        "inputs": training_inputs(config, init_weights, trainer)?,
+        "model_sha256": sha256_file(model)?,
+        "candidate_sha256": sha256_file(candidate)?,
+    }))
+}
+
+fn write_training_provenance(config: &Config) -> Result<(), String> {
+    let model = model_path(config);
+    let candidate = expand_path(&net_path(config));
+    let init_weights = resolved_init_weights(config);
+    let trainer =
+        env::current_exe().map_err(|err| format!("cannot resolve trainer executable: {err}"))?;
+    let provenance = training_provenance(
+        config,
+        init_weights.as_deref(),
+        &trainer,
+        &model,
+        &candidate,
+    )?;
+    write_json_atomic(&provenance_path(config), &provenance)
+}
+
+fn stale_training_artifacts(config: &Config, detail: &str) -> ! {
+    eprintln!(
+        "error: stale train/export artifacts for {}; remove them or pass --force",
+        run_name(config)
+    );
+    if !detail.is_empty() {
+        eprintln!("  {detail}");
+    }
+    process::exit(1);
+}
+
+fn copy_file_atomic(source: &Path, destination: &Path) -> Result<(), String> {
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("cannot create {}: {err}", parent.display()))?;
+    }
+    let name = destination
+        .file_name()
+        .and_then(OsStr::to_str)
+        .unwrap_or("net");
+    let tmp = destination.with_file_name(format!("{name}.tmp.{}", process::id()));
+    fs::copy(source, &tmp).map_err(|err| {
+        format!(
+            "cannot copy {} to {}: {err}",
+            source.display(),
+            tmp.display()
+        )
+    })?;
+    File::open(&tmp)
+        .and_then(|file| file.sync_all())
+        .map_err(|err| format!("cannot sync {}: {err}", tmp.display()))?;
+    fs::rename(&tmp, destination).map_err(|err| {
+        let _ = fs::remove_file(&tmp);
+        format!("cannot publish {}: {err}", destination.display())
+    })
+}
+
+fn ensure_training_data(config: &Config) {
+    let output = expand_path(&data_config(config).bullet_output);
+    if !output.is_file() {
+        eprintln!("rebuilding missing Bullet data: {}", output.display());
+        cmd_data(config);
+    }
+}
+
+fn resume_training(config: &Config, force: bool) -> bool {
+    if force {
+        return false;
+    }
+
+    let model = model_path(config);
+    let candidate = expand_path(&net_path(config));
+    if !model.is_file() && !candidate.is_file() {
+        return false;
+    }
+
+    let path = provenance_path(config);
+    let provenance = read_provenance(&path)
+        .unwrap_or_else(|| stale_training_artifacts(config, "missing or invalid provenance"));
+    let init_weights = resolved_init_weights(config);
+    let trainer =
+        env::current_exe().unwrap_or_else(|err| stale_training_artifacts(config, &err.to_string()));
+    let inputs = training_inputs(config, init_weights.as_deref(), &trainer)
+        .unwrap_or_else(|err| stale_training_artifacts(config, &err));
+    if !provenance_inputs_match(&provenance, &run_name(config), &inputs) {
+        stale_training_artifacts(config, "training inputs changed");
+    }
+
+    if provenance_artifact_matches(&provenance, "candidate_sha256", &candidate) {
+        ensure_training_data(config);
+        println!("training_artifacts=reused");
+        return true;
+    }
+    if provenance_artifact_matches(&provenance, "model_sha256", &model) {
+        copy_file_atomic(&model, &candidate)
+            .unwrap_or_else(|err| stale_training_artifacts(config, &err));
+        write_training_provenance(config)
+            .unwrap_or_else(|err| stale_training_artifacts(config, &err));
+        ensure_training_data(config);
+        println!("training_artifacts=restored");
+        return true;
+    }
+
+    stale_training_artifacts(config, "artifact checksum mismatch");
+}
+
+fn cmd_all(config: &Config, force: bool) {
+    if resume_training(config, force) {
+        return;
+    }
+    cmd_data(config);
+    cmd_run(config);
+    cmd_export(config, force);
+    write_training_provenance(config).unwrap_or_else(|err| {
+        eprintln!("error: cannot write training provenance: {err}");
+        process::exit(1);
+    });
+    println!("training_artifacts=created");
+}
+
 fn write_model(config: &Config) {
     let checkpoint = latest_checkpoint(config);
     let raw = fs::read(&checkpoint).unwrap_or_else(|err| {
@@ -1480,6 +1725,19 @@ mod tests {
             defaults: defaults(),
             build,
         }
+    }
+
+    fn test_dir(name: &str) -> PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let path = env::temp_dir().join(format!(
+            "enyo-train-{name}-{}-{nonce}",
+            process::id()
+        ));
+        fs::create_dir_all(&path).expect("create test directory");
+        path
     }
 
     #[test]
@@ -1661,6 +1919,66 @@ mod tests {
         let errors = config_contract_errors(&config);
         assert!(errors.iter().any(|err| err.contains("defaults.wdl")));
     }
+
+    #[test]
+    fn provenance_validates_inputs_and_artifacts() {
+        let dir = test_dir("provenance");
+        let init = dir.join("init.bin");
+        let trainer = dir.join("train");
+        let model = dir.join("model.nn");
+        let candidate = dir.join("candidate.nn");
+        let manifest = dir.join("train.provenance.json");
+        fs::write(&init, b"initial weights").expect("write init");
+        fs::write(&trainer, b"trainer").expect("write trainer");
+        fs::write(&model, b"model").expect("write model");
+        fs::write(&candidate, b"candidate").expect("write candidate");
+
+        let config = config(json!({
+            "run": "candidate",
+            "continue_from": "parent",
+            "data": {"source_binpack": "data.binpack", "limit": 100}
+        }));
+        let provenance = training_provenance(
+            &config,
+            Some(&init),
+            &trainer,
+            &model,
+            &candidate,
+        )
+        .expect("create provenance");
+        write_json_atomic(&manifest, &provenance).expect("write provenance");
+        let loaded = read_provenance(&manifest).expect("read provenance");
+        let inputs = training_inputs(&config, Some(&init), &trainer).expect("hash inputs");
+
+        assert!(provenance_inputs_match(&loaded, "candidate", &inputs));
+        assert!(provenance_artifact_matches(
+            &loaded,
+            "model_sha256",
+            &model
+        ));
+        assert!(provenance_artifact_matches(
+            &loaded,
+            "candidate_sha256",
+            &candidate
+        ));
+
+        fs::write(&candidate, b"changed").expect("change candidate");
+        assert!(!provenance_artifact_matches(
+            &loaded,
+            "candidate_sha256",
+            &candidate
+        ));
+        fs::write(&init, b"changed init").expect("change init");
+        let changed_inputs =
+            training_inputs(&config, Some(&init), &trainer).expect("rehash inputs");
+        assert!(!provenance_inputs_match(
+            &loaded,
+            "candidate",
+            &changed_inputs
+        ));
+
+        fs::remove_dir_all(dir).expect("remove test directory");
+    }
 }
 
 fn main() {
@@ -1671,11 +1989,7 @@ fn main() {
         "data" => cmd_data(&config),
         "run" => cmd_run(&config),
         "export" => cmd_export(&config, force),
-        "all" => {
-            cmd_data(&config);
-            cmd_run(&config);
-            cmd_export(&config, force);
-        }
+        "all" => cmd_all(&config, force),
         _ => usage(),
     }
 }
