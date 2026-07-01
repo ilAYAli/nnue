@@ -1,8 +1,8 @@
 {
-  "run": "enyo-4.31.0-rc2",
+  "run": "enyo-4.31.0-rc3",
   "continue_from": "enyo-4.30.0-rc1",
-  "hypothesis": "reduce output-only training from 1024 to 256 superbatches on the rejected pylon slice",
-  "superbatches": 256,
+  "hypothesis": "resume the accepted 1024-superbatch output-only regimen on pylon offset 800M",
+  "superbatches": 1024,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "output",
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 600000000
+    "offset": 800000000
   }
 }
