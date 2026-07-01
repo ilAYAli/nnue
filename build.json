@@ -1,10 +1,10 @@
 {
-  "run": "enyo-4.29.0-rc1",
+  "run": "enyo-4.29.0-rc2",
   "continue_from": "enyo-4.28.0-rc3",
-  "hypothesis": "focus the neutral 1024-superbatch pylon pass on quiet positions from ply 24",
+  "hypothesis": "raise WDL from 0.05 to 0.30 on the rejected ply-24 pylon slice",
   "superbatches": 1024,
   "lr": 0.00005,
-  "wdl": 0.05,
+  "wdl": 0.3,
   "sfbinpack": {
     "min_ply": 24
   },
