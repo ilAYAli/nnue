@@ -1,10 +1,9 @@
 {
-  "run": "enyo-5.0.0-rc2",
-  "reference": "enyo-4.28.0-rc3",
-  "initialize_from": "enyo-4.28.0-rc3",
-  "hypothesis": "increase input king buckets from 16 to 32 while preserving all 12 feature channels",
+  "run": "enyo-4.29.0-rc5",
+  "continue_from": "enyo-4.28.0-rc3",
+  "hypothesis": "double LR on the rejected ply-24 pylon slice after distribution and architecture changes failed",
   "superbatches": 1024,
-  "lr": 0.00005,
+  "lr": 0.0001,
   "wdl": 0.05,
   "sfbinpack": {
     "min_ply": 24
@@ -12,6 +11,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 200000000
   }
 }
