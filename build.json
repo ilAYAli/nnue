@@ -1,10 +1,13 @@
 {
-  "run": "enyo-4.28.0-rc2",
+  "run": "enyo-4.28.0-rc3",
   "continue_from": "enyo-4.27.0-rc2",
-  "hypothesis": "replace saturated 16-superbatch continuation with a 1024-superbatch pass on pylon offset zero",
+  "hypothesis": "focus the neutral 1024-superbatch pylon pass on quiet positions from ply 24",
   "superbatches": 1024,
   "lr": 0.00005,
   "wdl": 0.05,
+  "sfbinpack": {
+    "min_ply": 24
+  },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
