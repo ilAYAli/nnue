@@ -1,11 +1,11 @@
 {
-  "run": "enyo-4.31.0-rc3",
+  "run": "enyo-4.31.0-rc4",
   "continue_from": "enyo-4.30.0-rc1",
-  "hypothesis": "resume the accepted 1024-superbatch output-only regimen on pylon offset 800M",
+  "hypothesis": "unfreeze l2 with the output layer on the rejected pylon offset 800M slice",
   "superbatches": 1024,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "output",
+  "trainable": "float-head",
   "sfbinpack": {
     "min_ply": 24
   },
