@@ -1,6 +1,6 @@
 {
-  "run": "enyo-4.29.0-rc7",
-  "continue_from": "enyo-4.28.0-rc3",
+  "run": "enyo-4.30.0-rc1",
+  "continue_from": "enyo-4.29.0-rc7",
   "hypothesis": "freeze the parent representation and train only the output layer on the rejected pylon slice",
   "superbatches": 1024,
   "lr": 0.00005,
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 400000000
   }
 }
