@@ -1,13 +1,13 @@
 {
-  "run": "enyo-4.24.0-rc2",
+  "run": "enyo-4.24.0-rc3",
   "continue_from": "enyo-4.23.0-rc1",
-  "hypothesis": "retry the successful 32-superbatch regimen on the next pylon slice after offset 3.8B regressed",
-  "superbatches": 32,
+  "hypothesis": "reduce the pylon continuation dose from 32 to 16 superbatches after two consecutive regressions",
+  "superbatches": 16,
   "lr": 0.00005,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 4000000000
+    "offset": 4200000000
   }
 }
