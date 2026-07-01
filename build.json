@@ -1,6 +1,6 @@
 {
-  "run": "enyo-4.31.0-rc4",
-  "continue_from": "enyo-4.30.0-rc1",
+  "run": "enyo-4.32.0-rc1",
+  "continue_from": "enyo-4.31.0-rc4",
   "hypothesis": "unfreeze l2 with the output layer on the rejected pylon offset 800M slice",
   "superbatches": 1024,
   "lr": 0.00005,
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 800000000
+    "offset": 1000000000
   }
 }
