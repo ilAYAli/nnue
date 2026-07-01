@@ -1,8 +1,8 @@
 {
-  "run": "enyo-4.31.0-rc1",
+  "run": "enyo-4.31.0-rc2",
   "continue_from": "enyo-4.30.0-rc1",
-  "hypothesis": "freeze the parent representation and train only the output layer on the rejected pylon slice",
-  "superbatches": 1024,
+  "hypothesis": "reduce output-only training from 1024 to 256 superbatches on the rejected pylon slice",
+  "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "output",
