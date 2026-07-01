@@ -1,12 +1,13 @@
 {
-  "run": "enyo-4.29.0-rc3",
+  "run": "enyo-4.29.0-rc4",
   "continue_from": "enyo-4.28.0-rc3",
-  "hypothesis": "raise WDL from 0.30 to 0.75 on the same ply-24 pylon slice",
+  "hypothesis": "filter the rejected ply-24 pylon slice to positions within 1000 cp",
   "superbatches": 1024,
   "lr": 0.00005,
-  "wdl": 0.75,
+  "wdl": 0.05,
   "sfbinpack": {
-    "min_ply": 24
+    "min_ply": 24,
+    "max_abs_cp": 1000
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
