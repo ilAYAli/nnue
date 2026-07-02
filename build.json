@@ -1,8 +1,8 @@
 {
-  "run": "enyo-4.36.0-rc2",
+  "run": "enyo-4.36.0-rc3",
   "continue_from": "enyo-4.35.0-rc1",
-  "hypothesis": "reduce the rejected input-only pylon offset 600M slice dose from 256 to 128 superbatches",
-  "superbatches": 128,
+  "hypothesis": "skip the pylon 600M slice that rejected in both output and input lanes; continue the accepted input-only 256-superbatch regimen on offset 800M",
+  "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 600000000
+    "offset": 800000000
   }
 }
