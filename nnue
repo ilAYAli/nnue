@@ -29,7 +29,7 @@ PYTHON=${PYTHON:-.venv/bin/python}
 TRAIN_HELPER=${TRAIN_HELPER:-tools/bullet/train}
 FORGE=${FORGE:-forge}
 
-ENGINE=${ENGINE:-$HOME/assets/engines/enyo_66d64ba}
+ENGINE=${ENGINE:-$HOME/assets/engines/enyo_153e547}
 REFERENCE_NET=${REFERENCE_NET:-}
 CASES=${CASES:-runs/lichess-inacc-miss-blunder-20260612/native760_vs_native123_net_value_bad_move_gate.jsonl}
 
