@@ -1,6 +1,6 @@
 {
-  "run": "enyo-4.32.0-rc2",
-  "continue_from": "enyo-4.31.0-rc4",
+  "run": "enyo-4.33.0-rc1",
+  "continue_from": "enyo-4.32.0-rc2",
   "hypothesis": "continue the accepted float-head parent on pylon offset 1.2B after the 1B child was neutral",
   "superbatches": 1024,
   "lr": 0.00005,
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 1200000000
+    "offset": 1400000000
   }
 }
