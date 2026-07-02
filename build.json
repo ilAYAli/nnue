@@ -1,17 +1,17 @@
 {
-  "run": "enyo-4.34.0-rc1",
+  "run": "enyo-4.34.0-rc3",
   "continue_from": "enyo-4.33.0-rc3",
-  "hypothesis": "reduce the rejected float-head update on pylon offset 1.6B from 1024 to 256 superbatches",
+  "hypothesis": "train the input transformer on the pylon slice previously used only for output-layer training",
   "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "float-head",
+  "trainable": "input",
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 1800000000
+    "offset": 200000000
   }
 }
