@@ -1,8 +1,8 @@
 {
-  "run": "enyo-4.33.0-rc2",
+  "run": "enyo-4.33.0-rc3",
   "continue_from": "enyo-4.32.0-rc2",
-  "hypothesis": "continue the successful float-head regimen on pylon offset 1.6B after the 1.4B slice rejected",
-  "superbatches": 1024,
+  "hypothesis": "reduce the rejected float-head update on pylon offset 1.6B from 1024 to 256 superbatches",
+  "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "float-head",
