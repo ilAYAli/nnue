@@ -889,7 +889,20 @@ run_default_net_checkpoint_if_due() {
 
   section "default.net checkpoint"
   "$QSPRT" "$HOME/assets/nets/$candidate.nn" "$HOME/assets/nets/default.net" \
-    "$DEFAULT_NET_GAMES"
+    "$DEFAULT_NET_GAMES" || return 1
+
+  local result message sprt_json
+  result=$(tail -n 1 "$DEFAULT_NET_LEDGER")
+  message=$(jq -r '
+    "default.net SPRT games=\(.games)/\(.requested_games) elo=\(.elo) ci=\(.ci) "
+    + "llr=\(.llr)/\(.llr_bound) los=\(.los)% draw=\(.draw)%"' <<< "$result")
+  sprt_json=$(jq -c --arg line "$message" '
+    {
+      line: $line,
+      elo: (.elo | tostring),
+      llr: ("\(.llr)/\(.llr_bound)")
+    }' <<< "$result")
+  notify iteration_done default_net_sprt "$message" "$DEFAULT_NET_LEDGER" 0 "$sprt_json"
 }
 
 iterate() {
