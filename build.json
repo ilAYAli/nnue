@@ -1,6 +1,6 @@
 {
-  "run": "enyo-4.35.0-rc1",
-  "continue_from": "enyo-4.34.0-rc3",
+  "run": "enyo-4.36.0-rc1",
+  "continue_from": "enyo-4.35.0-rc1",
   "hypothesis": "train the input transformer on the pylon slice previously used only for output-layer training",
   "superbatches": 256,
   "lr": 0.00005,
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 400000000
+    "offset": 600000000
   }
 }
