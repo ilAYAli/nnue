@@ -1,8 +1,8 @@
 {
-  "run": "enyo-4.36.0-rc1",
+  "run": "enyo-4.36.0-rc2",
   "continue_from": "enyo-4.35.0-rc1",
-  "hypothesis": "train the input transformer on the pylon slice previously used only for output-layer training",
-  "superbatches": 256,
+  "hypothesis": "reduce the rejected input-only pylon offset 600M slice dose from 256 to 128 superbatches",
+  "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
