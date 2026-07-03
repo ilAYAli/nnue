@@ -1,9 +1,9 @@
 {
-  "run": "enyo-4.39.0-rc10",
+  "run": "enyo-4.39.0-rc11",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "no run in this lineage has completed one epoch; train reference-style with 4096 superbatches (~536M samples, ~2.7 epochs of the gold 2.6B window) under the built-in lr decay",
-  "superbatches": 4096,
-  "lr": 0.00002,
+  "hypothesis": "warm-restart escape from the exhausted local optimum: continue from the tip with lr raised back to 5e-5 decaying 10x over 16384 superbatches (~2.1B samples, ~2.7 epochs of the 2.0B-2.8B window)",
+  "superbatches": 16384,
+  "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "all",
   "sfbinpack": {
@@ -11,7 +11,7 @@
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "limit": 200000000,
-    "offset": 2600000000
+    "limit": 800000000,
+    "offset": 2000000000
   }
 }
