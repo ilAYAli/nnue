@@ -1,17 +1,18 @@
 {
-  "run": "enyo-4.39.0-rc12",
-  "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "switch the rejected 16384-superbatch warm restart from pylon to T60T70wIsRightFarseer at offset zero while holding the schedule fixed",
-  "superbatches": 16384,
-  "lr": 0.00005,
+  "run": "enyo-scratch-calibration-1.0.0-rc1",
+  "hypothesis": "random-init calibration on the current 16x12x1024 factorised architecture using the existing 800M-position pylon corpus",
+  "superbatches": 65536,
+  "lr": 0.001,
+  "final_lr": 0.000005,
   "wdl": 0.05,
   "trainable": "all",
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "bullet_output": "data/bullet/enyo-4.39.0-rc11.bullet",
     "limit": 800000000,
-    "offset": 0
+    "offset": 2000000000
   }
 }
