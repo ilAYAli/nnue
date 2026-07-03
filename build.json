@@ -1,6 +1,6 @@
 {
-  "run": "enyo-4.38.0-rc2",
-  "continue_from": "enyo-4.37.0-rc1",
+  "run": "enyo-4.39.0-rc1",
+  "continue_from": "enyo-4.38.0-rc2",
   "hypothesis": "treat the rejected 2.4B slice as a weak data region; continue the accepted float-head 2e-5 256-superbatch regimen on the fresh 2.6B slice",
   "superbatches": 256,
   "lr": 0.00002,
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 2600000000
+    "offset": 2800000000
   }
 }
