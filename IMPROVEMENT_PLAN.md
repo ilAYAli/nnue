@@ -61,3 +61,8 @@
 - Do not change the loader or conversion to shuffle mid-lineage: every ledger
   result, including accepted parents, was trained under prefix semantics and
   comparability would be lost.
+- Replay validation (2026-07-03): `enyo-4.38.0-rc2` vs `enyo-4.37.0-rc1`
+  re-measured at +4.6 +/-15.1, LLR 0.20, LOS 72.7% over 1500 games
+  (`enyo-4.38.0-rc2-replay-vs-4.37-20260703-095532`). The original +15.3 was
+  winner-curse inflated but the promotion is valid; the parent stands.
+  Promotion-gate Elo numbers overstate true gains on average.
