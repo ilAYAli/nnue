@@ -1,7 +1,7 @@
 {
-  "run": "enyo-4.36.0-rc3",
+  "run": "enyo-4.36.0-rc4",
   "continue_from": "enyo-4.35.0-rc1",
-  "hypothesis": "skip the pylon 600M slice that rejected in both output and input lanes; continue the accepted input-only 256-superbatch regimen on offset 800M",
+  "hypothesis": "skip the weak pylon 600M-1B region entirely; continue the accepted input-only 256-superbatch regimen on offset 1.2B where float-head previously gained",
   "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 800000000
+    "offset": 1200000000
   }
 }
