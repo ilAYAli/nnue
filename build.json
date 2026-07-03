@@ -1,17 +1,17 @@
 {
-  "run": "enyo-4.39.0-rc1",
+  "run": "enyo-4.39.0-rc3",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "treat the rejected 2.4B slice as a weak data region; continue the accepted float-head 2e-5 256-superbatch regimen on the fresh 2.6B slice",
+  "hypothesis": "pylon tail past 2.8B is toxic and closed; retrain the input block at the retuned 2e-5 lr on the proven 2.6B slice it has never consumed",
   "superbatches": 256,
   "lr": 0.00002,
   "wdl": 0.05,
-  "trainable": "float-head",
+  "trainable": "input",
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 2800000000
+    "offset": 2600000000
   }
 }
