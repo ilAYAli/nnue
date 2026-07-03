@@ -1,11 +1,11 @@
 {
-  "run": "enyo-4.39.0-rc3",
+  "run": "enyo-4.39.0-rc4",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "pylon tail past 2.8B is toxic and closed; retrain the input block at the retuned 2e-5 lr on the proven 2.6B slice it has never consumed",
-  "superbatches": 256,
+  "hypothesis": "input axis closed; the accepted 256sb pass consumed only the first ~34M of the rich 2.6B slice, so double float-head dose to 512 superbatches to mine the remainder",
+  "superbatches": 512,
   "lr": 0.00002,
   "wdl": 0.05,
-  "trainable": "input",
+  "trainable": "float-head",
   "sfbinpack": {
     "min_ply": 24
   },
