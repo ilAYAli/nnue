@@ -39,3 +39,19 @@
   `farseerT76` offset 200M.
 - The accepted lineage uses 8 output buckets and Stockfish binpacks. LC0 and
   the tested PV2 data lanes regressed and remain closed.
+
+## Data consumption semantics (2026-07-03)
+
+- The trainer uses bullet's `DirectSequentialDataLoader` and the
+  binpack-to-bullet conversion preserves order; nothing shuffles
+  (`convert_sfbinpack.rs`, `bullet.py`, `train.rs`).
+- A run therefore consumes only a sequential prefix of its
+  `data.offset`/`data.limit` window: samples = superbatches x 64 x 2048.
+  256 superbatches is ~34M positions, 512 is ~67M, 1024 is ~134M.
+- Every ledger conclusion about a "200M slice" applies only to that prefix.
+  Example: the +15.3 Elo `enyo-4.38.0-rc2` trained on pylon 2.600B-2.634B
+  only; "toxic" pylon 2.8B/3.0B means the ~34M prefixes at those offsets.
+- The unread ~166M remainder of each tested 200M window is untested data.
+- Do not change the loader or conversion to shuffle mid-lineage: every ledger
+  result, including accepted parents, was trained under prefix semantics and
+  comparability would be lost.
