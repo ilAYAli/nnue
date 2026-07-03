@@ -1,17 +1,17 @@
 {
-  "run": "enyo-4.39.0-rc9",
+  "run": "enyo-4.39.0-rc10",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "all step-size and data axes are exhausted at wdl 0.05; raise wdl to 0.2 to change the objective rather than the step, on virgin data inside the proven 2.2B window",
-  "superbatches": 256,
+  "hypothesis": "no run in this lineage has completed one epoch; train reference-style with 4096 superbatches (~536M samples, ~2.7 epochs of the gold 2.6B window) under the built-in lr decay",
+  "superbatches": 4096,
   "lr": 0.00002,
-  "wdl": 0.2,
-  "trainable": "float-head",
+  "wdl": 0.05,
+  "trainable": "all",
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "limit": 100000000,
-    "offset": 2240000000
+    "limit": 200000000,
+    "offset": 2600000000
   }
 }
