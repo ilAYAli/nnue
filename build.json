@@ -1,17 +1,17 @@
 {
-  "run": "enyo-4.39.0-rc5",
+  "run": "enyo-4.39.0-rc6",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "pylon windows are exhausted at the accepted regimen; switch the data source to the higher-diversity SF-labeled test80 binpack, regimen otherwise unchanged",
+  "hypothesis": "replay validated the parent at +4.6; single-block axes are exhausted, so test gentle all-weights co-adaptation at 2e-5 on the virgin 2.7B prefix of the proven pylon region",
   "superbatches": 256,
   "lr": 0.00002,
   "wdl": 0.05,
-  "trainable": "float-head",
+  "trainable": "all",
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack",
-    "limit": 200000000,
-    "offset": 0
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "limit": 100000000,
+    "offset": 2700000000
   }
 }
