@@ -1,6 +1,6 @@
 {
-  "run": "enyo-4.37.0-rc1",
-  "continue_from": "enyo-4.36.0-rc7",
+  "run": "enyo-4.38.0-rc1",
+  "continue_from": "enyo-4.37.0-rc1",
   "hypothesis": "the reused 1.6B slice held no remaining head signal at lr 2e-5; retune float-head at 2e-5 on the never-used pylon 2.0B slice",
   "superbatches": 256,
   "lr": 0.00002,
@@ -12,6 +12,6 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 2200000000
+    "offset": 2400000000
   }
 }
