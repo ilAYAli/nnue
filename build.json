@@ -1,17 +1,17 @@
 {
-  "run": "enyo-4.36.0-rc4",
+  "run": "enyo-4.36.0-rc5",
   "continue_from": "enyo-4.35.0-rc1",
-  "hypothesis": "skip the weak pylon 600M-1B region entirely; continue the accepted input-only 256-superbatch regimen on offset 1.2B where float-head previously gained",
+  "hypothesis": "rotate to float-head after four input-lane rejections; retune the head against the twice-updated input transformer on its proven 1.6B slice",
   "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "input",
+  "trainable": "float-head",
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 1200000000
+    "offset": 1600000000
   }
 }
