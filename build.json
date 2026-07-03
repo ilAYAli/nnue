@@ -1,8 +1,8 @@
 {
-  "run": "enyo-4.39.0-rc4",
+  "run": "enyo-4.39.0-rc5",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "input axis closed; the accepted 256sb pass consumed only the first ~34M of the rich 2.6B slice, so double float-head dose to 512 superbatches to mine the remainder",
-  "superbatches": 512,
+  "hypothesis": "pylon windows are exhausted at the accepted regimen; switch the data source to the higher-diversity SF-labeled test80 binpack, regimen otherwise unchanged",
+  "superbatches": 256,
   "lr": 0.00002,
   "wdl": 0.05,
   "trainable": "float-head",
@@ -10,8 +10,8 @@
     "min_ply": 24
   },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack",
     "limit": 200000000,
-    "offset": 2600000000
+    "offset": 0
   }
 }
