@@ -2,14 +2,20 @@
 
 ## Next experiment
 
-- Candidate: `enyo-5.0.0-rc1`; parent/gate reference: `enyo-4.27.0-rc2`.
-- Migrate the accepted parent from 16 input buckets / 12 feature channels to 32
-  input buckets / 11 feature channels.
-- Keep hidden=1024, l2_size=16, output_buckets=8, input factorisation, eval
-  scales, pylon source, offset 5.4B, limit 200M, 16 superbatches, LR 0.00005,
-  and WDL 0.05 unchanged.
-- Judge against `enyo-4.27.0-rc2`; reject unless Elo and LLR are both positive
-  at the cap.
+- Candidate: `enyo-4.39.0-rc5`; parent/gate reference: `enyo-4.38.0-rc2` (in
+  flight at document update).
+- Hypothesis: pylon prefix windows are exhausted at the accepted regimen;
+  switch `source_binpack` to `test80-2022-08-aug-16tb7p.v6-dd.min.binpack`
+  (offset 0, limit 200M), regimen otherwise unchanged.
+- Regimen: float-head, 256 superbatches, LR 2e-5, WDL 0.05, quiet ply>=24.
+- Current tip: `enyo-4.38.0-rc2` (+15.3 Elo vs `enyo-4.35.0-rc1` chain:
+  +1.9, +3.0, +15.3 at float-head 2e-5 on fresh pylon prefixes).
+- Closed from `enyo-4.38.0-rc2`: input block (-1.6 under ideal conditions),
+  float-head retreads (0.0), dose-up 512sb (-5.8), pylon prefixes at
+  2.8B/3.0B (toxic: -11.8, -43.6 aborted). The 32-bucket migration lane
+  below remains closed; see Durable results.
+- Fallback if test80 rejects: harvest unread remainders of proven pylon
+  windows (e.g. offset 2.7B, limit 100M).
 
 ## Durable results
 
