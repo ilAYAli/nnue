@@ -1,6 +1,6 @@
 {
-  "run": "enyo-scratch-calibration-1.0.0-rc1",
-  "hypothesis": "random-init calibration on the current 16x12x1024 factorised architecture using the existing 800M-position pylon corpus",
+  "run": "enyo-scratch-broad-1.0.0-rc1",
+  "hypothesis": "random-init broad-data calibration: hold the successful scratch recipe fixed while expanding pylon coverage from 800M to 2.8B positions",
   "superbatches": 65536,
   "lr": 0.001,
   "final_lr": 0.000005,
@@ -11,8 +11,7 @@
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "bullet_output": "data/bullet/enyo-4.39.0-rc11.bullet",
-    "limit": 800000000,
-    "offset": 2000000000
+    "limit": 2800000000,
+    "offset": 0
   }
 }
