@@ -1,17 +1,17 @@
 {
-  "run": "enyo-4.39.0-rc8",
+  "run": "enyo-4.39.0-rc9",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "scale the regimen: 1024-superbatch LR-decayed all-weights run (2e-5 to 2e-6) reading a 134M prefix of the proven pylon 2.0B region, testing whether long co-adaptation finds gains short doses cannot",
-  "superbatches": 1024,
+  "hypothesis": "all step-size and data axes are exhausted at wdl 0.05; raise wdl to 0.2 to change the objective rather than the step, on virgin data inside the proven 2.2B window",
+  "superbatches": 256,
   "lr": 0.00002,
-  "wdl": 0.05,
-  "trainable": "all",
+  "wdl": 0.2,
+  "trainable": "float-head",
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "limit": 200000000,
-    "offset": 2000000000
+    "limit": 100000000,
+    "offset": 2240000000
   }
 }
