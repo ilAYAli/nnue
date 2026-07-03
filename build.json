@@ -1,9 +1,9 @@
 {
-  "run": "enyo-4.36.0-rc5",
+  "run": "enyo-4.36.0-rc6",
   "continue_from": "enyo-4.35.0-rc1",
-  "hypothesis": "rotate to float-head after four input-lane rejections; retune the head against the twice-updated input transformer on its proven 1.6B slice",
+  "hypothesis": "five rejections across lanes and slices suggest the step size overshoots near the parent optimum; repeat the float-head 1.6B retune with lr reduced from 5e-5 to 2e-5",
   "superbatches": 256,
-  "lr": 0.00005,
+  "lr": 0.00002,
   "wdl": 0.05,
   "trainable": "float-head",
   "sfbinpack": {
