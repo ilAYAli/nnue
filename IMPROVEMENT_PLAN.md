@@ -66,3 +66,11 @@
   (`enyo-4.38.0-rc2-replay-vs-4.37-20260703-095532`). The original +15.3 was
   winner-curse inflated but the promotion is valid; the parent stands.
   Promotion-gate Elo numbers overstate true gains on average.
+- Fine-tune exhaustion (2026-07-03): eleven consecutive rejections from the
+  replay-validated `enyo-4.38.0-rc2` closed every configuration axis: blocks
+  (input -1.6, float-head 0.0 to -11.8, all -9.5/-3.5), LR (5e-5/2e-5/1e-5),
+  dose (256/512/1024/4096 superbatches, including the first multi-epoch run,
+  -3.5), data (pylon regions, test80 at two LRs), and objective (wdl 0.2,
+  -9.3). The parent is a hard local optimum for one-shot fine-tuning at
+  1500-game gate precision. Next gains require a structural change:
+  reference-scale from-scratch training or an architecture delta.
