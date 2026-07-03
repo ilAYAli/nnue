@@ -1,7 +1,7 @@
 {
-  "run": "enyo-4.39.0-rc11",
+  "run": "enyo-4.39.0-rc12",
   "continue_from": "enyo-4.38.0-rc2",
-  "hypothesis": "warm-restart escape from the exhausted local optimum: continue from the tip with lr raised back to 5e-5 decaying 10x over 16384 superbatches (~2.1B samples, ~2.7 epochs of the 2.0B-2.8B window)",
+  "hypothesis": "switch the rejected 16384-superbatch warm restart from pylon to T60T70wIsRightFarseer at offset zero while holding the schedule fixed",
   "superbatches": 16384,
   "lr": 0.00005,
   "wdl": 0.05,
@@ -10,8 +10,8 @@
     "min_ply": 24
   },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 800000000,
-    "offset": 2000000000
+    "offset": 0
   }
 }
