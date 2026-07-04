@@ -1,6 +1,6 @@
 {
-  "run": "enyo-10x11-768-o8",
-  "hypothesis": "Stage 2 candidate: use the Enyo-derived 10-bucket king map while holding 11 feature channels, hidden 768, and the scratch training protocol fixed",
+  "run": "enyo-32x11-1024-o8",
+  "hypothesis": "Stage 2 candidate: test the predeclared 32-bucket, 11-channel, hidden-1024 architecture under the fixed scratch training protocol",
   "superbatches": 16384,
   "lr_superbatches": 65536,
   "save_rate": 16384,
