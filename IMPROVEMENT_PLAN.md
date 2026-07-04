@@ -16,8 +16,12 @@ Current: **Stage 6 - incremental improvement**
   rejected at `-16.2 +/-15.6` Elo over 1,500 games.
 - Reducing the dose to 256 superbatches improved the result to `-1.4 +/-15.0`
   Elo, but the candidate was still rejected.
-- Next experiment: retry that second slice while changing only the dose from
-  256 to 128 superbatches.
+- Reducing the dose to 128 superbatches promoted the second-slice candidate at
+  `+8.1 +/-15.2` Elo; `enyo-scratch-broad-1.2.0-rc3` is the new parent.
+- The same 128-superbatch regimen on the third slice was rejected at
+  `-20.4 +/-15.3` Elo.
+- Next experiment: retry that third slice while changing only the dose from
+  128 to 64 superbatches.
 
 Completed stages:
 
@@ -184,6 +188,10 @@ Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
   134,217,728-position slice.
 - `enyo-scratch-broad-1.2.0-rc2` reduced the same slice to 256 superbatches
   and was rejected at `-1.4 +/-15.0` Elo over 1,500 games.
+- `enyo-scratch-broad-1.2.0-rc3` reduced the second slice to 128 superbatches
+  and was promoted at `+8.1 +/-15.2` Elo over 1,500 games.
+- `enyo-scratch-broad-1.3.0-rc1` applied that regimen to the third slice and
+  was rejected at `-20.4 +/-15.3` Elo over 1,500 games.
 - `enyo-scratch-32bucket-1.0.0-rc1` changed only 16 to 32 input buckets and was
   rejected at -6.3 +/-15.0 Elo over 1,500 games. Do not promote or retrain that
   exact architecture in Stage 2.
