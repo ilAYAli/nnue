@@ -1,12 +1,14 @@
 {
-  "run": "enyo-scratch-broad-1.1.0-rc2",
-  "continue_from": "enyo-scratch-broad-1.0.0-rc1",
-  "hypothesis": "float-head calibration after output-only rejected, holding parent, corpus, lr, dose, and WDL fixed",
+  "run": "enyo-scratch-broad-1.2.0-rc1",
+  "continue_from": "enyo-scratch-broad-1.1.0-rc2",
+  "hypothesis": "continue the promoted float-head regimen on the next disjoint 134217728-position pylon slice",
   "superbatches": 1024,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "float-head",
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
+    "limit": 134217728,
+    "offset": 134217728
   }
 }
