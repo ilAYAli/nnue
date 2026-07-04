@@ -2,19 +2,16 @@
 
 ## Current status
 
-Current: **Stage 4 - full winner training**
+Current: **Stage 5 - full validation**
 
-- Stage 2 completed all eight short-training runs in `3h 26m 47s`.
-- All eight nets passed runtime loading and static validation.
-- Static ranges: MAE `302.287-314.086`, sign `81.26-82.25%`,
-  correlation `0.704340-0.731247`, and slope `0.276686-0.296967`.
-- Results: `runs/logs/stage2-short-training.tsv`.
 - Stage 3 winner: `enyo-10x11-768-o8`.
-- Resume its optimizer checkpoint from superbatch 16,384 to 65,536.
+- Full training reached superbatch 65,536 in `52m 22s`.
+- Gates passed: start position `+69 cp`, MAE `294.422`, sign `83.05%`,
+  correlation `0.729800`, and slope `0.287622`.
 - Its short-trained pre-full baseline against `default.net` is
   `-311.5 +/-66.3` Elo over 1,000 games, with `19.4%` draws.
-- Expected remaining training time: about 50 minutes, based on its measured
-  short-training rate.
+- Active match: full winner against `enyo-scratch-broad-1.0.0-rc1` over
+  1,000 fixed games.
 
 Completed stages:
 
@@ -29,12 +26,13 @@ Completed stages:
   - Eight of eight planned candidates completed and passed the exit gate.
 - Stage 3 - architecture screening, 2026-07-04.
   - `enyo-10x11-768-o8` won both finalist matches head-to-head.
+- Stage 4 - full winner training, 2026-07-04.
+  - Optimizer-preserving resume and all exit gates passed.
 
 Queued stages and elapsed-time estimates:
 
-1. Stage 4 - full winner training: about 50 minutes remaining.
-2. Stage 5 - full validation: 45-60 minutes, plus 20-30 minutes if Berserk qualifies.
-3. Stage 6 - incremental improvement: 30-45 minutes per iteration.
+1. Stage 5 - full validation: 30-45 minutes, plus 20-30 minutes if Berserk qualifies.
+2. Stage 6 - incremental improvement: 30-45 minutes per iteration.
 
 Update this section when a stage starts and completes. Record the actual result
 and calculate the next stage's expected finish from its real start time.
