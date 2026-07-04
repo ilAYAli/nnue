@@ -1,6 +1,6 @@
 {
-  "run": "enyo-16x12-1024-o1",
-  "hypothesis": "Stage 2 candidate: reduce output buckets from 8 to 1 while holding the scratch training protocol fixed",
+  "run": "enyo-16x12-768-o8",
+  "hypothesis": "Stage 2 candidate: reduce hidden width from 1024 to 768 while holding the scratch training protocol fixed",
   "superbatches": 16384,
   "lr_superbatches": 65536,
   "save_rate": 16384,
