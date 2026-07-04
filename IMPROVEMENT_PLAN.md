@@ -20,8 +20,11 @@ Current: **Stage 6 - incremental improvement**
   `+8.1 +/-15.2` Elo; `enyo-scratch-broad-1.2.0-rc3` is the new parent.
 - The same 128-superbatch regimen on the third slice was rejected at
   `-20.4 +/-15.3` Elo.
-- Next experiment: retry that third slice while changing only the dose from
-  128 to 64 superbatches.
+- Reducing the third-slice dose to 64 superbatches was also rejected at
+  `-18.5 +/-15.3` Elo, confirming that slice as harmful for this regimen.
+- Close the third-slice dose lane.
+- Next experiment: restore the promoted 128-superbatch regimen and change only
+  to the fourth disjoint slice at offset 402,653,184.
 
 Completed stages:
 
@@ -192,6 +195,8 @@ Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
   and was promoted at `+8.1 +/-15.2` Elo over 1,500 games.
 - `enyo-scratch-broad-1.3.0-rc1` applied that regimen to the third slice and
   was rejected at `-20.4 +/-15.3` Elo over 1,500 games.
+- `enyo-scratch-broad-1.3.0-rc2` reduced the third slice to 64 superbatches
+  and was rejected at `-18.5 +/-15.3` Elo over 1,500 games.
 - `enyo-scratch-32bucket-1.0.0-rc1` changed only 16 to 32 input buckets and was
   rejected at -6.3 +/-15.0 Elo over 1,500 games. Do not promote or retrain that
   exact architecture in Stage 2.
