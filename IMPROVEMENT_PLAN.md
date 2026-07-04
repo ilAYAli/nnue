@@ -9,7 +9,7 @@ Current: **Stage 3 - architecture screening**
 - Static ranges: MAE `302.287-314.086`, sign `81.26-82.25%`,
   correlation `0.704340-0.731247`, and slope `0.276686-0.296967`.
 - Results: `runs/logs/stage2-short-training.tsv`.
-- First screen: `enyo-16x12-1024-o4` against the
+- Next screen: `enyo-16x12-1024-o1` against the
   `enyo-16x12-1024-o8` control over 1,000 fixed games.
 
 Completed stages:
@@ -78,6 +78,12 @@ Exit gate: all eight short nets and resumable checkpoints exist, pass static
 validation, and have recorded training times and hashes.
 
 ## Stage 3: architecture screening
+
+Results:
+
+- `enyo-16x12-1024-o4` beat the control by `+19.1 +/-20.8` Elo over
+  1,000 games, with `96.5%` LOS and `32.1%` draws. Advance it to the
+  finalist pool.
 
 - Run 1,000 fixed-protocol games for each candidate against the short-trained
   `enyo-16x12-1024-o8` control.
