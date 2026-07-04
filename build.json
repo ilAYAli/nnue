@@ -1,6 +1,6 @@
 {
-  "run": "enyo-32x11-1024-o8",
-  "hypothesis": "Stage 2 candidate: test the predeclared 32-bucket, 11-channel, hidden-1024 architecture under the fixed scratch training protocol",
+  "run": "enyo-16x12-512-o1",
+  "hypothesis": "Stage 2 candidate: test the compact 16-bucket, 12-channel, hidden-512, single-output architecture under the fixed scratch training protocol",
   "superbatches": 16384,
   "lr_superbatches": 65536,
   "save_rate": 16384,
