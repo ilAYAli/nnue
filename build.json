@@ -1,8 +1,8 @@
 {
-  "run": "enyo-scratch-broad-1.2.0-rc2",
+  "run": "enyo-scratch-broad-1.2.0-rc3",
   "continue_from": "enyo-scratch-broad-1.1.0-rc2",
-  "hypothesis": "retry the rejected second 134217728-position pylon slice with float-head dose reduced from 1024 to 256 superbatches",
-  "superbatches": 256,
+  "hypothesis": "retry the rejected second 134217728-position pylon slice with float-head dose reduced from 256 to 128 superbatches",
+  "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "float-head",
