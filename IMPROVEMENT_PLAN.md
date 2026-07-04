@@ -12,7 +12,7 @@ Current: **Stage 3 - architecture screening**
 - Initial control screens are complete.
 - Finalists: `enyo-16x12-768-o8`, `enyo-32x11-1024-o8`, and
   `enyo-10x11-768-o8`.
-- Active finalist match: `enyo-16x12-768-o8` against
+- Active finalist match: `enyo-32x11-1024-o8` against
   `enyo-10x11-768-o8` over 1,000 fixed games.
 
 Completed stages:
@@ -106,6 +106,9 @@ Results:
 - Finalist round robin: `enyo-16x12-768-o8` beat
   `enyo-32x11-1024-o8` by `+13.9 +/-19.8` Elo over 1,000 games, with
   `91.6%` LOS and `35.2%` draws.
+- Finalist round robin: `enyo-16x12-768-o8` lost to
+  `enyo-10x11-768-o8` by `-5.9 +/-21.1` Elo over 1,000 games, with
+  `29.2%` LOS and `35.1%` draws.
 
 - Run 1,000 fixed-protocol games for each candidate against the short-trained
   `enyo-16x12-1024-o8` control.
