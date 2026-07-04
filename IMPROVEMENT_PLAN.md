@@ -8,8 +8,10 @@ Current: **Stage 6 - incremental improvement**
   `16x12x1024-o8` architecture.
 - The full `enyo-10x11-768-o8` candidate scored `-4.9 +/-19.9` Elo
   against the champion over 1,000 games and was not promoted.
-- Next experiment: a 1,024-superbatch, `5e-5` output-only calibration
-  from the champion on the same pylon corpus.
+- Output-only calibration was rejected at `-8.6 +/-15.2` Elo over
+  1,500 games.
+- Next experiment: change only `trainable` to `float-head`, holding the
+  champion, corpus, 1,024-superbatch dose, `5e-5` LR, and WDL fixed.
 
 Completed stages:
 
