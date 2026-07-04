@@ -617,7 +617,11 @@ train
             tmp = Path(tmp_name)
             ledger = tmp / "default-net.jsonl"
             trace = tmp / "trace"
-            ledger.write_text('{"candidate":"native-1.0.0-rc1"}\n', encoding="utf-8")
+            ledger.write_text(
+                '{"candidate":"native-1.0.0-rc1"}\n'
+                '{"candidate":"manual-unpromoted-net"}\n',
+                encoding="utf-8",
+            )
 
             proc = self.run_sourced(
                 f"""
@@ -633,7 +637,7 @@ git() {{
   if [[ "$1" == rev-list ]]; then
     echo "$PROMOTIONS"
   elif [[ "$*" == *"--format=%H"* ]]; then
-    printf 'abc\\tnative-1.0.0-rc1.nn: Elo 1.0,LLR 0.1/2.2\\n'
+    [[ "$*" == *"manual-unpromoted-net"* ]] || printf 'abc\\n'
   else
     echo "native-1.3.0-rc1.nn: Elo 3.0,LLR 0.1/2.2"
   fi
