@@ -2,18 +2,17 @@
 
 ## Current status
 
-Current: **Stage 3 - architecture screening**
+Current: **Stage 4 - full winner training**
 
 - Stage 2 completed all eight short-training runs in `3h 26m 47s`.
 - All eight nets passed runtime loading and static validation.
 - Static ranges: MAE `302.287-314.086`, sign `81.26-82.25%`,
   correlation `0.704340-0.731247`, and slope `0.276686-0.296967`.
 - Results: `runs/logs/stage2-short-training.tsv`.
-- Initial control screens are complete.
-- Finalists: `enyo-16x12-768-o8`, `enyo-32x11-1024-o8`, and
-  `enyo-10x11-768-o8`.
-- Active finalist match: `enyo-32x11-1024-o8` against
-  `enyo-10x11-768-o8` over 1,000 fixed games.
+- Stage 3 winner: `enyo-10x11-768-o8`.
+- Resume its optimizer checkpoint from superbatch 16,384 to 65,536.
+- Expected remaining training time: about 50 minutes, based on its measured
+  short-training rate.
 
 Completed stages:
 
@@ -26,13 +25,14 @@ Completed stages:
     the variation between two uninterrupted CUDA runs.
 - Stage 2 - short training, 2026-07-04.
   - Eight of eight planned candidates completed and passed the exit gate.
+- Stage 3 - architecture screening, 2026-07-04.
+  - `enyo-10x11-768-o8` won both finalist matches head-to-head.
 
 Queued stages and elapsed-time estimates:
 
-1. Stage 3 - architecture screening: 4-5 hours.
-2. Stage 4 - full winner training: 1-2.5 hours, or up to 4.5 hours for two finalists.
-3. Stage 5 - full validation: 45-60 minutes, plus 20-30 minutes if Berserk qualifies.
-4. Stage 6 - incremental improvement: 30-45 minutes per iteration.
+1. Stage 4 - full winner training: about 50 minutes remaining.
+2. Stage 5 - full validation: 45-60 minutes, plus 20-30 minutes if Berserk qualifies.
+3. Stage 6 - incremental improvement: 30-45 minutes per iteration.
 
 Update this section when a stage starts and completes. Record the actual result
 and calculate the next stage's expected finish from its real start time.
@@ -109,6 +109,10 @@ Results:
 - Finalist round robin: `enyo-16x12-768-o8` lost to
   `enyo-10x11-768-o8` by `-5.9 +/-21.1` Elo over 1,000 games, with
   `29.2%` LOS and `35.1%` draws.
+- Finalist round robin: `enyo-32x11-1024-o8` lost to
+  `enyo-10x11-768-o8` by `-20.9 +/-19.7` Elo over 1,000 games, with
+  `1.9%` LOS and `35.2%` draws. Select `enyo-10x11-768-o8` as the
+  Stage 3 winner.
 
 - Run 1,000 fixed-protocol games for each candidate against the short-trained
   `enyo-16x12-1024-o8` control.
