@@ -1,6 +1,6 @@
 {
-  "run": "enyo-scratch-broad-1.4.0-rc2",
-  "continue_from": "enyo-scratch-broad-1.3.0-rc3",
+  "run": "enyo-scratch-broad-1.5.0-rc1",
+  "continue_from": "enyo-scratch-broad-1.4.0-rc2",
   "hypothesis": "switch the rejected fifth 134217728-position pylon slice from float-head to input-only training",
   "superbatches": 128,
   "lr": 0.00005,
@@ -9,6 +9,6 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
     "limit": 134217728,
-    "offset": 536870912
+    "offset": 671088640
   }
 }
