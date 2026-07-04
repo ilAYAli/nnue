@@ -12,8 +12,10 @@ Current: **Stage 6 - incremental improvement**
   1,500 games.
 - Float-head calibration passed at `+1.2 +/-15.2` Elo over 1,500 games
   and is the new parent.
-- Next experiment: preserve that regimen on the next disjoint
-  134,217,728-position pylon slice.
+- A full 1,024-superbatch float-head pass on the second disjoint slice was
+  rejected at `-16.2 +/-15.6` Elo over 1,500 games.
+- Next experiment: retry that second slice while changing only the dose from
+  1,024 to 256 superbatches.
 
 Completed stages:
 
@@ -173,6 +175,11 @@ Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
   recover substantial strength and beat the previous fine-tuned lineage.
 - `enyo-scratch-broad-1.0.0-rc1` extended the control recipe to the 2.8B pylon
   corpus and is the full 16x12x1024-o8 comparison baseline.
+- `enyo-scratch-broad-1.1.0-rc2` promoted float-head training at
+  `+1.2 +/-15.2` Elo over 1,500 games.
+- `enyo-scratch-broad-1.2.0-rc1` was rejected at `-16.2 +/-15.6` Elo after
+  applying the same 1,024-superbatch float-head regimen to the second disjoint
+  134,217,728-position slice.
 - `enyo-scratch-32bucket-1.0.0-rc1` changed only 16 to 32 input buckets and was
   rejected at -6.3 +/-15.0 Elo over 1,500 games. Do not promote or retrain that
   exact architecture in Stage 2.
