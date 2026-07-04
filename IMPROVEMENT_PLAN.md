@@ -22,9 +22,14 @@ Current: **Stage 6 - incremental improvement**
   `-20.4 +/-15.3` Elo.
 - Reducing the third-slice dose to 64 superbatches was also rejected at
   `-18.5 +/-15.3` Elo, confirming that slice as harmful for this regimen.
-- Close the third-slice dose lane.
-- Next experiment: restore the promoted 128-superbatch regimen and change only
-  to the fourth disjoint slice at offset 402,653,184.
+- The fourth slice promoted at `+2.6 +/-14.9` Elo, but with only `0.06` LLR.
+- Its fixed default-net checkpoint was `-215.4 +/-58.0` Elo, nominally better
+  than the scratch baseline but still inconclusive.
+- The next float-head slice was rejected at `-3.9 +/-14.7` Elo.
+- Close float-head slice continuation; it is producing small, inconsistent
+  changes and cannot plausibly close the remaining absolute gap.
+- Next experiment: reuse that rejected fifth slice and change only
+  `trainable` from `float-head` to `input`.
 
 Completed stages:
 
@@ -197,6 +202,11 @@ Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
   was rejected at `-20.4 +/-15.3` Elo over 1,500 games.
 - `enyo-scratch-broad-1.3.0-rc2` reduced the third slice to 64 superbatches
   and was rejected at `-18.5 +/-15.3` Elo over 1,500 games.
+- `enyo-scratch-broad-1.3.0-rc3` applied 128-superbatch float-head training to
+  the fourth slice and was promoted at `+2.6 +/-14.9` Elo.
+- Its 500-game default-net checkpoint scored `-215.4 +/-58.0` Elo.
+- `enyo-scratch-broad-1.4.0-rc1` applied the same regimen to the fifth slice
+  and was rejected at `-3.9 +/-14.7` Elo.
 - `enyo-scratch-32bucket-1.0.0-rc1` changed only 16 to 32 input buckets and was
   rejected at -6.3 +/-15.0 Elo over 1,500 games. Do not promote or retrain that
   exact architecture in Stage 2.
