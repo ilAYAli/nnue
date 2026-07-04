@@ -1,11 +1,11 @@
 {
-  "name": "enyo-16x11-768-o8",
+  "name": "enyo-10x11-768-o8",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 768,
   "l2_size": 16,
   "feature_channels": 11,
-  "input_buckets": 16,
+  "input_buckets": 10,
   "output_buckets": 8,
   "input_factoriser": true,
   "eval_scale": 400.0,
