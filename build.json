@@ -1,18 +1,11 @@
 {
-  "run": "enyo-scratch-32bucket-1.0.0-rc1",
-  "hypothesis": "random-init architecture calibration: increase input king buckets from 16 to 32 while holding the broad-data scratch recipe fixed",
-  "superbatches": 65536,
-  "lr": 0.001,
-  "final_lr": 0.000005,
+  "run": "enyo-16x12-1024-o8",
+  "hypothesis": "Stage 2 control: random-init 16 input buckets, 12 feature channels, hidden 1024, 8 output buckets",
+  "superbatches": 16384,
+  "lr_superbatches": 65536,
+  "save_rate": 16384,
   "wdl": 0.05,
-  "trainable": "all",
-  "sfbinpack": {
-    "min_ply": 24
-  },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "bullet_output": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
-    "limit": 2800000000,
-    "offset": 0
+    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   }
 }
