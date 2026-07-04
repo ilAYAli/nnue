@@ -11,6 +11,8 @@ Current: **Stage 4 - full winner training**
 - Results: `runs/logs/stage2-short-training.tsv`.
 - Stage 3 winner: `enyo-10x11-768-o8`.
 - Resume its optimizer checkpoint from superbatch 16,384 to 65,536.
+- Its short-trained pre-full baseline against `default.net` is
+  `-311.5 +/-66.3` Elo over 1,000 games, with `19.4%` draws.
 - Expected remaining training time: about 50 minutes, based on its measured
   short-training rate.
 
