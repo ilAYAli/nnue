@@ -2,16 +2,14 @@
 
 ## Current status
 
-Current: **Stage 5 - full validation**
+Current: **Stage 6 - incremental improvement**
 
-- Stage 3 winner: `enyo-10x11-768-o8`.
-- Full training reached superbatch 65,536 in `52m 22s`.
-- Gates passed: start position `+69 cp`, MAE `294.422`, sign `83.05%`,
-  correlation `0.729800`, and slope `0.287622`.
-- Its short-trained pre-full baseline against `default.net` is
-  `-311.5 +/-66.3` Elo over 1,000 games, with `19.4%` draws.
-- Active match: full winner against `enyo-scratch-broad-1.0.0-rc1` over
-  1,000 fixed games.
+- Champion: `enyo-scratch-broad-1.0.0-rc1` using the
+  `16x12x1024-o8` architecture.
+- The full `enyo-10x11-768-o8` candidate scored `-4.9 +/-19.9` Elo
+  against the champion over 1,000 games and was not promoted.
+- Next experiment: a 1,024-superbatch, `5e-5` output-only calibration
+  from the champion on the same pylon corpus.
 
 Completed stages:
 
@@ -28,11 +26,13 @@ Completed stages:
   - `enyo-10x11-768-o8` won both finalist matches head-to-head.
 - Stage 4 - full winner training, 2026-07-04.
   - Optimizer-preserving resume and all exit gates passed.
+- Stage 5 - full validation, 2026-07-04.
+  - The compact HalfKAv2-style candidate did not beat the full baseline;
+    `enyo-scratch-broad-1.0.0-rc1` remains champion.
 
 Queued stages and elapsed-time estimates:
 
-1. Stage 5 - full validation: 30-45 minutes, plus 20-30 minutes if Berserk qualifies.
-2. Stage 6 - incremental improvement: 30-45 minutes per iteration.
+1. Stage 6 - incremental improvement: 30-45 minutes per iteration.
 
 Update this section when a stage starts and completes. Record the actual result
 and calculate the next stage's expected finish from its real start time.
@@ -147,6 +147,10 @@ otherwise influence an Enyo net.
 
 Exit gate: establish the validated winner as the new native lineage root, or
 record why the existing full Enyo baseline remains champion.
+
+Result: `enyo-10x11-768-o8` scored `-4.9 +/-19.9` Elo with `31.6%`
+LOS over 1,000 games against `enyo-scratch-broad-1.0.0-rc1`. The existing
+full baseline remains champion; default-net and Berserk tests were not run.
 
 ## Stage 6: incremental improvement
 
