@@ -889,7 +889,7 @@ run_default_net_checkpoint_if_due() {
 
   section "default.net checkpoint"
   "$QSPRT" "$HOME/assets/nets/$candidate.nn" "$HOME/assets/nets/default.net" \
-    "$DEFAULT_NET_GAMES" || return 1
+    "$DEFAULT_NET_GAMES" || return $?
 
   local result message sprt_json
   result=$(tail -n 1 "$DEFAULT_NET_LEDGER")
