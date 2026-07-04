@@ -2,10 +2,15 @@
 
 ## Current status
 
-Current: **Stage 2 - short training**
+Current: **Stage 3 - architecture screening**
 
-- Status: ready to start the eight controlled screening runs.
-- Expected duration: 3.5-4 hours.
+- Stage 2 completed all eight short-training runs in `3h 26m 47s`.
+- All eight nets passed runtime loading and static validation.
+- Static ranges: MAE `302.287-314.086`, sign `81.26-82.25%`,
+  correlation `0.704340-0.731247`, and slope `0.276686-0.296967`.
+- Results: `runs/logs/stage2-short-training.tsv`.
+- First screen: `enyo-16x12-1024-o4` against the
+  `enyo-16x12-1024-o8` control over 1,000 fixed games.
 
 Completed stages:
 
@@ -16,14 +21,15 @@ Completed stages:
   - Checkpoint resume restored weights, Adam state, data position, and LR
     position. Its maximum final-weight difference was `1.91e-6`, identical to
     the variation between two uninterrupted CUDA runs.
+- Stage 2 - short training, 2026-07-04.
+  - Eight of eight planned candidates completed and passed the exit gate.
 
 Queued stages and elapsed-time estimates:
 
-1. Stage 2 - short training: 3.5-4 hours.
-2. Stage 3 - architecture screening: 4-5 hours.
-3. Stage 4 - full winner training: 1-2.5 hours, or up to 4.5 hours for two finalists.
-4. Stage 5 - full validation: 45-60 minutes, plus 20-30 minutes if Berserk qualifies.
-5. Stage 6 - incremental improvement: 30-45 minutes per iteration.
+1. Stage 3 - architecture screening: 4-5 hours.
+2. Stage 4 - full winner training: 1-2.5 hours, or up to 4.5 hours for two finalists.
+3. Stage 5 - full validation: 45-60 minutes, plus 20-30 minutes if Berserk qualifies.
+4. Stage 6 - incremental improvement: 30-45 minutes per iteration.
 
 Update this section when a stage starts and completes. Record the actual result
 and calculate the next stage's expected finish from its real start time.
