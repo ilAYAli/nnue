@@ -23,22 +23,26 @@ commit `d372d487aedfeb8bdc256b9f694dbcd41016bf82`. Bullet is MIT licensed.
 `architecture.json` is the trainer/export/runtime contract. Changing it is an
 architecture experiment and requires matching engine support and parity checks.
 
+The layout uses HalfKAv2-style input features: horizontal mirroring, 10-bucket
+king map, and 11 side-relative piece channels where both kings share one channel.
+The input transformer is factorised and 768 units wide; the network has 8 output buckets.
+
 ```json
 {
-  "name": "native-16bucket-12ch-1024-v2",
+  "name": "enyo-10x11-768-o8",
   "lineage": "native",
   "mode": "enyo",
-  "hidden": 1024,
+  "hidden": 768,
   "l2_size": 16,
-  "feature_channels": 12,
-  "input_buckets": 16,
-  "output_buckets": 4,
-  "input_factoriser": false,
+  "feature_channels": 11,
+  "input_buckets": 10,
+  "output_buckets": 8,
+  "input_factoriser": true,
   "eval_scale": 400.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
-  "export_format": "enyo-native-v1"
+  "export_format": "enyo-native-v2"
 }
 ```
 
