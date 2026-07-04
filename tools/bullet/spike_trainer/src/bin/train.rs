@@ -598,17 +598,27 @@ fn load_config(args: &[String]) -> (String, Config, bool) {
 
 fn data_config(config: &Config) -> DataConfig {
     let data = object_at(&config.build, "data");
+    let source_binpack = required_string(data, "source_binpack");
+    let offset = u64_at(
+        data,
+        "offset",
+        training_nested_u64(config, "sfbinpack", "offset", 0),
+    );
+    let limit = u64_at(data, "limit", 0);
+    let bullet_output = string_at(data, "bullet_output")
+        .map(str::to_owned)
+        .unwrap_or_else(|| {
+            if source_binpack.ends_with(".bullet") && offset == 0 && limit == 0 {
+                source_binpack.clone()
+            } else {
+                format!("data/bullet/{}.bullet", run_name(config))
+            }
+        });
     DataConfig {
-        source_binpack: required_string(data, "source_binpack"),
-        bullet_output: string_at(data, "bullet_output")
-            .map(str::to_owned)
-            .unwrap_or_else(|| format!("data/bullet/{}.bullet", run_name(config))),
-        offset: u64_at(
-            data,
-            "offset",
-            training_nested_u64(config, "sfbinpack", "offset", 0),
-        ),
-        limit: u64_at(data, "limit", 0),
+        source_binpack,
+        bullet_output,
+        offset,
+        limit,
         threads: usize_at(data, "threads", training_usize(config, "threads", 4)),
         buffer_mb: training_nested_usize(config, "sfbinpack", "buffer_mb", 1024),
         min_ply: training_nested_usize(config, "sfbinpack", "min_ply", 16) as u16,
@@ -2148,6 +2158,28 @@ mod tests {
         let data = data_config(&config);
         assert_eq!(data.offset, 900);
         assert_eq!(data.threads, 3);
+    }
+
+    #[test]
+    fn unsliced_bullet_source_is_used_in_place() {
+        let config = config(json!({
+            "run": "candidate",
+            "data": {"source_binpack": "data/shared.bullet"}
+        }));
+
+        let data = data_config(&config);
+        assert_eq!(data.bullet_output, "data/shared.bullet");
+    }
+
+    #[test]
+    fn sliced_bullet_source_keeps_run_specific_output() {
+        let config = config(json!({
+            "run": "candidate",
+            "data": {"source_binpack": "data/shared.bullet", "limit": 100}
+        }));
+
+        let data = data_config(&config);
+        assert_eq!(data.bullet_output, "data/bullet/candidate.bullet");
     }
 
     #[test]
