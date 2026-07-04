@@ -185,6 +185,30 @@ printf 'data=%s\n' "$data_file"
             self.assertEqual("", proc.stderr)
             self.assertEqual("data=data/bullet/shared.bullet\n", proc.stdout)
 
+            build.write_text(
+                json.dumps({
+                    "run": "candidate",
+                    "data": {
+                        "source_binpack": "data/bullet/shared.bullet",
+                        "offset": 1,
+                        "limit": 2,
+                    },
+                }),
+                encoding="utf-8",
+            )
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual("data=data/bullet/candidate.bullet\n", proc.stdout)
+
     def test_reference_net_env_overrides_continue_from(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
