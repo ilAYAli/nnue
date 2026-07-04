@@ -1,76 +1,126 @@
-# NNUE Improvement Plan
+# NNUE Architecture Improvement Plan
 
-## Next experiment
+## Current status
 
-- Candidate: `enyo-4.39.0-rc5`; parent/gate reference: `enyo-4.38.0-rc2` (in
-  flight at document update).
-- Hypothesis: pylon prefix windows are exhausted at the accepted regimen;
-  switch `source_binpack` to `test80-2022-08-aug-16tb7p.v6-dd.min.binpack`
-  (offset 0, limit 200M), regimen otherwise unchanged.
-- Regimen: float-head, 256 superbatches, LR 2e-5, WDL 0.05, quiet ply>=24.
-- Current tip: `enyo-4.38.0-rc2` (+15.3 Elo vs `enyo-4.35.0-rc1` chain:
-  +1.9, +3.0, +15.3 at float-head 2e-5 on fresh pylon prefixes).
-- Closed from `enyo-4.38.0-rc2`: input block (-1.6 under ideal conditions),
-  float-head retreads (0.0), dose-up 512sb (-5.8), pylon prefixes at
-  2.8B/3.0B (toxic: -11.8, -43.6 aborted). The 32-bucket migration lane
-  below remains closed; see Durable results.
-- Fallback if test80 rejects: harvest unread remainders of proven pylon
-  windows (e.g. offset 2.7B, limit 100M).
+Current: **Stage 1 - architecture support**
 
-## Durable results
+- Status: in progress.
+- Started: 2026-07-04.
+- ETA: 4-7 engineering days.
+- Expected finish: 2026-07-08 to 2026-07-11.
+- Progress: trainer, exporter, and Enyo runtime support are being implemented.
 
-- `enyo-4.27.0-rc2` is the accepted parent at +7.2 Elo and LLR 0.32/2.20.
-- Alternating gains and rejections through `enyo-4.28.0-rc1` show the
-  16-superbatch 16x12 pylon lane is saturated/noisy.
-- `native-4.19.0-rc5` was promoted at +4.4 +/-14.6 Elo and LLR 0.15/2.20 on
-  pylon offset 2.2B.
-- `native-4.20.0-rc1` was rejected at -1.2 +/-14.3 Elo and LLR -0.09/2.20
-  on pylon offset 2.4B.
-- `native-4.17.0-rc2` gained +13.9 +/-14.8 Elo over its parent after reducing
-  the dose to 64 superbatches on pylon offset 1.2B.
-- Fixed 1000-game testing put `native-4.17.0-rc2` at -294.6 +/-35.1 Elo versus
-  `default.net`, with a 15.4% draw rate.
-- `native-4.18.0-rc4` was initially promoted at +8.3 +/-14.8 Elo, but direct
-  replay against `native-4.17.0-rc2` rejected it at -17.6 +/-15.7 Elo after
-  1360 games. It is not a valid parent.
-- Fixed 1000-game testing put `native-4.18.0-rc4` at -351.1 +/-39.5 Elo versus
-  `default.net`, consistent with the direct replay regression.
-- `native-4.19.0-rc1` and `native-4.19.0-rc2`, both based on the invalid rc4
-  parent, were rejected at -1.4 and -4.2 Elo respectively.
-- Pylon offsets 1.4B through 2B are closed after repeated neutral or negative
-  results across dose and LR changes.
-- `native-4.19.0-rc3`: rejected at -0.7 +/-14.7 Elo and LLR -0.06/2.20 on
-  `farseerT76` offset 0.
-- `native-4.19.0-rc4`: rejected at -0.2 +/-14.6 Elo and LLR -0.06/2.20 on
-  `farseerT76` offset 200M.
-- The accepted lineage uses 8 output buckets and Stockfish binpacks. LC0 and
-  the tested PV2 data lanes regressed and remain closed.
+Completed: **Stage 0 - plan and protocol**, 2026-07-04.
 
-## Data consumption semantics (2026-07-03)
+Queued stages and elapsed-time estimates:
 
-- The trainer uses bullet's `DirectSequentialDataLoader` and the
-  binpack-to-bullet conversion preserves order; nothing shuffles
-  (`convert_sfbinpack.rs`, `bullet.py`, `train.rs`).
-- A run therefore consumes only a sequential prefix of its
-  `data.offset`/`data.limit` window: samples = superbatches x 64 x 2048.
-  256 superbatches is ~34M positions, 512 is ~67M, 1024 is ~134M.
-- Every ledger conclusion about a "200M slice" applies only to that prefix.
-  Example: the +15.3 Elo `enyo-4.38.0-rc2` trained on pylon 2.600B-2.634B
-  only; "toxic" pylon 2.8B/3.0B means the ~34M prefixes at those offsets.
-- The unread ~166M remainder of each tested 200M window is untested data.
-- Do not change the loader or conversion to shuffle mid-lineage: every ledger
-  result, including accepted parents, was trained under prefix semantics and
-  comparability would be lost.
-- Replay validation (2026-07-03): `enyo-4.38.0-rc2` vs `enyo-4.37.0-rc1`
-  re-measured at +4.6 +/-15.1, LLR 0.20, LOS 72.7% over 1500 games
-  (`enyo-4.38.0-rc2-replay-vs-4.37-20260703-095532`). The original +15.3 was
-  winner-curse inflated but the promotion is valid; the parent stands.
-  Promotion-gate Elo numbers overstate true gains on average.
-- Fine-tune exhaustion (2026-07-03): eleven consecutive rejections from the
-  replay-validated `enyo-4.38.0-rc2` closed every configuration axis: blocks
-  (input -1.6, float-head 0.0 to -11.8, all -9.5/-3.5), LR (5e-5/2e-5/1e-5),
-  dose (256/512/1024/4096 superbatches, including the first multi-epoch run,
-  -3.5), data (pylon regions, test80 at two LRs), and objective (wdl 0.2,
-  -9.3). The parent is a hard local optimum for one-shot fine-tuning at
-  1500-game gate precision. Next gains require a structural change:
-  reference-scale from-scratch training or an architecture delta.
+1. Stage 2 - short training: 3.5-4 hours.
+2. Stage 3 - architecture screening: 4-5 hours.
+3. Stage 4 - full winner training: 1-2.5 hours, or up to 4.5 hours for two finalists.
+4. Stage 5 - full validation: 45-60 minutes, plus 20-30 minutes if Berserk qualifies.
+5. Stage 6 - incremental improvement: 30-45 minutes per iteration.
+
+Update this section when a stage starts and completes. Record the actual result
+and calculate the next stage's expected finish from its real start time.
+
+## Stage 1: architecture support
+
+Support and verify the practical Enyo-native matrix before starting comparison
+training:
+
+- Hidden widths: 512, 768, and 1024.
+- Enyo-native input bucket layouts: 10, 16, and 32.
+- Feature channels: 11 and 12.
+- Output buckets: 1, 4, and 8.
+- Explicit architecture metadata in exported nets and strict runtime validation.
+- Trainer, exporter, scalar runtime, SIMD runtime, and parity-test support.
+- True checkpoint resume preserving weights, Adam momentum and velocity, current
+  superbatch, and learning-rate schedule position.
+
+Exit gate: every matrix architecture exports, loads, and produces matching
+trainer/runtime evaluations on the parity suite. A stopped short run must resume
+to the same final weights as an uninterrupted deterministic test run.
+
+## Stage 2: short training
+
+Train all candidates before comparing them:
+
+1. `enyo-16x12-1024-o8` - control.
+2. `enyo-16x12-1024-o4`.
+3. `enyo-16x12-1024-o1`.
+4. `enyo-16x12-768-o8`.
+5. `enyo-16x11-768-o8`.
+6. `enyo-10x11-768-o8` - Enyo-derived king map, not a copied engine layout.
+7. `enyo-32x11-1024-o8`.
+8. `enyo-16x12-512-o1`.
+
+Hold these variables fixed for every candidate:
+
+- Random initialization; never use weights from another engine.
+- The same 2.8B-position pylon Bullet file and record order.
+- The same batch settings, WDL, filters, initial LR, and final LR.
+- The same 65,536-superbatch schedule, stopped at 16,384 for screening.
+- A complete optimizer checkpoint saved at superbatch 16,384.
+
+Exit gate: all eight short nets and resumable checkpoints exist, pass static
+validation, and have recorded training times and hashes.
+
+## Stage 3: architecture screening
+
+- Run 1,000 fixed-protocol games for each candidate against the short-trained
+  `enyo-16x12-1024-o8` control.
+- Eliminate a candidate after one controlled negative result. Do not immediately
+  retry a rejected architecture.
+- Advance the strongest three positive or statistically tied candidates.
+- Run a three-match, 1,000-game round robin between those finalists.
+- Do not run an eight-way all-pairs tournament; the maximum is ten matches.
+
+Exit gate: select one winner. If two finalists remain indistinguishable, advance
+both to Stage 4. If no candidate beats the control, the control wins.
+
+## Stage 4: full winner training
+
+- Resume the winner from superbatch 16,384 to 65,536.
+- Preserve optimizer state and LR schedule position; do not restart training.
+- Resume both finalists only when Stage 3 leaves a genuine tie.
+
+Exit gate: the full net passes export, static, move, and runtime parity checks.
+
+## Stage 5: full validation
+
+Run sequential fixed-size tests:
+
+1. Full winner versus the current fully trained Enyo baseline: 1,000 games.
+2. If successful, full winner versus `default.net`: 1,000 games.
+3. Only after beating `default.net`, full winner versus
+   `~/code/cpp/chess/enyo/net/berserk-9b84c340af7e.nn`: 1,000 games.
+
+The Berserk net is an opponent only. Its weights must never initialize, alter, or
+otherwise influence an Enyo net.
+
+Exit gate: establish the validated winner as the new native lineage root, or
+record why the existing full Enyo baseline remains champion.
+
+## Stage 6: incremental improvement
+
+- Use `continue_from` for every same-architecture continuation.
+- Change one meaningful training variable per rejected experiment.
+- After one controlled rejection, move to the next documented hypothesis.
+- Preserve a successful regimen and advance only the data slice.
+- Run the fixed default-net benchmark periodically to measure absolute progress.
+
+Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
+20-30 minutes when a default-net benchmark is due.
+
+## Experiment ledger
+
+- `enyo-scratch-calibration-1.0.0-rc1` proved that random-init training can
+  recover substantial strength and beat the previous fine-tuned lineage.
+- `enyo-scratch-broad-1.0.0-rc1` extended the control recipe to the 2.8B pylon
+  corpus and is the full 16x12x1024-o8 comparison baseline.
+- `enyo-scratch-32bucket-1.0.0-rc1` changed only 16 to 32 input buckets and was
+  rejected at -6.3 +/-15.0 Elo over 1,500 games. Do not promote or retrain that
+  exact architecture in Stage 2.
+
+Game results decide promotion. Static and move gates remain rejection filters,
+not promotion evidence.
