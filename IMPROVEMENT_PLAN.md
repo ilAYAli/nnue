@@ -9,7 +9,7 @@ Current: **Stage 3 - architecture screening**
 - Static ranges: MAE `302.287-314.086`, sign `81.26-82.25%`,
   correlation `0.704340-0.731247`, and slope `0.276686-0.296967`.
 - Results: `runs/logs/stage2-short-training.tsv`.
-- Active screen: `enyo-16x11-768-o8` against the
+- Active screen: `enyo-10x11-768-o8` against the
   `enyo-16x12-1024-o8` control over 1,000 fixed games.
 
 Completed stages:
@@ -89,6 +89,9 @@ Results:
 - `enyo-16x12-768-o8` beat the control by `+31.7 +/-19.7` Elo over
   1,000 games, with `99.9%` LOS and `35.9%` draws. Advance it to the
   finalist pool.
+- `enyo-16x11-768-o8` beat the control by `+8.7 +/-20.6` Elo over
+  1,000 games, with `79.5%` LOS and `32.1%` draws. Keep it in the
+  provisional finalist pool pending the remaining screens.
 
 - Run 1,000 fixed-protocol games for each candidate against the short-trained
   `enyo-16x12-1024-o8` control.
