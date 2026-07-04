@@ -149,6 +149,42 @@ printf 'net=%s\n' "$reference_net"
                 proc.stdout,
             )
 
+    def test_load_config_uses_shared_bullet_source_as_gate_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            build = tmp / "build.json"
+            build.write_text(
+                json.dumps({
+                    "run": "candidate",
+                    "data": {"source_binpack": "data/bullet/shared.bullet"},
+                }),
+                encoding="utf-8",
+            )
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+NNUE_NTFY=0
+load_config
+printf 'data=%s\n' "$data_file"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({"BUILD": str(build), "NNUE_NTFY": "0"})
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual("data=data/bullet/shared.bullet\n", proc.stdout)
+
     def test_reference_net_env_overrides_continue_from(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
