@@ -2,15 +2,20 @@
 
 ## Current status
 
-Current: **Stage 1 - architecture support**
+Current: **Stage 2 - short training**
 
-- Status: in progress.
-- Started: 2026-07-04.
-- ETA: 4-7 engineering days.
-- Expected finish: 2026-07-08 to 2026-07-11.
-- Progress: trainer, exporter, and Enyo runtime support are being implemented.
+- Status: ready to start the eight controlled screening runs.
+- Expected duration: 3.5-4 hours.
 
-Completed: **Stage 0 - plan and protocol**, 2026-07-04.
+Completed stages:
+
+- Stage 0 - plan and protocol, 2026-07-04.
+- Stage 1 - architecture support, 2026-07-04.
+  - All eight planned layouts passed trainer-to-engine parity.
+  - Enyo, Rust/CUDA, and Python support suites passed.
+  - Checkpoint resume restored weights, Adam state, data position, and LR
+    position. Its maximum final-weight difference was `1.91e-6`, identical to
+    the variation between two uninterrupted CUDA runs.
 
 Queued stages and elapsed-time estimates:
 
@@ -39,7 +44,8 @@ training:
 
 Exit gate: every matrix architecture exports, loads, and produces matching
 trainer/runtime evaluations on the parity suite. A stopped short run must resume
-to the same final weights as an uninterrupted deterministic test run.
+to final weights within the measured variation between independent uninterrupted
+CUDA runs.
 
 ## Stage 2: short training
 

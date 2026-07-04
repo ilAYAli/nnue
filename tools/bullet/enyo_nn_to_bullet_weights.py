@@ -202,6 +202,7 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "output_buckets": args.output_buckets,
         "target_input_buckets": args.input_buckets,
         "target_feature_channels": args.feature_channels,
+        "target_hidden": args.hidden,
         "legacy_inputs": bool(args.legacy_inputs),
     }
     (path.parent / "meta.json").write_text(
@@ -222,6 +223,8 @@ def main() -> int:
                         help="Target Enyo input buckets; 0 keeps source layout.")
     parser.add_argument("--feature-channels", type=int, default=0, choices=[0, 11, 12],
                         help="Target feature channels; 0 keeps source layout.")
+    parser.add_argument("--hidden", type=int, default=0, choices=[0, 512, 768, 1024],
+                        help="Target hidden width; 0 keeps source trained width.")
     parser.add_argument(
         "--legacy-inputs",
         action="store_true",
@@ -238,8 +241,9 @@ def main() -> int:
     source_channels = int(getattr(net, "feature_channels", 12))
     args.input_buckets = args.input_buckets or source_buckets
     args.feature_channels = args.feature_channels or source_channels
-    if args.feature_channels == 11 and args.input_buckets != 32:
-        raise SystemExit("--feature-channels 11 requires --input-buckets 32")
+    args.hidden = args.hidden or int(getattr(net, "trained_hidden", N_HIDDEN))
+    if args.feature_channels == 11 and args.input_buckets not in (10, 16, 32):
+        raise SystemExit("--feature-channels 11 requires --input-buckets 10, 16, or 32")
     args.output.expanduser().parent.mkdir(parents=True, exist_ok=True)
 
     output_scale = args.eval_scale * args.eval_divisor
@@ -250,14 +254,19 @@ def main() -> int:
         source_channels=source_channels,
         target_buckets=args.input_buckets,
         target_channels=args.feature_channels,
-    )
+    )[:, :args.hidden]
+    input_biases = np.asarray(net.input_biases, dtype=np.float32)[:args.hidden]
+    l1_weights = np.concatenate((
+        np.asarray(net.l1_weights, dtype=np.float32)[:, :args.hidden],
+        np.asarray(net.l1_weights, dtype=np.float32)[:, N_HIDDEN:N_HIDDEN + args.hidden],
+    ), axis=1)
     with args.output.expanduser().open("wb") as handle:
         write_tensor(handle, "l0w", input_weights)
-        write_tensor(handle, "l0b", net.input_biases.astype(np.float32))
+        write_tensor(handle, "l0b", input_biases)
         write_tensor(
             handle,
             "l1w",
-            np.asarray(net.l1_weights, dtype=np.float32).ravel(order="F"),
+            l1_weights.ravel(order="F"),
         )
         write_tensor(handle, "l1b", net.l1_biases.astype(np.float32) / args.l1_export_scale)
         write_tensor(

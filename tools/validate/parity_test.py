@@ -14,7 +14,7 @@ Exit codes:
     2: setup/training/export failure
 """
 import argparse
-import json
+import os
 import shutil
 import subprocess
 import sys
@@ -24,7 +24,13 @@ from pathlib import Path
 # Add tools/lib to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from bullet.bullet import enyo_network_size, expand_enyo_input_buckets
+from bullet.bullet import (
+    ENYO_NETWORK_HEADER_SIZE,
+    enyo_network_size,
+    enyo_v2_container,
+    expand_enyo_input_buckets,
+    pad_enyo_hidden,
+)
 from lib import enyo_nnue as nn2
 from lib.nnue_model import EnyoNNUE, load_model_from_nn
 
@@ -41,6 +47,10 @@ def run_spike_trainer(
     output_dir: Path,
     rows: int,
     superbatches: int,
+    input_buckets: int = 16,
+    feature_channels: int = 12,
+    hidden: int = 1024,
+    output_buckets: int = 1,
 ) -> Path:
     """Train a tiny net and return a normalized runtime .nn path."""
     if rows <= 0:
@@ -55,7 +65,7 @@ def run_spike_trainer(
         "ENYO_BULLET_OUT": str(output_dir),
         "ENYO_BULLET_NET_ID": "parity",
         "ENYO_BULLET_MODE": "enyo",
-        "ENYO_BULLET_HIDDEN": "1024",
+        "ENYO_BULLET_HIDDEN": str(hidden),
         "ENYO_BULLET_L2": "16",
         "ENYO_BULLET_BATCH_SIZE": str(batch_size),
         "ENYO_BULLET_BATCHES": str(batches),
@@ -64,9 +74,9 @@ def run_spike_trainer(
         "ENYO_BULLET_LR": "1e-3",
         "ENYO_BULLET_FINAL_LR": "1e-4",
         "ENYO_BULLET_WDL": "0.3",
-        "ENYO_BULLET_ENYO_INPUT_BUCKETS": "16",
-        "ENYO_BULLET_ENYO_FEATURE_CHANNELS": "12",
-        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS": "1",
+        "ENYO_BULLET_ENYO_INPUT_BUCKETS": str(input_buckets),
+        "ENYO_BULLET_ENYO_FEATURE_CHANNELS": str(feature_channels),
+        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS": str(output_buckets),
         "ENYO_BULLET_ENYO_INPUT_FACTORISER": "0",
         "ENYO_BULLET_EVAL_SCALE": "400",
         "ENYO_BULLET_SAVE_RATE": str(superbatches),
@@ -85,7 +95,7 @@ def run_spike_trainer(
     print(f"Training {rows} rows for {superbatches} superbatches via {spike_trainer}...", flush=True)
     result = subprocess.run(
         [str(spike_trainer)],
-        env={**env},
+        env={**os.environ, **env},
         capture_output=True,
         text=True,
     )
@@ -110,24 +120,38 @@ def run_spike_trainer(
 
     runtime_net = expand_enyo_input_buckets(
         checkpoint_path.read_bytes(),
-        16,
-        feature_channels=12,
-        runtime_input_buckets=16,
-        output_buckets=1,
+        input_buckets,
+        feature_channels=feature_channels,
+        runtime_input_buckets=input_buckets,
+        output_buckets=output_buckets,
+        hidden=hidden,
+        l2=16,
+    )
+    runtime_net = pad_enyo_hidden(
+        runtime_net,
+        input_buckets,
+        feature_channels=feature_channels,
+        output_buckets=output_buckets,
+        hidden=hidden,
+    )
+    expected_payload_size = enyo_network_size(
+        input_buckets,
+        feature_channels=feature_channels,
+        output_buckets=output_buckets,
         hidden=1024,
         l2=16,
     )
-    expected_size = enyo_network_size(
-        16,
-        feature_channels=12,
-        output_buckets=1,
-        hidden=1024,
-        l2=16,
-    )
-    if len(runtime_net) != expected_size:
+    if len(runtime_net) != expected_payload_size:
         raise RuntimeError(
-            f"runtime net is {len(runtime_net)} bytes, expected {expected_size}"
+            f"runtime net is {len(runtime_net)} bytes, expected {expected_payload_size}"
         )
+    runtime_net = enyo_v2_container(
+        runtime_net,
+        input_buckets=input_buckets,
+        feature_channels=feature_channels,
+        hidden=hidden,
+        output_buckets=output_buckets,
+    )
 
     runtime_path = output_dir / "parity-runtime.nn"
     runtime_path.write_bytes(runtime_net)
@@ -142,8 +166,10 @@ def eval_python(nn_path: Path, fen: str) -> int:
 
     pieces, stm = nn2.parse_fen(fen)
     pieces.sort(key=lambda item: item[2])
-    w_feats = nn2.features_from_pieces(pieces, nn2.WHITE)
-    b_feats = nn2.features_from_pieces(pieces, nn2.BLACK)
+    w_feats = nn2.features_from_pieces(
+        pieces, nn2.WHITE, model.input_buckets, model.feature_channels)
+    b_feats = nn2.features_from_pieces(
+        pieces, nn2.BLACK, model.input_buckets, model.feature_channels)
     phase_scale = nn2.phase_scale_from_pieces(pieces)
     piece_count = len(pieces)
 
@@ -203,6 +229,14 @@ def main() -> int:
     ap.add_argument("--output", default=None, help="Output directory (default: temp)")
     ap.add_argument("--rows", type=int, default=10000, help="Training rows (default: 10000)")
     ap.add_argument("--superbatches", type=int, default=8, help="Training superbatches (default: 8)")
+    ap.add_argument("--input-buckets", type=int, default=16,
+                    choices=(10, 16, 32))
+    ap.add_argument("--feature-channels", type=int, default=12,
+                    choices=(11, 12))
+    ap.add_argument("--hidden", type=int, default=1024,
+                    choices=(512, 768, 1024))
+    ap.add_argument("--output-buckets", type=int, default=8,
+                    choices=(1, 4, 8))
     ap.add_argument("--fen", default=TEST_FEN, help=f"Test FEN (default: {TEST_FEN})")
     ap.add_argument("--tolerance", type=int, default=TOLERANCE_CP, help=f"Tolerance in cp (default: {TOLERANCE_CP})")
     args = ap.parse_args()
@@ -227,7 +261,16 @@ def main() -> int:
 
     try:
         # Train tiny net
-        nn_path = run_spike_trainer(data_path, output_dir, args.rows, args.superbatches)
+        nn_path = run_spike_trainer(
+            data_path,
+            output_dir,
+            args.rows,
+            args.superbatches,
+            args.input_buckets,
+            args.feature_channels,
+            args.hidden,
+            args.output_buckets,
+        )
 
         # Eval in Python
         print(f"Evaluating {args.fen} in Python...", flush=True)

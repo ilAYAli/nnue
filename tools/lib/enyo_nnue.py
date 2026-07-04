@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import struct
 from typing import Sequence
 
 import numpy as np
@@ -16,12 +17,13 @@ WHITE, BLACK = 0, 1
 PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING = 1, 2, 3, 4, 5, 6
 
 DEFAULT_N_KING_BUCKETS = 16
-SUPPORTED_N_KING_BUCKETS = (1, 2, 4, 8, 16, 32)
+SUPPORTED_N_KING_BUCKETS = (1, 2, 4, 8, 10, 16, 32)
+SUPPORTED_TRAINED_HIDDEN = (512, 768, 1024)
 DEFAULT_N_FEATURE_CHANNELS = 12
 HALFKA_V2_FEATURE_CHANNELS = 11
 SUPPORTED_N_FEATURE_LAYOUTS = (
-    (1, 12), (2, 12), (4, 12), (8, 12), (16, 12), (32, 12),
-    (32, 11),
+    (1, 12), (2, 12), (4, 12), (8, 12), (10, 12), (16, 12), (32, 12),
+    (10, 11), (16, 11), (32, 11),
 )
 DEFAULT_N_OUTPUT_BUCKETS = 1
 SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
@@ -36,6 +38,10 @@ N_L1 = 2 * N_HIDDEN
 N_L2 = 16
 N_L3 = 32
 N_OUTPUT = 1
+NETWORK_HEADER_MAGIC = b"ENYONN2\0"
+NETWORK_FORMAT_VERSION = 2
+NETWORK_HEADER = struct.Struct("<8s14I")
+NETWORK_HEADER_SIZE = NETWORK_HEADER.size
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
 LEGACY_N_FEATURES = N_FEATURES
 
@@ -103,30 +109,46 @@ KING_BUCKETS_32: tuple[int, ...] = (
      3,  2,  1,  0,  0,  1,  2,  3,
 )
 
+KING_BUCKETS_10: tuple[int, ...] = (
+     9,  9,  8,  8,  8,  8,  9,  9,
+     9,  9,  8,  8,  8,  8,  9,  9,
+     8,  8,  7,  7,  7,  7,  8,  8,
+     8,  8,  7,  7,  7,  7,  8,  8,
+     6,  6,  5,  5,  5,  5,  6,  6,
+     6,  6,  5,  5,  5,  5,  6,  6,
+     4,  3,  3,  2,  2,  3,  3,  4,
+     1,  1,  0,  0,  0,  0,  1,  1,
+)
+
 KING_BUCKETS = KING_BUCKETS_16
 
 
 def king_buckets(input_buckets: int = DEFAULT_N_KING_BUCKETS) -> tuple[int, ...]:
     if input_buckets in (1, 2, 4, 8, 16):
         return tuple(bucket * input_buckets // 16 for bucket in KING_BUCKETS_16)
+    if input_buckets == 10:
+        return KING_BUCKETS_10
     if input_buckets == 32:
         return KING_BUCKETS_32
     raise ValueError(f"unsupported input bucket count {input_buckets}")
 
 
 def detect_network_layout(size: int) -> tuple[int, int, int, int]:
-    for input_buckets, feature_channels in SUPPORTED_N_FEATURE_LAYOUTS:
-        for output_buckets in SUPPORTED_N_OUTPUT_BUCKETS:
-            for output_head_features in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
-                if size == network_size(
-                    input_buckets, output_buckets, output_head_features,
-                    feature_channels
-                ):
-                    return (
-                        input_buckets,
-                        feature_channels,
-                        output_buckets,
-                        output_head_features)
+    for payload_size in (size, size - NETWORK_HEADER_SIZE):
+        if payload_size <= 0:
+            continue
+        for input_buckets, feature_channels in SUPPORTED_N_FEATURE_LAYOUTS:
+            for output_buckets in SUPPORTED_N_OUTPUT_BUCKETS:
+                for output_head_features in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
+                    if payload_size == network_size(
+                        input_buckets, output_buckets, output_head_features,
+                        feature_channels
+                    ):
+                        return (
+                            input_buckets,
+                            feature_channels,
+                            output_buckets,
+                            output_head_features)
     expected = ", ".join(
         f"{network_size(i, o, h, c)} "
         f"({i} input, {c} channels, {o} output, {h} head)"
@@ -186,6 +208,8 @@ class Net:
     feature_channels: int = DEFAULT_N_FEATURE_CHANNELS
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS
     output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES
+    trained_hidden: int = N_HIDDEN
+    format_version: int = 1
 
     @property
     def output_bias(self) -> float:
@@ -305,11 +329,58 @@ def material_head_features_from_pieces(
 
 def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
-    try:
-        input_buckets, feature_channels, output_buckets, output_head_features = detect_network_layout(
-            len(data))
-    except ValueError as exc:
-        raise ValueError(f"{path}: {exc}") from exc
+    trained_hidden = N_HIDDEN
+    format_version = 1
+    payload = data
+    if data.startswith(NETWORK_HEADER_MAGIC):
+        if len(data) < NETWORK_HEADER_SIZE:
+            raise ValueError(f"{path}: truncated Enyo NNUE header")
+        (
+            magic,
+            format_version,
+            header_size,
+            input_buckets,
+            feature_channels,
+            trained_hidden,
+            runtime_hidden,
+            l2_size,
+            l3_size,
+            output_buckets,
+            output_head_features,
+            flags,
+            payload_size,
+            reserved0,
+            reserved1,
+        ) = NETWORK_HEADER.unpack_from(data)
+        if magic != NETWORK_HEADER_MAGIC or format_version != NETWORK_FORMAT_VERSION:
+            raise ValueError(f"{path}: unsupported Enyo NNUE header")
+        if header_size != NETWORK_HEADER_SIZE:
+            raise ValueError(f"{path}: invalid header size {header_size}")
+        if runtime_hidden != N_HIDDEN or l2_size != N_L2 or l3_size != N_L3:
+            raise ValueError(f"{path}: unsupported runtime dimensions")
+        if trained_hidden not in SUPPORTED_TRAINED_HIDDEN:
+            raise ValueError(f"{path}: unsupported trained hidden width {trained_hidden}")
+        if (input_buckets, feature_channels) not in SUPPORTED_N_FEATURE_LAYOUTS:
+            raise ValueError(f"{path}: unsupported feature layout")
+        if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
+            raise ValueError(f"{path}: unsupported output bucket count")
+        if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
+            raise ValueError(f"{path}: unsupported output head feature count")
+        if flags or reserved0 or reserved1:
+            raise ValueError(f"{path}: unsupported header flags or reserved fields")
+        payload = data[header_size:]
+        expected_payload = network_size(
+            input_buckets, output_buckets, output_head_features,
+            feature_channels)
+        if payload_size != expected_payload or len(payload) != expected_payload:
+            raise ValueError(
+                f"{path}: payload size {len(payload)} does not match {expected_payload}")
+    else:
+        try:
+            input_buckets, feature_channels, output_buckets, output_head_features = detect_network_layout(
+                len(data))
+        except ValueError as exc:
+            raise ValueError(f"{path}: {exc}") from exc
     n_features = feature_count(input_buckets, feature_channels)
     output_width = N_L3 + output_head_features
 
@@ -317,7 +388,7 @@ def load_net(path: str | Path) -> Net:
 
     def take(dtype, count: int):
         nonlocal off
-        arr = np.frombuffer(data, dtype=dtype, count=count, offset=off)
+        arr = np.frombuffer(payload, dtype=dtype, count=count, offset=off)
         off += arr.nbytes
         return arr.copy()
 
@@ -330,7 +401,7 @@ def load_net(path: str | Path) -> Net:
     ow = take(np.float32, output_buckets * output_width).reshape(
         output_buckets, output_width)
     ob = take(np.float32, output_buckets)
-    assert off == len(data)
+    assert off == len(payload)
     return Net(
         input_weights=iw,
         input_biases=ib,
@@ -343,15 +414,39 @@ def load_net(path: str | Path) -> Net:
         input_buckets=input_buckets,
         feature_channels=feature_channels,
         output_buckets=output_buckets,
-        output_head_features=output_head_features)
+        output_head_features=output_head_features,
+        trained_hidden=trained_hidden,
+        format_version=format_version)
 
 
 def write_net(net: Net, path: str | Path) -> None:
     expected_features = feature_count(net.input_buckets, net.feature_channels)
-    if net.input_weights.shape != (expected_features, N_HIDDEN):
+    if net.trained_hidden not in SUPPORTED_TRAINED_HIDDEN:
+        raise ValueError(f"unsupported trained hidden width {net.trained_hidden}")
+    input_weights = np.asarray(net.input_weights, dtype=np.int16)
+    if input_weights.shape == (expected_features, net.trained_hidden):
+        padded = np.zeros((expected_features, N_HIDDEN), dtype=np.int16)
+        padded[:, :net.trained_hidden] = input_weights
+        input_weights = padded
+    if input_weights.shape != (expected_features, N_HIDDEN):
         raise ValueError(
-            f"input_weights shape {net.input_weights.shape} does not match "
+            f"input_weights shape {input_weights.shape} does not match "
             f"{net.input_buckets} buckets / {net.feature_channels} channels")
+    input_biases = np.asarray(net.input_biases, dtype=np.int16).reshape(-1)
+    if input_biases.shape == (net.trained_hidden,):
+        padded = np.zeros(N_HIDDEN, dtype=np.int16)
+        padded[:net.trained_hidden] = input_biases
+        input_biases = padded
+    if input_biases.shape != (N_HIDDEN,):
+        raise ValueError(f"input_biases shape {input_biases.shape} does not match runtime")
+    l1_weights = np.asarray(net.l1_weights, dtype=np.int8)
+    if l1_weights.shape == (N_L2, 2 * net.trained_hidden):
+        padded = np.zeros((N_L2, N_L1), dtype=np.int8)
+        padded[:, :net.trained_hidden] = l1_weights[:, :net.trained_hidden]
+        padded[:, N_HIDDEN:N_HIDDEN + net.trained_hidden] = l1_weights[:, net.trained_hidden:]
+        l1_weights = padded
+    if l1_weights.shape != (N_L2, N_L1):
+        raise ValueError(f"l1_weights shape {l1_weights.shape} does not match runtime")
     if net.output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {net.output_buckets}")
     if net.output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
@@ -371,19 +466,49 @@ def write_net(net: Net, path: str | Path) -> None:
         raise ValueError(
             f"output_biases shape {output_biases.shape} does not match "
             f"{net.output_buckets} output buckets")
+    payload = b"".join((
+        input_weights.tobytes(order="C"),
+        input_biases.tobytes(order="C"),
+        l1_weights.tobytes(order="C"),
+        np.asarray(net.l1_biases, dtype=np.int32).tobytes(order="C"),
+        np.asarray(net.l2_weights, dtype=np.float32).tobytes(order="C"),
+        np.asarray(net.l2_biases, dtype=np.float32).tobytes(order="C"),
+        output_weights.tobytes(order="C"),
+        output_biases.tobytes(order="C"),
+    ))
+    if net.format_version == 1:
+        if net.trained_hidden != N_HIDDEN:
+            raise ValueError("non-1024 hidden widths require enyo-native-v2")
+        data = payload
+    elif net.format_version == NETWORK_FORMAT_VERSION:
+        header = NETWORK_HEADER.pack(
+            NETWORK_HEADER_MAGIC,
+            NETWORK_FORMAT_VERSION,
+            NETWORK_HEADER_SIZE,
+            net.input_buckets,
+            net.feature_channels,
+            net.trained_hidden,
+            N_HIDDEN,
+            N_L2,
+            N_L3,
+            net.output_buckets,
+            net.output_head_features,
+            0,
+            len(payload),
+            0,
+            0,
+        )
+        data = header + payload
+    else:
+        raise ValueError(f"unsupported format version {net.format_version}")
+
     out = Path(path)
-    with out.open("wb") as f:
-        f.write(np.asarray(net.input_weights, dtype=np.int16).tobytes(order="C"))
-        f.write(np.asarray(net.input_biases, dtype=np.int16).tobytes(order="C"))
-        f.write(np.asarray(net.l1_weights, dtype=np.int8).tobytes(order="C"))
-        f.write(np.asarray(net.l1_biases, dtype=np.int32).tobytes(order="C"))
-        f.write(np.asarray(net.l2_weights, dtype=np.float32).tobytes(order="C"))
-        f.write(np.asarray(net.l2_biases, dtype=np.float32).tobytes(order="C"))
-        f.write(output_weights.tobytes(order="C"))
-        f.write(output_biases.tobytes(order="C"))
+    out.write_bytes(data)
     size = out.stat().st_size
     expected = network_size(
         net.input_buckets, net.output_buckets, net.output_head_features,
         net.feature_channels)
+    if net.format_version == NETWORK_FORMAT_VERSION:
+        expected += NETWORK_HEADER_SIZE
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")

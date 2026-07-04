@@ -17,6 +17,8 @@ from tools.validate import parity_test
 
 class _RecordingModel:
     def __init__(self) -> None:
+        self.input_buckets = 32
+        self.feature_channels = 11
         self.args: tuple[torch.Tensor, ...] | None = None
         self.kwargs: dict[str, torch.Tensor] | None = None
         self.eval_called = False
@@ -56,6 +58,18 @@ class ParityTestRegressionTests(unittest.TestCase):
         assert args is not None
         self.assertEqual(args[0].ndim, 1)
         self.assertEqual(args[1].ndim, 1)
+        pieces, _ = parity_test.nn2.parse_fen(parity_test.TEST_FEN)
+        pieces.sort(key=lambda item: item[2])
+        torch.testing.assert_close(
+            args[0],
+            torch.tensor(parity_test.nn2.features_from_pieces(
+                pieces, parity_test.nn2.WHITE, 32, 11)),
+        )
+        torch.testing.assert_close(
+            args[1],
+            torch.tensor(parity_test.nn2.features_from_pieces(
+                pieces, parity_test.nn2.BLACK, 32, 11)),
+        )
         torch.testing.assert_close(args[2], torch.tensor([0]))
         torch.testing.assert_close(args[3], torch.tensor([0]))
         self.assertEqual(args[4].shape, (1,))
@@ -107,6 +121,16 @@ class ParityTestRegressionTests(unittest.TestCase):
                     "enyo_network_size",
                     return_value=7,
                 ) as network_size,
+                mock.patch.object(
+                    parity_test,
+                    "pad_enyo_hidden",
+                    return_value=b"runtime",
+                ) as pad_hidden,
+                mock.patch.object(
+                    parity_test,
+                    "enyo_v2_container",
+                    return_value=b"runtime",
+                ) as container,
             ):
                 result = parity_test.run_spike_trainer(
                     data,
@@ -138,6 +162,20 @@ class ParityTestRegressionTests(unittest.TestCase):
                 hidden=1024,
                 l2=16,
             )
+            pad_hidden.assert_called_once_with(
+                b"runtime",
+                16,
+                feature_channels=12,
+                output_buckets=1,
+                hidden=1024,
+            )
+            container.assert_called_once_with(
+                b"runtime",
+                input_buckets=16,
+                feature_channels=12,
+                hidden=1024,
+                output_buckets=1,
+            )
             expected_env = {
                 "ENYO_BULLET_DATA": str(data),
                 "ENYO_BULLET_OUT": str(output),
@@ -159,7 +197,10 @@ class ParityTestRegressionTests(unittest.TestCase):
                 "ENYO_BULLET_EVAL_SCALE": "400",
                 "ENYO_BULLET_SAVE_RATE": "3",
             }
-            self.assertEqual(captured["env"], expected_env)
+            captured_env = captured["env"]
+            assert isinstance(captured_env, dict)
+            for key, value in expected_env.items():
+                self.assertEqual(captured_env.get(key), value)
             for obsolete in (
                 "ENYO_BULLET_DATASET",
                 "ENYO_BULLET_OUTPUT",
@@ -220,8 +261,14 @@ class ParityTestRegressionTests(unittest.TestCase):
                 )
 
             self.assertEqual(runtime, output / "parity-runtime.nn")
-            self.assertEqual(runtime.stat().st_size, 25_203_012)
-            self.assertEqual(runtime.read_bytes(), payload)
+            self.assertEqual(
+                runtime.stat().st_size,
+                parity_test.ENYO_NETWORK_HEADER_SIZE + 25_203_012,
+            )
+            self.assertEqual(
+                runtime.read_bytes()[parity_test.ENYO_NETWORK_HEADER_SIZE:],
+                payload,
+            )
             checkpoint = output / "parity-2" / "quantised.bin"
             self.assertEqual(checkpoint.read_bytes(), payload + trailer)
 
@@ -256,11 +303,19 @@ class ParityTestRegressionTests(unittest.TestCase):
                 output_dir: Path,
                 rows: int,
                 superbatches: int,
+                input_buckets: int,
+                feature_channels: int,
+                hidden: int,
+                output_buckets: int,
             ) -> Path:
                 captured["data"] = data_path
                 captured["output"] = output_dir
                 self.assertEqual(rows, 12)
                 self.assertEqual(superbatches, 2)
+                self.assertEqual(
+                    (input_buckets, feature_channels, hidden, output_buckets),
+                    (16, 12, 1024, 8),
+                )
                 return root / "parity.nn"
 
             argv = [
