@@ -6,11 +6,12 @@ import argparse
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 
 ENYO_DEFAULT_INPUT_BUCKETS = 16
-ENYO_SUPPORTED_INPUT_BUCKETS = (1, 2, 4, 8, 16, 32)
+ENYO_SUPPORTED_INPUT_BUCKETS = (1, 2, 4, 8, 10, 16, 32)
 ENYO_DEFAULT_FEATURE_CHANNELS = 12
 ENYO_SUPPORTED_FEATURE_CHANNELS = (11, 12)
 ENYO_DEFAULT_OUTPUT_BUCKETS = 1
@@ -20,6 +21,10 @@ ENYO_SQUARES = 64
 ENYO_HIDDEN = 1024
 ENYO_L2 = 16
 ENYO_L3 = 32
+ENYO_NETWORK_HEADER_MAGIC = b"ENYONN2\0"
+ENYO_NETWORK_FORMAT_VERSION = 2
+ENYO_NETWORK_HEADER = struct.Struct("<8s14I")
+ENYO_NETWORK_HEADER_SIZE = ENYO_NETWORK_HEADER.size
 
 
 def enyo_network_size(
@@ -159,6 +164,92 @@ def expand_enyo_input_buckets(
 
     expanded[target_l0_bytes:] = rest
     return bytes(expanded)
+
+
+def pad_enyo_hidden(
+    raw: bytes,
+    input_buckets: int,
+    *,
+    feature_channels: int = ENYO_DEFAULT_FEATURE_CHANNELS,
+    output_buckets: int = ENYO_DEFAULT_OUTPUT_BUCKETS,
+    hidden: int,
+    l2: int = ENYO_L2,
+    l3: int = ENYO_L3,
+) -> bytes:
+    if hidden == ENYO_HIDDEN:
+        return raw
+    if hidden <= 0 or hidden > ENYO_HIDDEN:
+        raise SystemExit(f"unsupported trained hidden width {hidden}")
+    raw = trim_bullet_checkpoint(
+        raw,
+        input_buckets,
+        feature_channels=feature_channels,
+        output_buckets=output_buckets,
+        hidden=hidden,
+        l2=l2,
+        l3=l3,
+    )
+    features = input_buckets * feature_channels * ENYO_SQUARES
+    source_l0w = features * hidden * 2
+    source_l0b = hidden * 2
+    source_l1w = 2 * hidden * l2
+    target_l0w = features * ENYO_HIDDEN * 2
+    target_l0b = ENYO_HIDDEN * 2
+    target_l1w = 2 * ENYO_HIDDEN * l2
+    source_tail = source_l0w + source_l0b + source_l1w
+    target_tail = target_l0w + target_l0b + target_l1w
+    padded = bytearray(target_tail + len(raw) - source_tail)
+
+    source_feature_bytes = hidden * 2
+    target_feature_bytes = ENYO_HIDDEN * 2
+    for feature in range(features):
+        source = feature * source_feature_bytes
+        target = feature * target_feature_bytes
+        padded[target:target + source_feature_bytes] = raw[
+            source:source + source_feature_bytes]
+    padded[target_l0w:target_l0w + source_l0b] = raw[
+        source_l0w:source_l0w + source_l0b]
+
+    source_l1_start = source_l0w + source_l0b
+    target_l1_start = target_l0w + target_l0b
+    for row in range(l2):
+        source = source_l1_start + row * 2 * hidden
+        target = target_l1_start + row * 2 * ENYO_HIDDEN
+        padded[target:target + hidden] = raw[source:source + hidden]
+        padded[target + ENYO_HIDDEN:target + ENYO_HIDDEN + hidden] = raw[
+            source + hidden:source + 2 * hidden]
+    padded[target_tail:] = raw[source_tail:]
+    return bytes(padded)
+
+
+def enyo_v2_container(
+    payload: bytes,
+    *,
+    input_buckets: int,
+    feature_channels: int,
+    hidden: int,
+    output_buckets: int,
+    l2: int = ENYO_L2,
+    l3: int = ENYO_L3,
+) -> bytes:
+    header = ENYO_NETWORK_HEADER.pack(
+        ENYO_NETWORK_HEADER_MAGIC,
+        ENYO_NETWORK_FORMAT_VERSION,
+        ENYO_NETWORK_HEADER.size,
+        input_buckets,
+        feature_channels,
+        hidden,
+        ENYO_HIDDEN,
+        l2,
+        l3,
+        output_buckets,
+        0,
+        0,
+        len(payload),
+        0,
+        0,
+    )
+    return header + payload
 
 
 def expand_path(value: str | Path) -> Path:

@@ -16,12 +16,16 @@ class EnyoNNUE(nn_pt.Module):
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                  feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
                  output_buckets: int = nn2.DEFAULT_N_OUTPUT_BUCKETS,
-                 output_head_features: int = nn2.DEFAULT_N_OUTPUT_HEAD_FEATURES):
+                 output_head_features: int = nn2.DEFAULT_N_OUTPUT_HEAD_FEATURES,
+                 trained_hidden: int = nn2.N_HIDDEN,
+                 format_version: int = 1):
         super().__init__()
         self.input_buckets = input_buckets
         self.feature_channels = feature_channels
         self.output_buckets = output_buckets
         self.output_head_features = output_head_features
+        self.trained_hidden = trained_hidden
+        self.format_version = format_version
         self.embed = nn_pt.EmbeddingBag(
             nn2.feature_count(input_buckets, feature_channels), nn2.N_HIDDEN,
             mode="sum")
@@ -159,7 +163,9 @@ def load_model_from_nn(
         input_buckets=net.input_buckets,
         feature_channels=net.feature_channels,
         output_buckets=net.output_buckets,
-        output_head_features=output_head_features)
+        output_head_features=output_head_features,
+        trained_hidden=net.trained_hidden,
+        format_version=net.format_version)
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
         model.input_bias.copy_(torch.from_numpy(net.input_biases.astype(np.float32)))
@@ -222,5 +228,7 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         feature_channels=model.feature_channels,
         output_buckets=model.output_buckets,
         output_head_features=model.output_head_features,
+        trained_hidden=model.trained_hidden,
+        format_version=model.format_version,
     )
     nn2.write_net(net, path)

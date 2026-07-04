@@ -45,14 +45,17 @@ const FORBIDDEN_TEXT: &[&str] = &[
     "weights.bin",
 ];
 
-const ENYO_SUPPORTED_INPUT_BUCKETS: &[usize] = &[1, 2, 4, 8, 16, 32];
+const ENYO_SUPPORTED_INPUT_BUCKETS: &[usize] = &[1, 2, 4, 8, 10, 16, 32];
+const ENYO_SUPPORTED_HIDDEN: &[usize] = &[512, 768, 1024];
 const ENYO_SUPPORTED_FEATURE_CHANNELS: &[usize] = &[11, 12];
 const ENYO_SUPPORTED_OUTPUT_BUCKETS: &[usize] = &[1, 2, 4, 8];
+const ENYO_RUNTIME_HIDDEN: usize = 1024;
+const ENYO_NETWORK_HEADER_MAGIC: &[u8; 8] = b"ENYONN2\0";
+const ENYO_NETWORK_FORMAT_VERSION: u32 = 2;
+const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
-    0, 1, 2, 3, 4, 5, 6, 7,
-    8, 9, 10, 11, 8, 9, 10, 11,
-    12, 12, 13, 13, 12, 12, 13, 13,
-    14, 14, 15, 15, 14, 14, 15, 15,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 15,
+    15, 14, 14, 15, 15,
 ];
 const TRAIN_PROVENANCE_SCHEMA: u64 = 1;
 
@@ -62,6 +65,7 @@ const TRAINING_DEFAULT_KEYS: &[&str] = &[
     "batches",
     "batch_size",
     "superbatches",
+    "lr_superbatches",
     "threads",
     "wdl",
     "lr",
@@ -728,6 +732,8 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
         .arg(usize_at(&config.arch, "feature_channels", 12).to_string())
         .arg("--output-buckets")
         .arg(usize_at(&config.arch, "output_buckets", 1).to_string())
+        .arg("--hidden")
+        .arg(usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN).to_string())
         .status()
         .unwrap_or_else(|err| {
             eprintln!("error: cannot run initialize_from converter: {err}");
@@ -759,6 +765,13 @@ fn training_superbatches(config: &Config) -> usize {
     training_usize(config, "superbatches", 64)
 }
 
+fn training_lr_superbatches(config: &Config) -> usize {
+    match training_usize(config, "lr_superbatches", 0) {
+        0 => training_superbatches(config),
+        configured => configured,
+    }
+}
+
 fn training_batch_size(config: &Config) -> usize {
     training_usize(config, "batch_size", 2048)
 }
@@ -788,6 +801,9 @@ fn validate_layout(config: &Config) {
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
     let feature_channels = usize_at(&config.arch, "feature_channels", 12);
     let output_buckets = usize_at(&config.arch, "output_buckets", 1);
+    let hidden = usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN);
+    let l2 = usize_at(&config.arch, "l2_size", 16);
+    let export_format = string_at(&config.arch, "export_format").unwrap_or("enyo-native-v1");
     if !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&input_buckets)
         || !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&runtime_input_buckets)
     {
@@ -802,12 +818,31 @@ fn validate_layout(config: &Config) {
         eprintln!("error: unsupported Enyo feature_channels={feature_channels}");
         process::exit(2);
     }
-    if feature_channels == 11 && (input_buckets != 32 || runtime_input_buckets != 32) {
-        eprintln!("error: 11-channel layout requires 32 input/runtime buckets");
+    if feature_channels == 11
+        && (!matches!(input_buckets, 10 | 16 | 32)
+            || !matches!(runtime_input_buckets, 10 | 16 | 32))
+    {
+        eprintln!("error: 11-channel layout requires 10, 16, or 32 input/runtime buckets");
         process::exit(2);
     }
     if !ENYO_SUPPORTED_OUTPUT_BUCKETS.contains(&output_buckets) {
         eprintln!("error: unsupported Enyo output_buckets={output_buckets}");
+        process::exit(2);
+    }
+    if !ENYO_SUPPORTED_HIDDEN.contains(&hidden) || l2 != 16 {
+        eprintln!("error: Enyo layout requires hidden=512, 768, or 1024 and l2_size=16");
+        process::exit(2);
+    }
+    if !matches!(export_format, "enyo-native-v1" | "enyo-native-v2") {
+        eprintln!("error: unsupported export_format={export_format}");
+        process::exit(2);
+    }
+    if export_format == "enyo-native-v1" && hidden != ENYO_RUNTIME_HIDDEN {
+        eprintln!("error: non-1024 hidden widths require export_format=enyo-native-v2");
+        process::exit(2);
+    }
+    if training_lr_superbatches(config) < training_superbatches(config) {
+        eprintln!("error: lr_superbatches cannot be smaller than superbatches");
         process::exit(2);
     }
 }
@@ -860,8 +895,9 @@ fn cmd_plan(config: &Config) {
         training_save_rate(config),
     );
     println!(
-        "  dose={} superbatches, batch_size={}, batches={}",
+        "  dose={} superbatches, lr_schedule={} superbatches, batch_size={}, batches={}",
         training_superbatches(config),
+        training_lr_superbatches(config),
         training_batch_size(config),
         training_batches(config),
     );
@@ -884,12 +920,8 @@ fn cmd_plan(config: &Config) {
 }
 
 fn write_chunk(writer: &mut BufWriter<File>, chunk: &[ChessBoard]) -> std::io::Result<()> {
-    let bytes = unsafe {
-        std::slice::from_raw_parts(
-            chunk.as_ptr() as *const u8,
-            mem::size_of_val(chunk),
-        )
-    };
+    let bytes =
+        unsafe { std::slice::from_raw_parts(chunk.as_ptr() as *const u8, mem::size_of_val(chunk)) };
     writer.write_all(bytes)
 }
 
@@ -917,12 +949,7 @@ fn create_bullet_output(output: &Path) -> (PathBuf, BufWriter<File>) {
     (tmp, BufWriter::new(out_file))
 }
 
-fn publish_bullet_output(
-    tmp: PathBuf,
-    mut writer: BufWriter<File>,
-    output: &Path,
-    records: u64,
-) {
+fn publish_bullet_output(tmp: PathBuf, mut writer: BufWriter<File>, output: &Path, records: u64) {
     writer.flush().unwrap_or_else(|err| {
         let _ = fs::remove_file(&tmp);
         eprintln!("error: cannot flush {}: {err}", tmp.display());
@@ -994,27 +1021,40 @@ fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
         process::exit(1);
     }
     let available = total - offset;
-    let records = if limit == 0 { available } else { limit.min(available) };
+    let records = if limit == 0 {
+        available
+    } else {
+        limit.min(available)
+    };
     if records == 0 {
         eprintln!("error: selected 0 Bullet data records");
         process::exit(1);
     }
     if source == output {
         if offset != 0 || records != total {
-            eprintln!("error: cannot slice Bullet data in place: {}", source.display());
+            eprintln!(
+                "error: cannot slice Bullet data in place: {}",
+                source.display()
+            );
             process::exit(1);
         }
-        eprintln!("using existing Bullet data: {} records from {}", records, source.display());
+        eprintln!(
+            "using existing Bullet data: {} records from {}",
+            records,
+            source.display()
+        );
         return;
     }
     let mut input = BufReader::new(File::open(source).unwrap_or_else(|err| {
         eprintln!("error: cannot open {}: {err}", source.display());
         process::exit(1);
     }));
-    input.seek(SeekFrom::Start(offset * record_size)).unwrap_or_else(|err| {
-        eprintln!("error: cannot seek {}: {err}", source.display());
-        process::exit(1);
-    });
+    input
+        .seek(SeekFrom::Start(offset * record_size))
+        .unwrap_or_else(|err| {
+            eprintln!("error: cannot seek {}: {err}", source.display());
+            process::exit(1);
+        });
     let (tmp, mut output_file) = create_bullet_output(output);
     let bytes = records * record_size;
     let copied = std::io::copy(&mut input.take(bytes), &mut output_file).unwrap_or_else(|err| {
@@ -1028,7 +1068,11 @@ fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
         process::exit(1);
     }
     publish_bullet_output(tmp, output_file, output, records);
-    eprintln!("copied {} Bullet data records to {}", records, output.display());
+    eprintln!(
+        "copied {} Bullet data records to {}",
+        records,
+        output.display()
+    );
 }
 
 fn cmd_data(config: &Config) {
@@ -1072,12 +1116,10 @@ fn cmd_data(config: &Config) {
         max_abs_cp: data.max_abs_cp,
         quiet_only: data.quiet_only,
     };
-    let loader = SfBinpackLoader::new_concat_multiple(
-        &refs,
-        data.buffer_mb,
-        data.threads,
-        move |entry| filter.keep(entry),
-    );
+    let loader =
+        SfBinpackLoader::new_concat_multiple(&refs, data.buffer_mb, data.threads, move |entry| {
+            filter.keep(entry)
+        });
     let start = Instant::now();
     let mut written = 0_u64;
     let mut skipped = 0_u64;
@@ -1159,29 +1201,64 @@ fn cmd_run(config: &Config) {
         eprintln!("error: cannot create {}: {err}", output.display());
         process::exit(1);
     });
+    let target_superbatch = training_superbatches(config);
+    let checkpoint = latest_current_checkpoint(config);
+    ensure_resume_state(config, checkpoint.is_some());
+    if let Some((superbatch, _)) = &checkpoint {
+        if *superbatch > target_superbatch {
+            eprintln!(
+                "error: latest checkpoint superbatch {superbatch} exceeds target {target_superbatch}"
+            );
+            process::exit(1);
+        }
+        if *superbatch == target_superbatch {
+            println!("checkpoint_complete={superbatch}");
+            write_model(config);
+            return;
+        }
+    }
 
     set_env("ENYO_BULLET_DATA", bullet_output.display());
     set_env("ENYO_BULLET_LOADER", training_loader(config));
     set_env("ENYO_BULLET_OUT", output.display());
     set_env("ENYO_BULLET_NET_ID", net_id(config));
-    if let Some(net) = initialize_from(config) {
+    if let Some((superbatch, path)) = checkpoint {
+        set_env("ENYO_BULLET_RESUME_CHECKPOINT", path.display());
+        set_env("ENYO_BULLET_START_SUPERBATCH", superbatch + 1);
+    } else if let Some(net) = initialize_from(config) {
         let init_weights = convert_initialize_from(config, &net);
         set_env("ENYO_BULLET_INIT_WEIGHTS", init_weights.display());
     } else if let Some(previous_run) = continue_from(config) {
-        set_env("ENYO_BULLET_INIT_WEIGHTS", latest_weight_checkpoint(config, &previous_run).display());
+        set_env(
+            "ENYO_BULLET_INIT_WEIGHTS",
+            latest_weight_checkpoint(config, &previous_run).display(),
+        );
     }
-    set_env("ENYO_BULLET_MODE", string_at(&config.arch, "mode").unwrap_or("enyo"));
+    set_env(
+        "ENYO_BULLET_MODE",
+        string_at(&config.arch, "mode").unwrap_or("enyo"),
+    );
     set_env("ENYO_BULLET_HIDDEN", usize_at(&config.arch, "hidden", 1024));
     set_env("ENYO_BULLET_L2", usize_at(&config.arch, "l2_size", 16));
     set_env("ENYO_BULLET_BATCH_SIZE", training_batch_size(config));
     set_env("ENYO_BULLET_BATCHES", training_batches(config));
-    set_env("ENYO_BULLET_SUPERBATCHES", training_superbatches(config));
+    set_env("ENYO_BULLET_SUPERBATCHES", target_superbatch);
+    set_env(
+        "ENYO_BULLET_LR_SUPERBATCHES",
+        training_lr_superbatches(config),
+    );
     set_env("ENYO_BULLET_THREADS", training_threads(config));
     set_env("ENYO_BULLET_WDL", training_wdl(config));
     set_env("ENYO_BULLET_LR", training_lr(config));
     set_env("ENYO_BULLET_FINAL_LR", training_final_lr(config));
-    set_env("ENYO_BULLET_ENYO_L0_STD", f64_at(&config.arch, "l0_std", 8.0));
-    set_env("ENYO_BULLET_ENYO_L1_STD", f64_at(&config.arch, "l1_std", 1.0));
+    set_env(
+        "ENYO_BULLET_ENYO_L0_STD",
+        f64_at(&config.arch, "l0_std", 8.0),
+    );
+    set_env(
+        "ENYO_BULLET_ENYO_L1_STD",
+        f64_at(&config.arch, "l1_std", 1.0),
+    );
     set_env(
         "ENYO_BULLET_ENYO_L1_EXPORT_SCALE",
         f64_at(&config.arch, "l1_export_scale", 1.0),
@@ -1190,14 +1267,30 @@ fn cmd_run(config: &Config) {
         "ENYO_BULLET_ENYO_INPUT_FACTORISER",
         usize::from(bool_at(&config.arch, "input_factoriser", false)),
     );
-    set_env("ENYO_BULLET_ENYO_INPUT_BUCKETS", usize_at(&config.arch, "input_buckets", 1));
+    set_env(
+        "ENYO_BULLET_ENYO_INPUT_BUCKETS",
+        usize_at(&config.arch, "input_buckets", 1),
+    );
     set_env(
         "ENYO_BULLET_ENYO_RUNTIME_INPUT_BUCKETS",
-        usize_at(&config.arch, "runtime_input_buckets", usize_at(&config.arch, "input_buckets", 1)),
+        usize_at(
+            &config.arch,
+            "runtime_input_buckets",
+            usize_at(&config.arch, "input_buckets", 1),
+        ),
     );
-    set_env("ENYO_BULLET_ENYO_FEATURE_CHANNELS", usize_at(&config.arch, "feature_channels", 12));
-    set_env("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", usize_at(&config.arch, "output_buckets", 1));
-    set_env("ENYO_BULLET_EVAL_SCALE", f64_at(&config.arch, "eval_scale", 400.0));
+    set_env(
+        "ENYO_BULLET_ENYO_FEATURE_CHANNELS",
+        usize_at(&config.arch, "feature_channels", 12),
+    );
+    set_env(
+        "ENYO_BULLET_ENYO_OUTPUT_BUCKETS",
+        usize_at(&config.arch, "output_buckets", 1),
+    );
+    set_env(
+        "ENYO_BULLET_EVAL_SCALE",
+        f64_at(&config.arch, "eval_scale", 400.0),
+    );
     set_env("ENYO_BULLET_SAVE_RATE", training_save_rate(config));
     set_env("ENYO_BULLET_EXPORT_INIT_ONLY", 0);
     set_env("ENYO_BULLET_TRAINABLE", training_trainable(config));
@@ -1205,7 +1298,10 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_SFBINPACK_BUFFER_MB", data.buffer_mb);
     set_env("ENYO_BULLET_SFBINPACK_MIN_PLY", data.min_ply);
     set_env("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", data.max_abs_cp);
-    set_env("ENYO_BULLET_SFBINPACK_QUIET_ONLY", usize::from(data.quiet_only));
+    set_env(
+        "ENYO_BULLET_SFBINPACK_QUIET_ONLY",
+        usize::from(data.quiet_only),
+    );
 
     trainer_main::run_from_env();
     write_model(config);
@@ -1241,7 +1337,10 @@ fn trim_checkpoint(
 ) -> Vec<u8> {
     let expected = enyo_network_size(input_buckets, feature_channels, output_buckets, hidden, l2);
     if raw.len() < expected {
-        eprintln!("error: checkpoint is {} bytes, expected at least {expected}", raw.len());
+        eprintln!(
+            "error: checkpoint is {} bytes, expected at least {expected}",
+            raw.len()
+        );
         process::exit(1);
     }
     if raw.len() == expected {
@@ -1250,14 +1349,21 @@ fn trim_checkpoint(
     let trailer = &raw[expected..];
     for (idx, byte) in trailer.iter().enumerate() {
         if *byte != b"bullet"[idx % 6] {
-            eprintln!("error: checkpoint has unexpected {} byte trailer", trailer.len());
+            eprintln!(
+                "error: checkpoint has unexpected {} byte trailer",
+                trailer.len()
+            );
             process::exit(1);
         }
     }
     raw[..expected].to_vec()
 }
 
-fn parent_bucket(target_bucket: usize, input_buckets: usize, runtime_input_buckets: usize) -> usize {
+fn parent_bucket(
+    target_bucket: usize,
+    input_buckets: usize,
+    runtime_input_buckets: usize,
+) -> usize {
     if input_buckets == runtime_input_buckets {
         return target_bucket;
     }
@@ -1276,7 +1382,14 @@ fn expand_input_buckets(
     hidden: usize,
     l2: usize,
 ) -> Vec<u8> {
-    let raw = trim_checkpoint(raw, input_buckets, feature_channels, output_buckets, hidden, l2);
+    let raw = trim_checkpoint(
+        raw,
+        input_buckets,
+        feature_channels,
+        output_buckets,
+        hidden,
+        l2,
+    );
     if input_buckets == runtime_input_buckets {
         return raw;
     }
@@ -1305,43 +1418,101 @@ fn expand_input_buckets(
     expanded
 }
 
-fn latest_checkpoint(config: &Config) -> PathBuf {
-    let output = expand_path(&out_dir(config));
-    let prefix = format!("{}-", net_id(config));
-    let mut checkpoints = fs::read_dir(&output)
-        .unwrap_or_else(|err| {
-            eprintln!("error: cannot read {}: {err}", output.display());
-            process::exit(1);
-        })
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(OsStr::to_str)
-                .is_some_and(|name| name.starts_with(&prefix))
-        })
-        .map(|path| path.join("quantised.bin"))
-        .filter(|path| path.exists())
-        .collect::<Vec<_>>();
-    checkpoints.sort_by_key(|path| {
-        path.metadata()
-            .and_then(|metadata| metadata.modified())
-            .ok()
-    });
-    checkpoints.into_iter().last().unwrap_or_else(|| {
-        eprintln!("error: no quantised.bin checkpoints found under {}", output.display());
-        process::exit(1);
-    })
+fn pad_hidden_width(
+    raw: &[u8],
+    input_buckets: usize,
+    feature_channels: usize,
+    output_buckets: usize,
+    hidden: usize,
+    l2: usize,
+) -> Vec<u8> {
+    if hidden == ENYO_RUNTIME_HIDDEN {
+        return raw.to_vec();
+    }
+
+    let raw = trim_checkpoint(
+        raw,
+        input_buckets,
+        feature_channels,
+        output_buckets,
+        hidden,
+        l2,
+    );
+    let features = input_buckets * feature_channels * 64;
+    let source_l0w = features * hidden * 2;
+    let source_l0b = hidden * 2;
+    let source_l1w = 2 * hidden * l2;
+    let target_l0w = features * ENYO_RUNTIME_HIDDEN * 2;
+    let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
+    let target_l1w = 2 * ENYO_RUNTIME_HIDDEN * l2;
+    let source_tail = source_l0w + source_l0b + source_l1w;
+    let target_tail = target_l0w + target_l0b + target_l1w;
+    let mut padded = vec![0_u8; target_tail + raw.len() - source_tail];
+
+    let source_feature_bytes = hidden * 2;
+    let target_feature_bytes = ENYO_RUNTIME_HIDDEN * 2;
+    for feature in 0..features {
+        let source = feature * source_feature_bytes;
+        let target = feature * target_feature_bytes;
+        padded[target..target + source_feature_bytes]
+            .copy_from_slice(&raw[source..source + source_feature_bytes]);
+    }
+
+    padded[target_l0w..target_l0w + source_l0b]
+        .copy_from_slice(&raw[source_l0w..source_l0w + source_l0b]);
+
+    let source_l1_start = source_l0w + source_l0b;
+    let target_l1_start = target_l0w + target_l0b;
+    for row in 0..l2 {
+        let source_row = source_l1_start + row * 2 * hidden;
+        let target_row = target_l1_start + row * 2 * ENYO_RUNTIME_HIDDEN;
+        padded[target_row..target_row + hidden]
+            .copy_from_slice(&raw[source_row..source_row + hidden]);
+        padded[target_row + ENYO_RUNTIME_HIDDEN..target_row + ENYO_RUNTIME_HIDDEN + hidden]
+            .copy_from_slice(&raw[source_row + hidden..source_row + 2 * hidden]);
+    }
+
+    padded[target_tail..].copy_from_slice(&raw[source_tail..]);
+    padded
 }
 
-fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
-    if run.contains('/') || run.contains('\\') || run == "." || run == ".." {
-        eprintln!("error: continue_from must be a previous run name, not a path");
-        process::exit(2);
-    }
-    let output = expand_path(&format!("runs/{run}/checkpoints"));
-    let prefix = format!("{}-", net_id(config));
-    let entries = match fs::read_dir(&output) {
+fn write_u32_le(output: &mut [u8], offset: usize, value: u32) {
+    output[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn enyo_v2_container(
+    payload: &[u8],
+    input_buckets: usize,
+    feature_channels: usize,
+    hidden: usize,
+    l2: usize,
+    output_buckets: usize,
+) -> Vec<u8> {
+    let payload_size = u32::try_from(payload.len()).unwrap_or_else(|_| {
+        eprintln!("error: Enyo network payload is too large");
+        process::exit(1);
+    });
+    let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
+    output[..ENYO_NETWORK_HEADER_MAGIC.len()].copy_from_slice(ENYO_NETWORK_HEADER_MAGIC);
+    write_u32_le(&mut output, 8, ENYO_NETWORK_FORMAT_VERSION);
+    write_u32_le(&mut output, 12, ENYO_NETWORK_HEADER_SIZE as u32);
+    write_u32_le(&mut output, 16, input_buckets as u32);
+    write_u32_le(&mut output, 20, feature_channels as u32);
+    write_u32_le(&mut output, 24, hidden as u32);
+    write_u32_le(&mut output, 28, ENYO_RUNTIME_HIDDEN as u32);
+    write_u32_le(&mut output, 32, l2 as u32);
+    write_u32_le(&mut output, 36, 32);
+    write_u32_le(&mut output, 40, output_buckets as u32);
+    write_u32_le(&mut output, 44, 0);
+    write_u32_le(&mut output, 48, 0);
+    write_u32_le(&mut output, 52, payload_size);
+    output[ENYO_NETWORK_HEADER_SIZE..].copy_from_slice(payload);
+    output
+}
+
+fn checkpoint_dirs(output: &Path, net_id: &str) -> Vec<(usize, PathBuf)> {
+    let prefix = format!("{net_id}-");
+    let entries = match fs::read_dir(output) {
         Ok(entries) => Some(entries),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
         Err(err) => {
@@ -1356,13 +1527,55 @@ fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
         .filter_map(|path| {
             let name = path.file_name().and_then(OsStr::to_str)?;
             let superbatch = name.strip_prefix(&prefix)?.parse::<usize>().ok()?;
-            let weights = path.join("optimiser_state/weights.bin");
-            weights.exists().then_some((superbatch, weights))
+            Some((superbatch, path))
         })
         .collect::<Vec<_>>();
     checkpoints.sort_by_key(|(superbatch, _)| *superbatch);
-    if let Some((_, weights)) = checkpoints.into_iter().last() {
-        return weights;
+    checkpoints
+}
+
+fn latest_current_checkpoint(config: &Config) -> Option<(usize, PathBuf)> {
+    let output = expand_path(&out_dir(config));
+    checkpoint_dirs(&output, &net_id(config))
+        .into_iter()
+        .filter(|(_, path)| {
+            path.join("optimiser_state/weights.bin").is_file()
+                && path.join("optimiser_state/momentum.bin").is_file()
+                && path.join("optimiser_state/velocity.bin").is_file()
+                && path.join("quantised.bin").is_file()
+        })
+        .last()
+}
+
+fn latest_checkpoint(config: &Config) -> PathBuf {
+    let output = expand_path(&out_dir(config));
+    let checkpoint = checkpoint_dirs(&output, &net_id(config))
+        .into_iter()
+        .filter(|(_, path)| path.join("quantised.bin").is_file())
+        .last();
+    checkpoint
+        .map(|(_, path)| path.join("quantised.bin"))
+        .unwrap_or_else(|| {
+            eprintln!(
+                "error: no quantised.bin checkpoints found under {}",
+                output.display()
+            );
+            process::exit(1);
+        })
+}
+
+fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
+    if run.contains('/') || run.contains('\\') || run == "." || run == ".." {
+        eprintln!("error: continue_from must be a previous run name, not a path");
+        process::exit(2);
+    }
+    let output = expand_path(&format!("runs/{run}/checkpoints"));
+    if let Some((_, path)) = checkpoint_dirs(&output, &net_id(config))
+        .into_iter()
+        .filter(|(_, path)| path.join("optimiser_state/weights.bin").is_file())
+        .last()
+    {
+        return path.join("optimiser_state/weights.bin");
     }
 
     for net in [
@@ -1422,6 +1635,72 @@ fn config_sha256(config: &Config) -> Result<String, String> {
     serde_json::to_vec(&resolved)
         .map(|bytes| sha256_bytes(&bytes))
         .map_err(|err| format!("cannot serialize resolved training config: {err}"))
+}
+
+fn resume_config_sha256(config: &Config) -> Result<String, String> {
+    let mut build = config.build.clone();
+    if let Some(build) = build.as_object_mut() {
+        build.remove("superbatches");
+    }
+    let resolved = serde_json::json!({
+        "architecture": &config.arch,
+        "defaults": &config.defaults,
+        "build": build,
+    });
+    serde_json::to_vec(&resolved)
+        .map(|bytes| sha256_bytes(&bytes))
+        .map_err(|err| format!("cannot serialize resumable training config: {err}"))
+}
+
+fn resume_state_path(config: &Config) -> PathBuf {
+    expand_path(&format!("runs/{}/training.resume.json", run_name(config)))
+}
+
+fn resume_state(config: &Config) -> Result<Value, String> {
+    Ok(serde_json::json!({
+        "schema": 1,
+        "run": run_name(config),
+        "resume_config_sha256": resume_config_sha256(config)?,
+        "lr_superbatches": training_lr_superbatches(config),
+    }))
+}
+
+fn ensure_resume_state(config: &Config, has_checkpoint: bool) {
+    let path = resume_state_path(config);
+    let expected = resume_state(config).unwrap_or_else(|err| {
+        eprintln!("error: cannot resolve resume state: {err}");
+        process::exit(1);
+    });
+    if path.exists() {
+        let actual = read_provenance(&path).unwrap_or_else(|| {
+            eprintln!("error: invalid resume state: {}", path.display());
+            process::exit(1);
+        });
+        if actual != expected {
+            if !has_checkpoint {
+                write_json_atomic(&path, &expected).unwrap_or_else(|err| {
+                    eprintln!("error: cannot replace resume state: {err}");
+                    process::exit(1);
+                });
+                return;
+            }
+            eprintln!("error: checkpoint config does not match current resumable training config");
+            eprintln!("  state={}", path.display());
+            process::exit(1);
+        }
+        return;
+    }
+    if has_checkpoint {
+        eprintln!(
+            "error: refusing to resume checkpoints without {}",
+            path.display()
+        );
+        process::exit(1);
+    }
+    write_json_atomic(&path, &expected).unwrap_or_else(|err| {
+        eprintln!("error: cannot write resume state: {err}");
+        process::exit(1);
+    });
 }
 
 fn resolved_init_weights(config: &Config) -> Option<PathBuf> {
@@ -1583,6 +1862,12 @@ fn resume_training(config: &Config, force: bool) -> bool {
     if !model.is_file() && !candidate.is_file() {
         return false;
     }
+    if latest_current_checkpoint(config)
+        .is_some_and(|(superbatch, _)| superbatch < training_superbatches(config))
+    {
+        ensure_resume_state(config, true);
+        return false;
+    }
 
     let path = provenance_path(config);
     let provenance = read_provenance(&path)
@@ -1615,12 +1900,18 @@ fn resume_training(config: &Config, force: bool) -> bool {
 }
 
 fn cmd_all(config: &Config, force: bool) {
+    let extending = latest_current_checkpoint(config)
+        .is_some_and(|(superbatch, _)| superbatch < training_superbatches(config));
     if resume_training(config, force) {
         return;
     }
-    cmd_data(config);
+    if extending {
+        ensure_training_data(config);
+    } else {
+        cmd_data(config);
+    }
     cmd_run(config);
-    cmd_export(config, force);
+    cmd_export(config, force || extending);
     write_training_provenance(config).unwrap_or_else(|err| {
         eprintln!("error: cannot write training provenance: {err}");
         process::exit(1);
@@ -1636,15 +1927,39 @@ fn write_model(config: &Config) {
     });
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
+    let feature_channels = usize_at(&config.arch, "feature_channels", 12);
+    let output_buckets = usize_at(&config.arch, "output_buckets", 1);
+    let hidden = usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN);
+    let l2 = usize_at(&config.arch, "l2_size", 16);
     let model = expand_input_buckets(
         &raw,
         input_buckets,
-        usize_at(&config.arch, "feature_channels", 12),
+        feature_channels,
         runtime_input_buckets,
-        usize_at(&config.arch, "output_buckets", 1),
-        usize_at(&config.arch, "hidden", 1024),
-        usize_at(&config.arch, "l2_size", 16),
+        output_buckets,
+        hidden,
+        l2,
     );
+    let model = pad_hidden_width(
+        &model,
+        runtime_input_buckets,
+        feature_channels,
+        output_buckets,
+        hidden,
+        l2,
+    );
+    let model = if string_at(&config.arch, "export_format") == Some("enyo-native-v2") {
+        enyo_v2_container(
+            &model,
+            runtime_input_buckets,
+            feature_channels,
+            hidden,
+            l2,
+            output_buckets,
+        )
+    } else {
+        model
+    };
     let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
     if let Some(parent) = model_path.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
@@ -1702,6 +2017,7 @@ mod tests {
             "batches": 64,
             "batch_size": 2048,
             "superbatches": 7600,
+            "lr_superbatches": 0,
             "threads": 16,
             "wdl": 0.3,
             "lr": 0.001,
@@ -1732,10 +2048,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let path = env::temp_dir().join(format!(
-            "enyo-train-{name}-{}-{nonce}",
-            process::id()
-        ));
+        let path = env::temp_dir().join(format!("enyo-train-{name}-{}-{nonce}", process::id()));
         fs::create_dir_all(&path).expect("create test directory");
         path
     }
@@ -1749,6 +2062,7 @@ mod tests {
             "batches": 32,
             "batch_size": 4096,
             "superbatches": 3800,
+            "lr_superbatches": 12000,
             "threads": 8,
             "wdl": 0.25,
             "lr": 0.0005,
@@ -1765,6 +2079,7 @@ mod tests {
         assert_eq!(training_batches(&config), 32);
         assert_eq!(training_batch_size(&config), 4096);
         assert_eq!(training_superbatches(&config), 3800);
+        assert_eq!(training_lr_superbatches(&config), 12000);
         assert_eq!(training_threads(&config), 8);
         assert_eq!(training_wdl(&config), 0.25);
         assert_eq!(training_lr(&config), 0.0005);
@@ -1772,6 +2087,17 @@ mod tests {
         assert_eq!(training_save_rate(&config), 1900);
         assert_eq!(training_trainable(&config), "output");
         assert_eq!(training_weight_decay(&config), 0.00001);
+    }
+
+    #[test]
+    fn zero_lr_schedule_uses_training_stop() {
+        let config = config(json!({
+            "run": "candidate",
+            "superbatches": 16384,
+            "data": {"source_binpack": "data.binpack", "limit": 100}
+        }));
+
+        assert_eq!(training_lr_superbatches(&config), 16384);
     }
 
     #[test]
@@ -1938,24 +2264,14 @@ mod tests {
             "continue_from": "parent",
             "data": {"source_binpack": "data.binpack", "limit": 100}
         }));
-        let provenance = training_provenance(
-            &config,
-            Some(&init),
-            &trainer,
-            &model,
-            &candidate,
-        )
-        .expect("create provenance");
+        let provenance = training_provenance(&config, Some(&init), &trainer, &model, &candidate)
+            .expect("create provenance");
         write_json_atomic(&manifest, &provenance).expect("write provenance");
         let loaded = read_provenance(&manifest).expect("read provenance");
         let inputs = training_inputs(&config, Some(&init), &trainer).expect("hash inputs");
 
         assert!(provenance_inputs_match(&loaded, "candidate", &inputs));
-        assert!(provenance_artifact_matches(
-            &loaded,
-            "model_sha256",
-            &model
-        ));
+        assert!(provenance_artifact_matches(&loaded, "model_sha256", &model));
         assert!(provenance_artifact_matches(
             &loaded,
             "candidate_sha256",
@@ -1978,6 +2294,85 @@ mod tests {
         ));
 
         fs::remove_dir_all(dir).expect("remove test directory");
+    }
+
+    #[test]
+    fn resume_hash_ignores_only_training_stop() {
+        let first = config(json!({
+            "run": "candidate",
+            "superbatches": 16384,
+            "lr_superbatches": 65536,
+            "data": {"source_binpack": "data.bullet", "limit": 0}
+        }));
+        let mut extended = first.clone();
+        extended.build["superbatches"] = json!(65536);
+        assert_eq!(
+            resume_config_sha256(&first).expect("first hash"),
+            resume_config_sha256(&extended).expect("extended hash")
+        );
+
+        extended.build["lr"] = json!(0.0005);
+        assert_ne!(
+            resume_config_sha256(&first).expect("first hash"),
+            resume_config_sha256(&extended).expect("changed hash")
+        );
+    }
+
+    #[test]
+    fn narrow_hidden_padding_preserves_l1_perspectives() {
+        let input_buckets = 1;
+        let feature_channels = 1;
+        let output_buckets = 1;
+        let hidden = 2;
+        let l2 = 1;
+        let size = enyo_network_size(input_buckets, feature_channels, output_buckets, hidden, l2);
+        let mut raw = vec![0_u8; size];
+        let source_l0w = input_buckets * feature_channels * 64 * hidden * 2;
+        let source_l0b = hidden * 2;
+        let source_l1 = source_l0w + source_l0b;
+        raw[source_l1..source_l1 + 2 * hidden].copy_from_slice(&[1, 2, 3, 4]);
+
+        let padded = pad_hidden_width(
+            &raw,
+            input_buckets,
+            feature_channels,
+            output_buckets,
+            hidden,
+            l2,
+        );
+        let target_l0w = input_buckets * feature_channels * 64 * ENYO_RUNTIME_HIDDEN * 2;
+        let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
+        let target_l1 = target_l0w + target_l0b;
+        assert_eq!(&padded[target_l1..target_l1 + hidden], &[1, 2]);
+        assert_eq!(
+            &padded[target_l1 + ENYO_RUNTIME_HIDDEN..target_l1 + ENYO_RUNTIME_HIDDEN + hidden],
+            &[3, 4]
+        );
+    }
+
+    #[test]
+    fn versioned_header_records_trained_architecture() {
+        let payload = vec![7_u8; 32];
+        let container = enyo_v2_container(&payload, 10, 11, 768, 16, 8);
+        assert_eq!(&container[..8], ENYO_NETWORK_HEADER_MAGIC);
+        assert_eq!(
+            u32::from_le_bytes(container[16..20].try_into().unwrap()),
+            10
+        );
+        assert_eq!(
+            u32::from_le_bytes(container[20..24].try_into().unwrap()),
+            11
+        );
+        assert_eq!(
+            u32::from_le_bytes(container[24..28].try_into().unwrap()),
+            768
+        );
+        assert_eq!(u32::from_le_bytes(container[40..44].try_into().unwrap()), 8);
+        assert_eq!(
+            u32::from_le_bytes(container[52..56].try_into().unwrap()),
+            32
+        );
+        assert_eq!(&container[ENYO_NETWORK_HEADER_SIZE..], payload);
     }
 }
 

@@ -112,6 +112,18 @@ const ENYO_KING_BUCKETS_16: [usize; 64] = [
 ];
 
 #[rustfmt::skip]
+const ENYO_KING_BUCKETS_10: [usize; 64] = [
+     9,  9,  8,  8,  8,  8,  9,  9,
+     9,  9,  8,  8,  8,  8,  9,  9,
+     8,  8,  7,  7,  7,  7,  8,  8,
+     8,  8,  7,  7,  7,  7,  8,  8,
+     6,  6,  5,  5,  5,  5,  6,  6,
+     6,  6,  5,  5,  5,  5,  6,  6,
+     4,  3,  3,  2,  2,  3,  3,  4,
+     1,  1,  0,  0,  0,  0,  1,  1,
+];
+
+#[rustfmt::skip]
 const ENYO_KING_BUCKETS_32: [usize; 64] = [
     31, 30, 29, 28, 28, 29, 30, 31,
     27, 26, 25, 24, 24, 25, 26, 27,
@@ -126,6 +138,7 @@ const ENYO_KING_BUCKETS_32: [usize; 64] = [
 fn enyo_bucket<const INPUT_BUCKETS: usize>(oriented_king_square: usize) -> usize {
     match INPUT_BUCKETS {
         1 | 2 | 4 | 8 | 16 => ENYO_KING_BUCKETS_16[oriented_king_square] * INPUT_BUCKETS / 16,
+        10 => ENYO_KING_BUCKETS_10[oriented_king_square],
         32 => ENYO_KING_BUCKETS_32[oriented_king_square],
         _ => panic!("unsupported Enyo input bucket count: {INPUT_BUCKETS}"),
     }
@@ -203,21 +216,11 @@ mod tests {
     use super::*;
 
     fn stm_feature(piece: u8, square: u8, own_king: u8) -> usize {
-        enyo_feature::<16, 12>(
-            piece,
-            bullet_square_to_enyo_net(square),
-            own_king ^ 56,
-            0,
-        )
+        enyo_feature::<16, 12>(piece, bullet_square_to_enyo_net(square), own_king ^ 56, 0)
     }
 
     fn ntm_feature(piece: u8, square: u8, opp_king: u8) -> usize {
-        enyo_feature::<16, 12>(
-            piece,
-            bullet_square_to_enyo_net(square),
-            opp_king ^ 56,
-            1,
-        )
+        enyo_feature::<16, 12>(piece, bullet_square_to_enyo_net(square), opp_king ^ 56, 1)
     }
 
     #[test]
@@ -228,10 +231,25 @@ mod tests {
         assert_eq!(stm_feature(8, 52, 4), 396); // black pawn e7, white view
         assert_eq!(ntm_feature(8, 52, 60), 52); // black pawn e7, black view
     }
+
+    #[test]
+    fn ten_bucket_layout_uses_every_enyo_bucket() {
+        let mut used = [false; 10];
+        for square in 0..64 {
+            let bucket = enyo_bucket::<10>(square);
+            assert_eq!(bucket, ENYO_KING_BUCKETS_10[square]);
+            used[bucket] = true;
+        }
+        assert!(used.into_iter().all(|value| value));
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const OUTPUT_BUCKETS: usize>(
+fn train_enyo<
+    const INPUT_BUCKETS: usize,
+    const FEATURE_CHANNELS: usize,
+    const OUTPUT_BUCKETS: usize,
+>(
     dataset: String,
     output: String,
     net_id: String,
@@ -239,7 +257,9 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
     l2_size: usize,
     batch_size: usize,
     batches_per_superbatch: usize,
+    start_superbatch: usize,
     end_superbatch: usize,
+    lr_superbatches: usize,
     threads: usize,
     wdl_proportion: f32,
     initial_lr: f32,
@@ -253,23 +273,28 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
     trainable: String,
     weight_decay: f32,
 ) {
-    if !matches!(hidden, 1024 | 1280) || l2_size != 16 {
-        panic!(
-            "Enyo mode supports native layout hidden=1024 or 1280 with l2=16; \
-             engine parity/NPS support is required before using non-1024 nets"
-        );
+    if !matches!(hidden, 512 | 768 | 1024) || l2_size != 16 {
+        panic!("Enyo mode supports hidden=512, 768, or 1024 with l2=16");
     }
-    if !matches!(INPUT_BUCKETS, 1 | 2 | 4 | 8 | 16 | 32) {
-        panic!("Enyo mode supports only 1, 2, 4, 8, 16, or 32 input king buckets");
+    if !matches!(INPUT_BUCKETS, 1 | 2 | 4 | 8 | 10 | 16 | 32) {
+        panic!("Enyo mode supports only 1, 2, 4, 8, 10, 16, or 32 input king buckets");
     }
     if !matches!(FEATURE_CHANNELS, 11 | 12) {
         panic!("Enyo mode supports only 11 or 12 feature channels");
     }
-    if FEATURE_CHANNELS == 11 && INPUT_BUCKETS != 32 {
-        panic!("11-channel Enyo mode requires 32 input king buckets");
+    if FEATURE_CHANNELS == 11 && !matches!(INPUT_BUCKETS, 10 | 16 | 32) {
+        panic!("11-channel Enyo mode requires 10, 16, or 32 input king buckets");
     }
     if !matches!(OUTPUT_BUCKETS, 1 | 2 | 4 | 8) {
         panic!("Enyo mode supports only 1, 2, 4, or 8 output buckets");
+    }
+    if start_superbatch == 0 || start_superbatch > end_superbatch {
+        panic!("invalid superbatch range {start_superbatch}..={end_superbatch}");
+    }
+    if lr_superbatches < end_superbatch {
+        panic!(
+            "LR schedule ends at superbatch {lr_superbatches}, before training ends at {end_superbatch}"
+        );
     }
 
     println!("mode=enyo");
@@ -289,7 +314,9 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
     println!("trainable={trainable}");
     println!("weight_decay={weight_decay}");
     println!(
-        "batch_size={batch_size} batches_per_superbatch={batches_per_superbatch} superbatches={end_superbatch}"
+        "batch_size={batch_size} batches_per_superbatch={batches_per_superbatch} \
+         start_superbatch={start_superbatch} end_superbatch={end_superbatch} \
+         lr_superbatches={lr_superbatches}"
     );
 
     let train_input = trainable == "all" || trainable == "input";
@@ -297,6 +324,7 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
     let train_l2 = trainable == "all" || trainable == "float-head";
     let train_l3 = trainable == "all" || trainable == "float-head" || trainable == "output";
     let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
+    let resume_checkpoint = env_string("ENYO_BULLET_RESUME_CHECKPOINT", "");
     let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
 
     macro_rules! l0w_format {
@@ -357,11 +385,21 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
     macro_rules! enyo_forward {
         ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr) => {{
             let mut l0 = maybe_frozen($builder, !train_input, || {
-                enyo_affine($builder, "l0", INPUT_BUCKETS * FEATURE_CHANNELS * 64, hidden, l0_stdev)
+                enyo_affine(
+                    $builder,
+                    "l0",
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64,
+                    hidden,
+                    l0_stdev,
+                )
             });
             if input_factoriser {
                 let l0f = maybe_frozen($builder, !train_input, || {
-                    $builder.new_weights("l0f", Shape::new(hidden, FEATURE_CHANNELS * 64), InitSettings::Zeroed)
+                    $builder.new_weights(
+                        "l0f",
+                        Shape::new(hidden, FEATURE_CHANNELS * 64),
+                        InitSettings::Zeroed,
+                    )
                 });
                 l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
             }
@@ -449,7 +487,13 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
                 );
             }
 
-            if !init_weights.is_empty() {
+            if !resume_checkpoint.is_empty() {
+                if !init_weights.is_empty() {
+                    panic!("checkpoint resume and initial weights are mutually exclusive");
+                }
+                trainer.load_from_checkpoint(&resume_checkpoint);
+                println!("loaded_checkpoint={resume_checkpoint}");
+            } else if !init_weights.is_empty() {
                 trainer
                     .optimiser
                     .load_weights_from_file(&init_weights)
@@ -470,7 +514,7 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
                 steps: TrainingSteps {
                     batch_size,
                     batches_per_superbatch,
-                    start_superbatch: 1,
+                    start_superbatch,
                     end_superbatch,
                 },
                 wdl_scheduler: wdl::ConstantWDL {
@@ -479,7 +523,7 @@ fn train_enyo<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const O
                 lr_scheduler: lr::CosineDecayLR {
                     initial_lr,
                     final_lr,
-                    final_superbatch: end_superbatch,
+                    final_superbatch: lr_superbatches,
                 },
                 save_rate,
             };
@@ -538,7 +582,9 @@ fn main() {
     let l2_size = env_parse("ENYO_BULLET_L2", 16usize);
     let batch_size = env_parse("ENYO_BULLET_BATCH_SIZE", 2048usize);
     let batches_per_superbatch = env_parse("ENYO_BULLET_BATCHES", 64usize);
+    let start_superbatch = env_parse("ENYO_BULLET_START_SUPERBATCH", 1usize);
     let end_superbatch = env_parse("ENYO_BULLET_SUPERBATCHES", 2048usize);
+    let lr_superbatches = env_parse("ENYO_BULLET_LR_SUPERBATCHES", end_superbatch);
     let threads = env_parse("ENYO_BULLET_THREADS", 4usize);
     let wdl_proportion = env_parse("ENYO_BULLET_WDL", 0.75f32);
     let initial_lr = env_parse("ENYO_BULLET_LR", 0.001f32);
@@ -566,7 +612,9 @@ fn main() {
                     l2_size,
                     batch_size,
                     batches_per_superbatch,
+                    start_superbatch,
                     end_superbatch,
+                    lr_superbatches,
                     threads,
                     wdl_proportion,
                     initial_lr,
@@ -602,8 +650,11 @@ fn main() {
             (2, 12) => run_enyo_layout!(2, 12),
             (4, 12) => run_enyo_layout!(4, 12),
             (8, 12) => run_enyo_layout!(8, 12),
+            (10, 12) => run_enyo_layout!(10, 12),
             (16, 12) => run_enyo_layout!(16, 12),
             (32, 12) => run_enyo_layout!(32, 12),
+            (10, 11) => run_enyo_layout!(10, 11),
+            (16, 11) => run_enyo_layout!(16, 11),
             (32, 11) => run_enyo_layout!(32, 11),
             _ => panic!(
                 "unsupported Enyo input layout: buckets={enyo_input_buckets} \
