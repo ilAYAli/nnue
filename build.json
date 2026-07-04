@@ -1,6 +1,6 @@
 {
-  "run": "enyo-16x12-1024-o8",
-  "hypothesis": "Stage 2 control: random-init 16 input buckets, 12 feature channels, hidden 1024, 8 output buckets",
+  "run": "enyo-16x12-1024-o4",
+  "hypothesis": "Stage 2 candidate: reduce output buckets from 8 to 4 while holding the scratch training protocol fixed",
   "superbatches": 16384,
   "lr_superbatches": 65536,
   "save_rate": 16384,
