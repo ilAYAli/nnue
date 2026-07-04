@@ -4,32 +4,18 @@
 
 Current: **Stage 6 - incremental improvement**
 
-- Champion: `enyo-scratch-broad-1.0.0-rc1` using the
+- Champion: `enyo-scratch-broad-1.5.0-rc1` using the
   `16x12x1024-o8` architecture.
-- The full `enyo-10x11-768-o8` candidate scored `-4.9 +/-19.9` Elo
-  against the champion over 1,000 games and was not promoted.
-- Output-only calibration was rejected at `-8.6 +/-15.2` Elo over
-  1,500 games.
-- Float-head calibration passed at `+1.2 +/-15.2` Elo over 1,500 games
-  and is the new parent.
-- A full 1,024-superbatch float-head pass on the second disjoint slice was
-  rejected at `-16.2 +/-15.6` Elo over 1,500 games.
-- Reducing the dose to 256 superbatches improved the result to `-1.4 +/-15.0`
-  Elo, but the candidate was still rejected.
-- Reducing the dose to 128 superbatches promoted the second-slice candidate at
-  `+8.1 +/-15.2` Elo; `enyo-scratch-broad-1.2.0-rc3` is the new parent.
-- The same 128-superbatch regimen on the third slice was rejected at
-  `-20.4 +/-15.3` Elo.
-- Reducing the third-slice dose to 64 superbatches was also rejected at
-  `-18.5 +/-15.3` Elo, confirming that slice as harmful for this regimen.
-- The fourth slice promoted at `+2.6 +/-14.9` Elo, but with only `0.06` LLR.
-- Its fixed default-net checkpoint was `-215.4 +/-58.0` Elo, nominally better
-  than the scratch baseline but still inconclusive.
-- The next float-head slice was rejected at `-3.9 +/-14.7` Elo.
-- Close float-head slice continuation; it is producing small, inconsistent
-  changes and cannot plausibly close the remaining absolute gap.
-- Next experiment: reuse that rejected fifth slice and change only
-  `trainable` from `float-head` to `input`.
+- The 128-superbatch float-head lane produced two promotions but inconsistent
+  slice results.
+- Input-only training then promoted twice at `+2.3` and `+5.3` Elo before a
+  `+0.5` Elo candidate was rejected on negative LLR.
+- The latest fixed default-net checkpoint was `-215.4 +/-58.0` Elo.
+- Close short block-coordinate updates; they refine the net but cannot
+  plausibly close the remaining absolute gap.
+- Next: train `enyo-scratch-long-1.0.0-rc1` from random initialization on the
+  same architecture, 2.8B-position pylon corpus, WDL, and LR endpoints for
+  196,608 superbatches, about 9.2 corpus epochs.
 
 Completed stages:
 
@@ -180,8 +166,20 @@ full baseline remains champion; default-net and Berserk tests were not run.
 - Preserve a successful regimen and advance only the data slice.
 - Run the fixed default-net benchmark periodically to measure absolute progress.
 
-Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
-20-30 minutes when a default-net benchmark is due.
+Gap-closing sequence:
+
+1. Train the current architecture from scratch for 196,608 superbatches at
+   WDL 0.05 on the existing 2.8B-position pylon Bullet corpus.
+2. If rejected, repeat that scratch protocol while changing only WDL to 0.30.
+3. If rejected, repeat the winning objective while changing only to the best
+   alternate Stockfish corpus.
+
+Each candidate is gated for 1,500 games against the current champion. A
+promoted candidate receives the fixed default-net benchmark before further
+fine-tuning. Revisit architecture only if these recipe tests fail.
+
+Expected time for the long scratch candidate is about 2.5-3 hours of training
+plus its gates and 1,500-game SPRT.
 
 ## Experiment ledger
 
@@ -207,6 +205,12 @@ Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
 - Its 500-game default-net checkpoint scored `-215.4 +/-58.0` Elo.
 - `enyo-scratch-broad-1.4.0-rc1` applied the same regimen to the fifth slice
   and was rejected at `-3.9 +/-14.7` Elo.
+- `enyo-scratch-broad-1.4.0-rc2` switched the fifth slice to input-only
+  training and was promoted at `+2.3 +/-14.9` Elo.
+- `enyo-scratch-broad-1.5.0-rc1` continued input-only training and was
+  promoted at `+5.3 +/-15.1` Elo.
+- `enyo-scratch-broad-1.6.0-rc1` was rejected at `+0.5 +/-14.8` Elo because
+  its LLR was slightly negative.
 - `enyo-scratch-32bucket-1.0.0-rc1` changed only 16 to 32 input buckets and was
   rejected at -6.3 +/-15.0 Elo over 1,500 games. Do not promote or retrain that
   exact architecture in Stage 2.
