@@ -10,8 +10,10 @@ Current: **Stage 6 - incremental improvement**
   against the champion over 1,000 games and was not promoted.
 - Output-only calibration was rejected at `-8.6 +/-15.2` Elo over
   1,500 games.
-- Next experiment: change only `trainable` to `float-head`, holding the
-  champion, corpus, 1,024-superbatch dose, `5e-5` LR, and WDL fixed.
+- Float-head calibration passed at `+1.2 +/-15.2` Elo over 1,500 games
+  and is the new parent.
+- Next experiment: preserve that regimen on the next disjoint
+  134,217,728-position pylon slice.
 
 Completed stages:
 
