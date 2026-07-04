@@ -14,8 +14,10 @@ Current: **Stage 6 - incremental improvement**
   and is the new parent.
 - A full 1,024-superbatch float-head pass on the second disjoint slice was
   rejected at `-16.2 +/-15.6` Elo over 1,500 games.
+- Reducing the dose to 256 superbatches improved the result to `-1.4 +/-15.0`
+  Elo, but the candidate was still rejected.
 - Next experiment: retry that second slice while changing only the dose from
-  1,024 to 256 superbatches.
+  256 to 128 superbatches.
 
 Completed stages:
 
@@ -180,6 +182,8 @@ Expected cycle time is 30-45 minutes per normal train/gate/SPRT iteration, plus
 - `enyo-scratch-broad-1.2.0-rc1` was rejected at `-16.2 +/-15.6` Elo after
   applying the same 1,024-superbatch float-head regimen to the second disjoint
   134,217,728-position slice.
+- `enyo-scratch-broad-1.2.0-rc2` reduced the same slice to 256 superbatches
+  and was rejected at `-1.4 +/-15.0` Elo over 1,500 games.
 - `enyo-scratch-32bucket-1.0.0-rc1` changed only 16 to 32 input buckets and was
   rejected at -6.3 +/-15.0 Elo over 1,500 games. Do not promote or retrain that
   exact architecture in Stage 2.
