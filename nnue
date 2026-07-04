@@ -165,7 +165,9 @@ load_config() {
   candidate_net="$HOME/assets/nets/$run.nn"
   data_file=$(jq -r --arg run "$run" '
     .data.bullet_output
-    // (if ((.data.source_binpack // "") | endswith(".bullet"))
+    // (if (((.data.source_binpack // "") | endswith(".bullet"))
+            and ((.data.offset // 0) == 0)
+            and ((.data.limit // 0) == 0))
         then .data.source_binpack
         else ("data/bullet/" + $run + ".bullet")
         end)
