@@ -880,14 +880,22 @@ run_default_net_checkpoint_if_due() {
     jq -s -e --arg candidate "$candidate" 'any(.candidate == $candidate)' \
       "$DEFAULT_NET_LEDGER" >/dev/null && return 0
 
-    checkpoint=$(tail -n 1 "$DEFAULT_NET_LEDGER" | jq -r '.candidate // empty')
-    checkpoint_commit=$(git log -1 --format=%H --fixed-strings \
-      --grep="$checkpoint.nn: Elo ")
-    [[ -n "$checkpoint_commit" ]] \
-      || fail "cannot find benchmarked promotion: $checkpoint" default_net_sprt
-    count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' \
-      "$checkpoint_commit..HEAD")
-    (( count >= DEFAULT_NET_EVERY )) || return 0
+    checkpoint_commit=
+    while IFS= read -r checkpoint; do
+      [[ -n "$checkpoint" ]] || continue
+      checkpoint_commit=$(git log -1 --format=%H --fixed-strings \
+        --grep="$checkpoint.nn: Elo ")
+      [[ -z "$checkpoint_commit" ]] || break
+    done < <(jq -r '.candidate // empty' "$DEFAULT_NET_LEDGER" | tac)
+
+    if [[ -n "$checkpoint_commit" ]]; then
+      count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' \
+        "$checkpoint_commit..HEAD")
+      (( count >= DEFAULT_NET_EVERY )) || return 0
+    else
+      count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' HEAD)
+      (( count > 0 && count % DEFAULT_NET_EVERY == 0 )) || return 0
+    fi
   else
     count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' HEAD)
     (( count > 0 && count % DEFAULT_NET_EVERY == 0 )) || return 0
