@@ -1,14 +1,13 @@
 {
-  "run": "enyo-scratch-broad-1.6.0-rc1",
-  "continue_from": "enyo-scratch-broad-1.5.0-rc1",
-  "hypothesis": "switch the rejected fifth 134217728-position pylon slice from float-head to input-only training",
-  "superbatches": 128,
-  "lr": 0.00005,
+  "run": "enyo-scratch-long-1.0.0-rc1",
+  "reference": "enyo-scratch-broad-1.5.0-rc1",
+  "hypothesis": "random-init nine-epoch control with the proven architecture, pylon corpus, WDL, and LR endpoints",
+  "superbatches": 196608,
   "wdl": 0.05,
-  "trainable": "input",
+  "sfbinpack": {
+    "min_ply": 24
+  },
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
-    "limit": 134217728,
-    "offset": 805306368
+    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   }
 }
