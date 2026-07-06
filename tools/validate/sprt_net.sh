@@ -3,9 +3,10 @@ set -euo pipefail
 
 (( $# >= 1 )) || { echo "Usage: $0 <candidate_net> [reference_net] [games]" >&2; exit 1; }
 
-CANDIDATE=${CANDIDATE:-enyo_7483c1c}
+STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
+CANDIDATE=${CANDIDATE:-candidate}
 CANDIDATE_NET="~/assets/nets/$(basename "$1")"
-REFERENCE_NET="~/assets/nets/$(basename "${2:-default.net}")"
+REFERENCE_NET="~/assets/nets/$(basename "${2:-$STOCKFISH_NET}")"
 GAMES=${3:-500}
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
 RUN="sprt-$CANDIDATE-$GAMES-$(date +%Y%m%d-%H%M%S)"
@@ -15,7 +16,6 @@ LEDGER=
 SPRT_ARGS=()
 
 case "$REFERENCE" in
-    default.net) LEDGER=default-net.jsonl ;;
     *.nnue)      LEDGER=stockfish-net.jsonl ;;
 esac
 

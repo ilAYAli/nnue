@@ -165,12 +165,12 @@ def main() -> int:
                     help="Architecture config passed to tools/bullet/train.")
     ap.add_argument("--defaults", default="defaults.json",
                     help="Training defaults passed to tools/bullet/train.")
-    ap.add_argument("--engine", default="~/assets/engines/enyo_91ede5f",
+    ap.add_argument("--engine", default="~/assets/engines/candidate",
                     help="Engine binary used for startpos, move gate, and SPRT.")
     ap.add_argument("--candidate-net",
                     help="Candidate .nn path. Defaults to ~/assets/nets/<run>.nn.")
     ap.add_argument("--reference-net",
-                    help="Reference .nn path. Defaults to previous run, then default.net.")
+                    help="Reference net path. Defaults to previous run, then nn-0ee0657fb25e.nnue.")
     ap.add_argument("--cases", default=DEFAULT_CASES,
                     help="Move-gate JSONL cases.")
     ap.add_argument("--rows", type=int, default=50000,
@@ -223,7 +223,7 @@ def main() -> int:
     candidate_net = expand_path(args.candidate_net or f"~/assets/nets/{run}.nn")
     reference_net = expand_path(
         args.reference_net
-        or (f"~/assets/nets/{previous}.nn" if previous else "~/code/cpp/chess/enyo/net/default.net")
+        or (f"~/assets/nets/{previous}.nn" if previous else "~/assets/nets/nn-0ee0657fb25e.nnue")
     )
     data_cfg = build.get("data", {})
     data_file = expand_path(str(data_cfg.get("bullet_output", f"data/bullet/{run}.bullet")))
