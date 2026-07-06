@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.0.0-rc1",
+  "run": "enyo-1.1.0-rc1",
   "hypothesis": "halve the long continuation dose after the previous full pass gained only 7.4 Elo",
   "superbatches": 98304,
   "wdl": 0.05,
@@ -9,5 +9,5 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-scratch-long-1.5.0-rc1"
+  "continue_from": "enyo-1.0.0-rc1"
 }
