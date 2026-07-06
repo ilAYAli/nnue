@@ -94,13 +94,13 @@ class NnueRunTests(unittest.TestCase):
             home.mkdir()
             proc = self.run_sourced(
                 f"HOME={shlex.quote(str(home))}; "
-                "net_for_name_or_path '~/assets/nets/default.net'"
+                "net_for_name_or_path '~/assets/nets/nn-0ee0657fb25e.nnue'"
             )
 
             self.assertEqual("", proc.stderr)
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
-                f"{home}/assets/nets/default.net\n",
+                f"{home}/assets/nets/nn-0ee0657fb25e.nnue\n",
                 proc.stdout,
             )
 
@@ -216,7 +216,7 @@ printf 'data=%s\n' "$data_file"
             nets = home / "assets" / "nets"
             nets.mkdir(parents=True)
             (nets / "uho-native-1.0.42.nn").write_bytes(b"parent")
-            (nets / "default.net").write_bytes(b"default")
+            (nets / "nn-0ee0657fb25e.nnue").write_bytes(b"stockfish")
             build = tmp / "build.json"
             build.write_text(
                 '{"run":"uho-native-1.0.43","continue_from":"uho-native-1.0.42"}\n',
@@ -237,7 +237,7 @@ printf 'net=%s\n' "$reference_net"
                 "BUILD": str(build),
                 "HOME": str(home),
                 "NNUE_NTFY": "0",
-                "REFERENCE_NET": "~/assets/nets/default.net",
+                "REFERENCE_NET": "~/assets/nets/nn-0ee0657fb25e.nnue",
             })
 
             proc = subprocess.run(
@@ -252,7 +252,7 @@ printf 'net=%s\n' "$reference_net"
 
             self.assertEqual("", proc.stderr)
             self.assertEqual(
-                f"label=~/assets/nets/default.net\nnet={nets}/default.net\n",
+                f"label=~/assets/nets/nn-0ee0657fb25e.nnue\nnet={nets}/nn-0ee0657fb25e.nnue\n",
                 proc.stdout,
             )
 
@@ -636,10 +636,10 @@ train
         self.assertEqual(0, proc.returncode)
         self.assertEqual("native-3.1.0-rc1\n", proc.stdout)
 
-    def test_default_net_checkpoint_runs_after_three_promotions_once(self) -> None:
+    def test_stockfish_net_checkpoint_runs_after_three_promotions_once(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
-            ledger = tmp / "default-net.jsonl"
+            ledger = tmp / "stockfish-net.jsonl"
             trace = tmp / "trace"
             ledger.write_text(
                 '{"candidate":"native-1.0.0-rc1"}\n'
@@ -651,9 +651,9 @@ train
                 f"""
 NNUE_NTFY=0
 HOME={shlex.quote(str(tmp))}
-DEFAULT_NET_LEDGER={shlex.quote(str(ledger))}
-DEFAULT_NET_EVERY=3
-DEFAULT_NET_GAMES=1000
+STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
+STOCKFISH_NET_EVERY=3
+STOCKFISH_NET_GAMES=1000
 QSPRT=qsprt_mock
 TRACE={shlex.quote(str(trace))}
 PROMOTIONS=2
@@ -668,13 +668,13 @@ git() {{
 }}
 qsprt_mock() {{
   printf '%s\\n' "$*" >> "$TRACE"
-  printf '{{"candidate":"native-1.3.0-rc1"}}\\n' >> "$DEFAULT_NET_LEDGER"
+  printf '{{"candidate":"native-1.3.0-rc1"}}\\n' >> "$STOCKFISH_NET_LEDGER"
 }}
-run_default_net_checkpoint_if_due
+run_stockfish_net_checkpoint_if_due
 [[ ! -e "$TRACE" ]]
 PROMOTIONS=3
-run_default_net_checkpoint_if_due
-run_default_net_checkpoint_if_due
+run_stockfish_net_checkpoint_if_due
+run_stockfish_net_checkpoint_if_due
 """
             )
 
@@ -682,21 +682,21 @@ run_default_net_checkpoint_if_due
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
                 f"{tmp}/assets/nets/native-1.3.0-rc1.nn "
-                f"{tmp}/assets/nets/default.net 1000\n",
+                f"{tmp}/assets/nets/nn-0ee0657fb25e.nnue 1000\n",
                 trace.read_text(encoding="utf-8"),
             )
 
-    def test_default_net_checkpoint_propagates_qsprt_failure(self) -> None:
+    def test_stockfish_net_checkpoint_propagates_qsprt_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
-            ledger = tmp / "default-net.jsonl"
+            ledger = tmp / "stockfish-net.jsonl"
             ledger.write_text('{"candidate":"native-1.0.0-rc1"}\n', encoding="utf-8")
 
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
-DEFAULT_NET_LEDGER={shlex.quote(str(ledger))}
-DEFAULT_NET_EVERY=3
+STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
+STOCKFISH_NET_EVERY=3
 QSPRT=qsprt_mock
 git() {{
   if [[ "$1" == rev-list ]]; then
@@ -708,7 +708,7 @@ git() {{
   fi
 }}
 qsprt_mock() {{ return 9; }}
-run_default_net_checkpoint_if_due
+run_stockfish_net_checkpoint_if_due
 """
             )
 
@@ -729,7 +729,7 @@ run_default_net_checkpoint_if_due
                     "run": "native-2.0.0-rc1",
                     "lineage": "native",
                     "continue_from": "native-2.0.0-rc0",
-                    "reference": "~/assets/nets/default.net",
+                    "reference": "~/assets/nets/nn-0ee0657fb25e.nnue",
                     "hypothesis": "fresh scratch candidate",
                     "data": {
                         "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",

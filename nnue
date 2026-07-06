@@ -42,9 +42,10 @@ GAMES=${GAMES:-3000}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
-DEFAULT_NET_EVERY=${DEFAULT_NET_EVERY:-3}
-DEFAULT_NET_GAMES=${DEFAULT_NET_GAMES:-500}
-DEFAULT_NET_LEDGER=${DEFAULT_NET_LEDGER:-benchmarks/default-net.jsonl}
+STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
+STOCKFISH_NET_EVERY=${STOCKFISH_NET_EVERY:-3}
+STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-500}
+STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
 QSPRT=${QSPRT:-tools/validate/sprt_net.sh}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 SPRT_ELO1=${SPRT_ELO1:-3.0}
@@ -870,17 +871,17 @@ print_summary() {
   echo "summary_file=$summary_file"
 }
 
-run_default_net_checkpoint_if_due() {
-  (( DEFAULT_NET_EVERY > 0 )) || return 0
+run_stockfish_net_checkpoint_if_due() {
+  (( STOCKFISH_NET_EVERY > 0 )) || return 0
 
   local candidate checkpoint checkpoint_commit count
   candidate=$(git log -1 --format=%s --extended-regexp --grep='^.+\.nn: Elo ')
   candidate=${candidate%%.nn: Elo *}
   [[ -n "$candidate" ]] || return 0
 
-  if [[ -s "$DEFAULT_NET_LEDGER" ]]; then
+  if [[ -s "$STOCKFISH_NET_LEDGER" ]]; then
     jq -s -e --arg candidate "$candidate" 'any(.candidate == $candidate)' \
-      "$DEFAULT_NET_LEDGER" >/dev/null && return 0
+      "$STOCKFISH_NET_LEDGER" >/dev/null && return 0
 
     checkpoint_commit=
     while IFS= read -r checkpoint; do
@@ -888,29 +889,29 @@ run_default_net_checkpoint_if_due() {
       checkpoint_commit=$(git log -1 --format=%H --fixed-strings \
         --grep="$checkpoint.nn: Elo ")
       [[ -z "$checkpoint_commit" ]] || break
-    done < <(jq -r '.candidate // empty' "$DEFAULT_NET_LEDGER" | tac)
+    done < <(jq -r '.candidate // empty' "$STOCKFISH_NET_LEDGER" | tac)
 
     if [[ -n "$checkpoint_commit" ]]; then
       count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' \
         "$checkpoint_commit..HEAD")
-      (( count >= DEFAULT_NET_EVERY )) || return 0
+      (( count >= STOCKFISH_NET_EVERY )) || return 0
     else
       count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' HEAD)
-      (( count > 0 && count % DEFAULT_NET_EVERY == 0 )) || return 0
+      (( count > 0 && count % STOCKFISH_NET_EVERY == 0 )) || return 0
     fi
   else
     count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' HEAD)
-    (( count > 0 && count % DEFAULT_NET_EVERY == 0 )) || return 0
+    (( count > 0 && count % STOCKFISH_NET_EVERY == 0 )) || return 0
   fi
 
-  section "default.net checkpoint"
-  "$QSPRT" "$HOME/assets/nets/$candidate.nn" "$HOME/assets/nets/default.net" \
-    "$DEFAULT_NET_GAMES" || return $?
+  section "Stockfish net checkpoint"
+  "$QSPRT" "$HOME/assets/nets/$candidate.nn" "$HOME/assets/nets/$STOCKFISH_NET" \
+    "$STOCKFISH_NET_GAMES" || return $?
 
   local result message sprt_json
-  result=$(tail -n 1 "$DEFAULT_NET_LEDGER")
+  result=$(tail -n 1 "$STOCKFISH_NET_LEDGER")
   message=$(jq -r '
-    "default.net SPRT games=\(.games)/\(.requested_games) elo=\(.elo) ci=\(.ci) "
+    "Stockfish SPRT games=\(.games)/\(.requested_games) elo=\(.elo) ci=\(.ci) "
     + "llr=\(.llr)/\(.llr_bound) los=\(.los)% draw=\(.draw)%"' <<< "$result")
   sprt_json=$(jq -c --arg line "$message" '
     {
@@ -918,14 +919,14 @@ run_default_net_checkpoint_if_due() {
       elo: (.elo | tostring),
       llr: ("\(.llr)/\(.llr_bound)")
     }' <<< "$result")
-  notify iteration_done default_net_sprt "$message" "$DEFAULT_NET_LEDGER" 0 "$sprt_json"
+  notify iteration_done stockfish_net_sprt "$message" "$STOCKFISH_NET_LEDGER" 0 "$sprt_json"
 }
 
 iterate() {
   need jq
   need git
   ensure_git_identity
-  run_default_net_checkpoint_if_due || return 1
+  run_stockfish_net_checkpoint_if_due || return 1
   for ((i = 1; i <= ITERATIONS; i++)); do
     load_config
     section "iteration $i"
@@ -948,7 +949,7 @@ iterate() {
       || fail "build.json commit failed for $run" iterate
     record_iteration PASS "accepted; build.json advanced"
     notify iteration_done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
-    run_default_net_checkpoint_if_due || return 1
+    run_stockfish_net_checkpoint_if_due || return 1
   done
   print_summary
 }
@@ -976,7 +977,7 @@ Usage:
 
 Useful overrides:
   ITERATIONS=5 ./nnue iterate
-  DEFAULT_NET_EVERY=3 DEFAULT_NET_GAMES=500 ./nnue iterate
+  STOCKFISH_NET_EVERY=3 STOCKFISH_NET_GAMES=500 ./nnue iterate
   ./nnue iterate --full-sprt-first  # first iteration skips train/gates/smoke
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
   SKIP_SMOKE=1 GAMES=800 ./nnue iterate
