@@ -1693,7 +1693,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
             log_dir = tmp / "runs" / "candidate" / "logs"
             log_dir.mkdir(parents=True)
             (log_dir / "05-sprt-800.log").write_text(
-                "+ forge run nnue --run candidate-sprt-800-old --games 800\n",
+                "run: id=candidate-sprt-800-old\n",
                 encoding="utf-8",
             )
             build = tmp / "build.json"

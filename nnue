@@ -512,7 +512,10 @@ gates() {
 forge_run_from_log() {
   local log=$1
   [[ -f "$log" ]] || return 1
-  sed -nE 's/.* --run ([^ ]+).*/\1/p' "$log" | tail -1
+  sed -nE \
+    -e 's/^run: id=([^ ]+).*/\1/p' \
+    -e 's/.* --run ([^ ]+).*/\1/p' \
+    "$log" | tail -1
 }
 
 command_from_log() {
