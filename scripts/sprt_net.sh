@@ -9,7 +9,8 @@ fi
 #REFERENCE_NET="~/assets/nets/default.net"
 REFERENCE_NET=$1
 CANDIDATE_NET=$2
-ENGINE=${3:-"~/assets/engines/enyo_7483c1c"}
+#ENGINE=${3:-"~/assets/engines/enyo_7483c1c"}
+ENGINE=${3:-"~/assets/engines/candidate"}
 
 set +x
 forge sprt \
