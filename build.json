@@ -1,8 +1,8 @@
 {
-  "run": "enyo-1.1.0-rc1",
-  "hypothesis": "halve the long continuation dose after the previous full pass gained only 7.4 Elo",
+  "run": "enyo-1.1.0-rc2",
+  "hypothesis": "raise WDL from 0.05 to 0.15 after the 98304-superbatch continuation saturated",
   "superbatches": 98304,
-  "wdl": 0.05,
+  "wdl": 0.15,
   "sfbinpack": {
     "min_ply": 24
   },
