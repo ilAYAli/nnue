@@ -1,7 +1,7 @@
 {
-  "run": "enyo-scratch-long-1.4.0-rc1",
-  "hypothesis": "random-init nine-epoch control with the proven architecture, pylon corpus, WDL, and LR endpoints",
-  "superbatches": 196608,
+  "run": "enyo-scratch-long-1.5.0-rc1",
+  "hypothesis": "halve the long continuation dose after the previous full pass gained only 7.4 Elo",
+  "superbatches": 98304,
   "wdl": 0.05,
   "sfbinpack": {
     "min_ply": 24
@@ -9,5 +9,5 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-scratch-long-1.3.0-rc1"
+  "continue_from": "enyo-scratch-long-1.4.0-rc1"
 }
