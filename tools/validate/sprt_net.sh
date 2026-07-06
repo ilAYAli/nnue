@@ -3,18 +3,23 @@ set -euo pipefail
 
 (( $# >= 1 )) || { echo "Usage: $0 <candidate_net> [reference_net] [games]" >&2; exit 1; }
 
-CANDIDATE=enyo_7483c1c
+CANDIDATE=${CANDIDATE:-enyo_7483c1c}
 CANDIDATE_NET="~/assets/nets/$(basename "$1")"
 REFERENCE_NET="~/assets/nets/$(basename "${2:-default.net}")"
 GAMES=${3:-500}
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
 RUN="sprt-$CANDIDATE-$GAMES-$(date +%Y%m%d-%H%M%S)"
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
+REFERENCE=$(basename "$REFERENCE_NET")
+LEDGER=
 SPRT_ARGS=()
 
-if [[ $REFERENCE_NET == */default.net ]]; then
-    SPRT_ARGS=(--elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300)
-fi
+case "$REFERENCE" in
+    default.net) LEDGER=default-net.jsonl ;;
+    *.nnue)      LEDGER=stockfish-net.jsonl ;;
+esac
+
+[[ -z $LEDGER ]] || SPRT_ARGS=(--elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300)
 
 run_sprt() {
     forge sprt \
@@ -35,12 +40,13 @@ run_sprt() {
 }
 
 save_result() {
-    [[ $REFERENCE_NET == */default.net ]] || return
+    [[ -n $LEDGER ]] || return
 
     mkdir -p "$ROOT/benchmarks"
     forge status "$RUN" --json | jq -c \
         --arg candidate "$(basename "$CANDIDATE_NET" .nn)" \
         --arg engine "$CANDIDATE" \
+        --arg reference "$REFERENCE" \
         --argjson requested_games "$GAMES" '
         (.progress_fields | map(split("=") | {(.[0]): .[1]}) | add) as $metrics
         | ($metrics.games | split("/") | map(tonumber)) as $games
@@ -52,7 +58,7 @@ save_result() {
             date: .completed_at[0:10],
             candidate: $candidate,
             engine: $engine,
-            reference: "default.net",
+            reference: $reference,
             requested_games: $requested_games,
             games: $games[0],
             elo: ($metrics.elo | tonumber),
@@ -62,7 +68,7 @@ save_result() {
             los: ($metrics.los | rtrimstr("%") | tonumber),
             draw: ($metrics.draw | rtrimstr("%") | tonumber)
         }
-          end' >>"$ROOT/benchmarks/default-net.jsonl"
+          end' >>"$ROOT/benchmarks/$LEDGER"
 }
 
 main() {
