@@ -410,7 +410,7 @@ startpos_gate() {
   printf 'uci\nsetoption name nnue_file value %s\nisready\nposition startpos\ngo depth 3\nquit\n' "$candidate_net" \
     | "$ENGINE" | tee "$log"
 
-  grep -q 'evaluator=native-nnue' "$log" || fail "engine did not load native-nnue" startpos
+  grep -Eq 'evaluator=(enyo|native)-nnue' "$log" || fail "engine did not load Enyo NNUE" startpos
 
   local hidden buckets channels cp
   hidden=$(jq -r .hidden "$ARCH")
