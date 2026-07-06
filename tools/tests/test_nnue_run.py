@@ -712,7 +712,11 @@ run_stockfish_net_checkpoint_if_due
 """
             )
 
-            self.assertEqual(9, proc.returncode)
+            self.assertEqual(1, proc.returncode)
+            self.assertIn(
+                "FAILED: Stockfish net checkpoint failed for native-1.3.0-rc1",
+                proc.stderr,
+            )
 
     def test_plan_uses_training_build_without_validation_reference(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:

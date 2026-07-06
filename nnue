@@ -909,7 +909,8 @@ run_stockfish_net_checkpoint_if_due() {
 
   section "Stockfish net checkpoint"
   "$QSPRT" "$HOME/assets/nets/$candidate.nn" "$HOME/assets/nets/$STOCKFISH_NET" \
-    "$STOCKFISH_NET_GAMES" || return $?
+    "$STOCKFISH_NET_GAMES" \
+    || fail "Stockfish net checkpoint failed for $candidate" stockfish_net_sprt
 
   local result message sprt_json
   result=$(tail -n 1 "$STOCKFISH_NET_LEDGER")
