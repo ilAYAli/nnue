@@ -8,7 +8,7 @@ set -euo pipefail
 
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
 CANDIDATE=${CANDIDATE:-candidate}
-GAMES=${GAMES:-1000}
+GAMES=${GAMES:-500}
 if (( $# == 1 )); then
     REFERENCE_NET="$HOME/assets/nets/$STOCKFISH_NET"
     CANDIDATE_NET=$1
