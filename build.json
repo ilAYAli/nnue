@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.4.0-rc1",
+  "run": "enyo-1.4.0-rc2",
   "hypothesis": "add normalized activation L1 regularization while holding parent, data, WDL, LR, and dose fixed",
   "superbatches": 98304,
   "wdl": 0.15,
