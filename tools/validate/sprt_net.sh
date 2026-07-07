@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-(( $# >= 1 )) || { echo "Usage: $0 <candidate_net> [reference_net] [games]" >&2; exit 1; }
+(( $# >= 1 && $# <= 2 )) || {
+    echo "Usage: $0 CANDIDATE_NET | $0 REFERENCE_NET CANDIDATE_NET" >&2
+    exit 2
+}
 
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
 CANDIDATE=${CANDIDATE:-candidate}
-CANDIDATE_NET="~/assets/nets/$(basename "$1")"
-REFERENCE_NET="~/assets/nets/$(basename "${2:-$STOCKFISH_NET}")"
-GAMES=${3:-500}
+GAMES=${GAMES:-1000}
+if (( $# == 1 )); then
+    REFERENCE_NET="$HOME/assets/nets/$STOCKFISH_NET"
+    CANDIDATE_NET=$1
+else
+    REFERENCE_NET=$1
+    CANDIDATE_NET=$2
+fi
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
-RUN="sprt-$CANDIDATE-$GAMES-$(date +%Y%m%d-%H%M%S)"
+RUN="sprt-$(basename "$CANDIDATE_NET")-vs-$(basename "$REFERENCE_NET")-$GAMES-$(date +%Y%m%d-%H%M%S)"
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
 REFERENCE=$(basename "$REFERENCE_NET")
 LEDGER=
@@ -30,10 +38,12 @@ run_sprt() {
         --book "$BOOK" \
         --candidate ~/assets/engines/$CANDIDATE \
         --candidate-uci nnue_file="$CANDIDATE_NET" \
+        --concurrency 1 \
         --games "$GAMES" \
         --reference ~/assets/engines/$CANDIDATE \
         --reference-uci nnue_file="$REFERENCE_NET" \
         --restart on \
+        --shards 24 \
         --tc 10+0.1 \
         --threads 1 \
         "${SPRT_ARGS[@]}"
@@ -74,6 +84,12 @@ save_result() {
 main() {
     run_sprt
     save_result
+
+    local result elo llr
+    result=$(forge status "$RUN" --json)
+    elo=$(jq -r '.display.fields[] | select(startswith("elo=")) | split("=")[1]' <<< "$result")
+    llr=$(jq -r '.display.fields[] | select(startswith("llr=")) | split("=")[1] | split("/")[0]' <<< "$result")
+    printf 'elo=%s llr=%s\n' "$elo" "$llr"
 }
 
 [[ ${BASH_SOURCE[0]} != "$0" ]] || main
