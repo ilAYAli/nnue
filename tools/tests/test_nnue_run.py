@@ -667,7 +667,7 @@ git() {{
   fi
 }}
 qsprt_mock() {{
-  printf '%s\\n' "$*" >> "$TRACE"
+  printf '%s %s\\n' "$GAMES" "$*" >> "$TRACE"
   printf '{{"candidate":"native-1.3.0-rc1"}}\\n' >> "$STOCKFISH_NET_LEDGER"
 }}
 run_stockfish_net_checkpoint_if_due
@@ -681,8 +681,8 @@ run_stockfish_net_checkpoint_if_due
             self.assertEqual("", proc.stderr)
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
-                f"{tmp}/assets/nets/native-1.3.0-rc1.nn "
-                f"{tmp}/assets/nets/nn-0ee0657fb25e.nnue 1000\n",
+                f"1000 {tmp}/assets/nets/nn-0ee0657fb25e.nnue "
+                f"{tmp}/assets/nets/native-1.3.0-rc1.nn\n",
                 trace.read_text(encoding="utf-8"),
             )
 
