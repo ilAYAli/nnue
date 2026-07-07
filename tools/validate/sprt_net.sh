@@ -16,6 +16,8 @@ else
     REFERENCE_NET=$1
     CANDIDATE_NET=$2
 fi
+ENGINE="$HOME/assets/engines/$CANDIDATE"
+ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
 RUN="sprt-$(basename "$CANDIDATE_NET")-vs-$(basename "$REFERENCE_NET")-$GAMES-$(date +%Y%m%d-%H%M%S)"
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -36,11 +38,11 @@ run_sprt() {
         --verify \
         --comment "candidate=$(basename "$CANDIDATE_NET") vs reference=$(basename "$REFERENCE_NET")" \
         --book "$BOOK" \
-        --candidate ~/assets/engines/$CANDIDATE \
+        --candidate "$ENGINE" \
         --candidate-uci nnue_file="$CANDIDATE_NET" \
         --concurrency 1 \
         --games "$GAMES" \
-        --reference ~/assets/engines/$CANDIDATE \
+        --reference "$ENGINE" \
         --reference-uci nnue_file="$REFERENCE_NET" \
         --restart on \
         --shards 24 \
@@ -55,7 +57,7 @@ save_result() {
     mkdir -p "$ROOT/benchmarks"
     forge status "$RUN" --json | jq -c \
         --arg candidate "$(basename "$CANDIDATE_NET" .nn)" \
-        --arg engine "$CANDIDATE" \
+        --arg engine "$ENGINE_NAME" \
         --arg reference "$REFERENCE" \
         --argjson requested_games "$GAMES" '
         (.progress_fields | map(split("=") | {(.[0]): .[1]}) | add) as $metrics
