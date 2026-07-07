@@ -73,6 +73,7 @@ const TRAINING_DEFAULT_KEYS: &[&str] = &[
     "save_rate",
     "trainable",
     "weight_decay",
+    "activation_l1",
     "sfbinpack",
 ];
 
@@ -806,6 +807,10 @@ fn training_weight_decay(config: &Config) -> f64 {
     training_f64(config, "weight_decay", 0.0)
 }
 
+fn training_activation_l1(config: &Config) -> f64 {
+    training_f64(config, "activation_l1", 0.0)
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -912,12 +917,13 @@ fn cmd_plan(config: &Config) {
         training_batches(config),
     );
     println!(
-        "  wdl={}, lr={}, final_lr={}, trainable={}, weight_decay={}",
+        "  wdl={}, lr={}, final_lr={}, trainable={}, weight_decay={}, activation_l1={}",
         training_wdl(config),
         training_lr(config),
         training_final_lr(config),
         training_trainable(config),
         training_weight_decay(config),
+        training_activation_l1(config),
     );
     println!(
         "  sfbinpack buffer_mb={}, offset={}, min_ply={}, max_abs_cp={}, quiet_only={}",
@@ -1305,6 +1311,7 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_EXPORT_INIT_ONLY", 0);
     set_env("ENYO_BULLET_TRAINABLE", training_trainable(config));
     set_env("ENYO_BULLET_WEIGHT_DECAY", training_weight_decay(config));
+    set_env("ENYO_BULLET_ACTIVATION_L1", training_activation_l1(config));
     set_env("ENYO_BULLET_SFBINPACK_BUFFER_MB", data.buffer_mb);
     set_env("ENYO_BULLET_SFBINPACK_MIN_PLY", data.min_ply);
     set_env("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", data.max_abs_cp);
@@ -2035,6 +2042,7 @@ mod tests {
             "save_rate": 7600,
             "trainable": "all",
             "weight_decay": 0.0,
+            "activation_l1": 0.0,
             "sfbinpack": {
                 "buffer_mb": 1024,
                 "offset": 0,
@@ -2078,8 +2086,9 @@ mod tests {
             "lr": 0.0005,
             "final_lr": 0.000001,
             "save_rate": 1900,
-            "trainable": "output",
+            "trainable": "input",
             "weight_decay": 0.00001,
+            "activation_l1": 0.00002,
             "data": {"source_binpack": "data.binpack", "limit": 100, "offset": 20}
         }));
 
@@ -2095,8 +2104,9 @@ mod tests {
         assert_eq!(training_lr(&config), 0.0005);
         assert_eq!(training_final_lr(&config), 0.000001);
         assert_eq!(training_save_rate(&config), 1900);
-        assert_eq!(training_trainable(&config), "output");
+        assert_eq!(training_trainable(&config), "input");
         assert_eq!(training_weight_decay(&config), 0.00001);
+        assert_eq!(training_activation_l1(&config), 0.00002);
     }
 
     #[test]

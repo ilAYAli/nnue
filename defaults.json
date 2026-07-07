@@ -12,6 +12,7 @@
   "save_rate": 7600,
   "trainable": "all",
   "weight_decay": 0.0,
+  "activation_l1": 0.0,
   "sfbinpack": {
     "buffer_mb": 1024,
     "offset": 0,

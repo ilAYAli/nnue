@@ -272,6 +272,7 @@ fn train_enyo<
     save_rate: usize,
     trainable: String,
     weight_decay: f32,
+    activation_l1: f32,
 ) {
     if !matches!(hidden, 512 | 768 | 1024) || l2_size != 16 {
         panic!("Enyo mode supports hidden=512, 768, or 1024 with l2=16");
@@ -296,6 +297,9 @@ fn train_enyo<
             "LR schedule ends at superbatch {lr_superbatches}, before training ends at {end_superbatch}"
         );
     }
+    if !activation_l1.is_finite() || activation_l1 < 0.0 {
+        panic!("activation_l1 must be finite and non-negative");
+    }
 
     println!("mode=enyo");
     println!("dataset={dataset}");
@@ -313,6 +317,7 @@ fn train_enyo<
     println!("save_rate={save_rate}");
     println!("trainable={trainable}");
     println!("weight_decay={weight_decay}");
+    println!("activation_l1={activation_l1}");
     println!(
         "batch_size={batch_size} batches_per_superbatch={batches_per_superbatch} \
          start_superbatch={start_superbatch} end_superbatch={end_superbatch} \
@@ -323,6 +328,9 @@ fn train_enyo<
     let train_l1 = trainable == "all";
     let train_l2 = trainable == "all" || trainable == "float-head";
     let train_l3 = trainable == "all" || trainable == "float-head" || trainable == "output";
+    if activation_l1 > 0.0 && !train_input {
+        panic!("activation_l1 requires a trainable input layer");
+    }
     let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
     let resume_checkpoint = env_string("ENYO_BULLET_RESUME_CHECKPOINT", "");
     let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
@@ -378,7 +386,6 @@ fn train_enyo<
                         weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
                     }),
                 ])
-                .loss_fn(|output, target| output.sigmoid().squared_error(target))
         };
     }
 
@@ -422,12 +429,17 @@ fn train_enyo<
                 .faux_quantise(1.0, false);
             let ntm_hidden = (l0.forward($ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
                 .faux_quantise(1.0, false);
+            let activation_penalty = (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
+                * (activation_l1 / (2.0 * hidden as f32));
             let x0 = stm_hidden.concat(ntm_hidden);
             let x1 = l1.forward(x0).relu();
             let x2 = l2.forward(x1).relu();
-            l3.forward(x2)
+            (l3.forward(x2), activation_penalty)
         }};
-        ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr, $output_buckets:expr) => {{ enyo_forward!($builder, $stm_inputs, $ntm_inputs).select($output_buckets) }};
+        ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr, $output_buckets:expr) => {{
+            let (output, activation_penalty) = enyo_forward!($builder, $stm_inputs, $ntm_inputs);
+            (output.select($output_buckets), activation_penalty)
+        }};
     }
 
     macro_rules! run_trainer {
@@ -559,16 +571,25 @@ fn train_enyo<
     }
 
     if OUTPUT_BUCKETS == 1 {
-        run_trainer!(base_trainer!().build(|builder, stm_inputs, ntm_inputs| {
-            enyo_forward!(builder, stm_inputs, ntm_inputs)
-        }));
+        run_trainer!(
+            base_trainer!().build_custom(|builder, (stm_inputs, ntm_inputs), target| {
+                let (output, activation_penalty) = enyo_forward!(builder, stm_inputs, ntm_inputs);
+                let loss = output.sigmoid().squared_error(target) + activation_penalty;
+                (output, loss)
+            })
+        );
     } else {
         run_trainer!(
             base_trainer!()
                 .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
-                .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
-                    enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets)
-                })
+                .build_custom(
+                    |builder, (stm_inputs, ntm_inputs, output_buckets), target| {
+                        let (output, activation_penalty) =
+                            enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets);
+                        let loss = output.sigmoid().squared_error(target) + activation_penalty;
+                        (output, loss)
+                    }
+                )
         );
     }
 }
@@ -600,6 +621,7 @@ fn main() {
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
     let weight_decay = env_parse("ENYO_BULLET_WEIGHT_DECAY", 0.0f32);
+    let activation_l1 = env_parse("ENYO_BULLET_ACTIVATION_L1", 0.0f32);
 
     if mode == "enyo" {
         macro_rules! run_enyo {
@@ -627,6 +649,7 @@ fn main() {
                     save_rate,
                     trainable,
                     weight_decay,
+                    activation_l1,
                 )
             };
         }
