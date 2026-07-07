@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.3.0-rc2",
+  "run": "enyo-1.4.0-rc1",
   "hypothesis": "add normalized activation L1 regularization while holding parent, data, WDL, LR, and dose fixed",
   "superbatches": 98304,
   "wdl": 0.15,
@@ -9,6 +9,6 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-1.2.0-rc1",
+  "continue_from": "enyo-1.3.0-rc2",
   "activation_l1": 0.00001
 }
