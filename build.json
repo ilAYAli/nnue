@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.5.0-rc2",
+  "run": "enyo-1.6.0-rc1",
   "hypothesis": "reduce the repeated activation-L1 continuation from 98304 to 32768 superbatches after the full-dose pass regressed",
   "superbatches": 32768,
   "wdl": 0.15,
@@ -9,6 +9,6 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-1.4.0-rc2",
+  "continue_from": "enyo-1.5.0-rc2",
   "activation_l1": 0.00001
 }
