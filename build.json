@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.1.0-rc2",
+  "run": "enyo-1.2.0-rc1",
   "hypothesis": "raise WDL from 0.05 to 0.15 after the 98304-superbatch continuation saturated",
   "superbatches": 98304,
   "wdl": 0.15,
@@ -9,5 +9,5 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-1.0.0-rc1"
+  "continue_from": "enyo-1.1.0-rc2"
 }
