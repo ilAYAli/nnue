@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.6.0-rc1",
+  "run": "enyo-1.6.0-rc2",
   "hypothesis": "reduce the repeated activation-L1 continuation from 98304 to 32768 superbatches after the full-dose pass regressed",
   "superbatches": 32768,
   "wdl": 0.15,
