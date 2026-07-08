@@ -14,8 +14,8 @@ STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
 CANDIDATE=${CANDIDATE:-candidate}
 GAMES=${GAMES:-500}
 
-REFERENCE_NET=""
-CANDIDATE_NET=""
+REFERENCE_NET=$(resolve_path "$STOCKFISH_NET")
+CANDIDATE_NET=$(resolve_path candidate.net)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -33,15 +33,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-if [[ -z "$CANDIDATE_NET" ]]; then
-    echo "Usage: $0 --candidate CANDIDATE_NET [--reference REFERENCE_NET]" >&2
-    exit 2
-fi
-
-if [[ -z "$REFERENCE_NET" ]]; then
-    REFERENCE_NET="$HOME/assets/nets/$STOCKFISH_NET"
-fi
 
 ENGINE="$HOME/assets/engines/$CANDIDATE"
 ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
