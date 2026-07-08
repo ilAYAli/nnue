@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.10.0-rc1",
-  "hypothesis": "halve the accepted-parent continuation dose from 32768 to 16384 superbatches after data, WDL, and L1 changes failed",
-  "superbatches": 16384,
+  "run": "enyo-1.10.0-rc2",
+  "hypothesis": "halve the continuation dose from 16384 to 8192 superbatches after the third short-dose pass was neutral",
+  "superbatches": 8192,
   "wdl": 0.15,
   "sfbinpack": {
     "min_ply": 24
