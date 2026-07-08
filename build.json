@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.11.0-rc2",
+  "run": "enyo-1.12.0-rc1",
   "hypothesis": "retry the low-LR sparse continuation from the stronger Stockfish-benchmark checkpoint",
   "superbatches": 16384,
   "wdl": 0.15,
@@ -9,7 +9,7 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-1.7.0-rc3",
+  "continue_from": "enyo-1.11.0-rc2",
   "activation_l1": 0.00001,
   "lr": 0.000125
 }
