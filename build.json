@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.10.0-rc4",
+  "run": "enyo-1.11.0-rc1",
   "hypothesis": "halve LR from 0.00025 to 0.000125 after short-dose and no-L1 continuations regressed",
   "superbatches": 16384,
   "wdl": 0.15,
@@ -9,7 +9,7 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-1.9.0-rc1",
+  "continue_from": "enyo-1.10.0-rc4",
   "activation_l1": 0.00001,
   "lr": 0.000125
 }
