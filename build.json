@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.10.0-rc2",
-  "hypothesis": "halve the continuation dose from 16384 to 8192 superbatches after the third short-dose pass was neutral",
-  "superbatches": 8192,
+  "run": "enyo-1.10.0-rc3",
+  "hypothesis": "disable activation L1 for one consolidation pass after the sparse continuation saturated",
+  "superbatches": 16384,
   "wdl": 0.15,
   "sfbinpack": {
     "min_ply": 24
@@ -10,6 +10,6 @@
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
   "continue_from": "enyo-1.9.0-rc1",
-  "activation_l1": 0.00001,
+  "activation_l1": 0.0,
   "lr": 0.00025
 }
