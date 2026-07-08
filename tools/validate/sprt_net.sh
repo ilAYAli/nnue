@@ -1,21 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-(( $# >= 1 && $# <= 2 )) || {
-    echo "Usage: $0 CANDIDATE_NET | $0 REFERENCE_NET CANDIDATE_NET" >&2
-    exit 2
-}
-
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
 CANDIDATE=${CANDIDATE:-candidate}
 GAMES=${GAMES:-500}
-if (( $# == 1 )); then
-    REFERENCE_NET="$HOME/assets/nets/$STOCKFISH_NET"
-    CANDIDATE_NET=$1
-else
-    REFERENCE_NET=$1
-    CANDIDATE_NET=$2
-fi
+
+REFERENCE_NET="$HOME/assets/nets/$STOCKFISH_NET"
+CANDIDATE_NET="$HOME/assets/nets/candidate.net"
+
+while (( $# > 0 )); do
+    case "$1" in
+        --candidate)
+            if (( $# < 2 )); then echo "Error: --candidate requires an argument" >&2; exit 2; fi
+            CANDIDATE_NET=$2
+            shift 2
+            ;;
+        --reference)
+            if (( $# < 2 )); then echo "Error: --reference requires an argument" >&2; exit 2; fi
+            REFERENCE_NET=$2
+            shift 2
+            ;;
+        *)
+            echo "Usage: $0 [--candidate CANDIDATE_NET] [--reference REFERENCE_NET]" >&2
+            exit 2
+            ;;
+    esac
+done
+
 ENGINE="$HOME/assets/engines/$CANDIDATE"
 ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
