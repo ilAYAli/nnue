@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.8.0-rc6",
+  "run": "enyo-1.9.0-rc1",
   "hypothesis": "halve the accepted-parent continuation dose from 32768 to 16384 superbatches after data, WDL, and L1 changes failed",
   "superbatches": 16384,
   "wdl": 0.15,
@@ -9,7 +9,7 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-1.7.0-rc3",
+  "continue_from": "enyo-1.8.0-rc6",
   "activation_l1": 0.00001,
   "lr": 0.00025
 }
