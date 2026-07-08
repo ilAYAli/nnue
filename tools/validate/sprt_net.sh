@@ -74,7 +74,7 @@ save_result() {
 
     mkdir -p "$ROOT/benchmarks"
     forge status "$RUN" --json | jq -c \
-        --arg candidate "$(basename "$CANDIDATE_NET" .nn)" \
+        --arg candidate "$(basename "$(readlink -f "$CANDIDATE_NET")" .nn)" \
         --arg engine "$ENGINE_NAME" \
         --arg reference "$REFERENCE" \
         --argjson requested_games "$GAMES" '
