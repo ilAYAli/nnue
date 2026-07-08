@@ -43,7 +43,6 @@ CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
-STOCKFISH_NET_EVERY=${STOCKFISH_NET_EVERY:-3}
 STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-500}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
 QSPRT=${QSPRT:-tools/validate/sprt_net.sh}
@@ -83,6 +82,10 @@ last_sprt_llr=
 last_sprt_line=
 last_sprt_command=
 last_sprt_log=
+last_stockfish_line=
+stockfish_result=
+stockfish_delta=
+stockfish_upper90=
 
 fail() {
   echo "FAILED: $*" >&2
@@ -737,6 +740,7 @@ next_promoted_run_name() {
 commit_and_bump_build_json() {
   local result=$1 accepted=$2 elo=$3 llr=$4 command=$5 details=$6
   local next next_base subject hypothesis
+  local -a commit_paths=("$BUILD" "$ARCH")
   if [[ "$result" == PASS ]]; then
     subject="${accepted}.nn: Elo ${elo},LLR ${llr}"
     next_base=$accepted
@@ -747,6 +751,7 @@ commit_and_bump_build_json() {
     next=$(next_run_name "$accepted")
   fi
   hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
+  [[ -f "$STOCKFISH_NET_LEDGER" ]] && commit_paths+=("$STOCKFISH_NET_LEDGER")
 
   git commit --only \
     -m "$subject" \
@@ -758,7 +763,7 @@ $command
 
 Result:
 $details" \
-    -- "$BUILD" "$ARCH" || return
+    -- "${commit_paths[@]}" || return
 
   if [[ "$result" == PASS ]]; then
     ln -sfn "$accepted.nn" "$PROMOTED_NET_LINK" || return
@@ -838,76 +843,130 @@ print_summary() {
   echo "summary_file=$summary_file"
 }
 
-run_stockfish_net_checkpoint_if_due() {
-  (( STOCKFISH_NET_EVERY > 0 )) || return 0
+promoted_net_name() {
+  local target
+  [[ -L "$PROMOTED_NET_LINK" ]] || return 1
+  target=$(readlink "$PROMOTED_NET_LINK") || return 1
+  target=${target##*/}
+  [[ "$target" == *.nn ]] || return 1
+  printf '%s\n' "${target%.nn}"
+}
 
-  local candidate checkpoint checkpoint_commit count
-  candidate=$(git log -1 --format=%s --extended-regexp --grep='^.+\.nn: Elo ')
-  candidate=${candidate%%.nn: Elo *}
-  [[ -n "$candidate" ]] || return 0
+latest_stockfish_result() {
+  local candidate=$1 engine=$2
+  [[ -s "$STOCKFISH_NET_LEDGER" ]] || return 1
+  jq -sc \
+    --arg candidate "$candidate" \
+    --arg engine "$engine" \
+    --arg reference "${STOCKFISH_NET##*/}" \
+    '[.[] | select(
+        .candidate == $candidate
+        and .engine == $engine
+        and .reference == $reference
+      )] | last // empty' \
+    "$STOCKFISH_NET_LEDGER"
+}
 
-  if [[ -s "$STOCKFISH_NET_LEDGER" ]]; then
-    jq -s -e --arg candidate "$candidate" 'any(.candidate == $candidate)' \
-      "$STOCKFISH_NET_LEDGER" >/dev/null && return 0
+run_stockfish_benchmark() {
+  local candidate=$1
+  GAMES="$STOCKFISH_NET_GAMES" STOCKFISH_NET="$STOCKFISH_NET" "$QSPRT" \
+    --candidate "$candidate.nn" \
+    || fail "Stockfish net benchmark failed for $candidate" stockfish_net_sprt
 
-    checkpoint_commit=
-    while IFS= read -r checkpoint; do
-      [[ -n "$checkpoint" ]] || continue
-      checkpoint_commit=$(git log -1 --format=%H --fixed-strings \
-        --grep="$checkpoint.nn: Elo ")
-      [[ -z "$checkpoint_commit" ]] || break
-    done < <(jq -r '.candidate // empty' "$STOCKFISH_NET_LEDGER" | tac)
+  stockfish_result=$(tail -n 1 "$STOCKFISH_NET_LEDGER")
+  jq -e \
+    --arg candidate "$candidate" \
+    --arg reference "${STOCKFISH_NET##*/}" \
+    --argjson games "$STOCKFISH_NET_GAMES" \
+    '.candidate == $candidate
+     and .reference == $reference
+     and .games == $games
+     and (.elo | type) == "number"
+     and (.ci | type) == "number"' \
+    <<< "$stockfish_result" >/dev/null \
+    || fail "invalid Stockfish benchmark result for $candidate" stockfish_net_sprt
+}
 
-    if [[ -n "$checkpoint_commit" ]]; then
-      count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' \
-        "$checkpoint_commit..HEAD")
-      (( count >= STOCKFISH_NET_EVERY )) || return 0
-    else
-      count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' HEAD)
-      (( count > 0 && count % STOCKFISH_NET_EVERY == 0 )) || return 0
-    fi
-  else
-    count=$(git rev-list --count --extended-regexp --grep='^.+\.nn: Elo ' HEAD)
-    (( count > 0 && count % STOCKFISH_NET_EVERY == 0 )) || return 0
+stockfish_net_gate() {
+  local candidate=$1 champion candidate_result champion_result engine
+  local candidate_elo candidate_ci champion_elo champion_ci
+
+  stockfish_delta=
+  stockfish_upper90=
+
+  section "Stockfish promotion gate"
+  run_stockfish_benchmark "$candidate"
+  candidate_result=$stockfish_result
+  engine=$(jq -r '.engine' <<< "$candidate_result")
+
+  if ! champion=$(promoted_net_name); then
+    last_stockfish_line="Stockfish gate: no existing champion; benchmarked $candidate"
+    return 0
   fi
 
-  section "Stockfish net checkpoint"
-  GAMES="$STOCKFISH_NET_GAMES" "$QSPRT" \
-    --candidate "$candidate.nn" \
-    || fail "Stockfish net checkpoint failed for $candidate" stockfish_net_sprt
+  champion_result=$(latest_stockfish_result "$champion" "$engine")
+  if [[ -z "$champion_result" ]]; then
+    run_stockfish_benchmark "$champion"
+    champion_result=$stockfish_result
+    [[ $(jq -r '.engine' <<< "$champion_result") == "$engine" ]] \
+      || fail "Stockfish champion benchmark used a different engine" stockfish_net_sprt
+  fi
 
-  local result message sprt_json
-  result=$(tail -n 1 "$STOCKFISH_NET_LEDGER")
-  message=$(jq -r '
-    "Stockfish SPRT games=\(.games)/\(.requested_games) elo=\(.elo) ci=\(.ci) "
-    + "llr=\(.llr)/\(.llr_bound) los=\(.los)% draw=\(.draw)%"' <<< "$result")
-  sprt_json=$(jq -c --arg line "$message" '
+  candidate_elo=$(jq -r '.elo' <<< "$candidate_result")
+  candidate_ci=$(jq -r '.ci' <<< "$candidate_result")
+  champion_elo=$(jq -r '.elo' <<< "$champion_result")
+  champion_ci=$(jq -r '.ci' <<< "$champion_result")
+  # Convert combined 95% CI half-widths to a one-sided 90% upper bound.
+  read -r stockfish_delta stockfish_upper90 < <(awk \
+    -v candidate="$candidate_elo" -v champion="$champion_elo" \
+    -v candidate_ci="$candidate_ci" -v champion_ci="$champion_ci" \
+    'BEGIN {
+      delta = candidate - champion
+      combined_ci = sqrt(candidate_ci * candidate_ci + champion_ci * champion_ci)
+      printf "%.1f %.1f\n", delta, delta + 0.654 * combined_ci
+    }')
+
+  last_stockfish_line="Stockfish gate: $candidate ${candidate_elo} vs $champion ${champion_elo}; delta=${stockfish_delta}, upper90=${stockfish_upper90}"
+  echo "$last_stockfish_line"
+  float_lt "$stockfish_upper90" 0 && return 1
+
+  local sprt_json
+  sprt_json=$(jq -c --arg line "$last_stockfish_line" '
     {
       line: $line,
       elo: (.elo | tostring),
       llr: ("\(.llr)/\(.llr_bound)")
-    }' <<< "$result")
-  notify iteration_done stockfish_net_sprt "$message" "$STOCKFISH_NET_LEDGER" 0 "$sprt_json"
+    }' <<< "$candidate_result")
+  notify iteration_done stockfish_net_sprt "$last_stockfish_line" "$STOCKFISH_NET_LEDGER" 0 "$sprt_json"
 }
 
 iterate() {
   need jq
   need git
   ensure_git_identity
-  run_stockfish_net_checkpoint_if_due || return 1
   for ((i = 1; i <= ITERATIONS; i++)); do
     load_config
     section "iteration $i"
     show_config
     notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
+    if (( FULL_SPRT_FIRST != 1 || i != 1 )); then
+      train || fail "train failed for $run" train
+      gates || fail "gates failed for $run" gates
+    fi
+    if ! stockfish_net_gate "$run"; then
+      last_sprt_elo=$stockfish_delta
+      last_sprt_llr="Stockfish upper90=$stockfish_upper90"
+      last_sprt_command="$QSPRT --candidate $run.nn"
+      last_sprt_line=$last_stockfish_line
+      commit_failed_iteration
+      break
+    fi
     if (( FULL_SPRT_FIRST == 1 && i == 1 )); then
       if ! full_sprt_gate; then
         commit_failed_iteration
         break
       fi
     else
-      train || fail "train failed for $run" train
-      gates || fail "gates failed for $run" gates
       if ! sprt_gate; then
         commit_failed_iteration
         break
@@ -917,7 +976,6 @@ iterate() {
       || fail "build.json commit failed for $run" iterate
     record_iteration PASS "accepted; build.json advanced"
     notify iteration_done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
-    run_stockfish_net_checkpoint_if_due || return 1
   done
   print_summary
 }
