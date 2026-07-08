@@ -1,8 +1,8 @@
 {
-  "run": "enyo-1.8.0-rc4",
-  "hypothesis": "raise WDL from 0.15 to 0.30 on the accepted parent pylon corpus after alternate corpora rejected",
+  "run": "enyo-1.8.0-rc5",
+  "hypothesis": "reduce activation L1 from 1e-5 to 3e-6 after alternate data and higher WDL rejected",
   "superbatches": 32768,
-  "wdl": 0.30,
+  "wdl": 0.15,
   "sfbinpack": {
     "min_ply": 24
   },
@@ -10,6 +10,6 @@
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
   "continue_from": "enyo-1.7.0-rc3",
-  "activation_l1": 0.00001,
+  "activation_l1": 0.000003,
   "lr": 0.00025
 }
