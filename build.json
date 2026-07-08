@@ -1,6 +1,6 @@
 {
-  "run": "enyo-1.7.0-rc2",
-  "hypothesis": "halve the continuation LR from 0.001 to 0.0005 after the same-regimen child regressed",
+  "run": "enyo-1.7.0-rc3",
+  "hypothesis": "halve the continuation LR again from 0.0005 to 0.00025 after the first reduction remained slightly negative",
   "superbatches": 32768,
   "wdl": 0.15,
   "sfbinpack": {
@@ -11,5 +11,5 @@
   },
   "continue_from": "enyo-1.6.0-rc2",
   "activation_l1": 0.00001,
-  "lr": 0.0005
+  "lr": 0.00025
 }
