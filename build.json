@@ -1,15 +1,14 @@
 {
-  "run": "enyo-1.12.0-rc1",
-  "hypothesis": "retry the low-LR sparse continuation from the stronger Stockfish-benchmark checkpoint",
-  "superbatches": 16384,
+  "run": "enyo-1.13.0-rc1",
+  "hypothesis": "switch the saturated pylon continuation to the historically successful first farseerT76 slice",
+  "superbatches": 256,
   "wdl": 0.15,
-  "sfbinpack": {
-    "min_ply": 24
-  },
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "limit": 200000000,
+    "offset": 0
   },
-  "continue_from": "enyo-1.11.0-rc2",
+  "continue_from": "enyo-1.12.0-rc1",
   "activation_l1": 0.00001,
   "lr": 0.000125
 }
