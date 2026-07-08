@@ -29,6 +29,7 @@ done
 
 ENGINE="$HOME/assets/engines/$CANDIDATE"
 ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
+CANDIDATE_NAME=$(basename "$(readlink -f "$CANDIDATE_NET")" .nn)
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
 RUN="sprt-$(basename "$CANDIDATE_NET")-vs-$(basename "$REFERENCE_NET")-$GAMES-$(date +%Y%m%d-%H%M%S)"
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -67,7 +68,7 @@ save_result() {
 
     mkdir -p "$ROOT/benchmarks"
     forge status "$RUN" --json | jq -c \
-        --arg candidate "$(basename "$CANDIDATE_NET" .nn)" \
+        --arg candidate "$CANDIDATE_NAME" \
         --arg engine "$ENGINE_NAME" \
         --arg reference "$REFERENCE" \
         --argjson requested_games "$GAMES" '
