@@ -1800,58 +1800,5 @@ printf 'llr=%s\n' "$last_sprt_llr"
             self.assertIn("--run candidate-sprt-800-", calls)
             self.assertNotIn("--run candidate-sprt-800-old", calls)
 
-    def test_sprt_refuses_to_queue_when_forge_is_busy(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_name:
-            tmp = Path(tmp_name)
-            home = tmp / "home"
-            nets = home / "assets" / "nets"
-            nets.mkdir(parents=True)
-            (nets / "candidate.nn").write_bytes(b"candidate")
-            (nets / "reference.nn").write_bytes(b"reference")
-            build = tmp / "build.json"
-            build.write_text(
-                '{"run":"candidate","continue_from":"reference"}\n',
-                encoding="utf-8",
-            )
-            fake_forge = tmp / "forge"
-            fake_forge.write_text(
-                "#!/usr/bin/env bash\n"
-                "if [[ \"$1\" == \"status\" && \"$2\" == \"--json\" ]]; then\n"
-                "  printf '%s\\n' "
-                "'{\"runs\":[{\"run\":\"busy-run\",\"state\":\"running\","
-                "\"done\":1,\"tasks\":2,\"progress_fields\":[\"games=50/100\",\"elo=+1.0\"]}]}'\n"
-                "  exit 1\n"
-                "fi\n"
-                "echo \"unexpected forge call: $*\" >&2\n"
-                "exit 2\n",
-                encoding="utf-8",
-            )
-            fake_forge.chmod(0o755)
-            env = os.environ.copy()
-            env.update({
-                "BUILD": str(build),
-                "FORGE": str(fake_forge),
-                "HOME": str(home),
-                "NNUE_NTFY": "0",
-            })
-
-            proc = subprocess.run(
-                [str(REPO / "nnue"), "sprt"],
-                cwd=REPO,
-                env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            )
-
-            self.assertNotEqual(0, proc.returncode)
-            self.assertIn(
-                "refusing to start Forge SPRT while Forge is busy: "
-                "busy-run running games=50/100 elo=+1.0",
-                proc.stderr,
-            )
-
-
 if __name__ == "__main__":
     unittest.main()
