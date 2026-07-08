@@ -95,46 +95,6 @@ need() {
   command -v "$1" >/dev/null 2>&1 || fail "missing command: $1"
 }
 
-require_forge_idle() {
-  [[ "$SOLO" == 1 ]] && return 0
-  command -v "$FORGE" >/dev/null 2>&1 || fail "missing command: $FORGE" "${1:-sprt}"
-
-  local status_json busy
-  status_json=$("$FORGE" status --json) || {
-    [[ -n "$status_json" ]] && jq -e . >/dev/null <<< "$status_json" \
-      || fail "could not read Forge active status" "${1:-sprt}"
-  }
-  busy=$(jq -r '
-    def inactive_state:
-      (.state // "") as $state
-      | $state == "done"
-        or $state == "ok"
-        or $state == "completed"
-        or $state == "stopped"
-        or $state == "failed"
-        or $state == "fail";
-    (.runs // [])
-    | map(select((inactive_state | not) and ((.tasks // 0) > 0) and ((.done // 0) < (.tasks // 0))))
-    | .[0]? as $run
-    | if $run == null then empty else
-        [
-          ($run.run // "unknown"),
-          ($run.state // "active"),
-          (($run.progress_fields // []) | join(" "))
-        ] | @tsv
-      end
-  ' <<< "$status_json") || fail "could not read Forge active status" "${1:-sprt}"
-
-  [[ -z "$busy" ]] && return 0
-
-  local busy_run busy_state busy_progress
-  IFS=$'	' read -r busy_run busy_state busy_progress <<< "$busy"
-  local message="refusing to start Forge SPRT while Forge is busy: $busy_run"
-  [[ -z "$busy_state" || "$busy_state" == "null" ]] || message+=" $busy_state"
-  [[ -z "$busy_progress" || "$busy_progress" == "null" ]] || message+=" $busy_progress"
-  fail "$message" "${1:-sprt}"
-}
-
 json() {
   jq -r "$1" "$BUILD"
 }
@@ -636,7 +596,6 @@ run_sprt_once() {
       return 0
     fi
 
-    require_forge_idle "$stage"
     forge_run="${run}-${label}-${sprt_games}-$(date +%Y%m%d-%H%M%S)"
     [[ -x "$ENGINE" ]] || fail "missing engine: $ENGINE" sprt
     [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
