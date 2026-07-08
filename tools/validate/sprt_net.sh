@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-(( $# >= 1 && $# <= 2 )) || {
-    echo "Usage: $0 CANDIDATE_NET | $0 REFERENCE_NET CANDIDATE_NET" >&2
-    exit 2
-}
-
 resolve_path() {
     local path="$1"
     if [[ "$path" =~ ^(/|\./|\.\./) ]]; then
@@ -18,13 +13,36 @@ resolve_path() {
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
 CANDIDATE=${CANDIDATE:-candidate}
 GAMES=${GAMES:-500}
-if (( $# == 1 )); then
-    REFERENCE_NET="$HOME/assets/nets/$STOCKFISH_NET"
-    CANDIDATE_NET=$(resolve_path "$1")
-else
-    REFERENCE_NET=$(resolve_path "$1")
-    CANDIDATE_NET=$(resolve_path "$2")
+
+REFERENCE_NET=""
+CANDIDATE_NET=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --reference)
+            REFERENCE_NET=$(resolve_path "$2")
+            shift 2
+            ;;
+        --candidate)
+            CANDIDATE_NET=$(resolve_path "$2")
+            shift 2
+            ;;
+        *)
+            echo "Error: Invalid argument '$1'. Only --candidate and --reference flags are allowed." >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [[ -z "$CANDIDATE_NET" ]]; then
+    echo "Usage: $0 --candidate CANDIDATE_NET [--reference REFERENCE_NET]" >&2
+    exit 2
 fi
+
+if [[ -z "$REFERENCE_NET" ]]; then
+    REFERENCE_NET="$HOME/assets/nets/$STOCKFISH_NET"
+fi
+
 ENGINE="$HOME/assets/engines/$CANDIDATE"
 ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
