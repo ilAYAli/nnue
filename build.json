@@ -1,6 +1,6 @@
 {
   "run": "enyo-1.8.0-rc2",
-  "hypothesis": "switch the saturated pylon continuation to tablebase-heavy test80 data while holding the training schedule fixed",
+  "hypothesis": "switch the saturated pylon continuation to an 800M-position tablebase-heavy test80 slice while holding the training schedule fixed",
   "superbatches": 32768,
   "wdl": 0.15,
   "sfbinpack": {
