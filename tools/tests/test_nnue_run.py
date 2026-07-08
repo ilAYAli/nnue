@@ -831,12 +831,18 @@ run_stockfish_net_checkpoint_if_due
             harness = source.split('case "$cmd" in', 1)[0] + '''
 BUILD=build.json
 ARCH=architecture.json
+PROMOTED_NET_LINK=candidate.net
 bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "Forge result"
 '''
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
 
             subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
+
+            self.assertEqual(
+                "uho-native-1.0.35.nn",
+                os.readlink(tmp / "candidate.net"),
+            )
 
             subject = subprocess.run(
                 ["git", "show", "--no-patch", "--format=%s", "HEAD"],
@@ -941,12 +947,18 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "For
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
+PROMOTED_NET_LINK=candidate.net
 bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Forge result"
 """
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
 
             subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
+
+            self.assertEqual(
+                "native-3.0.0-rc7.nn",
+                os.readlink(tmp / "candidate.net"),
+            )
 
             committed_json = json.loads(subprocess.run(
                 ["git", "show", "HEAD:build.json"],
@@ -1011,6 +1023,8 @@ bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "For
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
+PROMOTED_NET_LINK=candidate.net
+ln -s uho-native-1.0.35.nn "$PROMOTED_NET_LINK"
 continue_from=uho-native-1.0.35
 fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Forge result"
 """
@@ -1018,6 +1032,11 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             harness_path.write_text(harness, encoding="utf-8")
 
             subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
+
+            self.assertEqual(
+                "uho-native-1.0.35.nn",
+                os.readlink(tmp / "candidate.net"),
+            )
 
             subject = subprocess.run(
                 ["git", "show", "--no-patch", "--format=%s", "HEAD"],

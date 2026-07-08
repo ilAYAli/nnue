@@ -47,6 +47,7 @@ STOCKFISH_NET_EVERY=${STOCKFISH_NET_EVERY:-3}
 STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-500}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
 QSPRT=${QSPRT:-tools/validate/sprt_net.sh}
+PROMOTED_NET_LINK=${PROMOTED_NET_LINK:-$HOME/assets/nets/candidate.net}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 SPRT_ELO1=${SPRT_ELO1:-3.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.10}
@@ -799,6 +800,10 @@ $command
 Result:
 $details" \
     -- "$BUILD" "$ARCH" || return
+
+  if [[ "$result" == PASS ]]; then
+    ln -sfn "$accepted.nn" "$PROMOTED_NET_LINK" || return
+  fi
 
   local tmp
   tmp=$(mktemp)
