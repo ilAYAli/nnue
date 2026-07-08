@@ -1,13 +1,13 @@
 {
-  "run": "enyo-1.8.0-rc2",
-  "hypothesis": "switch the saturated pylon continuation to an 800M-position tablebase-heavy test80 slice while holding the training schedule fixed",
+  "run": "enyo-1.8.0-rc3",
+  "hypothesis": "switch the rejected tablebase-heavy continuation to an 800M-position T60T70wIsRightFarseer slice while holding the training schedule fixed",
   "superbatches": 32768,
   "wdl": 0.15,
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 800000000,
     "offset": 0
   },
