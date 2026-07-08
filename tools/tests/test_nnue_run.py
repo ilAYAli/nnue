@@ -681,8 +681,7 @@ run_stockfish_net_checkpoint_if_due
             self.assertEqual("", proc.stderr)
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
-                f"1000 --candidate {tmp}/assets/nets/native-1.3.0-rc1.nn "
-                f"--reference {tmp}/assets/nets/nn-0ee0657fb25e.nnue\n",
+                "1000 nn-0ee0657fb25e.nnue native-1.3.0-rc1.nn\n",
                 trace.read_text(encoding="utf-8"),
             )
 
