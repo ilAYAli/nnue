@@ -636,84 +636,96 @@ train
         self.assertEqual(0, proc.returncode)
         self.assertEqual("native-3.1.0-rc1\n", proc.stdout)
 
-    def test_stockfish_net_checkpoint_runs_after_three_promotions_once(self) -> None:
+    def test_stockfish_net_gate_passes_candidate_without_significant_regression(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             ledger = tmp / "stockfish-net.jsonl"
             trace = tmp / "trace"
             ledger.write_text(
-                '{"candidate":"native-1.0.0-rc1"}\n'
-                '{"candidate":"manual-unpromoted-net"}\n',
+                '{"candidate":"champion","engine":"engine","reference":"nn-stockfish.nnue",'
+                '"requested_games":500,"games":500,"elo":-158.9,"ci":28.4,'
+                '"llr":-7.84,"llr_bound":690.78,"los":0.0,"draw":34.4}\n',
                 encoding="utf-8",
             )
 
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
-HOME={shlex.quote(str(tmp))}
 STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
-STOCKFISH_NET_EVERY=3
-STOCKFISH_NET_GAMES=1000
+STOCKFISH_NET=nn-stockfish.nnue
+STOCKFISH_NET_GAMES=500
+PROMOTED_NET_LINK={shlex.quote(str(tmp / "candidate.net"))}
 QSPRT=qsprt_mock
 TRACE={shlex.quote(str(trace))}
-PROMOTIONS=2
-git() {{
-  if [[ "$1" == rev-list ]]; then
-    echo "$PROMOTIONS"
-  elif [[ "$*" == *"--format=%H"* ]]; then
-    [[ "$*" == *"manual-unpromoted-net"* ]] || printf 'abc\\n'
-  else
-    echo "native-1.3.0-rc1.nn: Elo 3.0,LLR 0.1/2.2"
-  fi
-}}
+ln -s champion.nn "$PROMOTED_NET_LINK"
 qsprt_mock() {{
   printf '%s %s\\n' "$GAMES" "$*" >> "$TRACE"
-  printf '{{"candidate":"native-1.3.0-rc1"}}\\n' >> "$STOCKFISH_NET_LEDGER"
+  printf '{{"candidate":"challenger","engine":"engine","reference":"nn-stockfish.nnue","requested_games":500,"games":500,"elo":-170.0,"ci":28.0,"llr":-8.0,"llr_bound":690.78,"los":0.0,"draw":35.0}}\\n' >> "$STOCKFISH_NET_LEDGER"
 }}
-run_stockfish_net_checkpoint_if_due
-[[ ! -e "$TRACE" ]]
-PROMOTIONS=3
-run_stockfish_net_checkpoint_if_due
-run_stockfish_net_checkpoint_if_due
+stockfish_net_gate challenger
 """
             )
 
             self.assertEqual("", proc.stderr)
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
-                "1000 --candidate native-1.3.0-rc1.nn\n",
+                "500 --candidate challenger.nn\n",
                 trace.read_text(encoding="utf-8"),
             )
+            self.assertIn("delta=-11.1, upper90=15.0", proc.stdout)
 
-    def test_stockfish_net_checkpoint_propagates_qsprt_failure(self) -> None:
+    def test_stockfish_net_gate_vetoes_regression_and_preserves_champion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             ledger = tmp / "stockfish-net.jsonl"
-            ledger.write_text('{"candidate":"native-1.0.0-rc1"}\n', encoding="utf-8")
+            ledger.write_text(
+                '{"candidate":"champion","engine":"engine","reference":"nn-stockfish.nnue",'
+                '"requested_games":500,"games":500,"elo":-158.9,"ci":28.4,'
+                '"llr":-7.84,"llr_bound":690.78,"los":0.0,"draw":34.4}\n',
+                encoding="utf-8",
+            )
 
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
 STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
-STOCKFISH_NET_EVERY=3
+STOCKFISH_NET=nn-stockfish.nnue
+STOCKFISH_NET_GAMES=500
+PROMOTED_NET_LINK={shlex.quote(str(tmp / "candidate.net"))}
 QSPRT=qsprt_mock
-git() {{
-  if [[ "$1" == rev-list ]]; then
-    echo 3
-  elif [[ "$*" == *"--format=%H"* ]]; then
-    printf 'abc\\tnative-1.0.0-rc1.nn: Elo 1.0,LLR 0.1/2.2\\n'
-  else
-    echo "native-1.3.0-rc1.nn: Elo 3.0,LLR 0.1/2.2"
-  fi
+ln -s champion.nn "$PROMOTED_NET_LINK"
+qsprt_mock() {{
+  printf '{{"candidate":"challenger","engine":"engine","reference":"nn-stockfish.nnue","requested_games":500,"games":500,"elo":-197.4,"ci":29.8,"llr":-9.15,"llr_bound":690.78,"los":0.0,"draw":31.8}}\\n' >> "$STOCKFISH_NET_LEDGER"
 }}
+if stockfish_net_gate challenger; then
+  exit 9
+fi
+printf '%s %s\\n' "$stockfish_delta" "$stockfish_upper90"
+[[ $(readlink "$PROMOTED_NET_LINK") == champion.nn ]]
+"""
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(0, proc.returncode)
+            self.assertIn("-38.5 -11.6", proc.stdout)
+            self.assertEqual("champion.nn", os.readlink(tmp / "candidate.net"))
+
+    def test_stockfish_net_gate_propagates_benchmark_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            proc = self.run_sourced(
+                f"""
+NNUE_NTFY=0
+STOCKFISH_NET_LEDGER={shlex.quote(str(tmp / "stockfish-net.jsonl"))}
+QSPRT=qsprt_mock
 qsprt_mock() {{ return 9; }}
-run_stockfish_net_checkpoint_if_due
+stockfish_net_gate challenger
 """
             )
 
             self.assertEqual(1, proc.returncode)
             self.assertIn(
-                "FAILED: Stockfish net checkpoint failed for native-1.3.0-rc1",
+                "FAILED: Stockfish net benchmark failed for challenger",
                 proc.stderr,
             )
 
@@ -1267,6 +1279,7 @@ NNUE_NTFY=0
 ITERATIONS=2
 train() { printf 'train:%s\n' "$run" >> "$TRACE"; }
 gates() { printf 'gates:%s\n' "$run" >> "$TRACE"; }
+stockfish_net_gate() { printf 'stockfish:%s\n' "$run" >> "$TRACE"; }
 sprt_gate() {
   printf 'sprt:%s\n' "$run" >> "$TRACE"
   last_sprt_elo=-25.2
@@ -1296,6 +1309,7 @@ iterate
             self.assertEqual(
                 "train:uho-native-1.0.36\n"
                 "gates:uho-native-1.0.36\n"
+                "stockfish:uho-native-1.0.36\n"
                 "sprt:uho-native-1.0.36\n",
                 trace.read_text(encoding="utf-8"),
             )
