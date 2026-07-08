@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.7.0-rc3",
+  "run": "enyo-1.8.0-rc1",
   "hypothesis": "halve the continuation LR again from 0.0005 to 0.00025 after the first reduction remained slightly negative",
   "superbatches": 32768,
   "wdl": 0.15,
@@ -9,7 +9,7 @@
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "continue_from": "enyo-1.6.0-rc2",
+  "continue_from": "enyo-1.7.0-rc3",
   "activation_l1": 0.00001,
   "lr": 0.00025
 }
