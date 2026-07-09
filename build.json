@@ -1,6 +1,6 @@
 {
-  "run": "enyo-1.20.0-rc2",
-  "hypothesis": "retry rejected T60T70 offset 800M with dose reduced from 64 to 32 superbatches",
+  "run": "enyo-1.20.0-rc3",
+  "hypothesis": "train only the output layer on the rejected T60T70 offset 800M slice while holding the 32-superbatch dose fixed",
   "superbatches": 32,
   "wdl": 0.05,
   "data": {
@@ -9,6 +9,6 @@
     "offset": 800000000
   },
   "continue_from": "enyo-1.19.0-rc2",
-  "activation_l1": 0.00001,
+  "trainable": "output",
   "lr": 0.0001
 }
