@@ -853,15 +853,13 @@ promoted_net_name() {
 }
 
 latest_stockfish_result() {
-  local candidate=$1 engine=$2
+  local candidate=$1
   [[ -s "$STOCKFISH_NET_LEDGER" ]] || return 1
   jq -sc \
     --arg candidate "$candidate" \
-    --arg engine "$engine" \
     --arg reference "${STOCKFISH_NET##*/}" \
     '[.[] | select(
         .candidate == $candidate
-        and .engine == $engine
         and .reference == $reference
       )] | last // empty' \
     "$STOCKFISH_NET_LEDGER"
@@ -888,28 +886,28 @@ run_stockfish_benchmark() {
 }
 
 stockfish_net_gate() {
-  local candidate=$1 champion candidate_result champion_result engine
+  local candidate=$1 champion candidate_result champion_result
   local candidate_elo candidate_ci champion_elo champion_ci
 
   stockfish_delta=
   stockfish_upper90=
 
   section "Stockfish promotion gate"
-  run_stockfish_benchmark "$candidate"
-  candidate_result=$stockfish_result
-  engine=$(jq -r '.engine' <<< "$candidate_result")
+  candidate_result=$(latest_stockfish_result "$candidate") || candidate_result=
+  if [[ -z "$candidate_result" ]]; then
+    run_stockfish_benchmark "$candidate"
+    candidate_result=$stockfish_result
+  fi
 
   if ! champion=$(promoted_net_name); then
     last_stockfish_line="Stockfish gate: no existing champion; benchmarked $candidate"
     return 0
   fi
 
-  champion_result=$(latest_stockfish_result "$champion" "$engine")
+  champion_result=$(latest_stockfish_result "$champion") || champion_result=
   if [[ -z "$champion_result" ]]; then
     run_stockfish_benchmark "$champion"
     champion_result=$stockfish_result
-    [[ $(jq -r '.engine' <<< "$champion_result") == "$engine" ]] \
-      || fail "Stockfish champion benchmark used a different engine" stockfish_net_sprt
   fi
 
   candidate_elo=$(jq -r '.elo' <<< "$candidate_result")

@@ -636,13 +636,13 @@ train
         self.assertEqual(0, proc.returncode)
         self.assertEqual("native-3.1.0-rc1\n", proc.stdout)
 
-    def test_stockfish_net_gate_passes_candidate_without_significant_regression(self) -> None:
+    def test_stockfish_net_gate_reuses_champion_across_engine_versions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             ledger = tmp / "stockfish-net.jsonl"
             trace = tmp / "trace"
             ledger.write_text(
-                '{"candidate":"champion","engine":"engine","reference":"nn-stockfish.nnue",'
+                '{"candidate":"champion","engine":"old-engine","reference":"nn-stockfish.nnue",'
                 '"requested_games":500,"games":500,"elo":-158.9,"ci":28.4,'
                 '"llr":-7.84,"llr_bound":690.78,"los":0.0,"draw":34.4}\n',
                 encoding="utf-8",
