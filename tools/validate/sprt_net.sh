@@ -38,7 +38,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ENGINE="$HOME/assets/engines/$CANDIDATE"
+if [[ "$CANDIDATE" =~ ^(/|\./|\.\./) ]]; then
+    ENGINE="$CANDIDATE"
+else
+    ENGINE="$HOME/assets/engines/$CANDIDATE"
+fi
 ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
 RUN="sprt-$(basename "$CANDIDATE_NET")-vs-$(basename "$REFERENCE_NET")-$GAMES-$(date +%Y%m%d-%H%M%S)"
