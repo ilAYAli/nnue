@@ -1,8 +1,8 @@
 {
-  "run": "enyo-1.13.0-rc1",
-  "hypothesis": "switch the saturated pylon continuation to the historically successful first farseerT76 slice",
+  "run": "enyo-1.13.0-rc2",
+  "hypothesis": "raise WDL from 0.15 to the historically successful 0.30 on the same farseerT76 slice",
   "superbatches": 256,
-  "wdl": 0.15,
+  "wdl": 0.30,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
