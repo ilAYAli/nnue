@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.16.0-rc3",
+  "run": "enyo-1.17.0-rc1",
   "hypothesis": "switch the accepted parent to the historically positive T60T70wIsRightFarseer regimen",
   "superbatches": 256,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 200000000
   },
-  "continue_from": "enyo-1.15.0-rc2",
+  "continue_from": "enyo-1.16.0-rc3",
   "activation_l1": 0.00001,
   "lr": 0.0001
 }
