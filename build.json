@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.15.0-rc2",
+  "run": "enyo-1.16.0-rc1",
   "hypothesis": "retry farseerT76 offset 600M with the historically successful LR 0.0001",
   "superbatches": 256,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
-    "offset": 600000000
+    "offset": 800000000
   },
-  "continue_from": "enyo-1.14.0-rc2",
+  "continue_from": "enyo-1.15.0-rc2",
   "activation_l1": 0.00001,
   "lr": 0.0001
 }
