@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.16.0-rc2",
-  "hypothesis": "retry the rejected farseerT76 offset 800M slice with dose reduced from 256 to 128 superbatches",
-  "superbatches": 128,
+  "run": "enyo-1.16.0-rc3",
+  "hypothesis": "switch the accepted parent to the historically positive T60T70wIsRightFarseer regimen",
+  "superbatches": 256,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
-    "offset": 800000000
+    "offset": 0
   },
   "continue_from": "enyo-1.15.0-rc2",
   "activation_l1": 0.00001,
