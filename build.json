@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.16.0-rc1",
-  "hypothesis": "retry farseerT76 offset 600M with the historically successful LR 0.0001",
-  "superbatches": 256,
+  "run": "enyo-1.16.0-rc2",
+  "hypothesis": "retry the rejected farseerT76 offset 800M slice with dose reduced from 256 to 128 superbatches",
+  "superbatches": 128,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
