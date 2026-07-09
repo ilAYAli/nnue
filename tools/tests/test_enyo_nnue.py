@@ -12,10 +12,15 @@ def _zero_net(
     feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
     output_buckets: int = 1,
     output_head_features: int = 0,
+    full_threats: bool = False,
 ) -> nn2.Net:
     return nn2.Net(
         input_weights=np.zeros(
-            (nn2.feature_count(input_buckets, feature_channels), nn2.N_HIDDEN),
+            (
+                nn2.input_feature_count(
+                    input_buckets, feature_channels, full_threats),
+                nn2.N_HIDDEN,
+            ),
             dtype=np.int16),
         input_biases=np.zeros(nn2.N_HIDDEN, dtype=np.int16),
         l1_weights=np.zeros((nn2.N_L2, nn2.N_L1), dtype=np.int8),
@@ -30,6 +35,7 @@ def _zero_net(
         feature_channels=feature_channels,
         output_buckets=output_buckets,
         output_head_features=output_head_features,
+        full_threats=full_threats,
     )
 
 
@@ -57,6 +63,36 @@ def test_32_bucket_net_round_trip(tmp_path: Path) -> None:
     assert loaded.input_buckets == 32
     assert loaded.feature_channels == 12
     assert loaded.input_weights.shape == (nn2.feature_count(32), nn2.N_HIDDEN)
+
+
+def test_full_threats_net_round_trip(tmp_path: Path) -> None:
+    path = tmp_path / "full-threats.nn"
+    net = _zero_net(16, output_buckets=8, full_threats=True)
+    net.format_version = nn2.NETWORK_FORMAT_VERSION
+    nn2.write_net(net, path)
+
+    loaded = nn2.load_net(path)
+
+    assert path.stat().st_size == (
+        nn2.NETWORK_HEADER_SIZE + nn2.network_size(16, 8, 0, 12, True)
+    )
+    assert loaded.full_threats is True
+    assert loaded.output_buckets == 8
+    assert loaded.input_weights.shape == (
+        nn2.input_feature_count(16, 12, True), nn2.N_HIDDEN)
+
+
+def test_full_threats_features_extend_base_features() -> None:
+    pieces, _stm = nn2.parse_fen(
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    pieces.sort(key=lambda item: item[2])
+    base = nn2.features_from_pieces(pieces, nn2.WHITE, 16, 12)
+    full = nn2.features_from_pieces(pieces, nn2.WHITE, 16, 12, True)
+    base_count = nn2.feature_count(16, 12)
+
+    assert full[:len(base)] == base
+    assert any(feature >= base_count for feature in full)
+    assert max(full) < nn2.input_feature_count(16, 12, True)
 
 
 def test_halfka_v2_channel_net_round_trip(tmp_path: Path) -> None:
@@ -125,6 +161,22 @@ def test_pytorch_model_load_and_export_preserve_bucket_count(tmp_path: Path) -> 
     assert model.input_buckets == 32
     assert model.feature_channels == 12
     assert nn2.load_net(exported).input_buckets == 32
+
+
+def test_pytorch_model_load_and_export_preserve_full_threats(tmp_path: Path) -> None:
+    source = tmp_path / "source-full-threats.nn"
+    exported = tmp_path / "exported-full-threats.nn"
+    net = _zero_net(16, output_buckets=8, full_threats=True)
+    net.format_version = nn2.NETWORK_FORMAT_VERSION
+    nn2.write_net(net, source)
+
+    model = load_model_from_nn(source)
+    export_model(model, exported)
+
+    loaded = nn2.load_net(exported)
+    assert model.full_threats is True
+    assert loaded.full_threats is True
+    assert loaded.output_buckets == 8
 
 
 def test_export_model_does_not_move_module_to_cpu(tmp_path: Path) -> None:

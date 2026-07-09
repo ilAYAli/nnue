@@ -15,8 +15,10 @@ def zero_net(*, input_buckets: int = 16,
              output_buckets: int = 1,
              output_head_features: int = 0,
              trained_hidden: int = nn2.N_HIDDEN,
-             format_version: int = 1) -> nn2.Net:
-    features = nn2.feature_count(input_buckets, feature_channels)
+             format_version: int = 1,
+             full_threats: bool = False) -> nn2.Net:
+    features = nn2.input_feature_count(
+        input_buckets, feature_channels, full_threats)
     return nn2.Net(
         input_weights=np.zeros((features, trained_hidden), dtype=np.int16),
         input_biases=np.zeros((trained_hidden,), dtype=np.int16),
@@ -34,6 +36,7 @@ def zero_net(*, input_buckets: int = 16,
         output_head_features=output_head_features,
         trained_hidden=trained_hidden,
         format_version=format_version,
+        full_threats=full_threats,
     )
 
 
@@ -144,6 +147,32 @@ class EnyoNNUEFormatTests(unittest.TestCase):
             self.assertEqual(
                 loaded.input_weights.shape,
                 (nn2.feature_count(10, 11), nn2.N_HIDDEN),
+            )
+
+    def test_versioned_full_threats_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "full-threats.nn"
+            nn2.write_net(
+                zero_net(
+                    input_buckets=16,
+                    output_buckets=8,
+                    format_version=nn2.NETWORK_FORMAT_VERSION,
+                    full_threats=True,
+                ),
+                path,
+            )
+
+            self.assertEqual(
+                path.stat().st_size,
+                nn2.NETWORK_HEADER_SIZE
+                + nn2.network_size(16, 8, 0, 12, True),
+            )
+            loaded = nn2.load_net(path)
+            self.assertTrue(loaded.full_threats)
+            self.assertEqual(loaded.output_buckets, 8)
+            self.assertEqual(
+                loaded.input_weights.shape,
+                (nn2.input_feature_count(16, 12, True), nn2.N_HIDDEN),
             )
 
 

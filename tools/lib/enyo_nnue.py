@@ -6,6 +6,7 @@ format is Berserk v13's .nn layout as loaded by NNUE::LoadNetwork().
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 import struct
 from typing import Sequence
@@ -30,6 +31,7 @@ SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
 DEFAULT_N_OUTPUT_HEAD_FEATURES = 0
 N_HEAD_FEATURES = 2
 SUPPORTED_N_OUTPUT_HEAD_FEATURES = (0, N_HEAD_FEATURES)
+N_THREAT_FEATURES = 60_720
 N_KING_BUCKETS = DEFAULT_N_KING_BUCKETS
 N_PIECE_TYPES = 12
 N_SQUARES = 64
@@ -40,6 +42,7 @@ N_L3 = 32
 N_OUTPUT = 1
 NETWORK_HEADER_MAGIC = b"ENYONN2\0"
 NETWORK_FORMAT_VERSION = 2
+NETWORK_FLAG_FULL_THREATS = 1
 NETWORK_HEADER = struct.Struct("<8s14I")
 NETWORK_HEADER_SIZE = NETWORK_HEADER.size
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
@@ -59,13 +62,23 @@ def feature_count(
     return input_buckets * feature_channels * N_SQUARES
 
 
+def input_feature_count(
+    input_buckets: int = DEFAULT_N_KING_BUCKETS,
+    feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
+    full_threats: bool = False,
+) -> int:
+    return feature_count(input_buckets, feature_channels) + (
+        N_THREAT_FEATURES if full_threats else 0)
+
+
 def network_size(
     input_buckets: int = DEFAULT_N_KING_BUCKETS,
     output_buckets: int = DEFAULT_N_OUTPUT_BUCKETS,
     output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES,
     feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
+    full_threats: bool = False,
 ) -> int:
-    features = feature_count(input_buckets, feature_channels)
+    features = input_feature_count(input_buckets, feature_channels, full_threats)
     if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {output_buckets}")
     if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
@@ -210,6 +223,7 @@ class Net:
     output_head_features: int = DEFAULT_N_OUTPUT_HEAD_FEATURES
     trained_hidden: int = N_HIDDEN
     format_version: int = 1
+    full_threats: bool = False
 
     @property
     def output_bias(self) -> float:
@@ -258,6 +272,262 @@ def feature_index(piece_type: int, piece_color: int, enyo_sq: int,
     return king_buckets(input_buckets)[ok] * feature_channels * 64 + op * 64 + osq
 
 
+_VALID_THREAT_TARGETS = (0, 6, 10, 8, 8, 10, 0, 0, 0, 6, 10, 8, 8, 10, 0, 0)
+_THREAT_TARGET_MAP = (
+    (0, 1, -1, 2, -1, -1),
+    (0, 1, 2, 3, 4, -1),
+    (0, 1, 2, 3, -1, -1),
+    (0, 1, 2, 3, -1, -1),
+    (0, 1, 2, 3, 4, -1),
+    (-1, -1, -1, -1, -1, -1),
+)
+_THREAT_PIECES = (1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14)
+_THREAT_NONE = 0xff
+
+
+def _on_board(file_idx: int, rank: int) -> bool:
+    return 0 <= file_idx < 8 and 0 <= rank < 8
+
+
+def _piece_color(piece: int) -> int:
+    return piece >> 3
+
+
+def _piece_type(piece: int) -> int:
+    return piece & 7
+
+
+def _leaper_attacks(piece_type: int, square: int) -> int:
+    knight = (
+        (1, 2), (2, 1), (2, -1), (1, -2),
+        (-1, -2), (-2, -1), (-2, 1), (-1, 2),
+    )
+    king = (
+        (1, 1), (1, 0), (1, -1), (0, -1),
+        (-1, -1), (-1, 0), (-1, 1), (0, 1),
+    )
+    attacks = 0
+    file_idx = square % 8
+    rank = square // 8
+    for df, dr in (knight if piece_type == KNIGHT else king):
+        to_file = file_idx + df
+        to_rank = rank + dr
+        if _on_board(to_file, to_rank):
+            attacks |= 1 << (to_rank * 8 + to_file)
+    return attacks
+
+
+def _slider_attacks(piece_type: int, square: int, occupied: int) -> int:
+    bishop = ((1, 1), (1, -1), (-1, -1), (-1, 1))
+    rook = ((1, 0), (0, -1), (-1, 0), (0, 1))
+    attacks = 0
+    file_idx = square % 8
+    rank = square // 8
+    rays = ()
+    if piece_type in (BISHOP, QUEEN):
+        rays += bishop
+    if piece_type in (ROOK, QUEEN):
+        rays += rook
+    for df, dr in rays:
+        to_file = file_idx + df
+        to_rank = rank + dr
+        while _on_board(to_file, to_rank):
+            target = to_rank * 8 + to_file
+            bit = 1 << target
+            attacks |= bit
+            if occupied & bit:
+                break
+            to_file += df
+            to_rank += dr
+    return attacks
+
+
+def _pawn_push_or_attacks(color: int, square: int) -> int:
+    attacks = 0
+    file_idx = square % 8
+    rank = square // 8
+    rank_delta = 1 if color == WHITE else -1
+    for file_delta in (-1, 0, 1):
+        to_file = file_idx + file_delta
+        to_rank = rank + rank_delta
+        if _on_board(to_file, to_rank):
+            attacks |= 1 << (to_rank * 8 + to_file)
+    return attacks
+
+
+def _pseudo_threat_attacks(piece: int, square: int) -> int:
+    pt = _piece_type(piece)
+    if pt == PAWN:
+        return _pawn_push_or_attacks(_piece_color(piece), square)
+    if pt in (KNIGHT, KING):
+        return _leaper_attacks(pt, square)
+    return _slider_attacks(pt, square, 0)
+
+
+@lru_cache(maxsize=1)
+def _threat_tables():
+    offsets = [[0 for _ in range(N_SQUARES)] for _ in range(16)]
+    target_offsets = [
+        [[N_THREAT_FEATURES for _ in range(2)] for _ in range(16)]
+        for _ in range(16)
+    ]
+    attack_offsets = [
+        [[0 for _ in range(N_SQUARES)] for _ in range(N_SQUARES)]
+        for _ in range(16)
+    ]
+    helper: list[tuple[int, int]] = [(0, 0)] * 16
+    global_offset = 0
+    for piece in _THREAT_PIECES:
+        piece_span = 0
+        for square in range(N_SQUARES):
+            offsets[piece][square] = piece_span
+            if _piece_type(piece) != PAWN or 8 <= square < 56:
+                piece_span += _pseudo_threat_attacks(piece, square).bit_count()
+        helper[piece] = (piece_span, global_offset)
+        global_offset += _VALID_THREAT_TARGETS[piece] * piece_span
+
+        for from_sq in range(N_SQUARES):
+            attacks = _pseudo_threat_attacks(piece, from_sq)
+            for to_sq in range(N_SQUARES):
+                below = 0 if to_sq == 0 else (1 << to_sq) - 1
+                attack_offsets[piece][from_sq][to_sq] = (attacks & below).bit_count()
+    if global_offset != N_THREAT_FEATURES:
+        raise RuntimeError("FullThreats table size mismatch")
+
+    for attacker in _THREAT_PIECES:
+        for attacked in _THREAT_PIECES:
+            attacker_type = _piece_type(attacker)
+            attacked_type = _piece_type(attacked)
+            mapped = _THREAT_TARGET_MAP[attacker_type - 1][attacked_type - 1]
+            excluded = mapped < 0
+            enemy = (attacker ^ attacked) == 8
+            same_type_excluded = (
+                attacker_type == attacked_type and (enemy or attacker_type != PAWN)
+            )
+            if excluded:
+                base = N_THREAT_FEATURES
+            else:
+                piece_span, global_base = helper[attacker]
+                base = (
+                    global_base
+                    + (_piece_color(attacked) * (_VALID_THREAT_TARGETS[attacker] // 2)
+                       + mapped) * piece_span
+                )
+            target_offsets[attacker][attacked][0] = base
+            target_offsets[attacker][attacked][1] = (
+                N_THREAT_FEATURES if excluded or same_type_excluded else base
+            )
+    return offsets, target_offsets, attack_offsets
+
+
+def _threat_make_index(perspective: int, attacker: int, from_sq: int,
+                       to_sq: int, attacked: int, king_square: int) -> int:
+    orientation = (0 if king_square % 8 < 4 else 7) ^ (56 * perspective)
+    oriented_from = from_sq ^ orientation
+    oriented_to = to_sq ^ orientation
+    color_swap = 8 * perspective
+    oriented_attacker = attacker ^ color_swap
+    oriented_attacked = attacked ^ color_swap
+    offsets, target_offsets, attack_offsets = _threat_tables()
+    target_offset = target_offsets[oriented_attacker][oriented_attacked][
+        int(oriented_from < oriented_to)]
+    if target_offset >= N_THREAT_FEATURES:
+        return N_THREAT_FEATURES
+    return (
+        target_offset
+        + offsets[oriented_attacker][oriented_from]
+        + attack_offsets[oriented_attacker][oriented_from][oriented_to]
+    )
+
+
+def _trailing_square(bitboard: int) -> int:
+    if bitboard == 0:
+        raise ValueError("missing king for FullThreats features")
+    return (bitboard & -bitboard).bit_length() - 1
+
+
+def threat_features_from_pieces(
+    pieces: Sequence[tuple[int, int, int]],
+    view: int,
+) -> list[int]:
+    occupied = 0
+    pt_bb = [[0 for _ in range(7)] for _ in range(2)]
+    piece_at = [_THREAT_NONE for _ in range(N_SQUARES)]
+    color_at = [WHITE for _ in range(N_SQUARES)]
+    for pt, color, sq in pieces:
+        bit = 1 << sq
+        occupied |= bit
+        pt_bb[color][pt] |= bit
+        piece_at[sq] = pt
+        color_at[sq] = color
+
+    both = lambda pt: pt_bb[WHITE][pt] | pt_bb[BLACK][pt]
+    pawn_targets = both(PAWN) | both(KNIGHT) | both(ROOK)
+    minor_slider_targets = pawn_targets | both(BISHOP)
+    queen_targets = minor_slider_targets | both(QUEEN)
+    king_square = [
+        _trailing_square(pt_bb[WHITE][KING]) ^ 7,
+        _trailing_square(pt_bb[BLACK][KING]) ^ 7,
+    ]
+    active: list[int] = []
+
+    def emit(attacker: int, from_sq: int, to_sq: int) -> None:
+        if piece_at[to_sq] == _THREAT_NONE:
+            return
+        attacked = piece_at[to_sq] + (color_at[to_sq] << 3)
+        index = _threat_make_index(
+            view, attacker, from_sq ^ 7, to_sq ^ 7, attacked, king_square[view])
+        if index < N_THREAT_FEATURES:
+            active.append(index)
+
+    for color in (WHITE, BLACK):
+        rank_delta = 1 if color == WHITE else -1
+        pawn = PAWN + (color << 3)
+        pawns = pt_bb[color][PAWN]
+        while pawns:
+            from_sq = _trailing_square(pawns)
+            pawns &= pawns - 1
+            file_idx = from_sq % 8
+            target_rank = from_sq // 8 + rank_delta
+            for file_delta in (-1, 1):
+                target_file = file_idx + file_delta
+                if _on_board(target_file, target_rank):
+                    to_sq = target_rank * 8 + target_file
+                    if pawn_targets & (1 << to_sq):
+                        emit(pawn, from_sq, to_sq)
+            if _on_board(file_idx, target_rank):
+                to_sq = target_rank * 8 + file_idx
+                if piece_at[to_sq] == PAWN:
+                    emit(pawn, from_sq, to_sq)
+
+        for pt in (KNIGHT, BISHOP, ROOK, QUEEN):
+            attacker = pt + (color << 3)
+            targets = queen_targets if pt in (KNIGHT, QUEEN) else minor_slider_targets
+            attackers = pt_bb[color][pt]
+            while attackers:
+                from_sq = _trailing_square(attackers)
+                attackers &= attackers - 1
+                if pt == KNIGHT:
+                    attacks = _leaper_attacks(KNIGHT, from_sq)
+                elif pt == BISHOP:
+                    attacks = _slider_attacks(BISHOP, from_sq, occupied)
+                elif pt == ROOK:
+                    attacks = _slider_attacks(ROOK, from_sq, occupied)
+                else:
+                    attacks = (
+                        _slider_attacks(BISHOP, from_sq, occupied)
+                        | _slider_attacks(ROOK, from_sq, occupied)
+                    )
+                hits = attacks & targets
+                while hits:
+                    to_sq = _trailing_square(hits)
+                    hits &= hits - 1
+                    emit(attacker, from_sq, to_sq)
+
+    active.sort()
+    return active
+
+
 def parse_fen(fen: str) -> tuple[list[tuple[int, int, int]], int]:
     parts = fen.split()
     board_part, stm_part = parts[0], parts[1]
@@ -285,11 +555,18 @@ def parse_fen(fen: str) -> tuple[list[tuple[int, int, int]], int]:
 def features_from_pieces(pieces: Sequence[tuple[int, int, int]],
                          view: int,
                          input_buckets: int = DEFAULT_N_KING_BUCKETS,
-                         feature_channels: int = DEFAULT_N_FEATURE_CHANNELS) -> list[int]:
+                         feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
+                         full_threats: bool = False) -> list[int]:
     king_sq = next(sq for pt, color, sq in pieces
                    if pt == KING and color == view)
-    return [feature_index(pt, color, sq, king_sq, view, input_buckets, feature_channels)
-            for pt, color, sq in pieces]
+    features = [
+        feature_index(pt, color, sq, king_sq, view, input_buckets, feature_channels)
+        for pt, color, sq in pieces
+    ]
+    if full_threats:
+        base = feature_count(input_buckets, feature_channels)
+        features.extend(base + index for index in threat_features_from_pieces(pieces, view))
+    return features
 
 
 def phase_scale_from_pieces(pieces: Sequence[tuple[int, int, int]]) -> float:
@@ -331,6 +608,7 @@ def load_net(path: str | Path) -> Net:
     data = Path(path).read_bytes()
     trained_hidden = N_HIDDEN
     format_version = 1
+    full_threats = False
     payload = data
     if data.startswith(NETWORK_HEADER_MAGIC):
         if len(data) < NETWORK_HEADER_SIZE:
@@ -366,12 +644,13 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: unsupported output bucket count")
         if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
             raise ValueError(f"{path}: unsupported output head feature count")
-        if flags or reserved0 or reserved1:
+        if (flags & ~NETWORK_FLAG_FULL_THREATS) or reserved0 or reserved1:
             raise ValueError(f"{path}: unsupported header flags or reserved fields")
+        full_threats = bool(flags & NETWORK_FLAG_FULL_THREATS)
         payload = data[header_size:]
         expected_payload = network_size(
             input_buckets, output_buckets, output_head_features,
-            feature_channels)
+            feature_channels, full_threats)
         if payload_size != expected_payload or len(payload) != expected_payload:
             raise ValueError(
                 f"{path}: payload size {len(payload)} does not match {expected_payload}")
@@ -381,7 +660,7 @@ def load_net(path: str | Path) -> Net:
                 len(data))
         except ValueError as exc:
             raise ValueError(f"{path}: {exc}") from exc
-    n_features = feature_count(input_buckets, feature_channels)
+    n_features = input_feature_count(input_buckets, feature_channels, full_threats)
     output_width = N_L3 + output_head_features
 
     off = 0
@@ -416,11 +695,13 @@ def load_net(path: str | Path) -> Net:
         output_buckets=output_buckets,
         output_head_features=output_head_features,
         trained_hidden=trained_hidden,
-        format_version=format_version)
+        format_version=format_version,
+        full_threats=full_threats)
 
 
 def write_net(net: Net, path: str | Path) -> None:
-    expected_features = feature_count(net.input_buckets, net.feature_channels)
+    expected_features = input_feature_count(
+        net.input_buckets, net.feature_channels, net.full_threats)
     if net.trained_hidden not in SUPPORTED_TRAINED_HIDDEN:
         raise ValueError(f"unsupported trained hidden width {net.trained_hidden}")
     input_weights = np.asarray(net.input_weights, dtype=np.int16)
@@ -493,7 +774,7 @@ def write_net(net: Net, path: str | Path) -> None:
             N_L3,
             net.output_buckets,
             net.output_head_features,
-            0,
+            NETWORK_FLAG_FULL_THREATS if net.full_threats else 0,
             len(payload),
             0,
             0,
@@ -507,7 +788,7 @@ def write_net(net: Net, path: str | Path) -> None:
     size = out.stat().st_size
     expected = network_size(
         net.input_buckets, net.output_buckets, net.output_head_features,
-        net.feature_channels)
+        net.feature_channels, net.full_threats)
     if net.format_version == NETWORK_FORMAT_VERSION:
         expected += NETWORK_HEADER_SIZE
     if size != expected:

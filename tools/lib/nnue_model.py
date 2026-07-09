@@ -18,7 +18,8 @@ class EnyoNNUE(nn_pt.Module):
                  output_buckets: int = nn2.DEFAULT_N_OUTPUT_BUCKETS,
                  output_head_features: int = nn2.DEFAULT_N_OUTPUT_HEAD_FEATURES,
                  trained_hidden: int = nn2.N_HIDDEN,
-                 format_version: int = 1):
+                 format_version: int = 1,
+                 full_threats: bool = False):
         super().__init__()
         self.input_buckets = input_buckets
         self.feature_channels = feature_channels
@@ -26,8 +27,10 @@ class EnyoNNUE(nn_pt.Module):
         self.output_head_features = output_head_features
         self.trained_hidden = trained_hidden
         self.format_version = format_version
+        self.full_threats = full_threats
         self.embed = nn_pt.EmbeddingBag(
-            nn2.feature_count(input_buckets, feature_channels), nn2.N_HIDDEN,
+            nn2.input_feature_count(input_buckets, feature_channels, full_threats),
+            nn2.N_HIDDEN,
             mode="sum")
         self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
         self.l1_weight = nn_pt.Parameter(torch.zeros(nn2.N_L2, nn2.N_L1))
@@ -69,6 +72,16 @@ class EnyoNNUE(nn_pt.Module):
         divisor = (32 + self.output_buckets - 1) // self.output_buckets
         return torch.clamp(
             torch.div(counts - 2, divisor, rounding_mode="floor"),
+            min=0,
+            max=self.output_buckets - 1,
+        )
+
+    def output_bucket_from_piece_count(self, piece_count: torch.Tensor) -> torch.Tensor:
+        if self.output_buckets <= 1:
+            return torch.zeros_like(piece_count)
+        divisor = (32 + self.output_buckets - 1) // self.output_buckets
+        return torch.clamp(
+            torch.div(piece_count - 2, divisor, rounding_mode="floor"),
             min=0,
             max=self.output_buckets - 1,
         )
@@ -135,6 +148,8 @@ class EnyoNNUE(nn_pt.Module):
                 piece_count: torch.Tensor | None = None,
                 ) -> torch.Tensor:
         head_features = None
+        if output_bucket is None and piece_count is not None:
+            output_bucket = self.output_bucket_from_piece_count(piece_count)
         if self.output_head_features:
             if piece_count is None:
                 piece_count = self.piece_counts_from_offsets(w_feats, w_offsets)
@@ -165,7 +180,8 @@ def load_model_from_nn(
         output_buckets=net.output_buckets,
         output_head_features=output_head_features,
         trained_hidden=net.trained_hidden,
-        format_version=net.format_version)
+        format_version=net.format_version,
+        full_threats=net.full_threats)
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
         model.input_bias.copy_(torch.from_numpy(net.input_biases.astype(np.float32)))
@@ -230,5 +246,6 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         output_head_features=model.output_head_features,
         trained_hidden=model.trained_hidden,
         format_version=model.format_version,
+        full_threats=model.full_threats,
     )
     nn2.write_net(net, path)

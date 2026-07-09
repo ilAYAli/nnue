@@ -22,7 +22,8 @@ assert BULLET_CHESSBOARD_STRUCT.size == bullet_format.RECORD_BYTES
 class FenScoreDataset(Dataset):
     def __init__(self, rows: Iterable[dict], *,
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
-                 feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS):
+                 feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
+                 full_threats: bool = False):
         self.items: list[
             tuple[list[int], list[int], int, int, float, float, float, int]
         ] = []
@@ -31,18 +32,18 @@ class FenScoreDataset(Dataset):
             fen = row["fen"]
             pieces, stm = nn2.parse_fen(fen)
             pieces.sort(key=lambda item: item[2])
-            w_feats = nn2.features_from_pieces(
-                pieces, nn2.WHITE, input_buckets, feature_channels)
-            b_feats = nn2.features_from_pieces(
-                pieces, nn2.BLACK, input_buckets, feature_channels)
             phase_scale = nn2.phase_scale_from_pieces(pieces)
             source_name = str(
                 row.get("source_type") or row.get("teacher") or "unknown")
             if source_name not in source_map:
                 source_map[source_name] = len(source_map)
             self.items.append((
-                w_feats,
-                b_feats,
+                nn2.features_from_pieces(
+                    pieces, nn2.WHITE, input_buckets, feature_channels,
+                    full_threats),
+                nn2.features_from_pieces(
+                    pieces, nn2.BLACK, input_buckets, feature_channels,
+                    full_threats),
                 len(pieces),
                 stm,
                 float(row["score"]),
@@ -56,6 +57,7 @@ class FenScoreDataset(Dataset):
                    limit: int = 0, skip: int = 0,
                    input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                    feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
+                   full_threats: bool = False,
                    ) -> "FenScoreDataset":
         rows = []
         with Path(path).open() as f:
@@ -71,7 +73,8 @@ class FenScoreDataset(Dataset):
         return cls(
             rows,
             input_buckets=input_buckets,
-            feature_channels=feature_channels)
+            feature_channels=feature_channels,
+            full_threats=full_threats)
 
     def __len__(self) -> int:
         return len(self.items)
@@ -133,10 +136,12 @@ class BulletDataScoreDataset(Dataset):
     def __init__(self, path: str | Path, *,
                  limit: int = 0, skip: int = 0,
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
-                 feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS) -> None:
+                 feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
+                 full_threats: bool = False) -> None:
         self.path = Path(path)
         self.input_buckets = input_buckets
         self.feature_channels = feature_channels
+        self.full_threats = full_threats
         size = self.path.stat().st_size
         if size % bullet_format.RECORD_BYTES:
             raise ValueError(
@@ -187,9 +192,11 @@ class BulletDataScoreDataset(Dataset):
 
         pieces.sort(key=lambda item: item[2])
         w_feats = nn2.features_from_pieces(
-            pieces, nn2.WHITE, self.input_buckets, self.feature_channels)
+            pieces, nn2.WHITE, self.input_buckets, self.feature_channels,
+            self.full_threats)
         b_feats = nn2.features_from_pieces(
-            pieces, nn2.BLACK, self.input_buckets, self.feature_channels)
+            pieces, nn2.BLACK, self.input_buckets, self.feature_channels,
+            self.full_threats)
         phase_scale = nn2.phase_scale_from_pieces(pieces)
         return (
             torch.tensor(w_feats, dtype=torch.long),
@@ -285,9 +292,12 @@ def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
                        in_memory: bool = False,
                        input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                        feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
+                       full_threats: bool = False,
                        ) -> tuple[Dataset, Callable]:
     p = Path(path)
     if p.is_dir():
+        if full_threats:
+            raise ValueError("packed datasets do not include FullThreats features")
         return PackedFenScoreDataset(
             p, limit=limit, skip=skip, in_memory=in_memory), collate_packed
     if p.suffix == ".data":
@@ -301,10 +311,12 @@ def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
             limit=limit,
             skip=skip,
             input_buckets=input_buckets,
-            feature_channels=feature_channels), collate
+            feature_channels=feature_channels,
+            full_threats=full_threats), collate
     return FenScoreDataset.from_jsonl(
         p,
         limit=limit,
         skip=skip,
         input_buckets=input_buckets,
-        feature_channels=feature_channels), collate
+        feature_channels=feature_channels,
+        full_threats=full_threats), collate
