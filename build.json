@@ -1,6 +1,6 @@
 {
-  "run": "enyo-1.15.0-rc1",
-  "hypothesis": "apply the historically successful WDL 0.05 objective on farseerT76 offset 400M",
+  "run": "enyo-1.15.0-rc2",
+  "hypothesis": "retry farseerT76 offset 600M with the historically successful LR 0.0001",
   "superbatches": 256,
   "wdl": 0.05,
   "data": {
@@ -10,5 +10,5 @@
   },
   "continue_from": "enyo-1.14.0-rc2",
   "activation_l1": 0.00001,
-  "lr": 0.000125
+  "lr": 0.0001
 }
