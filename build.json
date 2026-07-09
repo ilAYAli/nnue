@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.18.0-rc1",
-  "hypothesis": "continue enyo-1.17.0-rc2 on the T60T70 offset 400M slice",
+  "run": "enyo-1.19.0-rc1",
+  "hypothesis": "continue confirmed champion enyo-1.18.0-rc1 on the T60T70 offset 600M slice",
   "superbatches": 256,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
-    "offset": 400000000
+    "offset": 600000000
   },
-  "continue_from": "enyo-1.17.0-rc2",
+  "continue_from": "enyo-1.18.0-rc1",
   "activation_l1": 0.00001,
   "lr": 0.0001
 }
