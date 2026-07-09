@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.14.0-rc1",
-  "hypothesis": "raise WDL from 0.15 to the historically successful 0.30 on the same farseerT76 slice",
+  "run": "enyo-1.14.0-rc2",
+  "hypothesis": "apply the historically successful WDL 0.05 objective on farseerT76 offset 400M",
   "superbatches": 256,
-  "wdl": 0.30,
+  "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 400000000
   },
   "continue_from": "enyo-1.13.0-rc2",
   "activation_l1": 0.00001,
