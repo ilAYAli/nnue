@@ -1,6 +1,6 @@
 {
-  "run": "enyo-1.17.0-rc1",
-  "hypothesis": "switch the accepted parent to the historically positive T60T70wIsRightFarseer regimen",
+  "run": "enyo-1.17.0-rc2",
+  "hypothesis": "apply the T60T70 offset 200M regimen to the strongest absolute checkpoint enyo-1.13.0-rc2",
   "superbatches": 256,
   "wdl": 0.05,
   "data": {
@@ -8,7 +8,7 @@
     "limit": 200000000,
     "offset": 200000000
   },
-  "continue_from": "enyo-1.16.0-rc3",
+  "continue_from": "enyo-1.13.0-rc2",
   "activation_l1": 0.00001,
   "lr": 0.0001
 }
