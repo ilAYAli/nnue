@@ -1,0 +1,2 @@
+{"date":"2026-07-09","candidate":"enyo_0a2b660","reference":"enyo_9fd7b74","net":"enyo-1.5.0-rc2.nn","requested_games":1000,"games":1000,"elo":4.5,"ci":18.3,"llr":0.01,"llr_bound":690.78,"los":68.5,"draw":36.1}
+{"date":"2026-07-09","candidate":"enyo_0a2b660","reference":"enyo_9fd7b74","net":"nn-0ee0657fb25e.nnue","requested_games":1000,"games":1000,"elo":17.0,"ci":18.9,"llr":1.37,"llr_bound":690.78,"los":96.1,"draw":32.1}
