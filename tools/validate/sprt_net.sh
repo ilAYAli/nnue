@@ -27,8 +27,12 @@ while [[ $# -gt 0 ]]; do
             CANDIDATE_NET=$(resolve_path "$2")
             shift 2
             ;;
+        --engine)
+            CANDIDATE="$2"
+            shift 2
+            ;;
         *)
-            echo "Error: Invalid argument '$1'. Only --candidate and --reference flags are allowed." >&2
+            echo "Error: Invalid argument '$1'. Only --candidate, --reference, and --engine flags are allowed." >&2
             exit 2
             ;;
     esac
