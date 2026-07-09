@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.19.0-rc1",
-  "hypothesis": "continue confirmed champion enyo-1.18.0-rc1 on the T60T70 offset 600M slice",
-  "superbatches": 256,
+  "run": "enyo-1.19.0-rc2",
+  "hypothesis": "retry rejected T60T70 offset 600M with dose reduced from 256 to 64 superbatches",
+  "superbatches": 64,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
