@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.20.0-rc1",
-  "hypothesis": "retry rejected T60T70 offset 600M with dose reduced from 256 to 64 superbatches",
-  "superbatches": 64,
+  "run": "enyo-1.20.0-rc2",
+  "hypothesis": "retry rejected T60T70 offset 800M with dose reduced from 64 to 32 superbatches",
+  "superbatches": 32,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
