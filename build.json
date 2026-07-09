@@ -1,14 +1,16 @@
 {
-  "run": "enyo-1.20.0-rc3",
-  "hypothesis": "train only the output layer on the rejected T60T70 offset 800M slice while holding the 32-superbatch dose fixed",
-  "superbatches": 32,
-  "wdl": 0.05,
+  "run": "enyo-2.0.0-rc1",
+  "reference": "enyo-1.16.0-rc3",
+  "hypothesis": "scratch FullThreats 16x12x1024-o8 with proven WDL/L1 recipe on the broad pylon corpus",
+  "superbatches": 32768,
+  "lr_superbatches": 32768,
+  "save_rate": 8192,
+  "wdl": 0.15,
+  "lr": 0.001,
+  "final_lr": 0.000005,
+  "activation_l1": 0.00001,
+  "trainable": "all",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
-    "limit": 200000000,
-    "offset": 800000000
-  },
-  "continue_from": "enyo-1.19.0-rc2",
-  "trainable": "output",
-  "lr": 0.0001
+    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+  }
 }
