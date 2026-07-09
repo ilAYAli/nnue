@@ -1,3 +1,5 @@
+mod enyo_threats;
+
 use std::env;
 
 use bullet_lib::{
@@ -97,7 +99,11 @@ fn maybe_frozen<'a, T>(builder: &'a ModelBuilder, frozen: bool, mut f: impl FnMu
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct EnyoInputs<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize>;
+struct EnyoInputs<
+    const INPUT_BUCKETS: usize,
+    const FEATURE_CHANNELS: usize,
+    const FULL_THREATS: bool,
+>;
 
 #[rustfmt::skip]
 const ENYO_KING_BUCKETS_16: [usize; 64] = [
@@ -177,17 +183,26 @@ fn bullet_square_to_enyo_net(square: u8) -> u8 {
     square ^ 56
 }
 
-impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize> SparseInputType
-    for EnyoInputs<INPUT_BUCKETS, FEATURE_CHANNELS>
+impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const FULL_THREATS: bool>
+    SparseInputType for EnyoInputs<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS>
 {
     type RequiredDataType = ChessBoard;
 
     fn num_inputs(&self) -> usize {
         INPUT_BUCKETS * FEATURE_CHANNELS * 64
+            + if FULL_THREATS {
+                enyo_threats::DIMENSIONS
+            } else {
+                0
+            }
     }
 
     fn max_active(&self) -> usize {
-        32
+        32 + if FULL_THREATS {
+            enyo_threats::MAX_ACTIVE
+        } else {
+            0
+        }
     }
 
     fn map_features<F: FnMut(usize, usize)>(&self, pos: &Self::RequiredDataType, mut f: F) {
@@ -199,6 +214,18 @@ impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize> SparseInputType
                 enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, stm_king, 0),
                 enyo_feature::<INPUT_BUCKETS, FEATURE_CHANNELS>(piece, sq, ntm_king, 1),
             );
+        }
+        if FULL_THREATS {
+            let base = INPUT_BUCKETS * FEATURE_CHANNELS * 64;
+            let threats = enyo_threats::active_features(pos);
+            assert_eq!(
+                threats[0].len(),
+                threats[1].len(),
+                "FullThreats perspective feature counts differ",
+            );
+            for i in 0..threats[0].len() {
+                f(base + threats[0].get(i), base + threats[1].get(i));
+            }
         }
     }
 
@@ -249,6 +276,7 @@ fn train_enyo<
     const INPUT_BUCKETS: usize,
     const FEATURE_CHANNELS: usize,
     const OUTPUT_BUCKETS: usize,
+    const FULL_THREATS: bool,
 >(
     dataset: String,
     output: String,
@@ -300,6 +328,9 @@ fn train_enyo<
     if !activation_l1.is_finite() || activation_l1 < 0.0 {
         panic!("activation_l1 must be finite and non-negative");
     }
+    if FULL_THREATS && input_factoriser {
+        panic!("full-threat Enyo mode does not support input_factoriser yet");
+    }
 
     println!("mode=enyo");
     println!("dataset={dataset}");
@@ -309,6 +340,7 @@ fn train_enyo<
     println!("enyo_input_buckets={INPUT_BUCKETS}");
     println!("enyo_feature_channels={FEATURE_CHANNELS}");
     println!("enyo_output_buckets={OUTPUT_BUCKETS}");
+    println!("enyo_full_threats={FULL_THREATS}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
     println!("enyo_input_factoriser={input_factoriser}");
@@ -360,7 +392,7 @@ fn train_enyo<
             ValueTrainerBuilder::default()
                 .dual_perspective()
                 .optimiser(AdamW)
-                .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS>)
+                .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS>)
                 .save_format(&[
                     l0w_format!(),
                     SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -395,7 +427,12 @@ fn train_enyo<
                 enyo_affine(
                     $builder,
                     "l0",
-                    INPUT_BUCKETS * FEATURE_CHANNELS * 64,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
+                        + if FULL_THREATS {
+                            enyo_threats::DIMENSIONS
+                        } else {
+                            0
+                        },
                     hidden,
                     l0_stdev,
                 )
@@ -617,6 +654,7 @@ fn main() {
     let enyo_input_buckets = env_parse("ENYO_BULLET_ENYO_INPUT_BUCKETS", 32usize);
     let enyo_feature_channels = env_parse("ENYO_BULLET_ENYO_FEATURE_CHANNELS", 12usize);
     let enyo_output_buckets = env_parse("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", 1usize);
+    let enyo_full_threats = env_parse("ENYO_BULLET_ENYO_FULL_THREATS", 0usize) != 0;
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
@@ -625,8 +663,8 @@ fn main() {
 
     if mode == "enyo" {
         macro_rules! run_enyo {
-            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal) => {
-                train_enyo::<$input_buckets, $feature_channels, $output_buckets>(
+            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal) => {
+                train_enyo::<$input_buckets, $feature_channels, $output_buckets, $full_threats>(
                     dataset,
                     output,
                     net_id,
@@ -656,11 +694,15 @@ fn main() {
 
         macro_rules! run_enyo_layout {
             ($input_buckets:literal, $feature_channels:literal) => {
-                match enyo_output_buckets {
-                    1 => run_enyo!($input_buckets, $feature_channels, 1),
-                    2 => run_enyo!($input_buckets, $feature_channels, 2),
-                    4 => run_enyo!($input_buckets, $feature_channels, 4),
-                    8 => run_enyo!($input_buckets, $feature_channels, 8),
+                match (enyo_output_buckets, enyo_full_threats) {
+                    (1, false) => run_enyo!($input_buckets, $feature_channels, 1, false),
+                    (2, false) => run_enyo!($input_buckets, $feature_channels, 2, false),
+                    (4, false) => run_enyo!($input_buckets, $feature_channels, 4, false),
+                    (8, false) => run_enyo!($input_buckets, $feature_channels, 8, false),
+                    (1, true) => run_enyo!($input_buckets, $feature_channels, 1, true),
+                    (2, true) => run_enyo!($input_buckets, $feature_channels, 2, true),
+                    (4, true) => run_enyo!($input_buckets, $feature_channels, 4, true),
+                    (8, true) => run_enyo!($input_buckets, $feature_channels, 8, true),
                     _ => {
                         panic!("unsupported ENYO_BULLET_ENYO_OUTPUT_BUCKETS={enyo_output_buckets}")
                     }

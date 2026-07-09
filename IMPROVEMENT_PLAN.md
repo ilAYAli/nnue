@@ -2,46 +2,38 @@
 
 ## Current status
 
-Current: **Stage 6 - incremental improvement**
+Current: **FullThreats architecture support**
 
-- Champion: `enyo-scratch-broad-1.5.0-rc1` using the
-  `16x12x1024-o8` architecture.
-- The 128-superbatch float-head lane produced two promotions but inconsistent
-  slice results.
-- Input-only training then promoted twice at `+2.3` and `+5.3` Elo before a
-  `+0.5` Elo candidate was rejected on negative LLR.
-- The latest fixed default-net checkpoint was `-215.4 +/-58.0` Elo.
-- Close short block-coordinate updates; they refine the net but cannot
-  plausibly close the remaining absolute gap.
-- Next: train `enyo-scratch-long-1.0.0-rc1` from random initialization on the
-  same architecture, 2.8B-position pylon corpus, WDL, and LR endpoints for
-  196,608 superbatches, about 9.2 corpus epochs.
+- Absolute benchmark target: Stockfish net `nn-0ee0657fb25e.nnue`, not
+  `default.net`.
+- Current promoted Enyo family is around `-150` to `-180` Elo versus the
+  Stockfish net in 500-game checks, so incremental same-architecture updates
+  are not enough.
+- New architecture direction: Enyo-native HalfKA input plus Stockfish-style
+  FullThreats features, keeping the existing dense head/output-bucket path.
+- Support implemented on 2026-07-09:
+  - Rust trainer can emit `full_threats=true` feature rows.
+  - Enyo native v2 header uses a strict FullThreats flag.
+  - Enyo runtime loads, reports, and searches with flagged FullThreats nets.
+  - FullThreats currently requires `export_format=enyo-native-v2` and
+    `input_factoriser=false`.
+- Verification completed:
+  - `cargo check --features cuda --bin train`
+  - `cargo check --features cuda`
+  - `cargo test --features cuda --bin train`
+  - Enyo build
+  - one-superbatch FullThreats export/load/search smoke
+- Known unrelated test issue: full Enyo test suite currently has one failing
+  search expectation, `search.hypersion_check_net_root_evasions_find_safer_defenses`.
+  Network/model/audit tests passed.
 
-Completed stages:
+Next:
 
-- Stage 0 - plan and protocol, 2026-07-04.
-- Stage 1 - architecture support, 2026-07-04.
-  - All eight planned layouts passed trainer-to-engine parity.
-  - Enyo, Rust/CUDA, and Python support suites passed.
-  - Checkpoint resume restored weights, Adam state, data position, and LR
-    position. Its maximum final-weight difference was `1.91e-6`, identical to
-    the variation between two uninterrupted CUDA runs.
-- Stage 2 - short training, 2026-07-04.
-  - Eight of eight planned candidates completed and passed the exit gate.
-- Stage 3 - architecture screening, 2026-07-04.
-  - `enyo-10x11-768-o8` won both finalist matches head-to-head.
-- Stage 4 - full winner training, 2026-07-04.
-  - Optimizer-preserving resume and all exit gates passed.
-- Stage 5 - full validation, 2026-07-04.
-  - The compact HalfKAv2-style candidate did not beat the full baseline;
-    `enyo-scratch-broad-1.0.0-rc1` remains champion.
-
-Queued stages and elapsed-time estimates:
-
-1. Stage 6 - incremental improvement: 30-45 minutes per iteration.
-
-Update this section when a stage starts and completes. Record the actual result
-and calculate the next stage's expected finish from its real start time.
+1. Commit the support changes in `nnue` and `enyo`.
+2. Configure the first short scratch FullThreats candidate in `architecture.json`
+   and `build.json`.
+3. Run the normal NNUE loop from `nnue_cmd` after the support commits are in
+   place.
 
 ## Stage 1: architecture support
 
