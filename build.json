@@ -1,20 +1,20 @@
 {
-  "run": "enyo-1.21.0-rc5",
+  "run": "enyo-1.21.0-rc7",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "train the input transformer on tablebase-heavy test80 data after output-only endgame targeting was neutral",
+  "hypothesis": "switch from failed tablebase-heavy endgame targeting to a small output-only pass on UHO PV2 tactical positions",
   "superbatches": 1024,
   "lr_superbatches": 1024,
   "save_rate": 1024,
   "wdl": 0.15,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "trainable": "input",
+  "trainable": "output",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
     "limit": 200000000,
     "offset": 0
   },
   "sfbinpack": {
-    "min_ply": 24
+    "min_ply": 16
   }
 }
