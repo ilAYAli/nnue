@@ -1,15 +1,14 @@
 {
-  "run": "enyo-1.20.0-rc5",
+  "run": "enyo-1.20.0-rc6",
   "continue_from": "enyo-1.16.0-rc3",
-  "hypothesis": "return to the strongest Stockfish-benchmark checkpoint and try a small input-only broad-pylon consolidation after later continuations regressed",
+  "hypothesis": "retry the strongest Stockfish-benchmark checkpoint with a small float-head broad-pylon consolidation after input-only was neutral",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "activation_l1": 0.00001,
-  "trainable": "input",
+  "trainable": "float-head",
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
     "limit": 134217728,
