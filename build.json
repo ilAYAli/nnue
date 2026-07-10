@@ -1,16 +1,20 @@
 {
-  "run": "enyo-2.0.0-rc2",
-  "reference": "enyo-1.16.0-rc3",
-  "hypothesis": "rerun scratch FullThreats 16x12x1024-o8 after fixing runtime input-row shuffling",
-  "superbatches": 32768,
-  "lr_superbatches": 32768,
-  "save_rate": 8192,
+  "run": "enyo-1.21.0-rc3",
+  "continue_from": "enyo-1.20.0-rc12",
+  "hypothesis": "target the observed endgame blind spots with a small output-only pass on tablebase-heavy test80 data after FullThreats failed",
+  "superbatches": 1024,
+  "lr_superbatches": 1024,
+  "save_rate": 1024,
   "wdl": 0.15,
-  "lr": 0.001,
+  "lr": 0.00005,
   "final_lr": 0.000005,
-  "activation_l1": 0.00001,
-  "trainable": "all",
+  "trainable": "output",
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+    "source_binpack": "data/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack",
+    "limit": 200000000,
+    "offset": 0
+  },
+  "sfbinpack": {
+    "min_ply": 24
   }
 }
