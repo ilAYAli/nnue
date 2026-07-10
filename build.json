@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.20.0-rc8",
+  "run": "enyo-1.20.0-rc9",
   "continue_from": "enyo-1.16.0-rc3",
-  "hypothesis": "switch from saturated broad-pylon consolidation to UHO nodes5000 PV2 data from the strongest Stockfish-benchmark checkpoint",
+  "hypothesis": "switch from failed UHO PV2 data to wrongNNUE d9 positions from the strongest Stockfish-benchmark checkpoint",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
@@ -10,7 +10,7 @@
   "final_lr": 0.000005,
   "trainable": "all",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/wrongNNUE_02_d9.binpack",
     "limit": 200000000,
     "offset": 0
   },
