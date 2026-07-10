@@ -660,7 +660,7 @@ TRACE={shlex.quote(str(trace))}
 ln -s champion.nn "$PROMOTED_NET_LINK"
 qsprt_mock() {{
   printf '%s %s\\n' "$GAMES" "$*" >> "$TRACE"
-  printf '{{"candidate":"challenger","engine":"engine","reference":"nn-stockfish.nnue","requested_games":500,"games":500,"elo":-170.0,"ci":28.0,"llr":-8.0,"llr_bound":690.78,"los":0.0,"draw":35.0}}\\n' >> "$STOCKFISH_NET_LEDGER"
+  printf '{{"candidate":"challenger","engine":"engine","reference":"nn-stockfish.nnue","requested_games":500,"games":500,"elo":-150.0,"ci":28.0,"llr":-8.0,"llr_bound":690.78,"los":0.0,"draw":35.0}}\\n' >> "$STOCKFISH_NET_LEDGER"
 }}
 stockfish_net_gate challenger
 """
@@ -672,7 +672,82 @@ stockfish_net_gate challenger
                 "500 --candidate challenger.nn\n",
                 trace.read_text(encoding="utf-8"),
             )
-            self.assertIn("delta=-11.1, upper90=15.0", proc.stdout)
+            self.assertIn("delta=8.9, upper90=35.0", proc.stdout)
+
+    def test_stockfish_net_gate_vetoes_small_negative_delta_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            ledger = tmp / "stockfish-net.jsonl"
+            ledger.write_text(
+                '{"candidate":"champion","engine":"engine","reference":"nn-stockfish.nnue",'
+                '"requested_games":500,"games":500,"elo":-174.5,"ci":28.2,'
+                '"llr":-8.47,"llr_bound":690.78,"los":0.0,"draw":37.1}\n',
+                encoding="utf-8",
+            )
+
+            proc = self.run_sourced(
+                f"""
+NNUE_NTFY=0
+STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
+STOCKFISH_NET=nn-stockfish.nnue
+STOCKFISH_NET_GAMES=500
+PROMOTED_NET_LINK={shlex.quote(str(tmp / "candidate.net"))}
+QSPRT=qsprt_mock
+ln -s champion.nn "$PROMOTED_NET_LINK"
+qsprt_mock() {{
+  printf '{{"candidate":"challenger","engine":"engine","reference":"nn-stockfish.nnue","requested_games":500,"games":500,"elo":-180.8,"ci":28.5,"llr":-8.76,"llr_bound":690.78,"los":0.0,"draw":35.4}}\n' >> "$STOCKFISH_NET_LEDGER"
+}}
+if stockfish_net_gate challenger; then
+  exit 9
+fi
+printf '%s %s\n' "$stockfish_delta" "$stockfish_upper90"
+[[ $(readlink "$PROMOTED_NET_LINK") == champion.nn ]]
+"""
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(0, proc.returncode)
+            self.assertIn("-6.3 19.9", proc.stdout)
+            self.assertEqual("champion.nn", os.readlink(tmp / "candidate.net"))
+
+    def test_stockfish_net_gate_allows_configured_negative_tolerance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            ledger = tmp / "stockfish-net.jsonl"
+            trace = tmp / "trace"
+            ledger.write_text(
+                '{"candidate":"champion","engine":"engine","reference":"nn-stockfish.nnue",'
+                '"requested_games":500,"games":500,"elo":-174.5,"ci":28.2,'
+                '"llr":-8.47,"llr_bound":690.78,"los":0.0,"draw":37.1}\n',
+                encoding="utf-8",
+            )
+
+            proc = self.run_sourced(
+                f"""
+NNUE_NTFY=0
+STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
+STOCKFISH_NET=nn-stockfish.nnue
+STOCKFISH_NET_GAMES=500
+STOCKFISH_NET_MIN_DELTA=-10
+PROMOTED_NET_LINK={shlex.quote(str(tmp / "candidate.net"))}
+QSPRT=qsprt_mock
+TRACE={shlex.quote(str(trace))}
+ln -s champion.nn "$PROMOTED_NET_LINK"
+qsprt_mock() {{
+  printf '%s %s\n' "$GAMES" "$*" >> "$TRACE"
+  printf '{{"candidate":"challenger","engine":"engine","reference":"nn-stockfish.nnue","requested_games":500,"games":500,"elo":-180.8,"ci":28.5,"llr":-8.76,"llr_bound":690.78,"los":0.0,"draw":35.4}}\n' >> "$STOCKFISH_NET_LEDGER"
+}}
+stockfish_net_gate challenger
+"""
+            )
+
+            self.assertEqual("", proc.stderr)
+            self.assertEqual(0, proc.returncode)
+            self.assertEqual(
+                "500 --candidate challenger.nn\n",
+                trace.read_text(encoding="utf-8"),
+            )
+            self.assertIn("delta=-6.3, upper90=19.9", proc.stdout)
 
     def test_stockfish_net_gate_vetoes_regression_and_preserves_champion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
