@@ -1,16 +1,16 @@
 {
-  "run": "enyo-1.20.0-rc10",
+  "run": "enyo-1.20.0-rc11",
   "continue_from": "enyo-1.16.0-rc3",
-  "hypothesis": "switch from failed wrongNNUE d9 data to wrongIsRight nodes5000 PV2 positions from the strongest Stockfish-benchmark checkpoint",
-  "superbatches": 256,
-  "lr_superbatches": 256,
-  "save_rate": 256,
+  "hypothesis": "lower LR and run a 512-superbatch all-weights pylon consolidation after alternate corpora regressed",
+  "superbatches": 512,
+  "lr_superbatches": 512,
+  "save_rate": 512,
   "wdl": 0.05,
-  "lr": 0.0001,
+  "lr": 0.00005,
   "final_lr": 0.000005,
   "trainable": "all",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
     "offset": 0
   },
