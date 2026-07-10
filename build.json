@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.21.0-rc9",
-  "continue_from": "enyo-1.16.0-rc3",
-  "hypothesis": "return to the broad activation-L1 regimen from the strongest Stockfish-benchmark checkpoint after small output-only targeting saturated",
+  "run": "enyo-1.22.0-rc2",
+  "continue_from": "enyo-1.21.0-rc8",
+  "hypothesis": "SF-labeled pylon all-weights activation-L1 reset from strongest SF-gate checkpoint",
   "superbatches": 32768,
   "lr_superbatches": 32768,
   "save_rate": 32768,
@@ -11,7 +11,7 @@
   "activation_l1": 0.00001,
   "trainable": "all",
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack"
   },
   "sfbinpack": {
     "min_ply": 24
