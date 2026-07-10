@@ -1,17 +1,21 @@
 {
-  "run": "enyo-1.20.0-rc7",
+  "run": "enyo-1.20.0-rc8",
   "continue_from": "enyo-1.16.0-rc3",
-  "hypothesis": "retry the strongest Stockfish-benchmark checkpoint with a small output-only broad-pylon consolidation after input-only was neutral and float-head regressed",
+  "hypothesis": "switch from saturated broad-pylon consolidation to UHO nodes5000 PV2 data from the strongest Stockfish-benchmark checkpoint",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
-  "lr": 0.00005,
+  "lr": 0.0001,
   "final_lr": 0.000005,
-  "trainable": "output",
+  "trainable": "all",
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
-    "limit": 134217728,
+    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
+    "limit": 200000000,
     "offset": 0
+  },
+  "activation_l1": 0.00001,
+  "sfbinpack": {
+    "min_ply": 24
   }
 }
