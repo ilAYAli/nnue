@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.20.0-rc9",
+  "run": "enyo-1.20.0-rc10",
   "continue_from": "enyo-1.16.0-rc3",
-  "hypothesis": "switch from failed UHO PV2 data to wrongNNUE d9 positions from the strongest Stockfish-benchmark checkpoint",
+  "hypothesis": "switch from failed wrongNNUE d9 data to wrongIsRight nodes5000 PV2 positions from the strongest Stockfish-benchmark checkpoint",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
@@ -10,7 +10,7 @@
   "final_lr": 0.000005,
   "trainable": "all",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/wrongNNUE_02_d9.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack",
     "limit": 200000000,
     "offset": 0
   },
