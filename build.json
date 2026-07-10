@@ -11,7 +11,8 @@
   "activation_l1": 0.00001,
   "trainable": "all",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack"
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "limit": 2800000000
   },
   "sfbinpack": {
     "min_ply": 24
