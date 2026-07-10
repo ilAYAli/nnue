@@ -1,20 +1,20 @@
 {
-  "run": "enyo-1.21.0-rc7",
+  "run": "enyo-1.21.0-rc8",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "switch from failed tablebase-heavy endgame targeting to a small output-only pass on UHO PV2 tactical positions",
-  "superbatches": 1024,
-  "lr_superbatches": 1024,
-  "save_rate": 1024,
-  "wdl": 0.15,
+  "hypothesis": "apply the accepted 512-superbatch output-only regimen to DFRC nodes5000 data after tablebase and UHO targeting rejected",
+  "superbatches": 512,
+  "lr_superbatches": 512,
+  "save_rate": 512,
+  "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
   "trainable": "output",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/dfrc_n5000.binpack",
     "limit": 200000000,
     "offset": 0
   },
   "sfbinpack": {
-    "min_ply": 16
+    "min_ply": 24
   }
 }
