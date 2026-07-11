@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/50d0d944-a763-44c9-8e9c-af4112c2fc14" alt="Enyo logo">
+</p>
+
 # Enyo Native NNUE
 
 This repository trains Enyo-native NNUE networks. The current native line began
