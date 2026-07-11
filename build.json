@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.25.0-rc1",
+  "run": "enyo-1.25.0-rc2",
   "hypothesis": "reset optimiser from the strongest measured checkpoint and recalibrate the output layer on T60T70 positions",
   "superbatches": 256,
   "lr_superbatches": 256,
@@ -9,7 +9,7 @@
   "final_lr": 0.000005,
   "trainable": "output",
   "data": {
-    "source_binpack": "data/stockfish/T60T70wIsRightFarseer.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
     "offset": 0
   },
