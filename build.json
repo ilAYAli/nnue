@@ -1,21 +1,16 @@
 {
-  "run": "enyo-1.26.0-rc1",
-  "hypothesis": "reset optimiser from the strongest measured checkpoint and recalibrate the output layer on the pylon training binpack",
-  "superbatches": 256,
-  "lr_superbatches": 256,
-  "save_rate": 256,
-  "wdl": 0.05,
-  "lr": 0.00005,
-  "final_lr": 0.000005,
-  "trainable": "output",
-  "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "limit": 200000000,
-    "offset": 0
-  },
-  "sfbinpack": {
-    "min_ply": 24
-  },
+  "run": "enyo-2.0.0-rc4",
   "reference": "enyo-1.20.0-rc12",
-  "initialize_from": "enyo-1.20.0-rc12"
+  "hypothesis": "retry FullThreats 16x12x1024-o8 with reduced LR after high-LR scratch attempts failed",
+  "superbatches": 32768,
+  "lr_superbatches": 32768,
+  "save_rate": 8192,
+  "wdl": 0.15,
+  "lr": 0.0005,
+  "final_lr": 5e-06,
+  "activation_l1": 1e-05,
+  "trainable": "all",
+  "data": {
+    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+  }
 }
