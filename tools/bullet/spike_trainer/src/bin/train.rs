@@ -717,10 +717,6 @@ fn initialize_from_path(value: &str) -> PathBuf {
 }
 
 fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
-    if arch_full_threats(config) {
-        eprintln!("error: initialize_from is not supported for full_threats architecture");
-        process::exit(2);
-    }
     let input = initialize_from_path(initialize_from);
     if !input.exists() {
         eprintln!("error: missing initialize_from: {}", input.display());
@@ -733,7 +729,8 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
             process::exit(1);
         });
     }
-    let status = Command::new(python_command())
+    let mut command = Command::new(python_command());
+    command
         .arg(root().join("tools/bullet/enyo_nn_to_bullet_weights.py"))
         .arg("--input")
         .arg(input)
@@ -750,7 +747,11 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
         .arg("--output-buckets")
         .arg(usize_at(&config.arch, "output_buckets", 1).to_string())
         .arg("--hidden")
-        .arg(usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN).to_string())
+        .arg(usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN).to_string());
+    if arch_full_threats(config) {
+        command.arg("--full-threats");
+    }
+    let status = command
         .status()
         .unwrap_or_else(|err| {
             eprintln!("error: cannot run initialize_from converter: {err}");

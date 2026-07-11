@@ -18,6 +18,7 @@ from lib.enyo_nnue import (
     KING_BUCKETS_32,
     LEGACY_N_FEATURES,
     LEGACY_NETWORK_SIZE,
+    N_THREAT_FEATURES,
     N_HIDDEN,
     N_L1,
     N_L2,
@@ -149,6 +150,11 @@ def convert_input_weights(
     return target
 
 
+def add_full_threat_rows(input_weights: np.ndarray) -> np.ndarray:
+    threats = np.zeros((N_THREAT_FEATURES, input_weights.shape[1]), dtype=np.float32)
+    return np.concatenate((np.asarray(input_weights, dtype=np.float32), threats), axis=0)
+
+
 def source_output_bucket_for_target(target_bucket: int, source_buckets: int, target_buckets: int) -> int:
     if source_buckets == target_buckets:
         return target_bucket
@@ -203,6 +209,7 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "target_input_buckets": args.input_buckets,
         "target_feature_channels": args.feature_channels,
         "target_hidden": args.hidden,
+        "full_threats": bool(args.full_threats),
         "legacy_inputs": bool(args.legacy_inputs),
     }
     (path.parent / "meta.json").write_text(
@@ -225,6 +232,11 @@ def main() -> int:
                         help="Target feature channels; 0 keeps source layout.")
     parser.add_argument("--hidden", type=int, default=0, choices=[0, 512, 768, 1024],
                         help="Target hidden width; 0 keeps source trained width.")
+    parser.add_argument(
+        "--full-threats",
+        action="store_true",
+        help="Append zero-initialized FullThreats rows for warm-starting that architecture.",
+    )
     parser.add_argument(
         "--legacy-inputs",
         action="store_true",
@@ -255,6 +267,8 @@ def main() -> int:
         target_buckets=args.input_buckets,
         target_channels=args.feature_channels,
     )[:, :args.hidden]
+    if args.full_threats:
+        input_weights = add_full_threat_rows(input_weights)
     input_biases = np.asarray(net.input_biases, dtype=np.float32)[:args.hidden]
     l1_weights = np.concatenate((
         np.asarray(net.l1_weights, dtype=np.float32)[:, :args.hidden],
