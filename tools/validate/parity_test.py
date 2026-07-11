@@ -51,6 +51,7 @@ def run_spike_trainer(
     feature_channels: int = 12,
     hidden: int = 1024,
     output_buckets: int = 1,
+    full_threats: bool = False,
 ) -> Path:
     """Train a tiny net and return a normalized runtime .nn path."""
     if rows <= 0:
@@ -81,6 +82,8 @@ def run_spike_trainer(
         "ENYO_BULLET_EVAL_SCALE": "400",
         "ENYO_BULLET_SAVE_RATE": str(superbatches),
     }
+    if full_threats:
+        env["ENYO_BULLET_ENYO_FULL_THREATS"] = "1"
 
     spike_trainer = Path(__file__).resolve().parents[1] / "bullet" / "spike_trainer" / "target" / "release" / "enyo-bullet-spike"
     if not spike_trainer.exists():
@@ -167,9 +170,11 @@ def eval_python(nn_path: Path, fen: str) -> int:
     pieces, stm = nn2.parse_fen(fen)
     pieces.sort(key=lambda item: item[2])
     w_feats = nn2.features_from_pieces(
-        pieces, nn2.WHITE, model.input_buckets, model.feature_channels)
+        pieces, nn2.WHITE, model.input_buckets, model.feature_channels,
+        model.full_threats)
     b_feats = nn2.features_from_pieces(
-        pieces, nn2.BLACK, model.input_buckets, model.feature_channels)
+        pieces, nn2.BLACK, model.input_buckets, model.feature_channels,
+        model.full_threats)
     phase_scale = nn2.phase_scale_from_pieces(pieces)
     piece_count = len(pieces)
 
@@ -237,6 +242,8 @@ def main() -> int:
                     choices=(512, 768, 1024))
     ap.add_argument("--output-buckets", type=int, default=8,
                     choices=(1, 4, 8))
+    ap.add_argument("--full-threats", action="store_true",
+                    help="Train/export a FullThreats net if the trainer supports it")
     ap.add_argument("--fen", default=TEST_FEN, help=f"Test FEN (default: {TEST_FEN})")
     ap.add_argument("--tolerance", type=int, default=TOLERANCE_CP, help=f"Tolerance in cp (default: {TOLERANCE_CP})")
     args = ap.parse_args()
@@ -270,6 +277,7 @@ def main() -> int:
             args.feature_channels,
             args.hidden,
             args.output_buckets,
+            args.full_threats,
         )
 
         # Eval in Python

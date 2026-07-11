@@ -297,6 +297,10 @@ def _piece_type(piece: int) -> int:
     return piece & 7
 
 
+def _popcount(value: int) -> int:
+    return bin(value).count("1")
+
+
 def _leaper_attacks(piece_type: int, square: int) -> int:
     knight = (
         (1, 2), (2, 1), (2, -1), (1, -2),
@@ -382,7 +386,7 @@ def _threat_tables():
         for square in range(N_SQUARES):
             offsets[piece][square] = piece_span
             if _piece_type(piece) != PAWN or 8 <= square < 56:
-                piece_span += _pseudo_threat_attacks(piece, square).bit_count()
+                piece_span += _popcount(_pseudo_threat_attacks(piece, square))
         helper[piece] = (piece_span, global_offset)
         global_offset += _VALID_THREAT_TARGETS[piece] * piece_span
 
@@ -390,7 +394,7 @@ def _threat_tables():
             attacks = _pseudo_threat_attacks(piece, from_sq)
             for to_sq in range(N_SQUARES):
                 below = 0 if to_sq == 0 else (1 << to_sq) - 1
-                attack_offsets[piece][from_sq][to_sq] = (attacks & below).bit_count()
+                attack_offsets[piece][from_sq][to_sq] = _popcount(attacks & below)
     if global_offset != N_THREAT_FEATURES:
         raise RuntimeError("FullThreats table size mismatch")
 

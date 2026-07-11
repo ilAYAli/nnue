@@ -19,6 +19,7 @@ class _RecordingModel:
     def __init__(self) -> None:
         self.input_buckets = 32
         self.feature_channels = 11
+        self.full_threats = False
         self.args: tuple[torch.Tensor, ...] | None = None
         self.kwargs: dict[str, torch.Tensor] | None = None
         self.eval_called = False
@@ -307,6 +308,7 @@ class ParityTestRegressionTests(unittest.TestCase):
                 feature_channels: int,
                 hidden: int,
                 output_buckets: int,
+                full_threats: bool,
             ) -> Path:
                 captured["data"] = data_path
                 captured["output"] = output_dir
@@ -316,6 +318,7 @@ class ParityTestRegressionTests(unittest.TestCase):
                     (input_buckets, feature_channels, hidden, output_buckets),
                     (16, 12, 1024, 8),
                 )
+                self.assertFalse(full_threats)
                 return root / "parity.nn"
 
             argv = [
