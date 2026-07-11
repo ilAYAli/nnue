@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.25.0-rc2",
+  "run": "enyo-1.25.0-rc3",
   "hypothesis": "reset optimiser from the strongest measured checkpoint and recalibrate the output layer on T60T70 positions",
   "superbatches": 256,
   "lr_superbatches": 256,
@@ -11,7 +11,7 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
-    "offset": 0
+    "offset": 200000000
   },
   "sfbinpack": {
     "min_ply": 24
