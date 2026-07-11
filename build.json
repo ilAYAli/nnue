@@ -1,20 +1,21 @@
 {
-  "run": "enyo-1.23.0-rc2",
-  "hypothesis": "reset optimiser from the strongest measured Stockfish-gate checkpoint and run a broad activation-L1 pass",
-  "superbatches": 8192,
-  "lr_superbatches": 8192,
-  "save_rate": 8192,
-  "wdl": 0.15,
-  "lr": 0.00025,
+  "run": "enyo-1.24.0-rc1",
+  "hypothesis": "reset optimiser from the strongest measured checkpoint and let all weights adapt on the original DFRC slice",
+  "superbatches": 128,
+  "lr_superbatches": 128,
+  "save_rate": 128,
+  "wdl": 0.05,
+  "lr": 0.00005,
   "final_lr": 0.000005,
   "trainable": "all",
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+    "source_binpack": "data/stockfish/master-binpacks/dfrc_n5000.binpack",
+    "limit": 200000000,
+    "offset": 0
   },
   "sfbinpack": {
     "min_ply": 24
   },
   "reference": "enyo-1.20.0-rc12",
-  "initialize_from": "enyo-1.20.0-rc12",
-  "activation_l1": 0.00001
+  "initialize_from": "enyo-1.20.0-rc12"
 }
