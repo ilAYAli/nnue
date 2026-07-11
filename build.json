@@ -1,20 +1,21 @@
 {
-  "run": "enyo-1.22.0-rc7",
+  "run": "enyo-1.22.0-rc8",
   "continue_from": "enyo-1.21.0-rc8",
-  "hypothesis": "retry the near-neutral DFRC all-weights adaptation with dose reduced from 128 to 64",
-  "superbatches": 64,
-  "lr_superbatches": 64,
-  "save_rate": 64,
+  "hypothesis": "switch saturated DFRC refinements to the historical T60T70 activation-L1 regimen from the Stockfish-gate anchor",
+  "superbatches": 256,
+  "lr_superbatches": 256,
+  "save_rate": 256,
   "wdl": 0.05,
-  "lr": 5e-05,
+  "lr": 0.0001,
   "final_lr": 5e-06,
   "trainable": "all",
+  "activation_l1": 0.00001,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/dfrc_n5000.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
     "offset": 0
   },
   "sfbinpack": {
-    "min_ply": 24
+    "min_ply": 16
   }
 }
