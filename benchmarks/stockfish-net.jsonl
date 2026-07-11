@@ -51,3 +51,4 @@
 {"date":"2026-07-10","candidate":"enyo-1.22.0-rc1","engine":"enyo_698de84","reference":"nn-0ee0657fb25e.nnue","requested_games":500,"games":500,"elo":-180.8,"ci":28.5,"llr":-8.76,"llr_bound":690.78,"los":0.0,"draw":35.4}
 {"date":"2026-07-10","candidate":"enyo-1.22.0-rc2","engine":"enyo_698de84","reference":"nn-0ee0657fb25e.nnue","requested_games":500,"games":500,"elo":-186.2,"ci":30.2,"llr":-8.70,"llr_bound":690.78,"los":0.0,"draw":31.4}
 {"date":"2026-07-11","candidate":"enyo-2.0.0-rc3","engine":"enyo_698de84","reference":"nn-0ee0657fb25e.nnue","requested_games":500,"games":500,"elo":-354.5,"ci":51.7,"llr":-12.68,"llr_bound":690.78,"los":0.0,"draw":21.4}
+{"date":"2026-07-11","candidate":"enyo-1.22.0-rc3","engine":"enyo_698de84","reference":"nn-0ee0657fb25e.nnue","requested_games":500,"games":500,"elo":-182.6,"ci":28.0,"llr":-8.87,"llr_bound":690.78,"los":0.0,"draw":35.8}
