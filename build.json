@@ -1,6 +1,6 @@
 {
-  "run": "enyo-1.25.0-rc3",
-  "hypothesis": "reset optimiser from the strongest measured checkpoint and recalibrate the output layer on T60T70 positions",
+  "run": "enyo-1.26.0-rc1",
+  "hypothesis": "reset optimiser from the strongest measured checkpoint and recalibrate the output layer on the pylon training binpack",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
@@ -9,9 +9,9 @@
   "final_lr": 0.000005,
   "trainable": "output",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 0
   },
   "sfbinpack": {
     "min_ply": 24
