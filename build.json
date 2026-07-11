@@ -1,21 +1,20 @@
 {
-  "run": "enyo-1.22.0-rc9",
+  "run": "enyo-1.22.0-rc10",
   "continue_from": "enyo-1.21.0-rc8",
-  "hypothesis": "switch from failed DFRC and T60T70 continuations to the historically successful farseerT76 WDL 0.30 regimen from the Stockfish-gate anchor",
-  "superbatches": 256,
-  "lr_superbatches": 256,
-  "save_rate": 256,
-  "wdl": 0.30,
-  "lr": 0.000125,
+  "hypothesis": "recalibrate the output layer on the original DFRC slice after non-output continuations regressed",
+  "superbatches": 128,
+  "lr_superbatches": 128,
+  "save_rate": 128,
+  "wdl": 0.05,
+  "lr": 0.00005,
   "final_lr": 0.000005,
-  "trainable": "all",
-  "activation_l1": 0.00001,
+  "trainable": "output",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/dfrc_n5000.binpack",
     "limit": 200000000,
     "offset": 0
   },
   "sfbinpack": {
-    "min_ply": 16
+    "min_ply": 24
   }
 }
