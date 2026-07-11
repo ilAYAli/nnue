@@ -1,6 +1,6 @@
 {
   "run": "enyo-1.23.0-rc1",
-  "hypothesis": "reset optimiser from the Stockfish-gate anchor and run a broad activation-L1 pass instead of another checkpoint continuation",
+  "hypothesis": "reset optimiser from the strongest measured Stockfish-gate checkpoint and run a broad activation-L1 pass",
   "superbatches": 8192,
   "lr_superbatches": 8192,
   "save_rate": 8192,
@@ -14,7 +14,7 @@
   "sfbinpack": {
     "min_ply": 24
   },
-  "reference": "enyo-1.21.0-rc8",
-  "initialize_from": "enyo-1.21.0-rc8",
+  "reference": "enyo-1.20.0-rc12",
+  "initialize_from": "enyo-1.20.0-rc12",
   "activation_l1": 0.00001
 }
