@@ -1,18 +1,18 @@
 {
-  "run": "enyo-1.22.0-rc4",
+  "run": "enyo-1.22.0-rc5",
   "continue_from": "enyo-1.21.0-rc8",
-  "hypothesis": "retry the failed DFRC slice from the absolute-best checkpoint with output-only dose reduced from 512 to 128",
+  "hypothesis": "let all weights adapt on the original DFRC slice that produced the strongest Stockfish-gate checkpoint",
   "superbatches": 128,
   "lr_superbatches": 128,
   "save_rate": 128,
   "wdl": 0.05,
   "lr": 5e-05,
   "final_lr": 5e-06,
-  "trainable": "output",
+  "trainable": "all",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/dfrc_n5000.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 0
   },
   "sfbinpack": {
     "min_ply": 24
