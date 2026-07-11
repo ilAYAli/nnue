@@ -1,15 +1,15 @@
 {
-  "run": "enyo-1.24.0-rc1",
-  "hypothesis": "reset optimiser from the strongest measured checkpoint and let all weights adapt on the original DFRC slice",
-  "superbatches": 128,
-  "lr_superbatches": 128,
-  "save_rate": 128,
+  "run": "enyo-1.25.0-rc1",
+  "hypothesis": "reset optimiser from the strongest measured checkpoint and recalibrate the output layer on T60T70 positions",
+  "superbatches": 256,
+  "lr_superbatches": 256,
+  "save_rate": 256,
   "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "trainable": "all",
+  "trainable": "output",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/dfrc_n5000.binpack",
+    "source_binpack": "data/stockfish/T60T70wIsRightFarseer.binpack",
     "limit": 200000000,
     "offset": 0
   },
