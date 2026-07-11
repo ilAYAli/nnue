@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.23.0-rc1",
+  "run": "enyo-1.23.0-rc2",
   "hypothesis": "reset optimiser from the strongest measured Stockfish-gate checkpoint and run a broad activation-L1 pass",
   "superbatches": 8192,
   "lr_superbatches": 8192,
