@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.22.0-rc5",
+  "run": "enyo-1.22.0-rc6",
   "continue_from": "enyo-1.21.0-rc8",
-  "hypothesis": "let all weights adapt on the original DFRC slice that produced the strongest Stockfish-gate checkpoint",
+  "hypothesis": "retry the original DFRC slice with float-head adaptation after all-weights was near-neutral but below the Stockfish gate",
   "superbatches": 128,
   "lr_superbatches": 128,
   "save_rate": 128,
   "wdl": 0.05,
   "lr": 5e-05,
   "final_lr": 5e-06,
-  "trainable": "all",
+  "trainable": "float-head",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/dfrc_n5000.binpack",
     "limit": 200000000,
