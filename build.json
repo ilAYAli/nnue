@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.28.0-rc5",
+  "run": "enyo-1.28.0-rc6",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "keep the non-damaging 256-superbatch output-only regimen fixed and test the next independent pylon slice at offset 400M",
+  "hypothesis": "keep the 256-superbatch output-only regimen fixed and test the next independent pylon slice at offset 600M after the 400M slice regressed",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
@@ -12,7 +12,7 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 400000000
+    "offset": 600000000
   },
   "sfbinpack": {
     "min_ply": 24
