@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.28.0-rc14",
+  "run": "enyo-1.28.0-rc15",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold parent, output-only scope, pylon 800M slice, and 256-superbatch exposure fixed and reduce only peak learning rate from 0.00002 to 0.00001",
+  "hypothesis": "hold parent, pylon 800M slice, 256-superbatch exposure, and low learning rate fixed and change only trainable scope from rejected output-only to all weights",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
   "lr": 0.00001,
   "final_lr": 0.000005,
-  "trainable": "output",
+  "trainable": "all",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
