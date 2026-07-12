@@ -1,9 +1,9 @@
 {
-  "run": "enyo-1.28.0-rc1",
+  "run": "enyo-1.28.0-rc2",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "a large regularized FarseerT75 supervised reset from the strongest measured native checkpoint can escape the exhausted small-dose fine-tuning regime",
-  "superbatches": 16384,
-  "lr_superbatches": 16384,
+  "hypothesis": "reduce only the FarseerT75 all-weights dose after rc1 compressed evaluation scale and failed the Stockfish gate",
+  "superbatches": 4096,
+  "lr_superbatches": 4096,
   "save_rate": 4096,
   "wdl": 0.15,
   "lr": 0.00005,
