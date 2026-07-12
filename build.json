@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.28.0-rc7",
+  "run": "enyo-1.28.0-rc8",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold the pylon 600M slice and 256-superbatch regimen fixed and change only trainable scope from output to input after the output-only lane failed to improve the parent",
+  "hypothesis": "hold the pylon 600M slice and 256-superbatch regimen fixed and change only trainable scope from rejected input-only to float-head",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "trainable": "input",
+  "trainable": "float-head",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
