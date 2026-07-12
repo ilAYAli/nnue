@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.28.0-rc9",
+  "run": "enyo-1.28.0-rc10",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold float-head, parent, and the pylon 600M slice fixed and reduce only training exposure from 256 to 128 superbatches after the larger dose regressed decisively",
+  "hypothesis": "hold parent, pylon 600M slice, and 128-superbatch regimen fixed and change only trainable scope from rejected float-head to output",
   "superbatches": 128,
   "lr_superbatches": 128,
   "save_rate": 128,
   "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "trainable": "float-head",
+  "trainable": "output",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
