@@ -1,23 +1,21 @@
 {
-  "run": "enyo-1.27.0-rc1",
+  "run": "enyo-1.28.0-rc1",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "return to the promoted factorised 1.x architecture and train the float head on multi-net PV-disagreement positions after FullThreats and saturated pylon/DFRC lanes failed",
-  "superbatches": 1024,
-  "lr_superbatches": 1024,
-  "save_rate": 512,
+  "hypothesis": "a large regularized FarseerT75 supervised reset from the strongest measured native checkpoint can escape the exhausted small-dose fine-tuning regime",
+  "superbatches": 16384,
+  "lr_superbatches": 16384,
+  "save_rate": 4096,
   "wdl": 0.15,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "activation_l1": 0.0,
-  "trainable": "float-head",
+  "activation_l1": 0.00001,
+  "trainable": "all",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/multinet_pv-2_diff-100_nodes-5000.binpack",
-    "limit": 200000000,
+    "source_binpack": "data/stockfish/master-binpacks/farseerT75.binpack",
+    "limit": 3000000000,
     "offset": 0
   },
   "sfbinpack": {
-    "min_ply": 20,
-    "max_abs_cp": 10000,
-    "quiet_only": true
+    "min_ply": 24
   }
 }
