@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.28.0-rc13",
+  "run": "enyo-1.28.0-rc14",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold parent, output-only scope, pylon 800M slice, and 256-superbatch exposure fixed and reduce only peak learning rate from 0.00005 to 0.00002",
+  "hypothesis": "hold parent, output-only scope, pylon 800M slice, and 256-superbatch exposure fixed and reduce only peak learning rate from 0.00002 to 0.00001",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
-  "lr": 0.00002,
+  "lr": 0.00001,
   "final_lr": 0.000005,
   "trainable": "output",
   "data": {
