@@ -1,18 +1,18 @@
 {
-  "run": "enyo-1.29.0-rc2",
-  "continue_from": "enyo-1.28.0-rc16",
-  "hypothesis": "hold promoted parent, input-only low-LR regimen, and the rejected pylon 1B slice fixed and reduce only training exposure from 256 to 128 superbatches",
-  "superbatches": 128,
-  "lr_superbatches": 128,
-  "save_rate": 128,
+  "run": "enyo-1.28.0-rc17",
+  "continue_from": "enyo-1.20.0-rc12",
+  "hypothesis": "retry the rc16 input-only pylon 800M experiment from the real champion and increase only peak learning rate from 0.00001 to 0.00002 so updates survive export quantization",
+  "superbatches": 256,
+  "lr_superbatches": 256,
+  "save_rate": 256,
   "wdl": 0.05,
-  "lr": 0.00001,
+  "lr": 0.00002,
   "final_lr": 0.000005,
   "trainable": "input",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 1000000000
+    "offset": 800000000
   },
   "sfbinpack": {
     "min_ply": 24
