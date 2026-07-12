@@ -884,6 +884,7 @@ latest_stockfish_result() {
     '[.[] | select(
         .candidate == $candidate
         and .reference == $reference
+        and (.valid != false)
       )] | last // empty' \
     "$STOCKFISH_NET_LEDGER"
 }

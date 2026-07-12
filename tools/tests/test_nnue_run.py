@@ -708,6 +708,28 @@ stockfish_net_gate challenger
             )
             self.assertIn("delta=8.9, upper90=35.0", proc.stdout)
 
+    def test_latest_stockfish_result_ignores_invalid_records(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            ledger = Path(tmp_name) / "stockfish-net.jsonl"
+            ledger.write_text(
+                '{"candidate":"candidate","reference":"nn-stockfish.nnue",'
+                '"elo":-150.0,"valid":true}\n'
+                '{"candidate":"candidate","reference":"nn-stockfish.nnue",'
+                '"elo":-120.0,"valid":false}\n',
+                encoding="utf-8",
+            )
+
+            proc = self.run_sourced(
+                "NNUE_NTFY=0; "
+                f"STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}; "
+                "STOCKFISH_NET=nn-stockfish.nnue; "
+                "latest_stockfish_result candidate"
+            )
+
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+        self.assertEqual(-150.0, json.loads(proc.stdout)["elo"])
+
     def test_stockfish_net_gate_vetoes_small_negative_delta_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
