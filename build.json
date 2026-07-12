@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.28.0-rc16",
-  "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold parent, pylon 800M slice, 256-superbatch exposure, and low learning rate fixed and change only trainable scope from rejected all-weights to input-only",
+  "run": "enyo-1.29.0-rc1",
+  "continue_from": "enyo-1.28.0-rc16",
+  "hypothesis": "preserve the promoted rc16 input-only low-LR regimen and advance only the pylon data slice from offset 800M to 1B",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
@@ -12,7 +12,7 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 800000000
+    "offset": 1000000000
   },
   "sfbinpack": {
     "min_ply": 24
