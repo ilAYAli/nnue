@@ -364,6 +364,27 @@ train() {
   notify phase_done train "training/export passed for $run" "$log" 0
 }
 
+require_distinct_nets() {
+  local candidate=$1
+  local reference=$2
+  [[ -f "$candidate" ]] || fail "missing candidate net: $candidate" distinct_net
+  [[ -f "$reference" ]] || fail "missing reference net: $reference" distinct_net
+  cmp -s "$candidate" "$reference" \
+    && fail "candidate net is byte-identical to reference: $candidate == $reference" distinct_net
+  return 0
+}
+
+distinct_net_gate() {
+  load_config
+  notify phase_start distinct_net "distinct net gate $run" "$log_dir/02-distinct-net.log" 0
+  section distinct_net
+  require_distinct_nets "$candidate_net" "$reference_net"
+  printf '  ┌─────────────────────────────────────\n'
+  printf '  │ \033[1;32m✓ PASS\033[0m  distinct_net\n'
+  printf '  └─────────────────────────────────────\n'
+  notify phase_done distinct_net "distinct net gate passed for $run" "$log_dir/02-distinct-net.log" 0
+}
+
 startpos_gate() {
   load_config
   notify phase_start startpos "startpos gate $run" "$log_dir/02-startpos.log" 0
@@ -469,6 +490,7 @@ move_gate() {
 }
 
 gates() {
+  distinct_net_gate
   startpos_gate
   static_gate
   move_gate

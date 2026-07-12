@@ -62,6 +62,40 @@ class NnueRunTests(unittest.TestCase):
         self.assertIn("stale trainer helper", proc.stderr)
         self.assertIn("tools/bullet/spike_trainer/", proc.stderr)
 
+    def test_distinct_net_gate_rejects_byte_identical_export(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            candidate = tmp / "candidate.nn"
+            reference = tmp / "reference.nn"
+            candidate.write_bytes(b"identical exported net")
+            reference.write_bytes(b"identical exported net")
+
+            proc = self.run_sourced(
+                "NNUE_NTFY=0; "
+                f"require_distinct_nets {shlex.quote(str(candidate))} "
+                f"{shlex.quote(str(reference))}"
+            )
+
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn("byte-identical to reference", proc.stderr)
+
+    def test_distinct_net_gate_accepts_changed_export(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            candidate = tmp / "candidate.nn"
+            reference = tmp / "reference.nn"
+            candidate.write_bytes(b"candidate")
+            reference.write_bytes(b"reference")
+
+            proc = self.run_sourced(
+                "NNUE_NTFY=0; "
+                f"require_distinct_nets {shlex.quote(str(candidate))} "
+                f"{shlex.quote(str(reference))}"
+            )
+
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+
     def test_full_sprt_accepts_positive_at_cap(self) -> None:
         proc = self.run_sourced(
             "NNUE_NTFY=0; GAMES=3000; "
