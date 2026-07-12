@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.28.0-rc17",
+  "run": "enyo-1.28.0-rc18",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "retry the rc16 input-only pylon 800M experiment from the real champion and increase only peak learning rate from 0.00001 to 0.00002 so updates survive export quantization",
+  "hypothesis": "hold the real champion, input-only pylon 800M slice, and 256-superbatch dose fixed and increase only peak learning rate from 0.00002 to 0.00005 after rc17 remained byte-identical at export",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
-  "lr": 0.00002,
+  "lr": 0.00005,
   "final_lr": 0.000005,
   "trainable": "input",
   "data": {
