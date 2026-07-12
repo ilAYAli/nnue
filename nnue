@@ -87,6 +87,7 @@ last_stockfish_line=
 stockfish_result=
 stockfish_delta=
 stockfish_upper90=
+pending_stockfish_results=
 
 fail() {
   echo "FAILED: $*" >&2
@@ -774,6 +775,10 @@ commit_and_bump_build_json() {
     next=$(next_run_name "$accepted")
   fi
   hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
+  if [[ -n "$pending_stockfish_results" ]]; then
+    printf '%s\n' "$pending_stockfish_results" >> "$STOCKFISH_NET_LEDGER"
+    pending_stockfish_results=
+  fi
   [[ -f "$STOCKFISH_NET_LEDGER" ]] && commit_paths+=("$STOCKFISH_NET_LEDGER")
 
   git commit --only \
@@ -890,7 +895,7 @@ latest_stockfish_result() {
 }
 
 run_stockfish_benchmark() {
-  local candidate=$1
+  local candidate=$1 ledger_tmp
   GAMES="$STOCKFISH_NET_GAMES" STOCKFISH_NET="$STOCKFISH_NET" "$QSPRT" \
     --candidate "$candidate.nn" \
     || fail "Stockfish net benchmark failed for $candidate" stockfish_net_sprt
@@ -907,6 +912,14 @@ run_stockfish_benchmark() {
      and (.ci | type) == "number"' \
     <<< "$stockfish_result" >/dev/null \
     || fail "invalid Stockfish benchmark result for $candidate" stockfish_net_sprt
+
+  ledger_tmp=$(mktemp)
+  sed '$d' "$STOCKFISH_NET_LEDGER" > "$ledger_tmp"
+  mv "$ledger_tmp" "$STOCKFISH_NET_LEDGER"
+  if [[ -n "$pending_stockfish_results" ]]; then
+    pending_stockfish_results+=$'\n'
+  fi
+  pending_stockfish_results+=$stockfish_result
 }
 
 stockfish_net_gate() {

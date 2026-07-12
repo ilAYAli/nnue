@@ -707,6 +707,10 @@ stockfish_net_gate challenger
                 trace.read_text(encoding="utf-8"),
             )
             self.assertIn("delta=8.9, upper90=35.0", proc.stdout)
+            self.assertEqual(
+                ["champion"],
+                [json.loads(line)["candidate"] for line in ledger.read_text(encoding="utf-8").splitlines()],
+            )
 
     def test_latest_stockfish_result_ignores_invalid_records(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
