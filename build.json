@@ -1,19 +1,18 @@
 {
-  "run": "enyo-1.28.0-rc2",
+  "run": "enyo-1.28.0-rc3",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "reduce only the FarseerT75 all-weights dose after rc1 compressed evaluation scale and failed the Stockfish gate",
-  "superbatches": 4096,
-  "lr_superbatches": 4096,
-  "save_rate": 4096,
-  "wdl": 0.15,
+  "hypothesis": "preserve the accepted enyo-1.20.0-rc12 output-only pylon regimen and advance only the data slice from offset zero to 200M",
+  "superbatches": 512,
+  "lr_superbatches": 512,
+  "save_rate": 512,
+  "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "activation_l1": 0.00001,
-  "trainable": "all",
+  "trainable": "output",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/farseerT75.binpack",
-    "limit": 3000000000,
-    "offset": 0
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "limit": 200000000,
+    "offset": 200000000
   },
   "sfbinpack": {
     "min_ply": 24
