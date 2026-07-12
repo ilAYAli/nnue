@@ -21,7 +21,8 @@ from lib import bullet_text
 
 
 def convert(input_path: Path, output_path: Path, *, limit: int,
-            max_abs_cp: int, enyo_runtime_target: bool) -> dict[str, int | str]:
+            max_abs_cp: int, enyo_runtime_target: bool,
+            zero_score: bool = False) -> dict[str, int | str]:
     stats: dict[str, int | str] = {
         "input": str(input_path),
         "output": str(output_path),
@@ -29,7 +30,9 @@ def convert(input_path: Path, output_path: Path, *, limit: int,
         "written": 0,
         "skipped_cp": 0,
         "skipped_bad": 0,
-        "target": "enyo-runtime" if enyo_runtime_target else "raw-cp",
+        "target": "zero-score" if zero_score else (
+            "enyo-runtime" if enyo_runtime_target else "raw-cp"
+        ),
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -43,13 +46,15 @@ def convert(input_path: Path, output_path: Path, *, limit: int,
                 score = bullet_text.white_score_from_row(
                     row,
                     enyo_runtime_target=enyo_runtime_target,
+                    zero_score=zero_score,
                 )
-                if max_abs_cp > 0 and abs(score) > max_abs_cp:
+                if not zero_score and max_abs_cp > 0 and abs(score) > max_abs_cp:
                     stats["skipped_cp"] = int(stats["skipped_cp"]) + 1
                     continue
                 text = bullet_text.row_to_text(
                     row,
                     enyo_runtime_target=enyo_runtime_target,
+                    zero_score=zero_score,
                 )
             except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
                 stats["skipped_bad"] = int(stats["skipped_bad"]) + 1
@@ -81,7 +86,19 @@ def main() -> None:
             "to Enyo .nn format."
         ),
     )
+    parser.add_argument(
+        "--zero-score",
+        action="store_true",
+        help=(
+            "Discard the per-move search score and emit score=0 for every "
+            "row, keeping only the game result. For outcome-only lineages "
+            "that must not learn from any engine eval as a label."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.zero_score and args.enyo_runtime_target:
+        parser.error("--zero-score and --enyo-runtime-target are mutually exclusive")
 
     stats = convert(
         args.input.expanduser(),
@@ -89,6 +106,7 @@ def main() -> None:
         limit=args.limit,
         max_abs_cp=args.max_abs_cp,
         enyo_runtime_target=args.enyo_runtime_target,
+        zero_score=args.zero_score,
     )
     print(json.dumps(stats, indent=2, sort_keys=True))
 

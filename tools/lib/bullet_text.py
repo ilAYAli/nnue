@@ -34,7 +34,9 @@ def white_result_from_row(row: dict) -> float:
     return categorical_result(white_wdl)
 
 
-def white_score_from_row(row: dict, *, enyo_runtime_target: bool) -> int:
+def white_score_from_row(row: dict, *, enyo_runtime_target: bool, zero_score: bool = False) -> int:
+    if zero_score:
+        return 0
     fen = str(row["fen"])
     stm = fen.split()[1]
     score = int(round(float(row["score"])))
@@ -43,8 +45,8 @@ def white_score_from_row(row: dict, *, enyo_runtime_target: bool) -> int:
     return score if stm == "w" else -score
 
 
-def row_to_text(row: dict, *, enyo_runtime_target: bool) -> str:
+def row_to_text(row: dict, *, enyo_runtime_target: bool, zero_score: bool = False) -> str:
     fen = str(row["fen"])
-    score = white_score_from_row(row, enyo_runtime_target=enyo_runtime_target)
+    score = white_score_from_row(row, enyo_runtime_target=enyo_runtime_target, zero_score=zero_score)
     result = white_result_from_row(row)
     return f"{fen} | {score} | {result:.1f}"
