@@ -1,17 +1,17 @@
 {
-  "run": "enyo-2.0.0-rc6",
-  "hypothesis": "warm-start FullThreats from enyo-1.20.0-rc12 and train only the input layer at low LR to learn threat rows without disturbing downstream layers",
-  "superbatches": 32768,
-  "lr_superbatches": 32768,
-  "save_rate": 8192,
+  "run": "enyo-2.0.0-rc7",
+  "hypothesis": "warm-start FullThreats from enyo-1.20.0-rc12 with all weights trainable but 10x lower LR after full-rate all-weights and input-only both damaged the Stockfish gate",
+  "superbatches": 16384,
+  "lr_superbatches": 16384,
+  "save_rate": 4096,
   "wdl": 0.15,
-  "lr": 0.00005,
+  "lr": 0.000005,
   "final_lr": 0.0000005,
   "activation_l1": 0.00001,
-  "trainable": "input",
+  "trainable": "all",
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
   },
-  "initialize_from": "enyo-1.20.0-rc12",
-  "continue_from": "enyo-1.20.0-rc12"
+  "continue_from": "enyo-1.20.0-rc12",
+  "initialize_from": "enyo-1.20.0-rc12"
 }
