@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.28.0-rc4",
+  "run": "enyo-1.28.0-rc5",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "reduce only the output-only training dose on the rejected pylon 200M slice from 512 to 256 superbatches",
+  "hypothesis": "keep the non-damaging 256-superbatch output-only regimen fixed and test the next independent pylon slice at offset 400M",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
@@ -12,7 +12,7 @@
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
-    "offset": 200000000
+    "offset": 400000000
   },
   "sfbinpack": {
     "min_ply": 24
