@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.28.0-rc6",
+  "run": "enyo-1.28.0-rc7",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "keep the 256-superbatch output-only regimen fixed and test the next independent pylon slice at offset 600M after the 400M slice regressed",
+  "hypothesis": "hold the pylon 600M slice and 256-superbatch regimen fixed and change only trainable scope from output to input after the output-only lane failed to improve the parent",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "trainable": "output",
+  "trainable": "input",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
