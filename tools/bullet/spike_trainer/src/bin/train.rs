@@ -53,13 +53,16 @@ const ENYO_RUNTIME_HIDDEN: usize = 1024;
 const ENYO_V2_HEADER_MAGIC: &[u8; 8] = b"ENYONN2\0";
 const ENYO_V3_HEADER_MAGIC: &[u8; 8] = b"ENYONN3\0";
 const ENYO_V4_HEADER_MAGIC: &[u8; 8] = b"ENYONN4\0";
+const ENYO_V5_HEADER_MAGIC: &[u8; 8] = b"ENYONN5\0";
 const ENYO_V2_FORMAT_VERSION: u32 = 2;
 const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_V4_FORMAT_VERSION: u32 = 4;
+const ENYO_V5_FORMAT_VERSION: u32 = 5;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
 const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
 const ENYO_NETWORK_FLAG_MIXED_ACTIVATION: u32 = 4;
+const ENYO_NETWORK_FLAG_PSQT_RESIDUAL: u32 = 8;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 60_720;
 const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 15,
@@ -763,6 +766,9 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
     if arch_mixed_activation(config) {
         command.arg("--mixed-activation");
     }
+    if arch_psqt_residual(config) {
+        command.arg("--psqt-residual");
+    }
     let status = command.status().unwrap_or_else(|err| {
         eprintln!("error: cannot run initialize_from converter: {err}");
         process::exit(1);
@@ -823,7 +829,7 @@ fn training_trainable(config: &Config) -> String {
 fn supported_trainable(value: &str) -> bool {
     matches!(
         value,
-        "all" | "input" | "dense-head" | "float-head" | "output" | "squared-branch"
+        "all" | "input" | "dense-head" | "float-head" | "output" | "squared-branch" | "psqt"
     )
 }
 
@@ -861,6 +867,10 @@ fn arch_mixed_activation(config: &Config) -> bool {
     }
 }
 
+fn arch_psqt_residual(config: &Config) -> bool {
+    bool_at(&config.arch, "psqt_residual", false)
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -872,6 +882,7 @@ fn validate_layout(config: &Config) {
     let full_threats = arch_full_threats(config);
     let full_heads = arch_full_heads(config);
     let mixed_activation = arch_mixed_activation(config);
+    let psqt_residual = arch_psqt_residual(config);
     if !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&input_buckets)
         || !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&runtime_input_buckets)
     {
@@ -903,7 +914,7 @@ fn validate_layout(config: &Config) {
     }
     if !matches!(
         export_format,
-        "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3" | "enyo-native-v4"
+        "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3" | "enyo-native-v4" | "enyo-native-v5"
     ) {
         eprintln!("error: unsupported export_format={export_format}");
         process::exit(2);
@@ -932,12 +943,28 @@ fn validate_layout(config: &Config) {
         eprintln!("error: enyo-native-v4 requires relu-screlu-residual");
         process::exit(2);
     }
+    if psqt_residual && export_format != "enyo-native-v5" {
+        eprintln!("error: PSQT residual requires export_format=enyo-native-v5");
+        process::exit(2);
+    }
+    if export_format == "enyo-native-v5" && !psqt_residual {
+        eprintln!("error: enyo-native-v5 requires psqt_residual=true");
+        process::exit(2);
+    }
+    if psqt_residual && (mixed_activation || full_heads || full_threats || output_buckets != 8) {
+        eprintln!("error: PSQT residual requires the shared-head 8-bucket base architecture");
+        process::exit(2);
+    }
     if mixed_activation && (full_heads || full_threats || output_buckets != 8) {
         eprintln!("error: mixed activation requires the shared-head 8-bucket base architecture");
         process::exit(2);
     }
     if training_trainable(config) == "squared-branch" && !mixed_activation {
         eprintln!("error: squared-branch requires mixed activation");
+        process::exit(2);
+    }
+    if training_trainable(config) == "psqt" && !psqt_residual {
+        eprintln!("error: psqt trainable mode requires psqt_residual=true");
         process::exit(2);
     }
     if full_heads && output_buckets <= 1 {
@@ -1427,6 +1454,10 @@ fn cmd_run(config: &Config) {
         usize::from(arch_mixed_activation(config)),
     );
     set_env(
+        "ENYO_BULLET_ENYO_PSQT_RESIDUAL",
+        usize::from(arch_psqt_residual(config)),
+    );
+    set_env(
         "ENYO_BULLET_EVAL_SCALE",
         f64_at(&config.arch, "eval_scale", 400.0),
     );
@@ -1674,6 +1705,7 @@ fn enyo_container(
     full_threats: bool,
     full_heads: bool,
     mixed_activation: bool,
+    psqt_residual: bool,
     format_version: u32,
 ) -> Vec<u8> {
     let payload_size = u32::try_from(payload.len()).unwrap_or_else(|_| {
@@ -1681,7 +1713,9 @@ fn enyo_container(
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    let magic = if format_version == ENYO_V4_FORMAT_VERSION {
+    let magic = if format_version == ENYO_V5_FORMAT_VERSION {
+        ENYO_V5_HEADER_MAGIC
+    } else if format_version == ENYO_V4_FORMAT_VERSION {
         ENYO_V4_HEADER_MAGIC
     } else if format_version == ENYO_V3_FORMAT_VERSION {
         ENYO_V3_HEADER_MAGIC
@@ -1712,6 +1746,10 @@ fn enyo_container(
             0
         }) | (if mixed_activation {
             ENYO_NETWORK_FLAG_MIXED_ACTIVATION
+        } else {
+            0
+        }) | (if psqt_residual {
+            ENYO_NETWORK_FLAG_PSQT_RESIDUAL
         } else {
             0
         }),
@@ -2144,6 +2182,7 @@ fn write_model(config: &Config) {
     let l2 = usize_at(&config.arch, "l2_size", 16);
     let full_threats = arch_full_threats(config);
     let full_heads = arch_full_heads(config);
+    let psqt_residual = arch_psqt_residual(config);
     let mixed_activation = arch_mixed_activation(config);
     let model = expand_input_buckets(
         &raw,
@@ -2179,6 +2218,7 @@ fn write_model(config: &Config) {
             full_threats,
             false,
             false,
+            false,
             ENYO_V2_FORMAT_VERSION,
         ),
         Some("enyo-native-v3") => enyo_container(
@@ -2190,6 +2230,7 @@ fn write_model(config: &Config) {
             output_buckets,
             false,
             full_heads,
+            false,
             false,
             ENYO_V3_FORMAT_VERSION,
         ),
@@ -2203,7 +2244,21 @@ fn write_model(config: &Config) {
             false,
             false,
             mixed_activation,
+            false,
             ENYO_V4_FORMAT_VERSION,
+        ),
+        Some("enyo-native-v5") => enyo_container(
+            &model,
+            runtime_input_buckets,
+            feature_channels,
+            hidden,
+            l2,
+            output_buckets,
+            false,
+            false,
+            false,
+            psqt_residual,
+            ENYO_V5_FORMAT_VERSION,
         ),
         _ => model,
     };
@@ -2645,6 +2700,7 @@ mod tests {
             8,
             false,
             true,
+            false,
             false,
             ENYO_V3_FORMAT_VERSION,
         );

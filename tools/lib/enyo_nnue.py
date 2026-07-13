@@ -43,11 +43,13 @@ N_OUTPUT = 1
 NETWORK_V2_HEADER_MAGIC = b"ENYONN2\0"
 NETWORK_V3_HEADER_MAGIC = b"ENYONN3\0"
 NETWORK_V4_HEADER_MAGIC = b"ENYONN4\0"
+NETWORK_V5_HEADER_MAGIC = b"ENYONN5\0"
 NETWORK_HEADER_MAGIC = NETWORK_V2_HEADER_MAGIC
 NETWORK_FORMAT_VERSION = 2
 NETWORK_FLAG_FULL_THREATS = 1
 NETWORK_FLAG_FULL_HEADS = 2
 NETWORK_FLAG_MIXED_ACTIVATION = 4
+NETWORK_FLAG_PSQT_RESIDUAL = 8
 NETWORK_HEADER = struct.Struct("<8s14I")
 NETWORK_HEADER_SIZE = NETWORK_HEADER.size
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
@@ -84,6 +86,7 @@ def network_size(
     full_threats: bool = False,
     full_heads: bool = False,
     mixed_activation: bool = False,
+    psqt_residual: bool = False,
 ) -> int:
     features = input_feature_count(input_buckets, feature_channels, full_threats)
     if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
@@ -104,6 +107,8 @@ def network_size(
            if mixed_activation else 0)
         + output_buckets * output_width * N_OUTPUT * np.dtype(np.float32).itemsize
         + output_buckets * N_OUTPUT * np.dtype(np.float32).itemsize
+        + ((features * output_buckets + output_buckets) * np.dtype(np.float32).itemsize
+           if psqt_residual else 0)
     )
 
 
@@ -236,8 +241,11 @@ class Net:
     full_threats: bool = False
     full_heads: bool = False
     mixed_activation: bool = False
+    psqt_residual: bool = False
     l2_squared_weights: np.ndarray | None = None
     l2_squared_biases: np.ndarray | None = None
+    psqt_weights: np.ndarray | None = None
+    psqt_biases: np.ndarray | None = None
 
     @property
     def output_bias(self) -> float:
@@ -629,8 +637,10 @@ def load_net(path: str | Path) -> Net:
     full_threats = False
     full_heads = False
     mixed_activation = False
+    psqt_residual = False
     payload = data
-    if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC, NETWORK_V4_HEADER_MAGIC)):
+    if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC,
+                        NETWORK_V4_HEADER_MAGIC, NETWORK_V5_HEADER_MAGIC)):
         if len(data) < NETWORK_HEADER_SIZE:
             raise ValueError(f"{path}: truncated Enyo NNUE header")
         (
@@ -654,6 +664,7 @@ def load_net(path: str | Path) -> Net:
             (NETWORK_V2_HEADER_MAGIC, 2),
             (NETWORK_V3_HEADER_MAGIC, 3),
             (NETWORK_V4_HEADER_MAGIC, 4),
+            (NETWORK_V5_HEADER_MAGIC, 5),
         ):
             raise ValueError(f"{path}: unsupported Enyo NNUE header")
         if header_size != NETWORK_HEADER_SIZE:
@@ -670,12 +681,14 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: unsupported output head feature count")
         allowed_flags = NETWORK_FLAG_FULL_THREATS | (
             NETWORK_FLAG_FULL_HEADS if format_version == 3 else 0) | (
-            NETWORK_FLAG_MIXED_ACTIVATION if format_version == 4 else 0)
+            NETWORK_FLAG_MIXED_ACTIVATION if format_version == 4 else 0) | (
+            NETWORK_FLAG_PSQT_RESIDUAL if format_version == 5 else 0)
         if (flags & ~allowed_flags) or reserved0 or reserved1:
             raise ValueError(f"{path}: unsupported header flags or reserved fields")
         full_threats = bool(flags & NETWORK_FLAG_FULL_THREATS)
         full_heads = bool(flags & NETWORK_FLAG_FULL_HEADS)
         mixed_activation = bool(flags & NETWORK_FLAG_MIXED_ACTIVATION)
+        psqt_residual = bool(flags & NETWORK_FLAG_PSQT_RESIDUAL)
         if full_heads != (format_version == 3):
             raise ValueError(f"{path}: v3 and full-head flag must be used together")
         if full_heads and (output_buckets <= 1 or full_threats):
@@ -684,10 +697,15 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: v4 and mixed-activation flag must be used together")
         if mixed_activation and (full_heads or full_threats or output_buckets != 8):
             raise ValueError(f"{path}: unsupported mixed-activation architecture")
+        if psqt_residual != (format_version == 5):
+            raise ValueError(f"{path}: v5 and PSQT-residual flag must be used together")
+        if psqt_residual and (full_heads or full_threats or mixed_activation
+                              or output_buckets != 8):
+            raise ValueError(f"{path}: unsupported PSQT-residual architecture")
         payload = data[header_size:]
         expected_payload = network_size(
             input_buckets, output_buckets, output_head_features,
-            feature_channels, full_threats, full_heads, mixed_activation)
+            feature_channels, full_threats, full_heads, mixed_activation, psqt_residual)
         if payload_size != expected_payload or len(payload) != expected_payload:
             raise ValueError(
                 f"{path}: payload size {len(payload)} does not match {expected_payload}")
@@ -730,6 +748,9 @@ def load_net(path: str | Path) -> Net:
     ow = take(np.float32, output_buckets * output_width).reshape(
         output_buckets, output_width)
     ob = take(np.float32, output_buckets)
+    psqtw = take(np.float32, n_features * output_buckets).reshape(
+        n_features, output_buckets) if psqt_residual else None
+    psqtb = take(np.float32, output_buckets) if psqt_residual else None
     assert off == len(payload)
     return Net(
         input_weights=iw,
@@ -749,8 +770,11 @@ def load_net(path: str | Path) -> Net:
         full_threats=full_threats,
         full_heads=full_heads,
         mixed_activation=mixed_activation,
+        psqt_residual=psqt_residual,
         l2_squared_weights=l2sw,
-        l2_squared_biases=l2sb)
+        l2_squared_biases=l2sb,
+        psqt_weights=psqtw,
+        psqt_biases=psqtb)
 
 
 def write_net(net: Net, path: str | Path) -> None:
@@ -836,6 +860,16 @@ def write_net(net: Net, path: str | Path) -> None:
         raise ValueError(
             f"output_biases shape {output_biases.shape} does not match "
             f"{net.output_buckets} output buckets")
+    psqt_payload = b""
+    if net.psqt_residual:
+        psqt_weights = np.asarray(net.psqt_weights, dtype=np.float32)
+        psqt_biases = np.asarray(net.psqt_biases, dtype=np.float32)
+        if psqt_weights.shape != (expected_features, net.output_buckets):
+            raise ValueError("PSQT residual requires psqt_weights[features,output_buckets]")
+        if psqt_biases.shape != (net.output_buckets,):
+            raise ValueError("PSQT residual requires psqt_biases[output_buckets]")
+        psqt_payload = (
+            psqt_weights.tobytes(order="C") + psqt_biases.tobytes(order="C"))
     payload = b"".join((
         input_weights.tobytes(order="C"),
         input_biases.tobytes(order="C"),
@@ -846,6 +880,7 @@ def write_net(net: Net, path: str | Path) -> None:
         squared_payload,
         output_weights.tobytes(order="C"),
         output_biases.tobytes(order="C"),
+        psqt_payload,
     ))
     if net.format_version == 1:
         if net.full_heads:
@@ -853,13 +888,16 @@ def write_net(net: Net, path: str | Path) -> None:
         if net.trained_hidden != N_HIDDEN:
             raise ValueError("non-1024 hidden widths require enyo-native-v2")
         data = payload
-    elif net.format_version in (2, 3, 4):
+    elif net.format_version in (2, 3, 4, 5):
         if (net.format_version == 3) != net.full_heads:
             raise ValueError("enyo-native-v3 and full_heads must be used together")
         if (net.format_version == 4) != net.mixed_activation:
             raise ValueError("enyo-native-v4 and mixed activation must be used together")
+        if (net.format_version == 5) != net.psqt_residual:
+            raise ValueError("enyo-native-v5 and PSQT residual must be used together")
         magic = (
-            NETWORK_V4_HEADER_MAGIC if net.mixed_activation
+            NETWORK_V5_HEADER_MAGIC if net.psqt_residual
+            else NETWORK_V4_HEADER_MAGIC if net.mixed_activation
             else NETWORK_V3_HEADER_MAGIC if net.full_heads
             else NETWORK_V2_HEADER_MAGIC
         )
@@ -877,7 +915,8 @@ def write_net(net: Net, path: str | Path) -> None:
             net.output_head_features,
             (NETWORK_FLAG_FULL_THREATS if net.full_threats else 0)
             | (NETWORK_FLAG_FULL_HEADS if net.full_heads else 0)
-            | (NETWORK_FLAG_MIXED_ACTIVATION if net.mixed_activation else 0),
+            | (NETWORK_FLAG_MIXED_ACTIVATION if net.mixed_activation else 0)
+            | (NETWORK_FLAG_PSQT_RESIDUAL if net.psqt_residual else 0),
             len(payload),
             0,
             0,
@@ -891,8 +930,9 @@ def write_net(net: Net, path: str | Path) -> None:
     size = out.stat().st_size
     expected = network_size(
         net.input_buckets, net.output_buckets, net.output_head_features,
-        net.feature_channels, net.full_threats, net.full_heads, net.mixed_activation)
-    if net.format_version in (2, 3, 4):
+        net.feature_channels, net.full_threats, net.full_heads,
+        net.mixed_activation, net.psqt_residual)
+    if net.format_version in (2, 3, 4, 5):
         expected += NETWORK_HEADER_SIZE
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")

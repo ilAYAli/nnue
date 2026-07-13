@@ -290,6 +290,11 @@ def main() -> int:
         help="Append a zero-initialized squared-activation residual affine.",
     )
     parser.add_argument(
+        "--psqt-residual",
+        action="store_true",
+        help="Append a zero-initialized material-bucketed PSQT residual table.",
+    )
+    parser.add_argument(
         "--legacy-inputs",
         action="store_true",
         help="Keep the 16-king-bucket legacy input tensor instead of expanding to 32 buckets.",
@@ -358,6 +363,14 @@ def main() -> int:
             bullet_l3_weights(output_weights) / output_scale,
         )
         write_tensor(handle, "l3b", output_biases / output_scale)
+        if args.psqt_residual:
+            write_tensor(
+                handle,
+                "psqtw",
+                np.zeros((args.input_buckets * args.feature_channels * 64,
+                          args.output_buckets), dtype=np.float32),
+            )
+            write_tensor(handle, "psqtb", np.zeros(args.output_buckets, dtype=np.float32))
 
     write_metadata(args.output.expanduser(), args)
     print(f"wrote {args.output.expanduser()}")
