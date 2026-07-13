@@ -1,12 +1,12 @@
 {
-  "run": "enyo-3.0.0-rc1",
+  "run": "enyo-4.0.0-rc1",
   "initialize_from": "enyo-1.20.0-rc12",
   "reference": "enyo-1.20.0-rc12",
-  "hypothesis": "change only material bucketing from a shared dense head with bucketed outputs to complete material-specific dense heads, warm-started from the protected Enyo champion",
+  "hypothesis": "add only a zero-initialized normalized squared-clipped residual into the shared dense head while preserving and freezing the protected champion path",
   "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "dense-head",
+  "trainable": "squared-branch",
   "sfbinpack": {
     "min_ply": 24
   },
