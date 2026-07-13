@@ -16,16 +16,27 @@ def zero_net(*, input_buckets: int = 16,
              output_head_features: int = 0,
              trained_hidden: int = nn2.N_HIDDEN,
              format_version: int = 1,
-             full_threats: bool = False) -> nn2.Net:
+             full_threats: bool = False,
+             full_heads: bool = False) -> nn2.Net:
     features = nn2.input_feature_count(
         input_buckets, feature_channels, full_threats)
+    head_count = output_buckets if full_heads else 1
+    l1_shape = (head_count, nn2.N_L2, 2 * trained_hidden)
+    l2_shape = (head_count, nn2.N_L3, nn2.N_L2)
+    if not full_heads:
+        l1_shape = l1_shape[1:]
+        l2_shape = l2_shape[1:]
     return nn2.Net(
         input_weights=np.zeros((features, trained_hidden), dtype=np.int16),
         input_biases=np.zeros((trained_hidden,), dtype=np.int16),
-        l1_weights=np.zeros((nn2.N_L2, 2 * trained_hidden), dtype=np.int8),
-        l1_biases=np.zeros((nn2.N_L2,), dtype=np.int32),
-        l2_weights=np.zeros((nn2.N_L3, nn2.N_L2), dtype=np.float32),
-        l2_biases=np.zeros((nn2.N_L3,), dtype=np.float32),
+        l1_weights=np.zeros(l1_shape, dtype=np.int8),
+        l1_biases=np.zeros(
+            (head_count, nn2.N_L2) if full_heads else (nn2.N_L2,),
+            dtype=np.int32),
+        l2_weights=np.zeros(l2_shape, dtype=np.float32),
+        l2_biases=np.zeros(
+            (head_count, nn2.N_L3) if full_heads else (nn2.N_L3,),
+            dtype=np.float32),
         output_weights=np.zeros(
             (output_buckets, nn2.N_L3 + output_head_features),
             dtype=np.float32),
@@ -37,10 +48,38 @@ def zero_net(*, input_buckets: int = 16,
         trained_hidden=trained_hidden,
         format_version=format_version,
         full_threats=full_threats,
+        full_heads=full_heads,
     )
 
 
 class EnyoNNUEFormatTests(unittest.TestCase):
+    def test_full_head_v3_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "full-heads.nn"
+            net = zero_net(
+                output_buckets=8,
+                format_version=3,
+                full_heads=True,
+            )
+            net.l1_biases[:, 0] = np.arange(8, dtype=np.int32)
+            net.l2_biases[:, 0] = np.arange(8, dtype=np.float32) + 0.5
+            nn2.write_net(net, path)
+
+            self.assertEqual(
+                path.stat().st_size,
+                nn2.NETWORK_HEADER_SIZE
+                + nn2.network_size(16, 8, full_heads=True))
+            loaded = nn2.load_net(path)
+
+            self.assertEqual(loaded.format_version, 3)
+            self.assertTrue(loaded.full_heads)
+            self.assertEqual(loaded.l1_weights.shape, (8, nn2.N_L2, nn2.N_L1))
+            self.assertEqual(loaded.l2_weights.shape, (8, nn2.N_L3, nn2.N_L2))
+            np.testing.assert_array_equal(
+                loaded.l1_biases[:, 0], np.arange(8, dtype=np.int32))
+            np.testing.assert_array_equal(
+                loaded.l2_biases[:, 0], np.arange(8, dtype=np.float32) + 0.5)
+
     def test_single_head_roundtrip_keeps_legacy_size(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "single.nn"

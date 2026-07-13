@@ -5,24 +5,24 @@ use std::env;
 use bullet_lib::{
     game::{
         formats::bulletformat::ChessBoard,
-        inputs::{ChessBucketsMirrored, SparseInputType, get_num_buckets},
+        inputs::{get_num_buckets, ChessBucketsMirrored, SparseInputType},
         outputs::MaterialCount,
     },
     nn::{
-        Affine, InitSettings, ModelBuilder, Shape,
         optimiser::{AdamW, AdamWParams},
+        Affine, InitSettings, ModelBuilder, Shape,
     },
     trainer::{
         save::SavedFormat,
-        schedule::{TrainingSchedule, TrainingSteps, lr, wdl},
+        schedule::{lr, wdl, TrainingSchedule, TrainingSteps},
         settings::LocalSettings,
     },
     value::{
-        ValueTrainerBuilder,
         loader::{
-            DirectSequentialDataLoader, SfBinpackLoader,
             sfbinpack::{MoveType, PieceType, TrainingDataEntry},
+            DirectSequentialDataLoader, SfBinpackLoader,
         },
+        ValueTrainerBuilder,
     },
 };
 
@@ -95,7 +95,11 @@ fn enyo_affine<'a>(
 }
 
 fn maybe_frozen<'a, T>(builder: &'a ModelBuilder, frozen: bool, mut f: impl FnMut() -> T) -> T {
-    if frozen { builder.no_grad(|| f()) } else { f() }
+    if frozen {
+        builder.no_grad(|| f())
+    } else {
+        f()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -277,6 +281,7 @@ fn train_enyo<
     const FEATURE_CHANNELS: usize,
     const OUTPUT_BUCKETS: usize,
     const FULL_THREATS: bool,
+    const FULL_HEADS: bool,
 >(
     dataset: String,
     output: String,
@@ -317,6 +322,12 @@ fn train_enyo<
     if !matches!(OUTPUT_BUCKETS, 1 | 2 | 4 | 8) {
         panic!("Enyo mode supports only 1, 2, 4, or 8 output buckets");
     }
+    if FULL_HEADS && OUTPUT_BUCKETS == 1 {
+        panic!("full-head Enyo mode requires more than one output bucket");
+    }
+    if FULL_HEADS && FULL_THREATS {
+        panic!("full-head and FullThreats changes must be trained separately");
+    }
     if start_superbatch == 0 || start_superbatch > end_superbatch {
         panic!("invalid superbatch range {start_superbatch}..={end_superbatch}");
     }
@@ -341,6 +352,7 @@ fn train_enyo<
     println!("enyo_feature_channels={FEATURE_CHANNELS}");
     println!("enyo_output_buckets={OUTPUT_BUCKETS}");
     println!("enyo_full_threats={FULL_THREATS}");
+    println!("enyo_full_heads={FULL_HEADS}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
     println!("enyo_input_factoriser={input_factoriser}");
@@ -474,8 +486,64 @@ fn train_enyo<
             (l3.forward(x2), activation_penalty)
         }};
         ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr, $output_buckets:expr) => {{
-            let (output, activation_penalty) = enyo_forward!($builder, $stm_inputs, $ntm_inputs);
-            (output.select($output_buckets), activation_penalty)
+            let mut l0 = maybe_frozen($builder, !train_input, || {
+                enyo_affine(
+                    $builder,
+                    "l0",
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
+                        + if FULL_THREATS {
+                            enyo_threats::DIMENSIONS
+                        } else {
+                            0
+                        },
+                    hidden,
+                    l0_stdev,
+                )
+            });
+            if input_factoriser {
+                let l0f = maybe_frozen($builder, !train_input, || {
+                    $builder.new_weights(
+                        "l0f",
+                        Shape::new(hidden, FEATURE_CHANNELS * 64),
+                        InitSettings::Zeroed,
+                    )
+                });
+                l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
+            }
+            l0.weights = l0.weights.faux_quantise(1.0, true);
+            l0.bias = l0.bias.faux_quantise(1.0, true);
+
+            let head_count = if FULL_HEADS { OUTPUT_BUCKETS } else { 1 };
+            let mut l1 = maybe_frozen($builder, !train_l1, || {
+                enyo_affine($builder, "l1", 2 * hidden, head_count * l2_size, l1_stdev)
+            });
+            l1.weights = l1.weights.faux_quantise(l1_export_scale, true);
+            l1.bias = l1.bias.faux_quantise(l1_export_scale, true);
+            let l2 = maybe_frozen($builder, !train_l2, || {
+                $builder.new_affine("l2", l2_size, head_count * 32)
+            });
+            let l3 = maybe_frozen($builder, !train_l3, || {
+                $builder.new_affine("l3", 32, OUTPUT_BUCKETS)
+            });
+
+            let stm_hidden = (l0.forward($stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+                .faux_quantise(1.0, false);
+            let ntm_hidden = (l0.forward($ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+                .faux_quantise(1.0, false);
+            let activation_penalty = (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
+                * (activation_l1 / (2.0 * hidden as f32));
+            let x0 = stm_hidden.concat(ntm_hidden);
+            let x1 = if FULL_HEADS {
+                l1.forward(x0).select($output_buckets).relu()
+            } else {
+                l1.forward(x0).relu()
+            };
+            let x2 = if FULL_HEADS {
+                l2.forward(x1).select($output_buckets).relu()
+            } else {
+                l2.forward(x1).relu()
+            };
+            (l3.forward(x2).select($output_buckets), activation_penalty)
         }};
     }
 
@@ -616,18 +684,16 @@ fn train_enyo<
             })
         );
     } else {
-        run_trainer!(
-            base_trainer!()
-                .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
-                .build_custom(
-                    |builder, (stm_inputs, ntm_inputs, output_buckets), target| {
-                        let (output, activation_penalty) =
-                            enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets);
-                        let loss = output.sigmoid().squared_error(target) + activation_penalty;
-                        (output, loss)
-                    }
-                )
-        );
+        run_trainer!(base_trainer!()
+            .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
+            .build_custom(
+                |builder, (stm_inputs, ntm_inputs, output_buckets), target| {
+                    let (output, activation_penalty) =
+                        enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets);
+                    let loss = output.sigmoid().squared_error(target) + activation_penalty;
+                    (output, loss)
+                }
+            ));
     }
 }
 
@@ -655,6 +721,7 @@ fn main() {
     let enyo_feature_channels = env_parse("ENYO_BULLET_ENYO_FEATURE_CHANNELS", 12usize);
     let enyo_output_buckets = env_parse("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", 1usize);
     let enyo_full_threats = env_parse("ENYO_BULLET_ENYO_FULL_THREATS", 0usize) != 0;
+    let enyo_full_heads = env_parse("ENYO_BULLET_ENYO_FULL_HEADS", 0usize) != 0;
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
@@ -663,8 +730,14 @@ fn main() {
 
     if mode == "enyo" {
         macro_rules! run_enyo {
-            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal) => {
-                train_enyo::<$input_buckets, $feature_channels, $output_buckets, $full_threats>(
+            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal, $full_heads:literal) => {
+                train_enyo::<
+                    $input_buckets,
+                    $feature_channels,
+                    $output_buckets,
+                    $full_threats,
+                    $full_heads,
+                >(
                     dataset,
                     output,
                     net_id,
@@ -694,17 +767,23 @@ fn main() {
 
         macro_rules! run_enyo_layout {
             ($input_buckets:literal, $feature_channels:literal) => {
-                match (enyo_output_buckets, enyo_full_threats) {
-                    (1, false) => run_enyo!($input_buckets, $feature_channels, 1, false),
-                    (2, false) => run_enyo!($input_buckets, $feature_channels, 2, false),
-                    (4, false) => run_enyo!($input_buckets, $feature_channels, 4, false),
-                    (8, false) => run_enyo!($input_buckets, $feature_channels, 8, false),
-                    (1, true) => run_enyo!($input_buckets, $feature_channels, 1, true),
-                    (2, true) => run_enyo!($input_buckets, $feature_channels, 2, true),
-                    (4, true) => run_enyo!($input_buckets, $feature_channels, 4, true),
-                    (8, true) => run_enyo!($input_buckets, $feature_channels, 8, true),
+                match (enyo_output_buckets, enyo_full_threats, enyo_full_heads) {
+                    (1, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false),
+                    (2, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false),
+                    (4, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false),
+                    (8, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false),
+                    (1, true, false) => run_enyo!($input_buckets, $feature_channels, 1, true, false),
+                    (2, true, false) => run_enyo!($input_buckets, $feature_channels, 2, true, false),
+                    (4, true, false) => run_enyo!($input_buckets, $feature_channels, 4, true, false),
+                    (8, true, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false),
+                    (2, false, true) => run_enyo!($input_buckets, $feature_channels, 2, false, true),
+                    (4, false, true) => run_enyo!($input_buckets, $feature_channels, 4, false, true),
+                    (8, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, true),
                     _ => {
-                        panic!("unsupported ENYO_BULLET_ENYO_OUTPUT_BUCKETS={enyo_output_buckets}")
+                        panic!(
+                            "unsupported Enyo output/full-threat/full-head combination: \
+                             {enyo_output_buckets}/{enyo_full_threats}/{enyo_full_heads}"
+                        )
                     }
                 }
             };

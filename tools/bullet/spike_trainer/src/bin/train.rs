@@ -15,8 +15,8 @@ use std::{
 use bullet_lib::{
     game::formats::bulletformat::ChessBoard,
     value::loader::{
-        DataLoader, SfBinpackLoader,
         sfbinpack::{MoveType, PieceType, TrainingDataEntry},
+        DataLoader, SfBinpackLoader,
     },
 };
 use serde_json::Value;
@@ -50,10 +50,13 @@ const ENYO_SUPPORTED_HIDDEN: &[usize] = &[512, 768, 1024];
 const ENYO_SUPPORTED_FEATURE_CHANNELS: &[usize] = &[11, 12];
 const ENYO_SUPPORTED_OUTPUT_BUCKETS: &[usize] = &[1, 2, 4, 8];
 const ENYO_RUNTIME_HIDDEN: usize = 1024;
-const ENYO_NETWORK_HEADER_MAGIC: &[u8; 8] = b"ENYONN2\0";
-const ENYO_NETWORK_FORMAT_VERSION: u32 = 2;
+const ENYO_V2_HEADER_MAGIC: &[u8; 8] = b"ENYONN2\0";
+const ENYO_V3_HEADER_MAGIC: &[u8; 8] = b"ENYONN3\0";
+const ENYO_V2_FORMAT_VERSION: u32 = 2;
+const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
+const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 60_720;
 const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 15,
@@ -751,12 +754,10 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
     if arch_full_threats(config) {
         command.arg("--full-threats");
     }
-    let status = command
-        .status()
-        .unwrap_or_else(|err| {
-            eprintln!("error: cannot run initialize_from converter: {err}");
-            process::exit(1);
-        });
+    let status = command.status().unwrap_or_else(|err| {
+        eprintln!("error: cannot run initialize_from converter: {err}");
+        process::exit(1);
+    });
     if !status.success() {
         eprintln!("error: initialize_from conversion failed");
         process::exit(1);
@@ -822,6 +823,17 @@ fn arch_full_threats(config: &Config) -> bool {
     bool_at(&config.arch, "full_threats", false)
 }
 
+fn arch_full_heads(config: &Config) -> bool {
+    match string_at(&config.arch, "output_bucket_scope").unwrap_or("final") {
+        "final" => false,
+        "full-head" => true,
+        value => {
+            eprintln!("error: unsupported output_bucket_scope={value}");
+            process::exit(2);
+        }
+    }
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -831,6 +843,7 @@ fn validate_layout(config: &Config) {
     let l2 = usize_at(&config.arch, "l2_size", 16);
     let export_format = string_at(&config.arch, "export_format").unwrap_or("enyo-native-v1");
     let full_threats = arch_full_threats(config);
+    let full_heads = arch_full_heads(config);
     if !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&input_buckets)
         || !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&runtime_input_buckets)
     {
@@ -860,7 +873,10 @@ fn validate_layout(config: &Config) {
         eprintln!("error: Enyo layout requires hidden=512, 768, or 1024 and l2_size=16");
         process::exit(2);
     }
-    if !matches!(export_format, "enyo-native-v1" | "enyo-native-v2") {
+    if !matches!(
+        export_format,
+        "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3"
+    ) {
         eprintln!("error: unsupported export_format={export_format}");
         process::exit(2);
     }
@@ -870,6 +886,24 @@ fn validate_layout(config: &Config) {
     }
     if full_threats && export_format != "enyo-native-v2" {
         eprintln!("error: full_threats requires export_format=enyo-native-v2");
+        process::exit(2);
+    }
+    if full_heads && export_format != "enyo-native-v3" {
+        eprintln!("error: output_bucket_scope=full-head requires export_format=enyo-native-v3");
+        process::exit(2);
+    }
+    if export_format == "enyo-native-v3" && !full_heads {
+        eprintln!("error: enyo-native-v3 requires output_bucket_scope=full-head");
+        process::exit(2);
+    }
+    if full_heads && output_buckets <= 1 {
+        eprintln!("error: full-head output bucketing requires at least 2 output buckets");
+        process::exit(2);
+    }
+    if full_heads && full_threats {
+        eprintln!(
+            "error: full-head and FullThreats architecture changes must be tested separately"
+        );
         process::exit(2);
     }
     if full_threats && bool_at(&config.arch, "input_factoriser", false) {
@@ -920,12 +954,13 @@ fn cmd_plan(config: &Config) {
     println!();
     println!("resolved:");
     println!(
-        "  layout={} buckets, {} channels, hidden={}, output_buckets={}, full_threats={}",
+        "  layout={} buckets, {} channels, hidden={}, output_buckets={}, full_threats={}, full_heads={}",
         usize_at(&config.arch, "input_buckets", 1),
         usize_at(&config.arch, "feature_channels", 12),
         usize_at(&config.arch, "hidden", 1024),
         usize_at(&config.arch, "output_buckets", 1),
         arch_full_threats(config),
+        arch_full_heads(config),
     );
     println!(
         "  loader={}, net_id={}, threads={}, save_rate={}",
@@ -1333,6 +1368,10 @@ fn cmd_run(config: &Config) {
         usize::from(arch_full_threats(config)),
     );
     set_env(
+        "ENYO_BULLET_ENYO_FULL_HEADS",
+        usize::from(arch_full_heads(config)),
+    );
+    set_env(
         "ENYO_BULLET_EVAL_SCALE",
         f64_at(&config.arch, "eval_scale", 400.0),
     );
@@ -1360,6 +1399,7 @@ fn enyo_network_size(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    full_heads: bool,
 ) -> usize {
     let features = input_buckets * feature_channels * 64
         + if full_threats {
@@ -1369,12 +1409,13 @@ fn enyo_network_size(
         };
     let l1 = 2 * hidden;
     let l3 = 32;
+    let head_count = if full_heads { output_buckets } else { 1 };
     features * hidden * 2
         + hidden * 2
-        + l1 * l2
-        + l2 * 4
-        + l2 * l3 * 4
-        + l3 * 4
+        + head_count * l1 * l2
+        + head_count * l2 * 4
+        + head_count * l2 * l3 * 4
+        + head_count * l3 * 4
         + output_buckets * l3 * 4
         + output_buckets * 4
 }
@@ -1387,6 +1428,7 @@ fn trim_checkpoint(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    full_heads: bool,
 ) -> Vec<u8> {
     let expected = enyo_network_size(
         input_buckets,
@@ -1395,6 +1437,7 @@ fn trim_checkpoint(
         hidden,
         l2,
         full_threats,
+        full_heads,
     );
     if raw.len() < expected {
         eprintln!(
@@ -1442,6 +1485,7 @@ fn expand_input_buckets(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    full_heads: bool,
 ) -> Vec<u8> {
     let raw = trim_checkpoint(
         raw,
@@ -1451,6 +1495,7 @@ fn expand_input_buckets(
         hidden,
         l2,
         full_threats,
+        full_heads,
     );
     if input_buckets == runtime_input_buckets {
         return raw;
@@ -1492,6 +1537,7 @@ fn pad_hidden_width(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    full_heads: bool,
 ) -> Vec<u8> {
     if hidden == ENYO_RUNTIME_HIDDEN {
         return raw.to_vec();
@@ -1505,6 +1551,7 @@ fn pad_hidden_width(
         hidden,
         l2,
         full_threats,
+        full_heads,
     );
     let features = input_buckets * feature_channels * 64
         + if full_threats {
@@ -1514,10 +1561,11 @@ fn pad_hidden_width(
         };
     let source_l0w = features * hidden * 2;
     let source_l0b = hidden * 2;
-    let source_l1w = 2 * hidden * l2;
+    let head_count = if full_heads { output_buckets } else { 1 };
+    let source_l1w = head_count * 2 * hidden * l2;
     let target_l0w = features * ENYO_RUNTIME_HIDDEN * 2;
     let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
-    let target_l1w = 2 * ENYO_RUNTIME_HIDDEN * l2;
+    let target_l1w = head_count * 2 * ENYO_RUNTIME_HIDDEN * l2;
     let source_tail = source_l0w + source_l0b + source_l1w;
     let target_tail = target_l0w + target_l0b + target_l1w;
     let mut padded = vec![0_u8; target_tail + raw.len() - source_tail];
@@ -1536,7 +1584,7 @@ fn pad_hidden_width(
 
     let source_l1_start = source_l0w + source_l0b;
     let target_l1_start = target_l0w + target_l0b;
-    for row in 0..l2 {
+    for row in 0..head_count * l2 {
         let source_row = source_l1_start + row * 2 * hidden;
         let target_row = target_l1_start + row * 2 * ENYO_RUNTIME_HIDDEN;
         padded[target_row..target_row + hidden]
@@ -1553,7 +1601,7 @@ fn write_u32_le(output: &mut [u8], offset: usize, value: u32) {
     output[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
 }
 
-fn enyo_v2_container(
+fn enyo_container(
     payload: &[u8],
     input_buckets: usize,
     feature_channels: usize,
@@ -1561,14 +1609,21 @@ fn enyo_v2_container(
     l2: usize,
     output_buckets: usize,
     full_threats: bool,
+    full_heads: bool,
+    format_version: u32,
 ) -> Vec<u8> {
     let payload_size = u32::try_from(payload.len()).unwrap_or_else(|_| {
         eprintln!("error: Enyo network payload is too large");
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    output[..ENYO_NETWORK_HEADER_MAGIC.len()].copy_from_slice(ENYO_NETWORK_HEADER_MAGIC);
-    write_u32_le(&mut output, 8, ENYO_NETWORK_FORMAT_VERSION);
+    let magic = if format_version == ENYO_V3_FORMAT_VERSION {
+        ENYO_V3_HEADER_MAGIC
+    } else {
+        ENYO_V2_HEADER_MAGIC
+    };
+    output[..magic.len()].copy_from_slice(magic);
+    write_u32_le(&mut output, 8, format_version);
     write_u32_le(&mut output, 12, ENYO_NETWORK_HEADER_SIZE as u32);
     write_u32_le(&mut output, 16, input_buckets as u32);
     write_u32_le(&mut output, 20, feature_channels as u32);
@@ -1581,11 +1636,15 @@ fn enyo_v2_container(
     write_u32_le(
         &mut output,
         48,
-        if full_threats {
+        (if full_threats {
             ENYO_NETWORK_FLAG_FULL_THREATS
         } else {
             0
-        },
+        }) | (if full_heads {
+            ENYO_NETWORK_FLAG_FULL_HEADS
+        } else {
+            0
+        }),
     );
     write_u32_le(&mut output, 52, payload_size);
     output[ENYO_NETWORK_HEADER_SIZE..].copy_from_slice(payload);
@@ -2014,6 +2073,7 @@ fn write_model(config: &Config) {
     let hidden = usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN);
     let l2 = usize_at(&config.arch, "l2_size", 16);
     let full_threats = arch_full_threats(config);
+    let full_heads = arch_full_heads(config);
     let model = expand_input_buckets(
         &raw,
         input_buckets,
@@ -2023,6 +2083,7 @@ fn write_model(config: &Config) {
         hidden,
         l2,
         full_threats,
+        full_heads,
     );
     let model = pad_hidden_width(
         &model,
@@ -2032,9 +2093,10 @@ fn write_model(config: &Config) {
         hidden,
         l2,
         full_threats,
+        full_heads,
     );
-    let model = if string_at(&config.arch, "export_format") == Some("enyo-native-v2") {
-        enyo_v2_container(
+    let model = match string_at(&config.arch, "export_format") {
+        Some("enyo-native-v2") => enyo_container(
             &model,
             runtime_input_buckets,
             feature_channels,
@@ -2042,9 +2104,21 @@ fn write_model(config: &Config) {
             l2,
             output_buckets,
             full_threats,
-        )
-    } else {
-        model
+            false,
+            ENYO_V2_FORMAT_VERSION,
+        ),
+        Some("enyo-native-v3") => enyo_container(
+            &model,
+            runtime_input_buckets,
+            feature_channels,
+            hidden,
+            l2,
+            output_buckets,
+            false,
+            full_heads,
+            ENYO_V3_FORMAT_VERSION,
+        ),
+        _ => model,
     };
     let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
     if let Some(parent) = model_path.parent() {
@@ -2270,11 +2344,9 @@ mod tests {
         }));
 
         let errors = config_contract_errors(&config);
-        assert!(
-            errors
-                .iter()
-                .any(|err| err.contains("build.new_training_knob"))
-        );
+        assert!(errors
+            .iter()
+            .any(|err| err.contains("build.new_training_knob")));
     }
 
     #[test]
@@ -2315,11 +2387,9 @@ mod tests {
         }));
 
         let errors = config_contract_errors(&config);
-        assert!(
-            errors
-                .iter()
-                .any(|err| err.contains("build.data.buffer_mb"))
-        );
+        assert!(errors
+            .iter()
+            .any(|err| err.contains("build.data.buffer_mb")));
     }
 
     #[test]
@@ -2333,16 +2403,12 @@ mod tests {
         }));
 
         let errors = config_contract_errors(&config);
-        assert!(
-            errors
-                .iter()
-                .any(|err| err.contains("build.data.source_binpack"))
-        );
-        assert!(
-            errors
-                .iter()
-                .any(|err| err.contains("build.data.bullet_output"))
-        );
+        assert!(errors
+            .iter()
+            .any(|err| err.contains("build.data.source_binpack")));
+        assert!(errors
+            .iter()
+            .any(|err| err.contains("build.data.bullet_output")));
     }
 
     #[test]
@@ -2443,6 +2509,7 @@ mod tests {
             hidden,
             l2,
             false,
+            false,
         );
         let mut raw = vec![0_u8; size];
         let source_l0w = input_buckets * feature_channels * 64 * hidden * 2;
@@ -2458,6 +2525,7 @@ mod tests {
             hidden,
             l2,
             false,
+            false,
         );
         let target_l0w = input_buckets * feature_channels * 64 * ENYO_RUNTIME_HIDDEN * 2;
         let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
@@ -2472,8 +2540,19 @@ mod tests {
     #[test]
     fn versioned_header_records_trained_architecture() {
         let payload = vec![7_u8; 32];
-        let container = enyo_v2_container(&payload, 10, 11, 768, 16, 8, false);
-        assert_eq!(&container[..8], ENYO_NETWORK_HEADER_MAGIC);
+        let container = enyo_container(
+            &payload,
+            10,
+            11,
+            768,
+            16,
+            8,
+            false,
+            true,
+            ENYO_V3_FORMAT_VERSION,
+        );
+        assert_eq!(&container[..8], ENYO_V3_HEADER_MAGIC);
+        assert_eq!(u32::from_le_bytes(container[8..12].try_into().unwrap()), 3);
         assert_eq!(
             u32::from_le_bytes(container[16..20].try_into().unwrap()),
             10
@@ -2487,6 +2566,10 @@ mod tests {
             768
         );
         assert_eq!(u32::from_le_bytes(container[40..44].try_into().unwrap()), 8);
+        assert_eq!(
+            u32::from_le_bytes(container[48..52].try_into().unwrap()),
+            ENYO_NETWORK_FLAG_FULL_HEADS
+        );
         assert_eq!(
             u32::from_le_bytes(container[52..56].try_into().unwrap()),
             32
