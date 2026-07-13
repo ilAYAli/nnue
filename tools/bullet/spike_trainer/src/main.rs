@@ -368,10 +368,21 @@ fn train_enyo<
          lr_superbatches={lr_superbatches}"
     );
 
+    if !matches!(
+        trainable.as_str(),
+        "all" | "input" | "dense-head" | "float-head" | "output"
+    ) {
+        panic!("unsupported trainable mode: {trainable}");
+    }
     let train_input = trainable == "all" || trainable == "input";
-    let train_l1 = trainable == "all";
-    let train_l2 = trainable == "all" || trainable == "float-head";
-    let train_l3 = trainable == "all" || trainable == "float-head" || trainable == "output";
+    let train_l1 = trainable == "all" || trainable == "dense-head";
+    let train_l2 = trainable == "all"
+        || trainable == "dense-head"
+        || trainable == "float-head";
+    let train_l3 = trainable == "all"
+        || trainable == "dense-head"
+        || trainable == "float-head"
+        || trainable == "output";
     if activation_l1 > 0.0 && !train_input {
         panic!("activation_l1 requires a trainable input layer");
     }

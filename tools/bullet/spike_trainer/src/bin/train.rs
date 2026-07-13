@@ -754,6 +754,9 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
     if arch_full_threats(config) {
         command.arg("--full-threats");
     }
+    if arch_full_heads(config) {
+        command.arg("--full-heads");
+    }
     let status = command.status().unwrap_or_else(|err| {
         eprintln!("error: cannot run initialize_from converter: {err}");
         process::exit(1);
@@ -809,6 +812,10 @@ fn training_save_rate(config: &Config) -> usize {
 
 fn training_trainable(config: &Config) -> String {
     training_string(config, "trainable", "all")
+}
+
+fn supported_trainable(value: &str) -> bool {
+    matches!(value, "all" | "input" | "dense-head" | "float-head" | "output")
 }
 
 fn training_weight_decay(config: &Config) -> f64 {
@@ -916,6 +923,13 @@ fn validate_layout(config: &Config) {
     }
     if training_lr_superbatches(config) < training_superbatches(config) {
         eprintln!("error: lr_superbatches cannot be smaller than superbatches");
+        process::exit(2);
+    }
+    if !supported_trainable(&training_trainable(config)) {
+        eprintln!(
+            "error: unsupported trainable mode: {}",
+            training_trainable(config)
+        );
         process::exit(2);
     }
 }
@@ -2261,6 +2275,12 @@ mod tests {
         }));
 
         assert_eq!(training_lr_superbatches(&config), 16384);
+    }
+
+    #[test]
+    fn dense_head_is_supported_and_unknown_mode_is_rejected() {
+        assert!(supported_trainable("dense-head"));
+        assert!(!supported_trainable("typo"));
     }
 
     #[test]

@@ -191,6 +191,46 @@ def bullet_l3_weights(output_weights: np.ndarray) -> np.ndarray:
     return np.asarray(output_weights, dtype=np.float32).T
 
 
+def expand_dense_heads(net, output_buckets: int, full_heads: bool):
+    l1_weights = np.asarray(net.l1_weights, dtype=np.float32)
+    l1_biases = np.asarray(net.l1_biases, dtype=np.float32)
+    l2_weights = np.asarray(net.l2_weights, dtype=np.float32)
+    l2_biases = np.asarray(net.l2_biases, dtype=np.float32)
+    source_full_heads = bool(getattr(net, "full_heads", False))
+
+    if source_full_heads:
+        if not full_heads:
+            raise SystemExit("cannot collapse full material heads into a shared dense head")
+        source_heads = int(getattr(net, "output_buckets", l1_weights.shape[0]))
+        indices = [
+            source_output_bucket_for_target(bucket, source_heads, output_buckets)
+            for bucket in range(output_buckets)
+        ]
+        return (
+            l1_weights[indices],
+            l1_biases[indices],
+            l2_weights[indices],
+            l2_biases[indices],
+        )
+
+    if l1_weights.shape != (N_L2, N_L1):
+        raise SystemExit(f"unexpected shared L1 weight shape: {l1_weights.shape}")
+    if l1_biases.shape != (N_L2,):
+        raise SystemExit(f"unexpected shared L1 bias shape: {l1_biases.shape}")
+    if l2_weights.shape != (N_L3, N_L2):
+        raise SystemExit(f"unexpected shared L2 weight shape: {l2_weights.shape}")
+    if l2_biases.shape != (N_L3,):
+        raise SystemExit(f"unexpected shared L2 bias shape: {l2_biases.shape}")
+    if not full_heads:
+        return l1_weights, l1_biases, l2_weights, l2_biases
+    return (
+        np.repeat(l1_weights[np.newaxis, ...], output_buckets, axis=0),
+        np.repeat(l1_biases[np.newaxis, ...], output_buckets, axis=0),
+        np.repeat(l2_weights[np.newaxis, ...], output_buckets, axis=0),
+        np.repeat(l2_biases[np.newaxis, ...], output_buckets, axis=0),
+    )
+
+
 def write_tensor(handle, name: str, values: np.ndarray) -> None:
     flat = np.asarray(values, dtype=np.float32).ravel(order="C")
     handle.write(name.encode("ascii") + b"\n")
@@ -210,6 +250,7 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "target_feature_channels": args.feature_channels,
         "target_hidden": args.hidden,
         "full_threats": bool(args.full_threats),
+        "full_heads": bool(args.full_heads),
         "legacy_inputs": bool(args.legacy_inputs),
     }
     (path.parent / "meta.json").write_text(
@@ -238,6 +279,11 @@ def main() -> int:
         help="Append zero-initialized FullThreats rows for warm-starting that architecture.",
     )
     parser.add_argument(
+        "--full-heads",
+        action="store_true",
+        help="Duplicate a shared native dense head into every output bucket.",
+    )
+    parser.add_argument(
         "--legacy-inputs",
         action="store_true",
         help="Keep the 16-king-bucket legacy input tensor instead of expanding to 32 buckets.",
@@ -260,6 +306,8 @@ def main() -> int:
 
     output_scale = args.eval_scale * args.eval_divisor
     output_weights, output_biases = expand_output_head(net, args.output_buckets)
+    l1_weights, l1_biases, l2_weights, l2_biases = expand_dense_heads(
+        net, args.output_buckets, args.full_heads)
     input_weights = convert_input_weights(
         net.input_weights,
         source_buckets=source_buckets,
@@ -271,9 +319,15 @@ def main() -> int:
         input_weights = add_full_threat_rows(input_weights)
     input_biases = np.asarray(net.input_biases, dtype=np.float32)[:args.hidden]
     l1_weights = np.concatenate((
-        np.asarray(net.l1_weights, dtype=np.float32)[:, :args.hidden],
-        np.asarray(net.l1_weights, dtype=np.float32)[:, N_HIDDEN:N_HIDDEN + args.hidden],
-    ), axis=1)
+        l1_weights[..., :args.hidden],
+        l1_weights[..., N_HIDDEN:N_HIDDEN + args.hidden],
+    ), axis=-1)
+    l1_output_rows = args.output_buckets * N_L2 if args.full_heads else N_L2
+    l2_output_rows = args.output_buckets * N_L3 if args.full_heads else N_L3
+    l1_weights = l1_weights.reshape(l1_output_rows, 2 * args.hidden)
+    l1_biases = l1_biases.reshape(l1_output_rows)
+    l2_weights = l2_weights.reshape(l2_output_rows, N_L2)
+    l2_biases = l2_biases.reshape(l2_output_rows)
     with args.output.expanduser().open("wb") as handle:
         write_tensor(handle, "l0w", input_weights)
         write_tensor(handle, "l0b", input_biases)
@@ -282,13 +336,13 @@ def main() -> int:
             "l1w",
             l1_weights.ravel(order="F"),
         )
-        write_tensor(handle, "l1b", net.l1_biases.astype(np.float32) / args.l1_export_scale)
+        write_tensor(handle, "l1b", l1_biases / args.l1_export_scale)
         write_tensor(
             handle,
             "l2w",
-            np.asarray(net.l2_weights, dtype=np.float32).ravel(order="F"),
+            l2_weights.ravel(order="F"),
         )
-        write_tensor(handle, "l2b", net.l2_biases.astype(np.float32))
+        write_tensor(handle, "l2b", l2_biases)
         write_tensor(
             handle,
             "l3w",

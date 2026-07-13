@@ -5,12 +5,13 @@ import numpy as np
 
 from enyo_nn_to_bullet_weights import (
     bullet_l3_weights,
+    expand_dense_heads,
     expand_output_head,
     source_bucket_for_target,
     source_output_bucket_for_target,
     source_channel_for_target,
 )
-from lib.enyo_nnue import N_L3
+from lib.enyo_nnue import N_L1, N_L2, N_L3
 
 
 class SingleHeadNet:
@@ -23,6 +24,14 @@ class FourHeadNet:
     output_weights = np.arange(4 * N_L3, dtype=np.float32).reshape(4, N_L3)
     output_biases = np.asarray([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
     output_buckets = 4
+
+
+class SharedDenseNet:
+    l1_weights = np.arange(N_L2 * N_L1, dtype=np.float32).reshape(N_L2, N_L1)
+    l1_biases = np.arange(N_L2, dtype=np.float32)
+    l2_weights = np.arange(N_L3 * N_L2, dtype=np.float32).reshape(N_L3, N_L2)
+    l2_biases = np.arange(N_L3, dtype=np.float32)
+    full_heads = False
 
 
 def test_expanded_l3_weights_use_bullet_internal_orientation() -> None:
@@ -52,6 +61,20 @@ def test_expanded_multi_bucket_head_repeats_parent_ranges() -> None:
     np.testing.assert_array_equal(output_weights[1], FourHeadNet.output_weights[0])
     np.testing.assert_array_equal(output_weights[6], FourHeadNet.output_weights[3])
     np.testing.assert_array_equal(output_weights[7], FourHeadNet.output_weights[3])
+
+
+def test_full_dense_heads_repeat_shared_native_head() -> None:
+    l1w, l1b, l2w, l2b = expand_dense_heads(SharedDenseNet(), 8, True)
+
+    assert l1w.shape == (8, N_L2, N_L1)
+    assert l1b.shape == (8, N_L2)
+    assert l2w.shape == (8, N_L3, N_L2)
+    assert l2b.shape == (8, N_L3)
+    for head in range(8):
+        np.testing.assert_array_equal(l1w[head], SharedDenseNet.l1_weights)
+        np.testing.assert_array_equal(l1b[head], SharedDenseNet.l1_biases)
+        np.testing.assert_array_equal(l2w[head], SharedDenseNet.l2_weights)
+        np.testing.assert_array_equal(l2b[head], SharedDenseNet.l2_biases)
 
 
 def test_32_bucket_init_uses_legacy_parent_buckets() -> None:
@@ -87,6 +110,7 @@ def test_halfka_v2_init_merges_king_channels_by_square_legality() -> None:
 def main() -> None:
     test_expanded_l3_weights_use_bullet_internal_orientation()
     test_expanded_multi_bucket_head_repeats_parent_ranges()
+    test_full_dense_heads_repeat_shared_native_head()
     test_32_bucket_init_uses_legacy_parent_buckets()
     test_clean_bucket_expansion_repeats_parent_buckets()
     test_unsupported_bucket_mapping_fails()
