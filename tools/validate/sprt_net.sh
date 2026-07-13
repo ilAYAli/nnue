@@ -60,7 +60,6 @@ esac
 run_sprt() {
     forge sprt \
         --run "$RUN" \
-        --wait \
         --verify \
         --comment "candidate=$(basename "$CANDIDATE_NET") vs reference=$(basename "$REFERENCE_NET")" \
         --book "$BOOK" \
