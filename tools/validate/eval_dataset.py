@@ -113,6 +113,8 @@ def main() -> None:
     ap.add_argument("--target-clamp", type=float, default=0.0)
     ap.add_argument("--buckets", action="store_true",
                     help="Print metrics grouped by absolute target score.")
+    ap.add_argument("--material-buckets", action="store_true",
+                    help="Print metrics grouped by the network material bucket.")
     ap.add_argument("--sources", action="store_true",
                     help="Print metrics grouped by source id/name.")
     args = ap.parse_args()
@@ -137,6 +139,7 @@ def main() -> None:
          "pred": 0.0, "target": 0.0}
         for _ in BUCKETS
     ]
+    material_stats = [empty_stats() for _ in range(model.output_buckets)]
     for w, b, w_off, b_off, counts, stm, y, _wdl, phase_scale, source_ids in loader:
         w = w.to(args.device)
         b = b.to(args.device)
@@ -153,6 +156,18 @@ def main() -> None:
         err = pred - y
         sign_mask = y != 0
         update_stats(overall, pred, y)
+
+        if args.material_buckets:
+            divisor = (32 + model.output_buckets - 1) // model.output_buckets
+            material_bucket = torch.clamp(
+                torch.div(counts - 2, divisor, rounding_mode="floor"),
+                min=0,
+                max=model.output_buckets - 1,
+            )
+            for bucket in range(model.output_buckets):
+                mask = material_bucket == bucket
+                if mask.any():
+                    update_stats(material_stats[bucket], pred[mask], y[mask])
 
         if args.sources:
             for source_id_tensor in torch.unique(source_ids):
@@ -207,6 +222,21 @@ def main() -> None:
                 f" {item['bias']:7.2f}"
                 f" {item['corr']:7.3f}"
                 f" {item['slope']:7.3f}")
+
+    if args.material_buckets:
+        print("material_bucket rows     mae    sign    bias    corr   slope")
+        for bucket, stats in enumerate(material_stats):
+            item = derived_stats(stats)
+            print(
+                f"{bucket:15d} {int(item['rows']):8d}"
+                f" {item['mae']:7.2f}"
+                f" {item['sign'] * 100:7.2f}%"
+                f" {item['bias']:7.2f}"
+                f" {item['corr']:7.3f}"
+                f" {item['slope']:7.3f}")
+            print(f"material_bucket_{bucket}_rows={int(item['rows'])}")
+            print(f"material_bucket_{bucket}_corr={item['corr']:.6f}")
+            print(f"material_bucket_{bucket}_slope={item['slope']:.6f}")
 
     if args.buckets:
         print("bucket       rows     mae    sign   pred_mean target_mean")

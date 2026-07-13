@@ -61,6 +61,8 @@ MIN_SIGN=${MIN_SIGN:-55}                   # 50% is chance; below 55% barely kno
 MIN_CORR=${MIN_CORR:-0.20}                 # Near zero means eval is mostly unrelated to target.
 MAX_ABS_BIAS=${MAX_ABS_BIAS:-300}          # Hundreds of cp offset indicates global bias/scale/sign trouble.
 MIN_SLOPE=${MIN_SLOPE:-0.10}               # Near zero means dead/flat eval.
+MIN_MATERIAL_CORR=${MIN_MATERIAL_CORR:-0.20}
+MIN_MATERIAL_SLOPE=${MIN_MATERIAL_SLOPE:-0.05}
 MOVE_GATE_STRICT=${MOVE_GATE_STRICT:-0}    # 0 reports move gate; 1 also fails on worse selected-move counts.
 
 EVENT_HOOK=${EVENT_HOOK:-tools/events/nnue_event_ntfy.sh}
@@ -425,9 +427,15 @@ static_gate() {
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" static_eval
   [[ -f "$data_file" ]] || fail "missing data: $data_file" static_eval
   local log="$log_dir/03-static-eval.log"
+  local eval_args=(
+    --net "$candidate_net" --data "$data_file" --rows "$ROWS"
+    --batch-size 4096 --device cpu --buckets
+  )
+  local full_heads
+  full_heads=$(jq -r '.output_bucket_scope == "full-head"' "$ARCH")
+  [[ "$full_heads" == true ]] && eval_args+=(--material-buckets)
   "$PYTHON" tools/validate/eval_dataset.py \
-    --net "$candidate_net" --data "$data_file" --rows "$ROWS" \
-    --batch-size 4096 --device cpu --buckets 2>&1 | tee "$log"
+    "${eval_args[@]}" 2>&1 | tee "$log"
   local mae sign corr bias slope
   mae=$(metric mae "$log")
   sign=$(metric sign "$log")
@@ -440,6 +448,38 @@ static_gate() {
   float_ge "$corr" "$MIN_CORR" || fail "corr $corr < $MIN_CORR" static_eval
   abs_float_le "$bias" "$MAX_ABS_BIAS" || fail "bias $bias outside +/-$MAX_ABS_BIAS" static_eval
   float_ge "$slope" "$MIN_SLOPE" || fail "slope $slope < $MIN_SLOPE" static_eval
+  if [[ "$full_heads" == true ]]; then
+    local init_weights trained_weights trainable
+    init_weights="runs/$run/init/optimiser_state/weights.bin"
+    trained_weights=$(find "runs/$run/checkpoints" -path '*/optimiser_state/weights.bin' \
+      -printf '%p\n' 2>/dev/null | sort -V | tail -1)
+    trainable=$(jq -r --slurpfile defaults "$DEFAULTS" \
+      '.trainable // $defaults[0].trainable' "$BUILD")
+    [[ -f "$init_weights" ]] || fail "missing full-head initialization weights" static_eval
+    [[ -f "$trained_weights" ]] || fail "missing trained full-head weights" static_eval
+    local update_args=(
+      --initial "$init_weights" --trained "$trained_weights"
+      --output-buckets "$(jq -r .output_buckets "$ARCH")"
+    )
+    [[ "$trainable" == dense-head ]] && update_args+=(--expect-frozen-input)
+    "$PYTHON" tools/validate/check_full_head_updates.py "${update_args[@]}" \
+      2>&1 | tee -a "$log" \
+      || fail "full-head dense paths did not all update" static_eval
+
+    local output_buckets bucket material_rows material_corr material_slope
+    output_buckets=$(jq -r .output_buckets "$ARCH")
+    for ((bucket = 0; bucket < output_buckets; bucket++)); do
+      material_rows=$(metric "material_bucket_${bucket}_rows" "$log")
+      material_corr=$(metric "material_bucket_${bucket}_corr" "$log")
+      material_slope=$(metric "material_bucket_${bucket}_slope" "$log")
+      [[ -n "$material_rows" && "$material_rows" -gt 0 ]] \
+        || fail "material bucket $bucket has no validation rows" static_eval
+      float_ge "$material_corr" "$MIN_MATERIAL_CORR" \
+        || fail "material bucket $bucket corr $material_corr < $MIN_MATERIAL_CORR" static_eval
+      float_ge "$material_slope" "$MIN_MATERIAL_SLOPE" \
+        || fail "material bucket $bucket slope $material_slope < $MIN_MATERIAL_SLOPE" static_eval
+    done
+  fi
   printf '  ┌─────────────────────────────────────\n'
   printf '  │ \033[1;32m✓ PASS\033[0m  static_eval\n'
   result_pass "mae" "$mae" "<" "$MAX_MAE"
