@@ -251,6 +251,7 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "target_hidden": args.hidden,
         "full_threats": bool(args.full_threats),
         "full_heads": bool(args.full_heads),
+        "mixed_activation": bool(args.mixed_activation),
         "legacy_inputs": bool(args.legacy_inputs),
     }
     (path.parent / "meta.json").write_text(
@@ -282,6 +283,11 @@ def main() -> int:
         "--full-heads",
         action="store_true",
         help="Duplicate a shared native dense head into every output bucket.",
+    )
+    parser.add_argument(
+        "--mixed-activation",
+        action="store_true",
+        help="Append a zero-initialized squared-activation residual affine.",
     )
     parser.add_argument(
         "--legacy-inputs",
@@ -343,6 +349,9 @@ def main() -> int:
             l2_weights.ravel(order="F"),
         )
         write_tensor(handle, "l2b", l2_biases)
+        if args.mixed_activation:
+            write_tensor(handle, "l2sw", np.zeros((N_L2, N_L3), dtype=np.float32))
+            write_tensor(handle, "l2sb", np.zeros(N_L3, dtype=np.float32))
         write_tensor(
             handle,
             "l3w",

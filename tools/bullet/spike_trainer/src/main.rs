@@ -94,6 +94,25 @@ fn enyo_affine<'a>(
     Affine { weights, bias }
 }
 
+fn zero_affine<'a>(
+    builder: &'a ModelBuilder,
+    id: &str,
+    input_size: usize,
+    output_size: usize,
+) -> Affine<'a> {
+    let weights = builder.new_weights(
+        &format!("{id}w"),
+        Shape::new(output_size, input_size),
+        InitSettings::Zeroed,
+    );
+    let bias = builder.new_weights(
+        &format!("{id}b"),
+        Shape::new(output_size, 1),
+        InitSettings::Zeroed,
+    );
+    Affine { weights, bias }
+}
+
 fn maybe_frozen<'a, T>(builder: &'a ModelBuilder, frozen: bool, mut f: impl FnMut() -> T) -> T {
     if frozen {
         builder.no_grad(|| f())
@@ -282,6 +301,7 @@ fn train_enyo<
     const OUTPUT_BUCKETS: usize,
     const FULL_THREATS: bool,
     const FULL_HEADS: bool,
+    const MIXED_ACTIVATION: bool,
 >(
     dataset: String,
     output: String,
@@ -328,6 +348,9 @@ fn train_enyo<
     if FULL_HEADS && FULL_THREATS {
         panic!("full-head and FullThreats changes must be trained separately");
     }
+    if MIXED_ACTIVATION && (FULL_HEADS || FULL_THREATS) {
+        panic!("mixed activation must be tested independently");
+    }
     if start_superbatch == 0 || start_superbatch > end_superbatch {
         panic!("invalid superbatch range {start_superbatch}..={end_superbatch}");
     }
@@ -353,6 +376,7 @@ fn train_enyo<
     println!("enyo_output_buckets={OUTPUT_BUCKETS}");
     println!("enyo_full_threats={FULL_THREATS}");
     println!("enyo_full_heads={FULL_HEADS}");
+    println!("enyo_mixed_activation={MIXED_ACTIVATION}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
     println!("enyo_input_factoriser={input_factoriser}");
@@ -370,7 +394,7 @@ fn train_enyo<
 
     if !matches!(
         trainable.as_str(),
-        "all" | "input" | "dense-head" | "float-head" | "output"
+        "all" | "input" | "dense-head" | "float-head" | "output" | "squared-branch"
     ) {
         panic!("unsupported trainable mode: {trainable}");
     }
@@ -383,6 +407,11 @@ fn train_enyo<
         || trainable == "dense-head"
         || trainable == "float-head"
         || trainable == "output";
+    let train_squared = MIXED_ACTIVATION
+        && (trainable == "all" || trainable == "squared-branch");
+    if trainable == "squared-branch" && !MIXED_ACTIVATION {
+        panic!("squared-branch requires mixed activation");
+    }
     if activation_l1 > 0.0 && !train_input {
         panic!("activation_l1 requires a trainable input layer");
     }
@@ -412,7 +441,33 @@ fn train_enyo<
 
     macro_rules! base_trainer {
         () => {
-            ValueTrainerBuilder::default()
+            if MIXED_ACTIVATION {
+                ValueTrainerBuilder::default()
+                    .dual_perspective()
+                    .optimiser(AdamW)
+                    .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS>)
+                    .save_format(&[
+                        l0w_format!(),
+                        SavedFormat::id("l0b").round().quantise::<i16>(1),
+                        SavedFormat::id("l1w").transpose().round().quantise::<i8>(l1_export_scale as i16),
+                        SavedFormat::id("l1b").round().quantise::<i32>(l1_export_scale as i32),
+                        SavedFormat::id("l2w").transpose().transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w / l1_export_scale).collect()
+                        }),
+                        SavedFormat::id("l2b"),
+                        SavedFormat::id("l2sw").transpose().transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w / l1_export_scale).collect()
+                        }),
+                        SavedFormat::id("l2sb"),
+                        SavedFormat::id("l3w").transpose().transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                        }),
+                        SavedFormat::id("l3b").transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                        }),
+                    ])
+            } else {
+                ValueTrainerBuilder::default()
                 .dual_perspective()
                 .optimiser(AdamW)
                 .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS>)
@@ -441,6 +496,7 @@ fn train_enyo<
                         weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
                     }),
                 ])
+            }
         };
     }
 
@@ -481,6 +537,13 @@ fn train_enyo<
             let l2 = maybe_frozen($builder, !train_l2, || {
                 $builder.new_affine("l2", l2_size, 32)
             });
+            let l2s = if MIXED_ACTIVATION {
+                Some(maybe_frozen($builder, !train_squared, || {
+                    zero_affine($builder, "l2s", l2_size, 32)
+                }))
+            } else {
+                None
+            };
             let l3 = maybe_frozen($builder, !train_l3, || {
                 $builder.new_affine("l3", 32, OUTPUT_BUCKETS)
             });
@@ -492,8 +555,16 @@ fn train_enyo<
             let activation_penalty = (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
                 * (activation_l1 / (2.0 * hidden as f32));
             let x0 = stm_hidden.concat(ntm_hidden);
-            let x1 = l1.forward(x0).relu();
-            let x2 = l2.forward(x1).relu();
+            let x1_pre = l1.forward(x0);
+            let x1 = x1_pre.relu();
+            let x2_pre = if let Some(l2s) = l2s {
+                let clipped = x1_pre.max(0.0).min(127.0);
+                let squared = clipped * clipped / 127.0;
+                l2.forward(x1) + l2s.forward(squared)
+            } else {
+                l2.forward(x1)
+            };
+            let x2 = x2_pre.relu();
             (l3.forward(x2), activation_penalty)
         }};
         ($builder:expr, $stm_inputs:expr, $ntm_inputs:expr, $output_buckets:expr) => {{
@@ -533,6 +604,13 @@ fn train_enyo<
             let l2 = maybe_frozen($builder, !train_l2, || {
                 $builder.new_affine("l2", l2_size, head_count * 32)
             });
+            let l2s = if MIXED_ACTIVATION {
+                Some(maybe_frozen($builder, !train_squared, || {
+                    zero_affine($builder, "l2s", l2_size, 32)
+                }))
+            } else {
+                None
+            };
             let l3 = maybe_frozen($builder, !train_l3, || {
                 $builder.new_affine("l3", 32, OUTPUT_BUCKETS)
             });
@@ -544,16 +622,22 @@ fn train_enyo<
             let activation_penalty = (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
                 * (activation_l1 / (2.0 * hidden as f32));
             let x0 = stm_hidden.concat(ntm_hidden);
-            let x1 = if FULL_HEADS {
-                l1.forward(x0).select($output_buckets).relu()
+            let x1_pre = if FULL_HEADS {
+                l1.forward(x0).select($output_buckets)
             } else {
-                l1.forward(x0).relu()
+                l1.forward(x0)
             };
-            let x2 = if FULL_HEADS {
-                l2.forward(x1).select($output_buckets).relu()
+            let x1 = x1_pre.relu();
+            let x2_pre = if FULL_HEADS {
+                l2.forward(x1).select($output_buckets)
+            } else if let Some(l2s) = l2s {
+                let clipped = x1_pre.max(0.0).min(127.0);
+                let squared = clipped * clipped / 127.0;
+                l2.forward(x1) + l2s.forward(squared)
             } else {
-                l2.forward(x1).relu()
+                l2.forward(x1)
             };
+            let x2 = x2_pre.relu();
             (l3.forward(x2).select($output_buckets), activation_penalty)
         }};
     }
@@ -733,6 +817,8 @@ fn main() {
     let enyo_output_buckets = env_parse("ENYO_BULLET_ENYO_OUTPUT_BUCKETS", 1usize);
     let enyo_full_threats = env_parse("ENYO_BULLET_ENYO_FULL_THREATS", 0usize) != 0;
     let enyo_full_heads = env_parse("ENYO_BULLET_ENYO_FULL_HEADS", 0usize) != 0;
+    let enyo_mixed_activation =
+        env_parse("ENYO_BULLET_ENYO_MIXED_ACTIVATION", 0usize) != 0;
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
@@ -741,13 +827,14 @@ fn main() {
 
     if mode == "enyo" {
         macro_rules! run_enyo {
-            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal, $full_heads:literal) => {
+            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal, $full_heads:literal, $mixed_activation:literal) => {
                 train_enyo::<
                     $input_buckets,
                     $feature_channels,
                     $output_buckets,
                     $full_threats,
                     $full_heads,
+                    $mixed_activation,
                 >(
                     dataset,
                     output,
@@ -778,22 +865,23 @@ fn main() {
 
         macro_rules! run_enyo_layout {
             ($input_buckets:literal, $feature_channels:literal) => {
-                match (enyo_output_buckets, enyo_full_threats, enyo_full_heads) {
-                    (1, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false),
-                    (2, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false),
-                    (4, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false),
-                    (8, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false),
-                    (1, true, false) => run_enyo!($input_buckets, $feature_channels, 1, true, false),
-                    (2, true, false) => run_enyo!($input_buckets, $feature_channels, 2, true, false),
-                    (4, true, false) => run_enyo!($input_buckets, $feature_channels, 4, true, false),
-                    (8, true, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false),
-                    (2, false, true) => run_enyo!($input_buckets, $feature_channels, 2, false, true),
-                    (4, false, true) => run_enyo!($input_buckets, $feature_channels, 4, false, true),
-                    (8, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, true),
+                match (enyo_output_buckets, enyo_full_threats, enyo_full_heads, enyo_mixed_activation) {
+                    (1, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false, false),
+                    (2, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, false),
+                    (4, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, false),
+                    (8, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false),
+                    (8, false, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, true),
+                    (1, true, false, false) => run_enyo!($input_buckets, $feature_channels, 1, true, false, false),
+                    (2, true, false, false) => run_enyo!($input_buckets, $feature_channels, 2, true, false, false),
+                    (4, true, false, false) => run_enyo!($input_buckets, $feature_channels, 4, true, false, false),
+                    (8, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false),
+                    (2, false, true, false) => run_enyo!($input_buckets, $feature_channels, 2, false, true, false),
+                    (4, false, true, false) => run_enyo!($input_buckets, $feature_channels, 4, false, true, false),
+                    (8, false, true, false) => run_enyo!($input_buckets, $feature_channels, 8, false, true, false),
                     _ => {
                         panic!(
                             "unsupported Enyo output/full-threat/full-head combination: \
-                             {enyo_output_buckets}/{enyo_full_threats}/{enyo_full_heads}"
+                             {enyo_output_buckets}/{enyo_full_threats}/{enyo_full_heads}/{enyo_mixed_activation}"
                         )
                     }
                 }

@@ -42,10 +42,12 @@ N_L3 = 32
 N_OUTPUT = 1
 NETWORK_V2_HEADER_MAGIC = b"ENYONN2\0"
 NETWORK_V3_HEADER_MAGIC = b"ENYONN3\0"
+NETWORK_V4_HEADER_MAGIC = b"ENYONN4\0"
 NETWORK_HEADER_MAGIC = NETWORK_V2_HEADER_MAGIC
 NETWORK_FORMAT_VERSION = 2
 NETWORK_FLAG_FULL_THREATS = 1
 NETWORK_FLAG_FULL_HEADS = 2
+NETWORK_FLAG_MIXED_ACTIVATION = 4
 NETWORK_HEADER = struct.Struct("<8s14I")
 NETWORK_HEADER_SIZE = NETWORK_HEADER.size
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
@@ -81,6 +83,7 @@ def network_size(
     feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
     full_threats: bool = False,
     full_heads: bool = False,
+    mixed_activation: bool = False,
 ) -> int:
     features = input_feature_count(input_buckets, feature_channels, full_threats)
     if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
@@ -97,6 +100,8 @@ def network_size(
         + head_count * N_L2 * np.dtype(np.int32).itemsize
         + head_count * N_L2 * N_L3 * np.dtype(np.float32).itemsize
         + head_count * N_L3 * np.dtype(np.float32).itemsize
+        + ((N_L2 * N_L3 + N_L3) * np.dtype(np.float32).itemsize
+           if mixed_activation else 0)
         + output_buckets * output_width * N_OUTPUT * np.dtype(np.float32).itemsize
         + output_buckets * N_OUTPUT * np.dtype(np.float32).itemsize
     )
@@ -230,6 +235,9 @@ class Net:
     format_version: int = 1
     full_threats: bool = False
     full_heads: bool = False
+    mixed_activation: bool = False
+    l2_squared_weights: np.ndarray | None = None
+    l2_squared_biases: np.ndarray | None = None
 
     @property
     def output_bias(self) -> float:
@@ -620,8 +628,9 @@ def load_net(path: str | Path) -> Net:
     format_version = 1
     full_threats = False
     full_heads = False
+    mixed_activation = False
     payload = data
-    if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC)):
+    if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC, NETWORK_V4_HEADER_MAGIC)):
         if len(data) < NETWORK_HEADER_SIZE:
             raise ValueError(f"{path}: truncated Enyo NNUE header")
         (
@@ -644,6 +653,7 @@ def load_net(path: str | Path) -> Net:
         if (magic, format_version) not in (
             (NETWORK_V2_HEADER_MAGIC, 2),
             (NETWORK_V3_HEADER_MAGIC, 3),
+            (NETWORK_V4_HEADER_MAGIC, 4),
         ):
             raise ValueError(f"{path}: unsupported Enyo NNUE header")
         if header_size != NETWORK_HEADER_SIZE:
@@ -659,19 +669,25 @@ def load_net(path: str | Path) -> Net:
         if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
             raise ValueError(f"{path}: unsupported output head feature count")
         allowed_flags = NETWORK_FLAG_FULL_THREATS | (
-            NETWORK_FLAG_FULL_HEADS if format_version == 3 else 0)
+            NETWORK_FLAG_FULL_HEADS if format_version == 3 else 0) | (
+            NETWORK_FLAG_MIXED_ACTIVATION if format_version == 4 else 0)
         if (flags & ~allowed_flags) or reserved0 or reserved1:
             raise ValueError(f"{path}: unsupported header flags or reserved fields")
         full_threats = bool(flags & NETWORK_FLAG_FULL_THREATS)
         full_heads = bool(flags & NETWORK_FLAG_FULL_HEADS)
+        mixed_activation = bool(flags & NETWORK_FLAG_MIXED_ACTIVATION)
         if full_heads != (format_version == 3):
             raise ValueError(f"{path}: v3 and full-head flag must be used together")
         if full_heads and (output_buckets <= 1 or full_threats):
             raise ValueError(f"{path}: unsupported full-head architecture")
+        if mixed_activation != (format_version == 4):
+            raise ValueError(f"{path}: v4 and mixed-activation flag must be used together")
+        if mixed_activation and (full_heads or full_threats or output_buckets != 8):
+            raise ValueError(f"{path}: unsupported mixed-activation architecture")
         payload = data[header_size:]
         expected_payload = network_size(
             input_buckets, output_buckets, output_head_features,
-            feature_channels, full_threats, full_heads)
+            feature_channels, full_threats, full_heads, mixed_activation)
         if payload_size != expected_payload or len(payload) != expected_payload:
             raise ValueError(
                 f"{path}: payload size {len(payload)} does not match {expected_payload}")
@@ -701,6 +717,11 @@ def load_net(path: str | Path) -> Net:
     l2w = take(np.float32, head_count * N_L2 * N_L3).reshape(
         head_count, N_L3, N_L2)
     l2b = take(np.float32, head_count * N_L3).reshape(head_count, N_L3)
+    l2sw = None
+    l2sb = None
+    if mixed_activation:
+        l2sw = take(np.float32, N_L2 * N_L3).reshape(N_L3, N_L2)
+        l2sb = take(np.float32, N_L3)
     if not full_heads:
         l1w = l1w[0]
         l1b = l1b[0]
@@ -726,7 +747,10 @@ def load_net(path: str | Path) -> Net:
         trained_hidden=trained_hidden,
         format_version=format_version,
         full_threats=full_threats,
-        full_heads=full_heads)
+        full_heads=full_heads,
+        mixed_activation=mixed_activation,
+        l2_squared_weights=l2sw,
+        l2_squared_biases=l2sb)
 
 
 def write_net(net: Net, path: str | Path) -> None:
@@ -777,6 +801,18 @@ def write_net(net: Net, path: str | Path) -> None:
         l2_biases = l2_biases.reshape(1, N_L3)
     if l2_biases.shape != (head_count, N_L3):
         raise ValueError(f"l2_biases shape {l2_biases.shape} does not match runtime")
+    squared_payload = b""
+    if net.mixed_activation:
+        l2_squared_weights = np.asarray(net.l2_squared_weights, dtype=np.float32)
+        l2_squared_biases = np.asarray(net.l2_squared_biases, dtype=np.float32)
+        if l2_squared_weights.shape != (N_L3, N_L2):
+            raise ValueError("mixed activation requires l2_squared_weights[32,16]")
+        if l2_squared_biases.shape != (N_L3,):
+            raise ValueError("mixed activation requires l2_squared_biases[32]")
+        squared_payload = (
+            l2_squared_weights.tobytes(order="C")
+            + l2_squared_biases.tobytes(order="C")
+        )
     if net.output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {net.output_buckets}")
     if net.output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
@@ -807,6 +843,7 @@ def write_net(net: Net, path: str | Path) -> None:
         l1_biases.tobytes(order="C"),
         l2_weights.tobytes(order="C"),
         l2_biases.tobytes(order="C"),
+        squared_payload,
         output_weights.tobytes(order="C"),
         output_biases.tobytes(order="C"),
     ))
@@ -816,10 +853,16 @@ def write_net(net: Net, path: str | Path) -> None:
         if net.trained_hidden != N_HIDDEN:
             raise ValueError("non-1024 hidden widths require enyo-native-v2")
         data = payload
-    elif net.format_version in (2, 3):
+    elif net.format_version in (2, 3, 4):
         if (net.format_version == 3) != net.full_heads:
             raise ValueError("enyo-native-v3 and full_heads must be used together")
-        magic = NETWORK_V3_HEADER_MAGIC if net.full_heads else NETWORK_V2_HEADER_MAGIC
+        if (net.format_version == 4) != net.mixed_activation:
+            raise ValueError("enyo-native-v4 and mixed activation must be used together")
+        magic = (
+            NETWORK_V4_HEADER_MAGIC if net.mixed_activation
+            else NETWORK_V3_HEADER_MAGIC if net.full_heads
+            else NETWORK_V2_HEADER_MAGIC
+        )
         header = NETWORK_HEADER.pack(
             magic,
             net.format_version,
@@ -833,7 +876,8 @@ def write_net(net: Net, path: str | Path) -> None:
             net.output_buckets,
             net.output_head_features,
             (NETWORK_FLAG_FULL_THREATS if net.full_threats else 0)
-            | (NETWORK_FLAG_FULL_HEADS if net.full_heads else 0),
+            | (NETWORK_FLAG_FULL_HEADS if net.full_heads else 0)
+            | (NETWORK_FLAG_MIXED_ACTIVATION if net.mixed_activation else 0),
             len(payload),
             0,
             0,
@@ -847,8 +891,8 @@ def write_net(net: Net, path: str | Path) -> None:
     size = out.stat().st_size
     expected = network_size(
         net.input_buckets, net.output_buckets, net.output_head_features,
-        net.feature_channels, net.full_threats, net.full_heads)
-    if net.format_version in (2, 3):
+        net.feature_channels, net.full_threats, net.full_heads, net.mixed_activation)
+    if net.format_version in (2, 3, 4):
         expected += NETWORK_HEADER_SIZE
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")
