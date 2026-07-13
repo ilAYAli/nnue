@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.28.0-rc34",
+  "run": "enyo-1.28.0-rc35",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold the real champion, pylon 800M slice, 512-superbatch dose, and low learning rate fixed and change only trainable scope from rejected output-only to input-only",
+  "hypothesis": "hold the real champion, input-only scope, pylon 800M slice, and 512-superbatch dose fixed and increase only peak learning rate from the export-no-op 0.00001 to 0.00002",
   "superbatches": 512,
   "lr_superbatches": 512,
   "save_rate": 512,
   "wdl": 0.05,
-  "lr": 0.00001,
+  "lr": 0.00002,
   "final_lr": 0.000005,
   "trainable": "input",
   "data": {
