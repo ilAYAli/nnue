@@ -19,7 +19,8 @@ class EnyoNNUE(nn_pt.Module):
                  output_head_features: int = nn2.DEFAULT_N_OUTPUT_HEAD_FEATURES,
                  trained_hidden: int = nn2.N_HIDDEN,
                  format_version: int = 1,
-                 full_threats: bool = False):
+                 full_threats: bool = False,
+                 full_heads: bool = False):
         super().__init__()
         self.input_buckets = input_buckets
         self.feature_channels = feature_channels
@@ -28,28 +29,47 @@ class EnyoNNUE(nn_pt.Module):
         self.trained_hidden = trained_hidden
         self.format_version = format_version
         self.full_threats = full_threats
+        self.full_heads = full_heads
         self.embed = nn_pt.EmbeddingBag(
             nn2.input_feature_count(input_buckets, feature_channels, full_threats),
             nn2.N_HIDDEN,
             mode="sum")
         self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
-        self.l1_weight = nn_pt.Parameter(torch.zeros(nn2.N_L2, nn2.N_L1))
-        self.l1_bias = nn_pt.Parameter(torch.zeros(nn2.N_L2))
-        self.l2 = nn_pt.Linear(nn2.N_L2, nn2.N_L3)
+        head_count = output_buckets if full_heads else 1
+        self.l1_weight = nn_pt.Parameter(torch.zeros(
+            (head_count, nn2.N_L2, nn2.N_L1)
+            if full_heads else (nn2.N_L2, nn2.N_L1)))
+        self.l1_bias = nn_pt.Parameter(torch.zeros(
+            (head_count, nn2.N_L2) if full_heads else (nn2.N_L2,)))
+        if full_heads:
+            self.l2 = None
+            self.l2_weight = nn_pt.Parameter(torch.zeros(
+                head_count, nn2.N_L3, nn2.N_L2))
+            self.l2_bias = nn_pt.Parameter(torch.zeros(head_count, nn2.N_L3))
+        else:
+            self.l2 = nn_pt.Linear(nn2.N_L2, nn2.N_L3)
+            self.register_parameter("l2_weight", None)
+            self.register_parameter("l2_bias", None)
         self.output = nn_pt.Linear(
             nn2.N_L3 + output_head_features, output_buckets)
 
         if init == "kaiming":
             nn_pt.init.normal_(self.embed.weight, std=math.sqrt(2.0 / 32.0))
             nn_pt.init.normal_(self.l1_weight, std=math.sqrt(2.0 / nn2.N_L1))
-            nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / nn2.N_L2))
+            if self.full_heads:
+                nn_pt.init.normal_(self.l2_weight, std=math.sqrt(2.0 / nn2.N_L2))
+            else:
+                nn_pt.init.normal_(self.l2.weight, std=math.sqrt(2.0 / nn2.N_L2))
             nn_pt.init.normal_(
                 self.output.weight,
                 std=math.sqrt(2.0 / (nn2.N_L3 + output_head_features)))
         elif init == "berserk-ish":
             nn_pt.init.normal_(self.embed.weight, std=64.0)
             nn_pt.init.normal_(self.l1_weight, std=4.0)
-            nn_pt.init.normal_(self.l2.weight, std=0.02)
+            if self.full_heads:
+                nn_pt.init.normal_(self.l2_weight, std=0.02)
+            else:
+                nn_pt.init.normal_(self.l2.weight, std=0.02)
             nn_pt.init.normal_(self.output.weight, std=0.02)
         else:
             raise ValueError(f"unknown init '{init}'")
@@ -128,8 +148,21 @@ class EnyoNNUE(nn_pt.Module):
         acc = torch.cat([us, them], dim=-1)
 
         x0 = self._quantized_input_relu(acc)
-        x1 = torch.relu(x0 @ self.l1_weight.t() + self.l1_bias)
-        x2 = torch.relu(self.l2(x1))
+        if output_bucket is None:
+            output_bucket = self.output_bucket_from_offsets(w_feats, w_offsets)
+        output_bucket = output_bucket.long()
+        if self.full_heads:
+            l1_weight = self.l1_weight[output_bucket]
+            l1_bias = self.l1_bias[output_bucket]
+            x1 = torch.relu(
+                torch.bmm(l1_weight, x0.unsqueeze(-1)).squeeze(-1) + l1_bias)
+            l2_weight = self.l2_weight[output_bucket]
+            l2_bias = self.l2_bias[output_bucket]
+            x2 = torch.relu(
+                torch.bmm(l2_weight, x1.unsqueeze(-1)).squeeze(-1) + l2_bias)
+        else:
+            x1 = torch.relu(x0 @ self.l1_weight.t() + self.l1_bias)
+            x2 = torch.relu(self.l2(x1))
         if self.output_head_features:
             if head_features is None:
                 raise ValueError("head_features is required for output-head nets")
@@ -137,9 +170,7 @@ class EnyoNNUE(nn_pt.Module):
         raw = self.output(x2) / nn2.EVAL_DIVISOR
         if self.output_buckets == 1:
             return raw.squeeze(-1)
-        if output_bucket is None:
-            output_bucket = self.output_bucket_from_offsets(w_feats, w_offsets)
-        return raw.gather(1, output_bucket.long().view(-1, 1)).squeeze(-1)
+        return raw.gather(1, output_bucket.view(-1, 1)).squeeze(-1)
 
     def forward(self, w_feats: torch.Tensor, b_feats: torch.Tensor,
                 w_offsets: torch.Tensor, b_offsets: torch.Tensor,
@@ -181,14 +212,19 @@ def load_model_from_nn(
         output_head_features=output_head_features,
         trained_hidden=net.trained_hidden,
         format_version=net.format_version,
-        full_threats=net.full_threats)
+        full_threats=net.full_threats,
+        full_heads=net.full_heads)
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
         model.input_bias.copy_(torch.from_numpy(net.input_biases.astype(np.float32)))
         model.l1_weight.copy_(torch.from_numpy(net.l1_weights.astype(np.float32)))
         model.l1_bias.copy_(torch.from_numpy(net.l1_biases.astype(np.float32)))
-        model.l2.weight.copy_(torch.from_numpy(net.l2_weights.astype(np.float32)))
-        model.l2.bias.copy_(torch.from_numpy(net.l2_biases.astype(np.float32)))
+        if net.full_heads:
+            model.l2_weight.copy_(torch.from_numpy(net.l2_weights.astype(np.float32)))
+            model.l2_bias.copy_(torch.from_numpy(net.l2_biases.astype(np.float32)))
+        else:
+            model.l2.weight.copy_(torch.from_numpy(net.l2_weights.astype(np.float32)))
+            model.l2.bias.copy_(torch.from_numpy(net.l2_biases.astype(np.float32)))
         output_weights = np.zeros(
             (net.output_buckets, output_width), dtype=np.float32)
         output_weights[:, :net.output_weights.shape[1]] = net.output_weights
@@ -231,13 +267,19 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         np.iinfo(np.int32).min,
         np.iinfo(np.int32).max,
         "l1_biases").astype(np.int32)
+    if model.full_heads:
+        l2_weights = _tensor_numpy(model.l2_weight).astype(np.float32)
+        l2_biases = _tensor_numpy(model.l2_bias).astype(np.float32)
+    else:
+        l2_weights = _tensor_numpy(model.l2.weight).astype(np.float32)
+        l2_biases = _tensor_numpy(model.l2.bias).astype(np.float32)
     net = nn2.Net(
         input_weights=iw,
         input_biases=ib,
         l1_weights=l1w,
         l1_biases=l1b,
-        l2_weights=_tensor_numpy(model.l2.weight).astype(np.float32),
-        l2_biases=_tensor_numpy(model.l2.bias).astype(np.float32),
+        l2_weights=l2_weights,
+        l2_biases=l2_biases,
         output_weights=_tensor_numpy(model.output.weight).astype(np.float32),
         output_biases=_tensor_numpy(model.output.bias).astype(np.float32),
         input_buckets=model.input_buckets,
@@ -247,5 +289,6 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         trained_hidden=model.trained_hidden,
         format_version=model.format_version,
         full_threats=model.full_threats,
+        full_heads=model.full_heads,
     )
     nn2.write_net(net, path)

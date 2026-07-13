@@ -13,7 +13,9 @@ def _zero_net(
     output_buckets: int = 1,
     output_head_features: int = 0,
     full_threats: bool = False,
+    full_heads: bool = False,
 ) -> nn2.Net:
+    head_count = output_buckets if full_heads else 1
     return nn2.Net(
         input_weights=np.zeros(
             (
@@ -23,10 +25,18 @@ def _zero_net(
             ),
             dtype=np.int16),
         input_biases=np.zeros(nn2.N_HIDDEN, dtype=np.int16),
-        l1_weights=np.zeros((nn2.N_L2, nn2.N_L1), dtype=np.int8),
-        l1_biases=np.zeros(nn2.N_L2, dtype=np.int32),
-        l2_weights=np.zeros((nn2.N_L3, nn2.N_L2), dtype=np.float32),
-        l2_biases=np.zeros(nn2.N_L3, dtype=np.float32),
+        l1_weights=np.zeros(
+            (head_count, nn2.N_L2, nn2.N_L1)
+            if full_heads else (nn2.N_L2, nn2.N_L1), dtype=np.int8),
+        l1_biases=np.zeros(
+            (head_count, nn2.N_L2) if full_heads else (nn2.N_L2,),
+            dtype=np.int32),
+        l2_weights=np.zeros(
+            (head_count, nn2.N_L3, nn2.N_L2)
+            if full_heads else (nn2.N_L3, nn2.N_L2), dtype=np.float32),
+        l2_biases=np.zeros(
+            (head_count, nn2.N_L3) if full_heads else (nn2.N_L3,),
+            dtype=np.float32),
         output_weights=np.zeros(
             (output_buckets, nn2.N_L3 + output_head_features),
             dtype=np.float32),
@@ -36,6 +46,7 @@ def _zero_net(
         output_buckets=output_buckets,
         output_head_features=output_head_features,
         full_threats=full_threats,
+        full_heads=full_heads,
     )
 
 
@@ -280,3 +291,36 @@ def test_pytorch_model_selects_material_output_bucket(tmp_path: Path) -> None:
         pred.detach().numpy(),
         np.asarray([0.0, 0.0, 1.0, 3.0], dtype=np.float32),
     )
+
+
+def test_pytorch_model_selects_complete_material_head(tmp_path: Path) -> None:
+    source = tmp_path / "full-heads.nn"
+    exported = tmp_path / "full-heads-exported.nn"
+    net = _zero_net(16, output_buckets=8, full_heads=True)
+    net.format_version = 3
+    net.l1_biases[:, 0] = np.arange(1, 9, dtype=np.int32)
+    net.l2_weights[:, 0, 0] = 1.0
+    net.output_weights[:, 0] = 32.0
+    nn2.write_net(net, source)
+
+    model = load_model_from_nn(source)
+    counts = [2, 6, 10, 14, 18, 22, 26, 30]
+    offsets = np.cumsum([0] + counts[:-1])
+    feats = np.zeros(sum(counts), dtype=np.int64)
+    pred = model(
+        torch.from_numpy(feats),
+        torch.from_numpy(feats),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.tensor(offsets, dtype=torch.long),
+        torch.zeros(len(counts), dtype=torch.long),
+        torch.ones(len(counts), dtype=torch.float32),
+    )
+
+    np.testing.assert_allclose(
+        pred.detach().numpy(),
+        np.arange(1, 9, dtype=np.float32),
+    )
+    export_model(model, exported)
+    loaded = nn2.load_net(exported)
+    assert loaded.full_heads is True
+    np.testing.assert_array_equal(loaded.l1_biases, net.l1_biases)
