@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.28.0-rc30",
+  "run": "enyo-1.28.0-rc31",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold the real champion, float-head scope, pylon 800M slice, and 128-superbatch dose fixed and increase only peak learning rate from 0.00001 to 0.00002 after the lower rate remained negative",
+  "hypothesis": "hold the real champion, pylon 800M slice, 128-superbatch dose, and intermediate learning rate fixed and change only trainable scope from rejected float-head to output",
   "superbatches": 128,
   "lr_superbatches": 128,
   "save_rate": 128,
   "wdl": 0.05,
   "lr": 0.00002,
   "final_lr": 0.000005,
-  "trainable": "float-head",
+  "trainable": "output",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
