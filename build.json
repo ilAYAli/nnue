@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.28.0-rc26",
+  "run": "enyo-1.28.0-rc27",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold the real champion, float-head scope, pylon 800M slice, and learning rates fixed and increase only training exposure from the rejected 128 to 256 superbatches",
+  "hypothesis": "hold the real champion, float-head scope, pylon 800M slice, and 256-superbatch dose fixed and reduce only peak learning rate from 0.00005 to 0.00002",
   "superbatches": 256,
   "lr_superbatches": 256,
   "save_rate": 256,
   "wdl": 0.05,
-  "lr": 0.00005,
+  "lr": 0.00002,
   "final_lr": 0.000005,
   "trainable": "float-head",
   "data": {
