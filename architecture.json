@@ -1,5 +1,5 @@
 {
-  "name": "native-16bucket-12ch-1024-v3-factorised",
+  "name": "native-16bucket-12ch-1024-v4-factorised-full-heads",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
@@ -7,10 +7,11 @@
   "feature_channels": 12,
   "input_buckets": 16,
   "output_buckets": 8,
+  "output_bucket_scope": "full-head",
   "input_factoriser": true,
   "eval_scale": 400.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
-  "export_format": "enyo-native-v1"
+  "export_format": "enyo-native-v3"
 }
