@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.28.0-rc38",
+  "run": "enyo-1.28.0-rc39",
   "continue_from": "enyo-1.20.0-rc12",
-  "hypothesis": "hold the real champion, pylon 1B slice, 512-superbatch dose, and learning rates fixed and change only trainable scope from decisively rejected input-only to output-only",
+  "hypothesis": "hold the real champion, pylon 1B slice, 512-superbatch dose, and learning rates fixed and change only trainable scope from rejected output-only to float-head",
   "superbatches": 512,
   "lr_superbatches": 512,
   "save_rate": 512,
   "wdl": 0.05,
   "lr": 0.00005,
   "final_lr": 0.000005,
-  "trainable": "output",
+  "trainable": "float-head",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "limit": 200000000,
