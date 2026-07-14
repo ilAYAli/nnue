@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.32.0-rc6",
+  "run": "enyo-1.32.0-rc7",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold the parent, pylon slice, input-only scope, dose, learning rate, WDL, and filtering fixed; remove the unsupported output-bucket weight override and rerun the same lane",
+  "hypothesis": "hold the parent, input-only scope, dose, learning rate, WDL, and filtering fixed and move only the pylon slice back to 1.3B after the 1.5B slice regressed",
   "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1400000000,
+    "offset": 1300000000,
     "limit": 100000000
   },
   "sfbinpack": {
