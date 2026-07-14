@@ -85,6 +85,7 @@ const TRAINING_DEFAULT_KEYS: &[&str] = &[
     "trainable",
     "weight_decay",
     "activation_l1",
+    "output_bucket_weights",
     "sfbinpack",
 ];
 
@@ -129,6 +130,7 @@ struct DataConfig {
     min_ply: u16,
     max_abs_cp: u32,
     quiet_only: bool,
+    output_bucket_weights: Vec<f32>,
 }
 
 #[derive(Clone, Copy)]
@@ -636,6 +638,10 @@ fn data_config(config: &Config) -> DataConfig {
         min_ply: training_nested_usize(config, "sfbinpack", "min_ply", 16) as u16,
         max_abs_cp: training_nested_usize(config, "sfbinpack", "max_abs_cp", 10000) as u32,
         quiet_only: training_nested_bool(config, "sfbinpack", "quiet_only", true),
+        output_bucket_weights: parse_output_bucket_weights(
+            &training_output_bucket_weights(config),
+            usize_at(&config.arch, "output_buckets", 8),
+        ),
     }
 }
 
@@ -839,6 +845,27 @@ fn training_weight_decay(config: &Config) -> f64 {
 
 fn training_activation_l1(config: &Config) -> f64 {
     training_f64(config, "activation_l1", 0.0)
+}
+
+fn training_output_bucket_weights(config: &Config) -> String {
+    training_string(config, "output_bucket_weights", "auto")
+}
+
+fn parse_output_bucket_weights(raw: &str, buckets: usize) -> Vec<f32> {
+    let values = if raw == "auto" {
+        vec![1.0; buckets]
+    } else {
+        raw.split(',')
+            .map(str::trim)
+            .map(|value| value.parse::<f32>())
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_else(|_| panic!("invalid output_bucket_weights={raw}"))
+    };
+    if values.len() != buckets || values.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+        panic!("output_bucket_weights requires {buckets} finite positive values");
+    }
+    let mean = values.iter().sum::<f32>() / buckets as f32;
+    values.into_iter().map(|v| v / mean).collect()
 }
 
 fn arch_full_threats(config: &Config) -> bool {
@@ -1063,6 +1090,7 @@ fn cmd_plan(config: &Config) {
         training_weight_decay(config),
         training_activation_l1(config),
     );
+    println!("output_bucket_weights={}", training_output_bucket_weights(config));
     println!(
         "  sfbinpack buffer_mb={}, offset={}, min_ply={}, max_abs_cp={}, quiet_only={}",
         training_nested_usize(config, "sfbinpack", "buffer_mb", 1024),
@@ -1151,6 +1179,27 @@ fn is_bullet_data_path(path: &Path) -> bool {
 
 fn is_deprecated_bullet_data_path(path: &Path) -> bool {
     matches!(path.extension().and_then(OsStr::to_str), Some("data"))
+}
+
+fn material_bucket(board: &ChessBoard, buckets: usize) -> usize {
+    let divisor = 32usize.div_ceil(buckets);
+    ((board.occ().count_ones().saturating_sub(2) as usize) / divisor).min(buckets - 1)
+}
+
+fn mix64(mut value: u64) -> u64 {
+    value ^= value >> 30;
+    value = value.wrapping_mul(0xbf58476d1ce4e5b9);
+    value ^= value >> 27;
+    value = value.wrapping_mul(0x94d049bb133111eb);
+    value ^ (value >> 31)
+}
+
+fn keep_weighted(index: u64, weight: f32, maximum: f32) -> bool {
+    if weight >= maximum {
+        return true;
+    }
+    let threshold = (weight / maximum * 1_000_000.0) as u64;
+    mix64(index) % 1_000_000 < threshold
 }
 
 fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
@@ -1252,6 +1301,10 @@ fn cmd_data(config: &Config) {
         process::exit(1);
     }
     if is_bullet_data_path(&source) {
+        if data.output_bucket_weights.iter().any(|weight| (*weight - 1.0).abs() > 1e-6) {
+            eprintln!("error: weighted resampling requires an sfbinpack source");
+            process::exit(2);
+        }
         copy_bullet_data(&source, &output, data.offset, data.limit);
         return;
     }
@@ -1277,6 +1330,14 @@ fn cmd_data(config: &Config) {
     let start = Instant::now();
     let mut written = 0_u64;
     let mut skipped = 0_u64;
+    let mut sampled = 0_u64;
+    let mut bucket_seen = vec![0_u64; data.output_bucket_weights.len()];
+    let mut bucket_written = vec![0_u64; data.output_bucket_weights.len()];
+    let maximum_weight = data
+        .output_bucket_weights
+        .iter()
+        .copied()
+        .fold(0.0_f32, f32::max);
     loader.map_chunks(0, |chunk: &[ChessBoard]| {
         let mut chunk = chunk;
         if skipped < data.offset {
@@ -1296,22 +1357,30 @@ fn cmd_data(config: &Config) {
                 return false;
             }
         }
-        let remaining = if data.limit == 0 {
-            chunk.len()
-        } else {
-            data.limit.saturating_sub(written).min(chunk.len() as u64) as usize
-        };
-        if remaining == 0 {
-            return true;
+        let mut selected = Vec::with_capacity(chunk.len());
+        for board in chunk {
+            if data.limit != 0 && written + selected.len() as u64 >= data.limit {
+                break;
+            }
+            let bucket = material_bucket(board, data.output_bucket_weights.len());
+            bucket_seen[bucket] += 1;
+            let keep = keep_weighted(sampled, data.output_bucket_weights[bucket], maximum_weight);
+            sampled += 1;
+            if keep {
+                selected.push(*board);
+                bucket_written[bucket] += 1;
+            }
         }
-        let chunk = &chunk[..remaining];
-        write_chunk(&mut writer, chunk).unwrap_or_else(|err| {
+        if selected.is_empty() {
+            return data.limit != 0 && written >= data.limit;
+        }
+        write_chunk(&mut writer, &selected).unwrap_or_else(|err| {
             let _ = fs::remove_file(&tmp);
             eprintln!("error: write failed: {err}");
             process::exit(1);
         });
-        written += chunk.len() as u64;
-        if written % 5_000_000 < chunk.len() as u64 {
+        written += selected.len() as u64;
+        if written % 5_000_000 < selected.len() as u64 {
             let secs = start.elapsed().as_secs_f32();
             eprintln!(
                 "converted {} positions ({:.1}M/s)",
@@ -1331,6 +1400,7 @@ fn cmd_data(config: &Config) {
         secs,
         written as f32 / secs.max(0.001) / 1e6
     );
+    eprintln!("weighted bucket input={bucket_seen:?} output={bucket_written:?}");
 }
 
 fn set_env(key: &str, value: impl ToString) {
@@ -2342,6 +2412,7 @@ mod tests {
             "trainable": "all",
             "weight_decay": 0.0,
             "activation_l1": 0.0,
+            "output_bucket_weights": "auto",
             "sfbinpack": {
                 "buffer_mb": 1024,
                 "offset": 0,
