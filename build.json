@@ -1,15 +1,15 @@
 {
-  "run": "enyo-1.31.0-rc22",
+  "run": "enyo-1.31.0-rc24",
   "continue_from": "enyo-1.30.0-rc3",
-  "hypothesis": "hold the accepted 0.48 scaled parent, 96-superbatch dose, and broad slice fixed and change only trainable scope from rejected all-layer to output-only",
-  "superbatches": 96,
+  "hypothesis": "hold the accepted 0.48 scaled parent, output-only scope, and 600M slice fixed and increase only training exposure from 96 to 128 superbatches after the 96-superbatch output-only run was rejected",
+  "superbatches": 128,
   "lr": 0.00001,
   "wdl": 0.05,
   "trainable": "output",
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
     "bullet_output": "data/bullet/enyo-1.31.0-rc20.bullet",
-    "offset": 500000000,
+    "offset": 600000000,
     "limit": 100000000
   }
 }
