@@ -1,16 +1,15 @@
 {
-  "run": "enyo-1.31.0-rc20",
+  "run": "enyo-1.31.0-rc22",
   "continue_from": "enyo-1.30.0-rc3",
-  "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "single controlled all-layer 96-superbatch fine-tune from the accepted 0.48 scaled parent; canonical rerun after descriptive-name cleanup",
+  "hypothesis": "hold the accepted 0.48 scaled parent, 96-superbatch dose, and broad slice fixed and change only trainable scope from rejected all-layer to output-only",
   "superbatches": 96,
-  "lr": 1e-05,
+  "lr": 0.00001,
   "wdl": 0.05,
-  "trainable": "all",
+  "trainable": "output",
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
     "bullet_output": "data/bullet/enyo-1.31.0-rc20.bullet",
-    "offset": 400000000,
+    "offset": 500000000,
     "limit": 100000000
   }
 }
