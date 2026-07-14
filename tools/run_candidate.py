@@ -137,7 +137,10 @@ def parse_startpos(output: str) -> dict[str, Any]:
     input_match = re.search(r"input_buckets=(\d+)", evaluator)
     channel_match = re.search(r"feature_channels=(\d+)", evaluator)
     return {
-        "native": "evaluator=native-nnue" in evaluator,
+        "native": (
+            "evaluator=native-nnue" in evaluator
+            or "evaluator=enyo-nnue" in evaluator
+        ),
         "hidden_1024": "hidden=1024" in evaluator,
         "input_buckets": input_match.group(1) if input_match else None,
         "feature_channels": channel_match.group(1) if channel_match else None,
@@ -298,7 +301,7 @@ def main() -> int:
         expected_channels = str(arch.get("feature_channels", 12))
         try:
             fail_if(code != 0, f"startpos engine exited with {code}")
-            fail_if(not metrics["native"], "startpos did not load evaluator=native-nnue")
+            fail_if(not metrics["native"], "startpos did not load Enyo native evaluator")
             fail_if(metrics["input_buckets"] != expected_input_buckets,
                     f"input_buckets {metrics['input_buckets']} != {expected_input_buckets}")
             fail_if(metrics["feature_channels"] != expected_channels,

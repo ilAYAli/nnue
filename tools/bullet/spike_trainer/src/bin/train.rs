@@ -1487,6 +1487,7 @@ fn enyo_network_size(
     full_threats: bool,
     full_heads: bool,
     mixed_activation: bool,
+    psqt_residual: bool,
 ) -> usize {
     let features = input_buckets * feature_channels * 64
         + if full_threats {
@@ -1506,6 +1507,11 @@ fn enyo_network_size(
         + (if mixed_activation { l2 * l3 * 4 + l3 * 4 } else { 0 })
         + output_buckets * l3 * 4
         + output_buckets * 4
+        + (if psqt_residual {
+            features * output_buckets * 4 + output_buckets * 4
+        } else {
+            0
+        })
 }
 
 fn trim_checkpoint(
@@ -1518,6 +1524,7 @@ fn trim_checkpoint(
     full_threats: bool,
     full_heads: bool,
     mixed_activation: bool,
+    psqt_residual: bool,
 ) -> Vec<u8> {
     let expected = enyo_network_size(
         input_buckets,
@@ -1528,6 +1535,7 @@ fn trim_checkpoint(
         full_threats,
         full_heads,
         mixed_activation,
+        psqt_residual,
     );
     if raw.len() < expected {
         eprintln!(
@@ -1577,6 +1585,7 @@ fn expand_input_buckets(
     full_threats: bool,
     full_heads: bool,
     mixed_activation: bool,
+    psqt_residual: bool,
 ) -> Vec<u8> {
     let raw = trim_checkpoint(
         raw,
@@ -1588,6 +1597,7 @@ fn expand_input_buckets(
         full_threats,
         full_heads,
         mixed_activation,
+        psqt_residual,
     );
     if input_buckets == runtime_input_buckets {
         return raw;
@@ -1631,6 +1641,7 @@ fn pad_hidden_width(
     full_threats: bool,
     full_heads: bool,
     mixed_activation: bool,
+    psqt_residual: bool,
 ) -> Vec<u8> {
     if hidden == ENYO_RUNTIME_HIDDEN {
         return raw.to_vec();
@@ -1646,6 +1657,7 @@ fn pad_hidden_width(
         full_threats,
         full_heads,
         mixed_activation,
+        psqt_residual,
     );
     let features = input_buckets * feature_channels * 64
         + if full_threats {
@@ -2195,6 +2207,7 @@ fn write_model(config: &Config) {
         full_threats,
         full_heads,
         mixed_activation,
+        psqt_residual,
     );
     let model = pad_hidden_width(
         &model,
@@ -2206,6 +2219,7 @@ fn write_model(config: &Config) {
         full_threats,
         full_heads,
         mixed_activation,
+        psqt_residual,
     );
     let model = match string_at(&config.arch, "export_format") {
         Some("enyo-native-v2") => enyo_container(
@@ -2660,6 +2674,7 @@ mod tests {
             false,
             false,
             false,
+            false,
         );
         let mut raw = vec![0_u8; size];
         let source_l0w = input_buckets * feature_channels * 64 * hidden * 2;
@@ -2677,6 +2692,7 @@ mod tests {
             false,
             false,
             false,
+            false,
         );
         let target_l0w = input_buckets * feature_channels * 64 * ENYO_RUNTIME_HIDDEN * 2;
         let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
@@ -2685,6 +2701,60 @@ mod tests {
         assert_eq!(
             &padded[target_l1 + ENYO_RUNTIME_HIDDEN..target_l1 + ENYO_RUNTIME_HIDDEN + hidden],
             &[3, 4]
+        );
+    }
+
+    #[test]
+    fn psqt_residual_size_includes_bucketed_piece_square_tail() {
+        let input_buckets = 16;
+        let feature_channels = 12;
+        let output_buckets = 8;
+        let hidden = 1024;
+        let l2 = 16;
+        let base = enyo_network_size(
+            input_buckets,
+            feature_channels,
+            output_buckets,
+            hidden,
+            l2,
+            false,
+            false,
+            false,
+            false,
+        );
+        let with_psqt = enyo_network_size(
+            input_buckets,
+            feature_channels,
+            output_buckets,
+            hidden,
+            l2,
+            false,
+            false,
+            false,
+            true,
+        );
+        let features = input_buckets * feature_channels * 64;
+        assert_eq!(
+            with_psqt - base,
+            features * output_buckets * 4 + output_buckets * 4,
+        );
+
+        let payload = vec![0_u8; with_psqt];
+        assert_eq!(
+            trim_checkpoint(
+                &payload,
+                input_buckets,
+                feature_channels,
+                output_buckets,
+                hidden,
+                l2,
+                false,
+                false,
+                false,
+                true,
+            )
+            .len(),
+            with_psqt,
         );
     }
 
