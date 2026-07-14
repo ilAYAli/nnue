@@ -267,27 +267,16 @@ publish() {
 }
 
 wake_agent() {
-    [ "$NOTIFAI_ENABLE" = "1" ] || return 0
+    [ "$AI_STDIN_ENABLE" = "1" ] || return 0
 
-    if [ "$DRY_RUN" = "1" ]; then
-        printf 'notifai:%s → %s\n' "$NOTIFAI_TARGET" "$rendered"
+    if publish "$AI_STDIN_URL" "$rendered" "Enyo NNUE $event_name" "4"; then
+        printf '%s event=%s → AI_stdin direct\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         return 0
     fi
 
-    if ! command -v "$NOTIFAI_COMMAND" >/dev/null 2>&1; then
-        printf '%s event=%s notifai missing command=%s\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI_COMMAND" >>"$LOG"
-        return 1
-    fi
-
-    if "$NOTIFAI_COMMAND" "$rendered" "$NOTIFAI_TARGET"; then
-        printf '%s event=%s → notifai target=%s\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI_TARGET" >>"$LOG"
-        return 0
-    fi
-
-    printf '%s event=%s notifai failed target=%s\n' \
-        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$NOTIFAI_TARGET" >>"$LOG"
+    printf '%s event=%s AI_stdin direct publish failed\n' \
+        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
     return 1
 }
 
