@@ -13,7 +13,6 @@
   "trainable": "all",
   "weight_decay": 0.0,
   "activation_l1": 0.0,
-  "output_bucket_weights": "auto",
   "sfbinpack": {
     "buffer_mb": 1024,
     "offset": 0,
