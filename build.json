@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.31.0-rc42",
-  "continue_from": "enyo-1.30.0-rc3",
-  "hypothesis": "hold the accepted parent, 1.3B pylon slice, min_ply=24 filter, and 128-superbatch dose fixed and change only trainable scope from rejected float-head to input-only",
+  "run": "enyo-1.32.0-rc2",
+  "continue_from": "enyo-1.31.0-rc42",
+  "hypothesis": "hold the accepted parent, 1.3B pylon slice, min_ply=24 filter, 128-superbatch dose, and input-only scope fixed and increase only peak learning rate from 0.00002 to 0.00005 to further escape export quantization",
   "superbatches": 128,
-  "lr": 0.00001,
+  "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1300000000,
+    "offset": 1400000000,
     "limit": 100000000
   },
   "sfbinpack": {
