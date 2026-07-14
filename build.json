@@ -1,15 +1,18 @@
 {
-  "run": "enyo-1.31.0-rc32",
+  "run": "enyo-1.31.0-rc36",
   "continue_from": "enyo-1.30.0-rc3",
-  "hypothesis": "hold the accepted 0.48 scaled parent, 1B slice, 128-superbatch dose, and learning rate fixed and change only trainable scope from rejected float-head to output-only",
+  "reference": "enyo-1.30.0-rc3",
+  "hypothesis": "replay the accepted parent's exact pylon/min_ply=24 data regime from its documented 800M range while holding architecture, optimizer, dose, WDL, and trainable scope fixed",
   "superbatches": 128,
   "lr": 0.00001,
   "wdl": 0.05,
-  "trainable": "output",
+  "trainable": "all",
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
-    "bullet_output": "data/bullet/enyo-1.31.0-rc20.bullet",
-    "offset": 1000000000,
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "offset": 800000000,
     "limit": 100000000
+  },
+  "sfbinpack": {
+    "min_ply": 24
   }
 }
