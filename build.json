@@ -1,11 +1,12 @@
 {
-  "run": "enyo-1.32.0-rc5",
+  "run": "enyo-1.32.0-rc4",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold the parent, pylon slice, input-only scope, dose, learning rate, WDL, and filtering fixed; remove the unsupported output-bucket weight override and rerun the same lane",
+  "hypothesis": "hold the parent, pylon slice, input-only scope, dose, learning rate, WDL, and filtering fixed; apply validated square-root inverse reference residual weights by material output bucket during data resampling",
   "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
+  "output_bucket_weights": "1.2,0.9451,0.9348,1.0405,0.9940,0.9143,0.9761,0.9951",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 1300000000,
