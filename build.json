@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.31.0-rc38",
+  "run": "enyo-1.31.0-rc39",
   "continue_from": "enyo-1.30.0-rc3",
-  "hypothesis": "hold the accepted parent, 900M pylon slice, min_ply=24 filter, and trainable scope fixed and increase only training exposure from 128 to 256 superbatches after the smaller dose was rejected",
-  "superbatches": 256,
+  "hypothesis": "hold the accepted parent, 900M pylon slice, min_ply=24 filter, and trainable scope fixed and reduce only training exposure from 256 to 128 superbatches after the larger dose regressed",
+  "superbatches": 128,
   "lr": 0.00001,
   "wdl": 0.05,
   "trainable": "all",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 900000000,
+    "offset": 1000000000,
     "limit": 100000000
   },
   "sfbinpack": {
