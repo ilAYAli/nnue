@@ -1,15 +1,15 @@
 {
-  "run": "enyo-1.31.0-rc28",
+  "run": "enyo-1.31.0-rc30",
   "continue_from": "enyo-1.30.0-rc3",
-  "hypothesis": "hold the accepted 0.48 scaled parent, float-head scope, 800M slice, and learning rate fixed and increase only training exposure from 128 to 256 superbatches after the smaller dose was rejected",
-  "superbatches": 256,
+  "hypothesis": "hold the accepted 0.48 scaled parent, float-head scope, 900M slice, and learning rate fixed and reduce only training exposure from 256 to 128 superbatches after the larger dose was rejected",
+  "superbatches": 128,
   "lr": 0.00001,
   "wdl": 0.05,
   "trainable": "float-head",
   "data": {
     "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet",
     "bullet_output": "data/bullet/enyo-1.31.0-rc20.bullet",
-    "offset": 800000000,
+    "offset": 900000000,
     "limit": 100000000
   }
 }
