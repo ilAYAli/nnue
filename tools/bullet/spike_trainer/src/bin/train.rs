@@ -85,6 +85,7 @@ const TRAINING_DEFAULT_KEYS: &[&str] = &[
     "trainable",
     "weight_decay",
     "activation_l1",
+    "output_bucket_weights",
     "sfbinpack",
 ];
 
@@ -841,6 +842,10 @@ fn training_activation_l1(config: &Config) -> f64 {
     training_f64(config, "activation_l1", 0.0)
 }
 
+fn training_output_bucket_weights(config: &Config) -> String {
+    training_string(config, "output_bucket_weights", "auto")
+}
+
 fn arch_full_threats(config: &Config) -> bool {
     bool_at(&config.arch, "full_threats", false)
 }
@@ -1063,6 +1068,7 @@ fn cmd_plan(config: &Config) {
         training_weight_decay(config),
         training_activation_l1(config),
     );
+    println!("output_bucket_weights={}", training_output_bucket_weights(config));
     println!(
         "  sfbinpack buffer_mb={}, offset={}, min_ply={}, max_abs_cp={}, quiet_only={}",
         training_nested_usize(config, "sfbinpack", "buffer_mb", 1024),
@@ -1466,6 +1472,10 @@ fn cmd_run(config: &Config) {
     set_env("ENYO_BULLET_TRAINABLE", training_trainable(config));
     set_env("ENYO_BULLET_WEIGHT_DECAY", training_weight_decay(config));
     set_env("ENYO_BULLET_ACTIVATION_L1", training_activation_l1(config));
+    set_env(
+        "ENYO_BULLET_OUTPUT_BUCKET_WEIGHTS",
+        training_output_bucket_weights(config),
+    );
     set_env("ENYO_BULLET_SFBINPACK_BUFFER_MB", data.buffer_mb);
     set_env("ENYO_BULLET_SFBINPACK_MIN_PLY", data.min_ply);
     set_env("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", data.max_abs_cp);
@@ -2342,6 +2352,7 @@ mod tests {
             "trainable": "all",
             "weight_decay": 0.0,
             "activation_l1": 0.0,
+            "output_bucket_weights": "1",
             "sfbinpack": {
                 "buffer_mb": 1024,
                 "offset": 0,

@@ -37,6 +37,22 @@ fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> T {
         .unwrap_or(default)
 }
 
+fn output_bucket_weights(raw: &str, buckets: usize) -> Vec<f32> {
+    let values = raw
+        .split(',')
+        .map(str::trim)
+        .map(|value| value.parse::<f32>())
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|_| panic!("invalid ENYO_BULLET_OUTPUT_BUCKET_WEIGHTS={raw}"));
+    if values.len() != buckets || values.iter().any(|value| !value.is_finite() || *value <= 0.0) {
+        panic!(
+            "ENYO_BULLET_OUTPUT_BUCKET_WEIGHTS requires {buckets} finite positive values, got {raw}"
+        );
+    }
+    let mean = values.iter().sum::<f32>() / buckets as f32;
+    values.into_iter().map(|value| value / mean).collect()
+}
+
 fn dataset_paths(dataset: &str) -> Vec<String> {
     dataset
         .split(';')
@@ -292,6 +308,19 @@ mod tests {
         }
         assert!(used.into_iter().all(|value| value));
     }
+
+    #[test]
+    fn output_bucket_weights_are_normalized() {
+        let weights = super::output_bucket_weights("2,4,6,8", 4);
+        assert_eq!(weights, vec![0.4, 0.8, 1.2, 1.6]);
+        assert!((weights.iter().sum::<f32>() / 4.0 - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    #[should_panic(expected = "requires 4 finite positive values")]
+    fn output_bucket_weights_reject_wrong_shape() {
+        let _ = super::output_bucket_weights("1,1,1", 4);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -326,8 +355,10 @@ fn train_enyo<
     trainable: String,
     weight_decay: f32,
     activation_l1: f32,
+    output_bucket_weights_raw: String,
     psqt_residual: bool,
 ) {
+    let bucket_weights = output_bucket_weights(&output_bucket_weights_raw, OUTPUT_BUCKETS);
     if !matches!(hidden, 512 | 768 | 1024) || l2_size != 16 {
         panic!("Enyo mode supports hidden=512, 768, or 1024 with l2=16");
     }
@@ -391,6 +422,7 @@ fn train_enyo<
     println!("trainable={trainable}");
     println!("weight_decay={weight_decay}");
     println!("activation_l1={activation_l1}");
+    println!("output_bucket_weights={output_bucket_weights_raw}");
     println!(
         "batch_size={batch_size} batches_per_superbatch={batches_per_superbatch} \
          start_superbatch={start_superbatch} end_superbatch={end_superbatch} \
@@ -858,7 +890,11 @@ fn train_enyo<
                 |builder, (stm_inputs, ntm_inputs, output_buckets), target| {
                     let (output, activation_penalty) =
                         enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets);
-                    let loss = output.sigmoid().squared_error(target) + activation_penalty;
+                    let error = output.sigmoid().squared_error(target);
+                    let weights = builder
+                        .new_constant(Shape::new(OUTPUT_BUCKETS, 1), &bucket_weights)
+                        .select(output_buckets);
+                    let loss = error * weights + activation_penalty;
                     (output, loss)
                 }
             ));
@@ -899,6 +935,25 @@ fn main() {
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
     let weight_decay = env_parse("ENYO_BULLET_WEIGHT_DECAY", 0.0f32);
     let activation_l1 = env_parse("ENYO_BULLET_ACTIVATION_L1", 0.0f32);
+    let output_bucket_weights_raw = env_string(
+            "ENYO_BULLET_OUTPUT_BUCKET_WEIGHTS",
+            "auto",
+        );
+    let output_bucket_weights_input = if output_bucket_weights_raw == "auto" {
+        std::iter::repeat_n("1", enyo_output_buckets)
+            .collect::<Vec<_>>()
+            .join(",")
+    } else {
+        output_bucket_weights_raw.clone()
+    };
+    let output_bucket_weights = output_bucket_weights(
+        &output_bucket_weights_input,
+        enyo_output_buckets,
+    )
+    .into_iter()
+    .map(|value| value.to_string())
+    .collect::<Vec<_>>()
+    .join(",");
 
     if mode == "enyo" {
         macro_rules! run_enyo {
@@ -934,6 +989,7 @@ fn main() {
                     trainable,
                     weight_decay,
                     activation_l1,
+                    output_bucket_weights,
                     enyo_psqt_residual,
                 )
             };
