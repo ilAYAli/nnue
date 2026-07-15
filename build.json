@@ -1,11 +1,11 @@
 {
-  "run": "enyo-1.32.0-rc27",
+  "run": "enyo-1.32.0-rc28",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, 256-superbatch dose, and high learning rate fixed and change only trainable scope from input to output to see whether the residual gate prefers a shallower calibration path",
+  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, 256-superbatch dose, and high learning rate fixed and change only trainable scope from output back to input because the input lane was the closer residual fit",
   "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "output",
+  "trainable": "input",
   "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
   "data": {
