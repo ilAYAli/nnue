@@ -936,9 +936,13 @@ latest_stockfish_result() {
 }
 
 run_stockfish_benchmark() {
-  local candidate=$1 ledger_tmp
+  local candidate=$1 candidate_path ledger_tmp
+  candidate_path="$HOME/assets/nets/$candidate.nn"
+  [[ -f "$candidate_path" ]] \
+    || fail "missing Stockfish benchmark candidate: $candidate_path" stockfish_net_sprt
+  echo "Stockfish benchmark candidate=$candidate path=$candidate_path"
   GAMES="$STOCKFISH_NET_GAMES" STOCKFISH_NET="$STOCKFISH_NET" "$QSPRT" \
-    --candidate "$candidate.nn" \
+    --candidate "$candidate_path" \
     || fail "Stockfish net benchmark failed for $candidate" stockfish_net_sprt
 
   stockfish_result=$(tail -n 1 "$STOCKFISH_NET_LEDGER")
