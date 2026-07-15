@@ -67,6 +67,7 @@ MOVE_GATE_STRICT=${MOVE_GATE_STRICT:-0}    # 0 reports move gate; 1 also fails o
 
 EVENT_HOOK=${EVENT_HOOK:-tools/events/nnue_event_ntfy.sh}
 NNUE_NTFY=${NNUE_NTFY:-1}
+NNUE_ITERATE_LOCK_DIR=${NNUE_ITERATE_LOCK_DIR:-runs/.nnue-iterate.lock}
 
 run=
 continue_from=
@@ -1019,6 +1020,17 @@ iterate() {
   need jq
   need git
   ensure_git_identity
+  if ! mkdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null; then
+    local lock_pid
+    lock_pid=$(cat "$NNUE_ITERATE_LOCK_DIR/pid" 2>/dev/null || true)
+    if [[ "$lock_pid" =~ ^[0-9]+$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
+      fail "another NNUE iterate process is active (pid=$lock_pid)" iterate
+    fi
+    rmdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null || fail "cannot clear stale iterate lock" iterate
+    mkdir "$NNUE_ITERATE_LOCK_DIR" || fail "cannot acquire iterate lock" iterate
+  fi
+  printf '%s\n' "$$" > "$NNUE_ITERATE_LOCK_DIR/pid"
+  trap 'rmdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null || true' EXIT
   for ((i = 1; i <= ITERATIONS; i++)); do
     load_config
     section "iteration $i"
