@@ -1,12 +1,13 @@
 {
-  "run": "enyo-1.32.0-rc5",
+  "run": "enyo-1.32.0-rc6",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, input-only scope, dose, learning rate, WDL, and filtering fixed; replace material-only residual resampling with evaluation-stratified resampling, emphasizing 301-800 and >800 cp targets",
+  "hypothesis": "hold parent, architecture, pylon slice, input-only scope, dose, learning rate, WDL, filtering, and neutral resampling fixed; inverse phase-normalize training scores to match runtime phase scaling",
   "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
   "output_bucket_weights": "auto",
+  "eval_bucket_weights": "auto",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 1300000000,
@@ -14,6 +15,5 @@
   },
   "sfbinpack": {
     "min_ply": 24
-  },
-  "eval_bucket_weights": "1.0,1.0,1.0,1.5,2.0"
+  }
 }
