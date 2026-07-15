@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.32.0-rc31",
+  "run": "enyo-1.32.0-rc32",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, input scope, 256-superbatch dose, and high learning rate fixed and reweight material output buckets inversely to the observed slope inflation so the later buckets are downweighted",
+  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, input scope, 256-superbatch dose, and high learning rate fixed and revert output-bucket weighting back to auto because the explicit downweighting was slightly worse",
   "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
-  "output_bucket_weights": "0.97,0.95,0.89,0.83,0.78,0.73,0.67,0.62",
+  "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
