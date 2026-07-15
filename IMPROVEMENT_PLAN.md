@@ -474,3 +474,11 @@ Concrete current candidate:
   `800,000,000` (100M positions for this controlled run).
 - This is the first post-audit candidate and is eligible for one smoke test and
   one 1500-game SPRT only after training/export and static gates pass.
+
+## 2026-07-15 50k target/runtime audit
+
+- Built a deterministic 50,000-position corpus balanced across opening, middlegame, late, and endgame (12,500 each), and compared champion enyo-1.31.0-rc42, Berserk, and Stockfish with phase, absolute-eval, and output-bucket grouping.
+- Largest measured mismatch is endgame/high-eval output saturation: Stockfish-vs-champion endgame MAE 285.11 cp with 2,972/12,500 runtime clamps (23.8%); the 800+ group has MAE 432.99 cp with 3,269/8,397 clamps (38.9%). Input clipping is 0%, so this is an output target/runtime-limit problem, not input saturation.
+- Verified the target/runtime contract: side orientation, centipawn units, WDL blend, phase normalization, output-bucket selection, and export quantization. Added deterministic contract tests and retained trainer feature-index parity tests.
+- Corrected the largest mismatch by clamping training targets to the runtime +/-2045 cp limit before inverse phase normalization. The residual gate now runs the balanced 50k audit and requires endgame, 300-799 cp, and 800+ cp MAE and slope-distance improvement before any SPRT.
+- The unchanged-candidate gate test rejects with exit 1. No SPRT has been launched for rc7; its build config is staged as the single controlled follow-up.

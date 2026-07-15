@@ -64,6 +64,9 @@ MIN_SLOPE=${MIN_SLOPE:-0.10}               # Near zero means dead/flat eval.
 MIN_MATERIAL_CORR=${MIN_MATERIAL_CORR:-0.20}
 MIN_MATERIAL_SLOPE=${MIN_MATERIAL_SLOPE:-0.05}
 MOVE_GATE_STRICT=${MOVE_GATE_STRICT:-0}    # 0 reports move gate; 1 also fails on worse selected-move counts.
+REQUIRE_RESIDUAL_GATE=${REQUIRE_RESIDUAL_GATE:-1}
+RESIDUAL_FEN_FILE=${RESIDUAL_FEN_FILE:-runs/structural-audit-50k-balanced.fens}
+RESIDUAL_ROWS=${RESIDUAL_ROWS:-50000}
 
 EVENT_HOOK=${EVENT_HOOK:-tools/events/nnue_event_ntfy.sh}
 NNUE_NTFY=${NNUE_NTFY:-1}
