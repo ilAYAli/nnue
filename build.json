@@ -1,8 +1,8 @@
 {
-  "run": "enyo-1.32.0-rc20",
+  "run": "enyo-1.32.0-rc21",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, dose, WDL, and filtering fixed and change only trainable scope from output-only to float-head to better correct the high-eval residual overshoot",
-  "superbatches": 128,
+  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, and float-head scope fixed and increase only training exposure from 128 to 256 superbatches to see whether more dose corrects the high-eval residual overshoot",
+  "superbatches": 256,
   "lr": 0.00001,
   "wdl": 0.05,
   "trainable": "float-head",
