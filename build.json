@@ -1,17 +1,19 @@
 {
-  "run": "enyo-1.32.0-rc17",
+  "run": "enyo-1.32.0-rc5",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold the parent, pylon slice, dose, learning rate, WDL, and filtering fixed and change only trainable scope from input-only to output-only after repeated input-only regressions",
+  "hypothesis": "hold parent, architecture, pylon slice, input-only scope, dose, learning rate, WDL, and filtering fixed; replace material-only residual resampling with evaluation-stratified resampling, emphasizing 301-800 and >800 cp targets",
   "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "output",
+  "trainable": "input",
+  "output_bucket_weights": "auto",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1400000000,
+    "offset": 1300000000,
     "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
-  }
+  },
+  "eval_bucket_weights": "1.0,1.0,1.0,1.5,2.0"
 }
