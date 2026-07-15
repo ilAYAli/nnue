@@ -1,11 +1,11 @@
 {
-  "run": "enyo-1.32.0-rc7",
+  "run": "enyo-1.32.0-rc16",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, input-only scope, dose, learning rate, WDL, filtering, and neutral resampling fixed and cap phase-normalized training targets at the runtime +/-2045 evaluation limit to remove endgame and high-eval output clamping",
+  "hypothesis": "hold parent, architecture, pylon slice, dose, WDL, and filtering fixed and reduce only learning rate from 0.00002 to 0.00001 to curb the high-eval residual overshoot",
   "superbatches": 128,
-  "lr": 0.00005,
+  "lr": 0.00001,
   "wdl": 0.05,
-  "trainable": "input",
+  "trainable": "all",
   "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
   "data": {
