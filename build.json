@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.32.0-rc11",
+  "run": "enyo-1.32.0-rc12",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold the parent, input-only scope, dose, learning rate, WDL, and filtering fixed and move only the pylon slice back to 1.3B after the 1.4B slice regressed",
+  "hypothesis": "hold the parent, pylon slice, dose, learning rate, WDL, and filtering fixed and change only trainable scope from input-only to output-only after repeated input-only regressions",
   "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "input",
+  "trainable": "output",
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1300000000,
+    "offset": 1400000000,
     "limit": 100000000
   },
   "sfbinpack": {
