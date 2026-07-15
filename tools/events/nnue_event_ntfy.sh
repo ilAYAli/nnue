@@ -304,7 +304,8 @@ case "$event_name" in
         ;;
     iteration_done)
         publish "$NNUE_URL" "$rendered" "Enyo NNUE iteration done" "4"
-        printf '%s event=iteration_done → nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
+        publish "$AI_STDOUT_URL" "$rendered" "Enyo NNUE iteration done" "4"
+        printf '%s event=iteration_done → nnue,AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
         ;;
     *)
         publish "$AI_STDOUT_URL" "$rendered" "Enyo NNUE $event_name" "3"
