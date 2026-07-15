@@ -1,11 +1,11 @@
 {
-  "run": "enyo-1.32.0-rc29",
+  "run": "enyo-1.32.0-rc30",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, 256-superbatch dose, and high learning rate fixed and change only trainable scope from input to dense-head to test the last untapped calibration path",
+  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, 256-superbatch dose, and high learning rate fixed and change only trainable scope from dense-head back to input because the input lane was the closer residual fit",
   "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
-  "trainable": "dense-head",
+  "trainable": "input",
   "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
   "data": {
