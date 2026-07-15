@@ -1,11 +1,11 @@
 {
-  "run": "enyo-1.32.0-rc18",
+  "run": "enyo-1.32.0-rc19",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, dose, WDL, and filtering fixed and reduce only learning rate from 0.00002 to 0.00001 to curb the high-eval residual overshoot",
+  "hypothesis": "hold parent, architecture, pylon slice, dose, WDL, and filtering fixed and change only trainable scope from all-weights to output-only to rein in the high-eval residual overshoot",
   "superbatches": 128,
   "lr": 0.00001,
   "wdl": 0.05,
-  "trainable": "all",
+  "trainable": "output",
   "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
   "data": {
