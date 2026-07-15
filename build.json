@@ -1,7 +1,7 @@
 {
-  "run": "enyo-1.32.0-rc12",
+  "run": "enyo-1.32.0-rc13",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold the parent, pylon slice, dose, learning rate, WDL, and filtering fixed and change only trainable scope from input-only to output-only after repeated input-only regressions",
+  "hypothesis": "hold the parent, output-only scope, dose, learning rate, WDL, and filtering fixed and move only the pylon slice back to 1.4B after the 1.5B slice regressed",
   "superbatches": 128,
   "lr": 0.00005,
   "wdl": 0.05,
