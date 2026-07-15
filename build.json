@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.32.0-rc10",
+  "run": "enyo-1.32.0-rc11",
   "continue_from": "enyo-1.31.0-rc42",
   "hypothesis": "hold the parent, input-only scope, dose, learning rate, WDL, and filtering fixed and move only the pylon slice back to 1.3B after the 1.4B slice regressed",
   "superbatches": 128,
