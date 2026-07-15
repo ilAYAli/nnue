@@ -1,8 +1,8 @@
 {
-  "run": "enyo-1.32.0-rc25",
+  "run": "enyo-1.32.0-rc26",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, input scope, and 128-superbatch dose fixed and increase only learning rate from 0.00002 to 0.00005 to escape export quantization",
-  "superbatches": 128,
+  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, input scope, and high learning rate fixed and increase only training exposure from 128 to 256 superbatches to see whether more dose improves the residual gate",
+  "superbatches": 256,
   "lr": 0.00005,
   "wdl": 0.05,
   "trainable": "input",
