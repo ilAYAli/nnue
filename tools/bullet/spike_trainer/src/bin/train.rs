@@ -131,6 +131,7 @@ struct DataConfig {
     max_abs_cp: u32,
     quiet_only: bool,
     output_bucket_weights: Vec<f32>,
+    eval_bucket_weights: Vec<f32>,
 }
 
 #[derive(Clone, Copy)]
@@ -642,6 +643,7 @@ fn data_config(config: &Config) -> DataConfig {
             &training_output_bucket_weights(config),
             usize_at(&config.arch, "output_buckets", 8),
         ),
+        eval_bucket_weights: parse_eval_bucket_weights(&training_eval_bucket_weights(config)),
     }
 }
 
@@ -849,6 +851,27 @@ fn training_activation_l1(config: &Config) -> f64 {
 
 fn training_output_bucket_weights(config: &Config) -> String {
     training_string(config, "output_bucket_weights", "auto")
+}
+
+fn training_eval_bucket_weights(config: &Config) -> String {
+    training_string(config, "eval_bucket_weights", "auto")
+}
+
+fn parse_eval_bucket_weights(raw: &str) -> Vec<f32> {
+    let values = if raw == "auto" {
+        vec![1.0; 5]
+    } else {
+        raw.split(',')
+            .map(str::trim)
+            .map(|value| value.parse::<f32>())
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_else(|_| panic!("invalid eval_bucket_weights={raw}"))
+    };
+    if values.len() != 5 || values.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+        panic!("eval_bucket_weights requires 5 finite positive values");
+    }
+    let mean = values.iter().sum::<f32>() / values.len() as f32;
+    values.into_iter().map(|v| v / mean).collect()
 }
 
 fn parse_output_bucket_weights(raw: &str, buckets: usize) -> Vec<f32> {
@@ -1186,6 +1209,16 @@ fn material_bucket(board: &ChessBoard, buckets: usize) -> usize {
     ((board.occ().count_ones().saturating_sub(2) as usize) / divisor).min(buckets - 1)
 }
 
+fn eval_bucket(score: i16) -> usize {
+    match i32::from(score).unsigned_abs() {
+        0..=50 => 0,
+        51..=100 => 1,
+        101..=300 => 2,
+        301..=800 => 3,
+        _ => 4,
+    }
+}
+
 fn mix64(mut value: u64) -> u64 {
     value ^= value >> 30;
     value = value.wrapping_mul(0xbf58476d1ce4e5b9);
@@ -1333,11 +1366,10 @@ fn cmd_data(config: &Config) {
     let mut sampled = 0_u64;
     let mut bucket_seen = vec![0_u64; data.output_bucket_weights.len()];
     let mut bucket_written = vec![0_u64; data.output_bucket_weights.len()];
-    let maximum_weight = data
-        .output_bucket_weights
-        .iter()
-        .copied()
-        .fold(0.0_f32, f32::max);
+    let mut eval_seen = vec![0_u64; data.eval_bucket_weights.len()];
+    let mut eval_written = vec![0_u64; data.eval_bucket_weights.len()];
+    let maximum_weight = data.output_bucket_weights.iter().copied().fold(0.0_f32, f32::max)
+        * data.eval_bucket_weights.iter().copied().fold(0.0_f32, f32::max);
     loader.map_chunks(0, |chunk: &[ChessBoard]| {
         let mut chunk = chunk;
         if skipped < data.offset {
@@ -1363,12 +1395,16 @@ fn cmd_data(config: &Config) {
                 break;
             }
             let bucket = material_bucket(board, data.output_bucket_weights.len());
+            let eval = eval_bucket(board.score);
             bucket_seen[bucket] += 1;
-            let keep = keep_weighted(sampled, data.output_bucket_weights[bucket], maximum_weight);
+            eval_seen[eval] += 1;
+            let weight = data.output_bucket_weights[bucket] * data.eval_bucket_weights[eval];
+            let keep = keep_weighted(sampled, weight, maximum_weight);
             sampled += 1;
             if keep {
                 selected.push(*board);
                 bucket_written[bucket] += 1;
+                eval_written[eval] += 1;
             }
         }
         if selected.is_empty() {
@@ -1401,6 +1437,7 @@ fn cmd_data(config: &Config) {
         written as f32 / secs.max(0.001) / 1e6
     );
     eprintln!("weighted bucket input={bucket_seen:?} output={bucket_written:?}");
+    eprintln!("weighted eval input={eval_seen:?} output={eval_written:?}");
 }
 
 fn set_env(key: &str, value: impl ToString) {
