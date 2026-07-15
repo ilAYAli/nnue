@@ -1209,6 +1209,24 @@ fn material_bucket(board: &ChessBoard, buckets: usize) -> usize {
     ((board.occ().count_ones().saturating_sub(2) as usize) / divisor).min(buckets - 1)
 }
 
+fn phase_scale(board: &ChessBoard) -> f32 {
+    let mut phase = 0_u32;
+    let mut occupied = board.occ();
+    let mut index = 0_usize;
+    while occupied != 0 {
+        let code = (board.pcs[index / 2] >> (4 * (index & 1))) & 0x0f;
+        match code & 0x07 {
+            1 | 2 => phase += 3,
+            3 => phase += 5,
+            4 => phase += 10,
+            _ => {}
+        }
+        occupied &= occupied - 1;
+        index += 1;
+    }
+    (128.0 + phase as f32) / 128.0
+}
+
 fn eval_bucket(score: i16) -> usize {
     match i32::from(score).unsigned_abs() {
         0..=50 => 0,
@@ -1402,7 +1420,10 @@ fn cmd_data(config: &Config) {
             let keep = keep_weighted(sampled, weight, maximum_weight);
             sampled += 1;
             if keep {
-                selected.push(*board);
+                let mut normalized = *board;
+                normalized.score =
+                    (f32::from(board.score) / phase_scale(board)).round() as i16;
+                selected.push(normalized);
                 bucket_written[bucket] += 1;
                 eval_written[eval] += 1;
             }
