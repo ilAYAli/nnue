@@ -1,11 +1,11 @@
 {
-  "run": "enyo-1.32.0-rc22",
+  "run": "enyo-1.32.0-rc23",
   "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, float-head scope, and 256-superbatch dose fixed and increase only learning rate from 0.00001 to 0.00002 to test whether the lower rate is underfitting the residual calibration",
+  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, 256-superbatch dose, and learning rate fixed and change only trainable scope from float-head back to input to reduce the high-eval residual overshoot",
   "superbatches": 256,
   "lr": 0.00002,
   "wdl": 0.05,
-  "trainable": "float-head",
+  "trainable": "input",
   "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
   "data": {
