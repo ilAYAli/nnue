@@ -449,6 +449,29 @@ static_gate() {
   float_ge "$corr" "$MIN_CORR" || fail "corr $corr < $MIN_CORR" static_eval
   abs_float_le "$bias" "$MAX_ABS_BIAS" || fail "bias $bias outside +/-$MAX_ABS_BIAS" static_eval
   float_ge "$slope" "$MIN_SLOPE" || fail "slope $slope < $MIN_SLOPE" static_eval
+
+  if [[ "$REQUIRE_RESIDUAL_GATE" == 1 ]]; then
+    local residual_log="$log_dir/03-residual-audit.log"
+    local residual_json="$log_dir/03-residual-audit.json"
+    [[ -f "$RESIDUAL_FEN_FILE" ]] \
+      || fail "missing residual audit positions: $RESIDUAL_FEN_FILE" residual_gate
+    notify phase_start residual_gate "50k residual audit for $run" "$residual_log" 0
+    "$PYTHON" tools/validate/structural_net_audit.py \
+      --engine "$ENGINE" \
+      --subject "reference=$reference_net" \
+      --subject "candidate=$candidate_net" \
+      --subject "stockfish=$HOME/assets/nets/$STOCKFISH_NET" \
+      --fen-file "$RESIDUAL_FEN_FILE" \
+      --limit "$RESIDUAL_ROWS" \
+      --threads 1 \
+      --hash 64 \
+      --json-out "$residual_json" 2>&1 | tee "$residual_log"
+    "$PYTHON" tools/validate/residual_gate.py \
+      --audit "$residual_json" 2>&1 | tee -a "$residual_log" \
+      || fail "candidate did not improve required endgame/high-eval residuals" residual_gate
+    notify phase_done residual_gate "residual gate passed for $run" "$residual_log" 0
+  fi
+
   if [[ "$full_heads" == true ]]; then
     local init_weights trained_weights trainable
     init_weights="runs/$run/init/optimiser_state/weights.bin"

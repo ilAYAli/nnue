@@ -91,6 +91,8 @@ def load_fens(path: Path | None, structural_json: Path | None, limit: int) -> li
             if not stripped or stripped.startswith("#"):
                 continue
             fen = fen_from_json_line(stripped) if stripped.startswith("{") else stripped
+            if path.suffix.lower() == ".epd" and fen:
+                fen = " ".join(fen.split()[:4]) + " 0 1"
             if fen:
                 fens.append(fen)
             if len(fens) >= limit:

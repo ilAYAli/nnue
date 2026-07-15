@@ -1209,6 +1209,13 @@ fn material_bucket(board: &ChessBoard, buckets: usize) -> usize {
     ((board.occ().count_ones().saturating_sub(2) as usize) / divisor).min(buckets - 1)
 }
 
+const RUNTIME_EVAL_CLAMP: i16 = 2045;
+
+fn normalize_training_score(score: i16, scale: f32) -> i16 {
+    let runtime_score = score.clamp(-RUNTIME_EVAL_CLAMP, RUNTIME_EVAL_CLAMP);
+    (f32::from(runtime_score) / scale).round() as i16
+}
+
 fn phase_scale(board: &ChessBoard) -> f32 {
     let mut phase = 0_u32;
     let mut occupied = board.occ();
@@ -1421,8 +1428,7 @@ fn cmd_data(config: &Config) {
             sampled += 1;
             if keep {
                 let mut normalized = *board;
-                normalized.score =
-                    (f32::from(board.score) / phase_scale(board)).round() as i16;
+                normalized.score = normalize_training_score(board.score, phase_scale(board));
                 selected.push(normalized);
                 bucket_written[bucket] += 1;
                 eval_written[eval] += 1;
@@ -2763,6 +2769,17 @@ mod tests {
         ));
 
         fs::remove_dir_all(dir).expect("remove test directory");
+    }
+
+    #[test]
+    fn phase_normalized_training_score_roundtrips_runtime_units() {
+        let scale = 1.375_f32;
+        let normalized = normalize_training_score(640, scale);
+        assert_eq!(normalized, 465);
+        assert!((f32::from(normalized) * scale - 640.0).abs() < 1.0);
+
+        let capped = normalize_training_score(10_000, scale);
+        assert!((f32::from(capped) * scale - f32::from(RUNTIME_EVAL_CLAMP)).abs() < 1.0);
     }
 
     #[test]

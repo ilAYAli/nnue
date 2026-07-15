@@ -206,6 +206,8 @@ def load_fens(path: Path | None, limit: int) -> list[str]:
             if not stripped or stripped.startswith("#"):
                 continue
             fen = fen_from_json_line(stripped) if stripped.startswith("{") else stripped
+            if path.suffix.lower() == ".epd" and fen:
+                fen = " ".join(fen.split()[:4]) + " 0 1"
             if fen:
                 fens.append(fen)
             if len(fens) >= limit:
@@ -243,6 +245,13 @@ def material_bucket(fen: str) -> str:
     if count >= 10:
         return "late"
     return "endgame"
+
+
+def output_bucket(piece_count_value: int, buckets: int = 8) -> int:
+    if buckets <= 1:
+        return 0
+    divisor = (32 + buckets - 1) // buckets
+    return max(0, min(buckets - 1, (piece_count_value - 2) // divisor))
 
 
 def eval_bucket(value: int) -> str:
@@ -408,6 +417,18 @@ def main() -> int:
                 f" mae={mae:8.2f} corr={group_corr:8.4f}"
                 f" slope={group_slope:8.4f}")
 
+    print("\nGrouped by output bucket")
+    for subject in subjects[1:]:
+        print(f"{subject.name} vs {base_name}")
+        for key, rows, delta, mae, group_corr, group_slope in grouped_pair_summary(
+            fens, base, scores[subject.name],
+            lambda fen, _b, _o: str(output_bucket(piece_count(fen))),
+        ):
+            print(
+                f"  out{key:8} rows={rows:6d} mean_delta={delta:8.2f}"
+                f" mae={mae:8.2f} corr={group_corr:8.4f}"
+                f" slope={group_slope:8.4f}")
+
     print("\nGrouped by baseline eval")
     for subject in subjects[1:]:
         print(f"{subject.name} vs {base_name}")
@@ -431,6 +452,7 @@ def main() -> int:
                     "piece_count": piece_count(fen),
                     "non_pawn_material": non_pawn_material(fen),
                     "material_bucket": material_bucket(fen),
+                    "output_bucket": output_bucket(piece_count(fen)),
                 }
                 for fen in fens
             ],
