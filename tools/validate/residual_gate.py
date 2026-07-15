@@ -35,6 +35,27 @@ def eval_bucket(value: float) -> str:
     return "800+"
 
 
+def audit_rows(payload: dict) -> list[dict]:
+    if "rows" in payload:
+        return payload["rows"]
+    scores = payload["scores"]
+    features = payload["features"]
+    required = ("reference", "candidate", "stockfish")
+    missing = [name for name in required if name not in scores]
+    if missing:
+        raise ValueError(f"audit is missing score subjects: {missing}")
+    return [
+        {
+            "reference": scores["reference"][index],
+            "candidate": scores["candidate"][index],
+            "stockfish": scores["stockfish"][index],
+            "material_bucket": feature["material_bucket"],
+            "output_bucket": feature["output_bucket"],
+        }
+        for index, feature in enumerate(features)
+    ]
+
+
 def metrics(rows: list[dict], key: str) -> dict[str, float]:
     target = [float(row["stockfish"]) for row in rows]
     values = [float(row[key]) for row in rows]
@@ -52,7 +73,7 @@ def main() -> int:
     ap.add_argument("--audit", required=True, type=Path)
     ap.add_argument("--min-improvement", type=float, default=0.0)
     args = ap.parse_args()
-    rows = json.loads(args.audit.read_text())["rows"]
+    rows = audit_rows(json.loads(args.audit.read_text()))
 
     groups: dict[str, list[dict]] = defaultdict(list)
     for row in rows:

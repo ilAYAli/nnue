@@ -300,7 +300,8 @@ event_selected() {
 case "$event_name" in
     fail)
         publish "$PING_URL" "$rendered" "Enyo NNUE fail" "5"
-        printf '%s event=fail → ping\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
+        publish "$AI_STDOUT_URL" "$rendered" "Enyo NNUE fail" "5"
+        printf '%s event=fail → ping,AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
         ;;
     iteration_done)
         publish "$NNUE_URL" "$rendered" "Enyo NNUE iteration done" "4"
