@@ -1,14 +1,14 @@
 {
-  "run": "enyo-selfdistill-1.0.0-rc2",
-  "hypothesis": "same as rc1 but upweight eval buckets covering decisive and crushing material, which are underrepresented in self-play training data, to fix rc1 failing to recognize extreme material imbalance",
+  "run": "enyo-selfdistill-1.0.0-rc3",
+  "hypothesis": "scratch self-distillation on gen1-cont data only (11.8M positions, clean, generated with include-mates fix so decisive/mate-adjacent positions are represented). Reverted eval_bucket_weights to auto versus rc2, isolating the data fix as the single changed variable. Checks whether the fix alone resolves rc1/rc2 failure to recognize extreme material imbalance.",
   "superbatches": 2048,
   "lr": 0.001,
   "final_lr": 0.000005,
   "wdl": 0.3,
   "trainable": "all",
   "output_bucket_weights": "auto",
-  "eval_bucket_weights": "1.0,1.0,1.5,3.0,6.0",
+  "eval_bucket_weights": "auto",
   "data": {
-    "source_binpack": "data/selfplay/gen1/combined.bullet"
+    "source_binpack": "data/selfplay/gen1/gen1-cont.bullet"
   }
 }
