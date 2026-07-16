@@ -1,19 +1,14 @@
 {
-  "run": "enyo-1.32.0-rc33",
-  "continue_from": "enyo-1.31.0-rc42",
-  "hypothesis": "hold parent, architecture, pylon slice, WDL, filtering, input scope, 256-superbatch dose, and high learning rate fixed and upweight the higher eval residual buckets so the trainer pays more attention to the 300-799 and 800+ regions",
-  "superbatches": 256,
-  "lr": 0.00005,
-  "wdl": 0.05,
-  "trainable": "input",
+  "run": "enyo-selfdistill-1.0.0-rc2",
+  "hypothesis": "same as rc1 but upweight eval buckets covering decisive and crushing material, which are underrepresented in self-play training data, to fix rc1 failing to recognize extreme material imbalance",
+  "superbatches": 2048,
+  "lr": 0.001,
+  "final_lr": 0.000005,
+  "wdl": 0.3,
+  "trainable": "all",
   "output_bucket_weights": "auto",
-  "eval_bucket_weights": "1.0,1.0,1.0,1.4,1.8",
+  "eval_bucket_weights": "1.0,1.0,1.5,3.0,6.0",
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1300000000,
-    "limit": 100000000
-  },
-  "sfbinpack": {
-    "min_ply": 24
+    "source_binpack": "data/selfplay/gen1/combined.bullet"
   }
 }
