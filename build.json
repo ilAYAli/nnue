@@ -1,10 +1,10 @@
 {
-  "run": "enyo-selfdistill-1.0.0-rc4",
-  "hypothesis": "same clean gen1-cont data as rc3 but wdl dropped from 0.3 to 0.05: 41.5 percent of extreme-score self-play positions still end in a draw because 5000-node search cannot reliably convert winning positions, so the WDL loss term was contradicting the score term at exactly the positions rc3 still mishandled. Lower wdl weight to trust the score signal over the noisy self-play outcome signal.",
+  "run": "enyo-selfdistill-1.0.0-rc5",
+  "hypothesis": "controlled wdl=0.3 baseline retrain on the fully-fixed gen1-cont data (14.56M positions). Codex found the actual root cause: jsonl_to_bullet_text.py has its own separate --max-abs-cp default of 1600 that was never being passed through from selfplay_to_bullet.py, so phase-normalized decisive labels (e.g. a 2045 mate score / 1.078 phase scale = 1897) were silently dropped at the second conversion stage even after the earlier include-mates fix. Fixed by forwarding --max-abs-cp consistently and clamping raw scores to the runtime +/-2045 ceiling before phase division. This is the controlled wdl=0.3 retrain requested before testing wdl changes again.",
   "superbatches": 2048,
   "lr": 0.001,
   "final_lr": 0.000005,
-  "wdl": 0.05,
+  "wdl": 0.3,
   "trainable": "all",
   "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
