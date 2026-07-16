@@ -1,10 +1,10 @@
 {
-  "run": "enyo-selfdistill-1.0.0-rc3",
-  "hypothesis": "scratch self-distillation on gen1-cont data only (11.8M positions, clean, generated with include-mates fix so decisive/mate-adjacent positions are represented). Reverted eval_bucket_weights to auto versus rc2, isolating the data fix as the single changed variable. Checks whether the fix alone resolves rc1/rc2 failure to recognize extreme material imbalance.",
+  "run": "enyo-selfdistill-1.0.0-rc4",
+  "hypothesis": "same clean gen1-cont data as rc3 but wdl dropped from 0.3 to 0.05: 41.5 percent of extreme-score self-play positions still end in a draw because 5000-node search cannot reliably convert winning positions, so the WDL loss term was contradicting the score term at exactly the positions rc3 still mishandled. Lower wdl weight to trust the score signal over the noisy self-play outcome signal.",
   "superbatches": 2048,
   "lr": 0.001,
   "final_lr": 0.000005,
-  "wdl": 0.3,
+  "wdl": 0.05,
   "trainable": "all",
   "output_bucket_weights": "auto",
   "eval_bucket_weights": "auto",
