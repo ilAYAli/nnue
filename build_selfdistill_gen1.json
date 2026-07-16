@@ -1,0 +1,14 @@
+{
+  "run": "enyo-selfdistill-1.0.0-rc1",
+  "hypothesis": "scratch train on Enyo self-play (self-distillation: own search score + real game WDL, not outcome-only) using ~30.5M positions from the gen1 self-play batch, to check for any directional signal versus the Stockfish-imitation champion. Not expected to close the gap at this data scale; first real checkpoint only.",
+  "superbatches": 2048,
+  "lr": 0.001,
+  "final_lr": 0.000005,
+  "wdl": 0.3,
+  "trainable": "all",
+  "output_bucket_weights": "auto",
+  "eval_bucket_weights": "auto",
+  "data": {
+    "source_binpack": "data/selfplay/gen1/combined.bullet"
+  }
+}
