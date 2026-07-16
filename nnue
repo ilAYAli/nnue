@@ -1056,11 +1056,12 @@ iterate() {
     if [[ "$lock_pid" =~ ^[0-9]+$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
       fail "another NNUE iterate process is active (pid=$lock_pid)" iterate
     fi
+    rm -f "$NNUE_ITERATE_LOCK_DIR/pid"
     rmdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null || fail "cannot clear stale iterate lock" iterate
     mkdir "$NNUE_ITERATE_LOCK_DIR" || fail "cannot acquire iterate lock" iterate
   fi
   printf '%s\n' "$$" > "$NNUE_ITERATE_LOCK_DIR/pid"
-  trap 'rmdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null || true' EXIT
+  trap 'rm -f "$NNUE_ITERATE_LOCK_DIR/pid"; rmdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null || true' EXIT
   for ((i = 1; i <= ITERATIONS; i++)); do
     load_config
     section "iteration $i"
