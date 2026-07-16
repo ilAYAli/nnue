@@ -34,6 +34,9 @@ def white_result_from_row(row: dict) -> float:
     return categorical_result(white_wdl)
 
 
+ENYO_RUNTIME_SCORE_CLAMP = 2045
+
+
 def white_score_from_row(row: dict, *, enyo_runtime_target: bool, zero_score: bool = False) -> int:
     if zero_score:
         return 0
@@ -41,6 +44,16 @@ def white_score_from_row(row: dict, *, enyo_runtime_target: bool, zero_score: bo
     stm = fen.split()[1]
     score = int(round(float(row["score"])))
     if enyo_runtime_target:
+        # Clamp before dividing by phase scale: Enyo's runtime clamps its
+        # final output to +/-2045 (NNUE.md ScaleEval), so that is the actual
+        # ceiling the network ever needs to produce. Dividing an unclamped
+        # label (e.g. a mate score of several thousand) by a phase scale
+        # >= 1.0 can still land above the runtime's ceiling, which then gets
+        # silently dropped by jsonl_to_bullet_text.py's own --max-abs-cp
+        # filter -- exactly the bug that erased every KQK-style decisive
+        # position from training data despite pgn_to_jsonl.py emitting them
+        # correctly.
+        score = max(-ENYO_RUNTIME_SCORE_CLAMP, min(ENYO_RUNTIME_SCORE_CLAMP, score))
         score = int(round(score / phase_scale_from_fen(fen)))
     return score if stm == "w" else -score
 

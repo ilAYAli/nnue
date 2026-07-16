@@ -43,7 +43,7 @@ def convert_shard(
     skip_plies: int,
     min_depth: int,
     max_abs_cp: int,
-) -> Path:
+) -> tuple[Path, dict]:
     stem = pgn_path.stem
     rows_jsonl = tmp_dir / f"{stem}.rows.jsonl"
     stats_json = tmp_dir / f"{stem}.stats.json"
@@ -56,27 +56,59 @@ def convert_shard(
         "--skip-plies", str(skip_plies),
         "--min-depth", str(min_depth),
         "--max-abs-cp", str(max_abs_cp),
+        # Without this, any position where the engine found a forced mate is
+        # dropped entirely (pgn_to_jsonl's default). Those are exactly the
+        # most decisive positions -- a crushing material advantage is often
+        # a trivial mate for even a shallow search -- so omitting them left
+        # training data with "somewhat ahead" examples but none of the
+        # "completely over" ones, and the net never learned the extreme end
+        # of the eval range. mate-score-cp matches Enyo's runtime ScaleEval
+        # clamp (NNUE.md), the actual ceiling the network will ever need to
+        # produce, so training targets stay inside the range the runtime
+        # can express instead of chasing an arbitrary larger number.
+        "--include-mates",
+        "--mate-score-cp", "2045",
     ])
 
+    bullet_stats_json = tmp_dir / f"{stem}.bullet_stats.json"
     convert_cmd = [
         str(VENV_PYTHON), str(REPO_ROOT / "tools/bullet/jsonl_to_bullet_text.py"),
         "--input", str(rows_jsonl), "--output", str(bulletfmt),
+        # Must match pgn_to_jsonl.py's own --max-abs-cp, or this tool's
+        # separate default (1600) silently re-drops rows the first stage
+        # already accepted -- including every KQK-style position at the
+        # runtime's actual +/-2045 ceiling, since 2045 divided by even a
+        # mild phase scale still lands above 1600.
+        "--max-abs-cp", str(max_abs_cp),
     ]
     if label_mode == "outcome-only":
         convert_cmd.append("--zero-score")
     else:
         convert_cmd.append("--enyo-runtime-target")
-    run(convert_cmd)
+    with bullet_stats_json.open("w") as stats_out:
+        result = subprocess.run(convert_cmd, check=True, stdout=stats_out)
 
     run([
         str(VENV_PYTHON), str(REPO_ROOT / "tools/bullet/bullet.py"), "format",
         "--input", str(bulletfmt), "--output", str(chunk_bullet), "--validate",
     ])
 
+    pgn_stats = json.loads(stats_json.read_text()) if stats_json.exists() else {}
+    bullet_stats = json.loads(bullet_stats_json.read_text()) if bullet_stats_json.exists() else {}
+    skipped = {
+        "shard": pgn_path.name,
+        "pgn_skipped_mate": pgn_stats.get("skipped_mate"),
+        "pgn_skipped_cp": pgn_stats.get("skipped_cp"),
+        "pgn_skipped_depth": pgn_stats.get("skipped_depth"),
+        "bullet_skipped_cp": bullet_stats.get("skipped_cp"),
+        "bullet_written": bullet_stats.get("written"),
+    }
+
     rows_jsonl.unlink(missing_ok=True)
     bulletfmt.unlink(missing_ok=True)
     stats_json.unlink(missing_ok=True)
-    return chunk_bullet
+    bullet_stats_json.unlink(missing_ok=True)
+    return chunk_bullet, skipped
 
 
 def load_state(state_path: Path) -> dict:
@@ -149,9 +181,10 @@ def main() -> int:
             print(f"no new shards in {args.pgn_dir} (already processed {len(processed)})")
             return 0
 
-        with args.output.open("ab") as out:
+        skip_log_path = work_dir / f"{args.output.stem}.skips.jsonl"
+        with args.output.open("ab") as out, skip_log_path.open("a") as skip_log:
             for index, shard in enumerate(new_shards, start=1):
-                chunk = convert_shard(
+                chunk, skipped = convert_shard(
                     shard, tmp_dir, args.label_mode,
                     args.skip_plies, args.min_depth, args.max_abs_cp,
                 )
@@ -160,6 +193,8 @@ def main() -> int:
                     out.write(src.read())
                 chunk.unlink()
                 out.flush()
+                skip_log.write(json.dumps(skipped) + "\n")
+                skip_log.flush()
                 processed.add(shard.name)
                 # Save after every shard, not just at the end: if this
                 # process is killed mid-run, already-appended shards must
@@ -167,7 +202,11 @@ def main() -> int:
                 state["processed_shards"] = sorted(processed)
                 state["total_rows"] = state.get("total_rows", 0) + chunk_bytes // 32
                 save_state(state_path, state)
-                print(f"[{index}/{len(new_shards)}] {shard.name} -> +{chunk_bytes // 32} rows")
+                print(
+                    f"[{index}/{len(new_shards)}] {shard.name} -> +{chunk_bytes // 32} rows "
+                    f"(pgn_skipped_mate={skipped['pgn_skipped_mate']} "
+                    f"bullet_skipped_cp={skipped['bullet_skipped_cp']})"
+                )
 
         tmp_dir.rmdir()
         print(
