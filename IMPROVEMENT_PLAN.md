@@ -264,8 +264,8 @@ Use the canonical source directly:
 `data/stockfish/master-binpacks/training_data_pylon.binpack`, offset `0`, limit
 `2800000000`, with `sfbinpack.min_ply=24`. Do not depend on the deleted
 `data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet` intermediate. Record the
-source SHA-256 and use the same explicit loader-order seed for every matched
-replicate so all architectures consume identical accepted rows in identical
+source SHA-256, convert the declared slice once, and reuse that immutable Bullet
+artifact so all architectures consume identical accepted rows in identical
 order. Do not independently convert, resample, or relabel the source per
 architecture.
 
@@ -282,6 +282,7 @@ The canonical block-1 `build.json` shape is:
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "bullet_output": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet",
     "offset": 0,
     "limit": 2800000000
   }
@@ -311,22 +312,22 @@ human-readable ID and full fields in `hypothesis`, never in the run name.
 ### Replication and randomness contract
 
 Train three replicates of every configuration. For replicate 1, 2, or 3, every
-configuration uses the same declared initialization seed and the same declared
-data-order seed. Initialization and data ordering must use independent random
-streams so a different parameter count cannot shift the data order.
+configuration uses the same declared `init_seed`: `5090001`, `5090002`, or
+`5090003`, respectively. Seeded initialization derives
+an independent ChaCha stream from the seed and tensor name, so differently sized
+architectures cannot shift the random stream of another tensor. Record the
+effective seed in each run's resolved configuration and provenance.
 
-The current `build.json` training schema does not expose these seeds. Before
-kickoff, prove that trainer initialization and direct-loader order are
-deterministic and controllable. If they are not, stop and obtain approval for a
-narrow seed-plumbing change plus deterministic regression tests. The game
-runner's `config.json` seed is not a training seed and must not be presented as
-one. Record effective seeds in each run's resolved configuration and
-provenance.
+Data ordering is controlled by the immutable shared
+`data/bullet/enyo-architecture-race-pylon-2.8b.bullet` artifact and Bullet's
+direct sequential loader, not by a random seed. Build that artifact once, record
+its hash, and reuse it without conversion for all 36 runs. The game runner's
+`config.json` seed is not a training seed and must not be presented as one.
 
 ### Documented execution steps
 
 1. Freeze the field and protocol.
-   - Record the twelve IDs, exact architecture JSON, three seed pairs, corpus
+   - Record the twelve IDs, exact architecture JSON, three initialization seeds, corpus
      hash, trainer hash, Enyo engine hash, opening-suite hash, time control, and
      game count before training.
    - Do not add, remove, or modify candidates after observing results. Any later
@@ -344,7 +345,9 @@ provenance.
 
 3. Freeze the training input.
    - Verify and record the SHA-256 and size of the pylon source plus the resolved
-     offset, limit, filters, and loader-order seed.
+     offset, limit, and filters.
+   - Convert it once to the declared shared Bullet artifact, then record that
+     artifact's SHA-256 and row count.
    - Confirm that every run reads identical rows in identical order and processes
      the same number of positions at each checkpoint.
    - Do not regenerate, filter, resample, or relabel the corpus between candidates.

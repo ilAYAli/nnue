@@ -6,6 +6,7 @@
   "superbatches": 7600,
   "lr_superbatches": 0,
   "threads": 16,
+  "init_seed": 1,
   "wdl": 0.3,
   "lr": 0.001,
   "final_lr": 0.000005,

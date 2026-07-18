@@ -113,6 +113,9 @@ name = "enyo-bullet-spike"
 version = "0.1.0"
 dependencies = [
  "bullet_lib",
+ "rand",
+ "rand_chacha",
+ "rand_distr",
  "serde_json",
  "sha2",
 ]

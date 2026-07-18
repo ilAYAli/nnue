@@ -78,6 +78,7 @@ const TRAINING_DEFAULT_KEYS: &[&str] = &[
     "superbatches",
     "lr_superbatches",
     "threads",
+    "init_seed",
     "wdl",
     "lr",
     "final_lr",
@@ -494,6 +495,12 @@ fn training_string(config: &Config, key: &str, default: &str) -> String {
 fn training_usize(config: &Config, key: &str, default: usize) -> usize {
     resolved_training_value(config, key)
         .map(|(value, path)| value_usize(value, &path))
+        .unwrap_or(default)
+}
+
+fn training_u64(config: &Config, key: &str, default: u64) -> u64 {
+    resolved_training_value(config, key)
+        .map(|(value, path)| value_u64(value, &path))
         .unwrap_or(default)
 }
 
@@ -1536,6 +1543,7 @@ fn cmd_run(config: &Config) {
         training_lr_superbatches(config),
     );
     set_env("ENYO_BULLET_THREADS", training_threads(config));
+    set_env("ENYO_BULLET_INIT_SEED", training_u64(config, "init_seed", 1));
     set_env("ENYO_BULLET_WDL", training_wdl(config));
     set_env("ENYO_BULLET_LR", training_lr(config));
     set_env("ENYO_BULLET_FINAL_LR", training_final_lr(config));
@@ -2469,6 +2477,7 @@ mod tests {
             "superbatches": 7600,
             "lr_superbatches": 0,
             "threads": 16,
+            "init_seed": 1,
             "wdl": 0.3,
             "lr": 0.001,
             "final_lr": 0.000005,

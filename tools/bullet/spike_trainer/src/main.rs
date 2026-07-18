@@ -1,6 +1,11 @@
 mod enyo_threats;
 
-use std::env;
+use std::{
+    env,
+    fs::File,
+    io::{self, Write},
+    path::Path,
+};
 
 use bullet_lib::{
     game::{
@@ -25,6 +30,113 @@ use bullet_lib::{
         ValueTrainerBuilder,
     },
 };
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+use rand_distr::{Distribution, Normal};
+use sha2::{Digest, Sha256};
+
+fn tensor_rng(seed: u64, id: &str) -> ChaCha8Rng {
+    let mut hash = Sha256::new();
+    hash.update(seed.to_le_bytes());
+    hash.update(id.as_bytes());
+    let digest: [u8; 32] = hash.finalize().into();
+    ChaCha8Rng::from_seed(digest)
+}
+
+fn write_tensor<W: Write>(
+    output: &mut W,
+    seed: u64,
+    id: &str,
+    len: usize,
+    stdev: Option<f32>,
+) -> io::Result<()> {
+    output.write_all(id.as_bytes())?;
+    output.write_all(b"\n")?;
+    output.write_all(&len.to_le_bytes())?;
+    if let Some(stdev) = stdev {
+        let normal = Normal::new(0.0_f32, stdev).expect("positive init stdev");
+        let mut rng = tensor_rng(seed, id);
+        for _ in 0..len {
+            output.write_all(&normal.sample(&mut rng).to_le_bytes())?;
+        }
+    } else {
+        let zero = 0.0_f32.to_le_bytes();
+        for _ in 0..len {
+            output.write_all(&zero)?;
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_seeded_enyo_weights(
+    path: &Path,
+    seed: u64,
+    input_size: usize,
+    feature_channels: usize,
+    hidden: usize,
+    l2_size: usize,
+    output_buckets: usize,
+    input_factoriser: bool,
+    full_heads: bool,
+    mixed_activation: bool,
+    psqt_residual: bool,
+    l0_stdev: f32,
+    l1_stdev: f32,
+) -> io::Result<()> {
+    let mut output = File::create(path)?;
+    let head_count = if full_heads { output_buckets } else { 1 };
+    write_tensor(&mut output, seed, "l0w", hidden * input_size, Some(l0_stdev))?;
+    write_tensor(&mut output, seed, "l0b", hidden, None)?;
+    if input_factoriser {
+        write_tensor(
+            &mut output,
+            seed,
+            "l0f",
+            hidden * feature_channels * 64,
+            None,
+        )?;
+    }
+    write_tensor(
+        &mut output,
+        seed,
+        "l1w",
+        head_count * l2_size * 2 * hidden,
+        Some(l1_stdev),
+    )?;
+    write_tensor(&mut output, seed, "l1b", head_count * l2_size, None)?;
+    write_tensor(
+        &mut output,
+        seed,
+        "l2w",
+        head_count * 32 * l2_size,
+        Some((2.0 / l2_size as f32).sqrt()),
+    )?;
+    write_tensor(&mut output, seed, "l2b", head_count * 32, None)?;
+    if mixed_activation {
+        write_tensor(&mut output, seed, "l2sw", 32 * l2_size, None)?;
+        write_tensor(&mut output, seed, "l2sb", 32, None)?;
+    }
+    write_tensor(
+        &mut output,
+        seed,
+        "l3w",
+        output_buckets * 32,
+        Some((2.0 / 32.0_f32).sqrt()),
+    )?;
+    write_tensor(&mut output, seed, "l3b", output_buckets, None)?;
+    if psqt_residual {
+        write_tensor(
+            &mut output,
+            seed,
+            "psqtw",
+            output_buckets * input_size,
+            None,
+        )?;
+        write_tensor(&mut output, seed, "psqtb", output_buckets, None)?;
+    }
+    Ok(())
+}
 
 fn env_string(name: &str, default: &str) -> String {
     env::var(name).unwrap_or_else(|_| default.to_owned())
@@ -264,6 +376,7 @@ impl<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize, const FULL_THREA
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn stm_feature(piece: u8, square: u8, own_king: u8) -> usize {
         enyo_feature::<16, 12>(piece, bullet_square_to_enyo_net(square), own_king ^ 56, 0)
@@ -291,6 +404,28 @@ mod tests {
             used[bucket] = true;
         }
         assert!(used.into_iter().all(|value| value));
+    }
+
+    #[test]
+    fn seeded_initial_weights_are_reproducible_and_seed_sensitive() {
+        let dir = env::temp_dir().join(format!("enyo-seeded-init-{}", std::process::id()));
+        fs::create_dir_all(&dir).expect("create seeded-init test directory");
+        let first = dir.join("first.bin");
+        let same = dir.join("same.bin");
+        let different = dir.join("different.bin");
+        for (path, seed) in [(&first, 17), (&same, 17), (&different, 18)] {
+            write_seeded_enyo_weights(
+                path, seed, 24, 12, 8, 4, 2, true, false, false, false, 8.0, 1.0,
+            )
+            .expect("write seeded weights");
+        }
+        let first_bytes = fs::read(&first).expect("read first seeded weights");
+        assert_eq!(first_bytes, fs::read(&same).expect("read repeated seeded weights"));
+        assert_ne!(
+            first_bytes,
+            fs::read(&different).expect("read different seeded weights")
+        );
+        fs::remove_dir_all(&dir).expect("remove seeded-init test directory");
     }
 }
 
@@ -426,6 +561,9 @@ fn train_enyo<
     }
     let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
     let resume_checkpoint = env_string("ENYO_BULLET_RESUME_CHECKPOINT", "");
+    let init_seed = env::var("ENYO_BULLET_INIT_SEED")
+        .ok()
+        .map(|value| value.parse::<u64>().expect("invalid ENYO_BULLET_INIT_SEED"));
     let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
 
     macro_rules! l0w_format {
@@ -789,8 +927,43 @@ fn train_enyo<
                     println!("export_init_only=1");
                     return;
                 }
+            } else if let Some(seed) = init_seed {
+                let seeded_path = Path::new(&output).join(format!("{net_id}-seeded-init.bin"));
+                write_seeded_enyo_weights(
+                    &seeded_path,
+                    seed,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
+                        + if FULL_THREATS {
+                            enyo_threats::DIMENSIONS
+                        } else {
+                            0
+                        },
+                    FEATURE_CHANNELS,
+                    hidden,
+                    l2_size,
+                    OUTPUT_BUCKETS,
+                    input_factoriser,
+                    FULL_HEADS,
+                    MIXED_ACTIVATION,
+                    psqt_residual,
+                    l0_stdev,
+                    l1_stdev,
+                )
+                .expect("failed to write deterministic initial weights");
+                trainer
+                    .optimiser
+                    .load_weights_from_file(seeded_path.to_str().expect("UTF-8 init path"))
+                    .expect("failed to load deterministic initial weights");
+                println!("loaded_init_seed={seed}");
+                trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+                if export_init_only {
+                    println!("export_init_only=1");
+                    return;
+                }
             } else if export_init_only {
-                panic!("ENYO_BULLET_EXPORT_INIT_ONLY requires ENYO_BULLET_INIT_WEIGHTS");
+                panic!(
+                    "ENYO_BULLET_EXPORT_INIT_ONLY requires ENYO_BULLET_INIT_WEIGHTS or ENYO_BULLET_INIT_SEED"
+                );
             }
 
             let schedule = TrainingSchedule {
