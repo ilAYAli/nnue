@@ -232,33 +232,18 @@ Do not use `enyo-scratch-long-1.0.0-rc1` alone as the training recipe. Its
 absolute default-net result was still about `-169 Elo`. It was the start of the
 successful lineage, not a sufficiently trained endpoint.
 
-Use the mature foundation schedule that produced `enyo-1.0.0-rc1`. Starting
-from random initialization, that accepted path used the same pylon data and
-all-layer training for five consecutive `196608`-superbatch passes followed by
-two `98304`-superbatch passes: `1179648` superbatches total. The successive
-full-pass gains fell from `+93.2` to `+45.9`, `+25.8`, `+16.0`, and `+7.4`
-Elo, demonstrating both that the first pass was undertrained and that the later
-passes were approaching diminishing returns. The two half-dose passes then
-scored `+0.5` and `+4.9` Elo. This is the minimum historically justified
-scratch foundation for architecture ranking.
+The accepted lineage eventually used five `196608`-superbatch passes followed
+by two `98304`-superbatch passes, but reproducing that entire trajectory for
+every architecture and seed would require roughly 550 GPU-hours. That protocol
+was stopped after candidate A's first pass when its cost became clear.
 
-Every candidate and replicate follows the identical seven-block curriculum:
-
-| Block | Superbatches | WDL | LR endpoints | Trainable | Origin |
-| --- | ---: | ---: | --- | --- | --- |
-| 1 | 196608 | 0.05 | `0.001 -> 0.000005` | all | random initialization |
-| 2 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
-| 3 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
-| 4 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
-| 5 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
-| 6 | 98304 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
-| 7 | 98304 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
-
-`continue_from` in blocks 2-7 must preserve the candidate's own weights and
-optimizer state; it never crosses architectures or replicates. Each block
-repeats the historical LR schedule used by the accepted lineage. Do not collapse
-the seven blocks into one nominally equivalent schedule without first proving
-optimizer and LR-schedule equivalence.
+The competition instead uses one uniform `196608`-superbatch scratch training
+per architecture and seed. This is the longest historically demonstrated
+single-pass recipe, keeps the LR schedule identical across shapes, and makes the
+race practical without staged training. With twelve configurations and two
+seeds, the fixed field contains 24 trainings and is expected to require about 62
+GPU-hours on the measured host. The result selects the architecture that
+performs best at this fixed compute budget; deeper winner training is separate.
 
 Use the canonical source directly:
 `data/stockfish/master-binpacks/training_data_pylon.binpack`, offset `0`, limit
@@ -269,29 +254,23 @@ artifact so all architectures consume identical accepted rows in identical
 order. Do not independently convert, resample, or relabel the source per
 architecture.
 
-The canonical block-1 `build.json` shape is:
+The canonical `build.json` shape is:
 
 ```json
 {
   "run": "enyo-A.P.0-rcN",
-  "hypothesis": "competition replicate block 1/7: random-init ARCH under the fixed mature pylon foundation protocol",
+  "hypothesis": "competition replicate: random-init ARCH under the fixed one-pass pylon protocol",
   "superbatches": 196608,
+  "init_seed": 5090001,
   "wdl": 0.05,
-  "sfbinpack": {
-    "min_ply": 24
-  },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "bullet_output": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet",
-    "offset": 0,
-    "limit": 2800000000
+    "source_binpack": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet"
   }
 }
 ```
 
-Block 1 omits both origins and starts from scratch. Blocks 2-7 change only
-`run`, `hypothesis`, `superbatches` where specified, and `continue_from` to the
-same replicate's preceding block. `lr`, `final_lr`, batches, batch size, loader,
+Every run omits both origins and starts from scratch. `lr`, `final_lr`, batches,
+batch size, loader,
 trainable scope, weight decay, and threads stay inherited from `defaults.json`;
 before kickoff, verify they still resolve respectively to `0.001`, `0.000005`,
 `64`, `2048`, `direct`, `all`, `0.0`, and `16`.
@@ -301,19 +280,19 @@ lower learning rates, and disjoint Farseer/T60T70 slices. Those are valuable
 post-foundation optimization evidence but are not folded into this competition:
 doing so would test a long sequence of objective and corpus interactions rather
 than architecture/feature capacity. The race selects the best architecture
-after the mature common foundation; it does not claim to finish all subsequent
+under a common fixed compute budget; it does not claim to finish all subsequent
 net tuning.
 
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
-run names. Assign one architecture number to each configuration and use `rc1`,
-`rc2`, and `rc3` for its three random-initialization replicates; record the
+run names. Assign one architecture number to each configuration and use `rc1`
+and `rc2` for its two random-initialization replicates; record the
 human-readable ID and full fields in `hypothesis`, never in the run name.
 
 ### Replication and randomness contract
 
-Train three replicates of every configuration. For replicate 1, 2, or 3, every
-configuration uses the same declared `init_seed`: `5090001`, `5090002`, or
-`5090003`, respectively. Seeded initialization derives
+Train two replicates of every configuration. For replicate 1 or 2, every
+configuration uses the same declared `init_seed`: `5090001` or `5090002`,
+respectively. Seeded initialization derives
 an independent ChaCha stream from the seed and tensor name, so differently sized
 architectures cannot shift the random stream of another tensor. Record the
 effective seed in each run's resolved configuration and provenance.
@@ -321,13 +300,13 @@ effective seed in each run's resolved configuration and provenance.
 Data ordering is controlled by the immutable shared
 `data/bullet/enyo-architecture-race-pylon-2.8b.bullet` artifact and Bullet's
 direct sequential loader, not by a random seed. Build that artifact once, record
-its hash, and reuse it without conversion for all 36 runs. The game runner's
+its hash, and reuse it without conversion for all 24 runs. The game runner's
 `config.json` seed is not a training seed and must not be presented as one.
 
 ### Documented execution steps
 
 1. Freeze the field and protocol.
-   - Record the twelve IDs, exact architecture JSON, three initialization seeds, corpus
+   - Record the twelve IDs, exact architecture JSON, two initialization seeds, corpus
      hash, trainer hash, Enyo engine hash, opening-suite hash, time control, and
      game count before training.
    - Do not add, remove, or modify candidates after observing results. Any later
@@ -362,9 +341,9 @@ its hash, and reuse it without conversion for all 36 runs. The game runner's
 5. Run all full scratch trainings.
    - Launch exactly one Forge-owned iteration at a time through the repository
      workflow; never duplicate or interfere with active jobs.
-   - Train every configuration through all seven blocks and all `1179648`
-     superbatches even when an early block looks weak.
-   - Preserve the final checkpoint of every block, including optimizer state,
+   - Train every configuration and both seeds for exactly `196608` superbatches;
+     do not eliminate a configuration based on its other replicate's result.
+   - Preserve the final checkpoint of every run, including optimizer state,
      hashes, elapsed time, and processed-position count.
    - A failed job is retried only from its verified optimizer checkpoint and
      schedule position. Never restart it under the same run identity with new
@@ -378,13 +357,12 @@ its hash, and reuse it without conversion for all 36 runs. The game runner's
    - Gates detect broken artifacts; static or move metrics do not select or
      promote the winner. Game results decide.
 
-7. Measure learning curves.
-   - Test the seven common block checkpoints from every replicate with the same fixed
+7. Measure fixed-budget results.
+   - Test the single final checkpoint from every replicate with the same fixed
      paired-opening sample against one frozen Enyo anchor.
    - Use fixed-size matches, not SPRT early stopping, for ranking.
-   - Plot Elo against processed positions with seed uncertainty. If a richer
-     HalfKA candidate is still improving materially faster at the final
-     checkpoint, report that the dose did not settle the architecture question.
+   - Report seed uncertainty. If a richer HalfKA candidate remains highly
+     seed-sensitive, report that the fixed dose did not settle its ranking.
 
 8. Run the final game competition.
    - Test every final checkpoint against the same frozen Enyo anchor using the
