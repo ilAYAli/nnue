@@ -227,37 +227,81 @@ cost; historical FullThreats NPS loss must not be ignored.
 
 ### Fixed training method
 
-Use the historically strongest scratch method, introduced by
-`enyo-scratch-long-1.0.0-rc1`: random initialization, the materialized 2.8B
-pylon Bullet corpus, nine-epoch `196608`-superbatch all-layer training,
-`wdl=0.05`, and the shared learning-rate endpoints `0.001 -> 0.000005`. That
-candidate gained `+93.2 Elo` against the prior broad lineage and is stronger
-evidence for scratch architecture selection than the later 128-superbatch
-continuation recipes.
+Do not use `enyo-scratch-long-1.0.0-rc1` alone as the training recipe. Its
+`+93.2 Elo` was parent-relative to a weak broad baseline, while its first
+absolute default-net result was still about `-169 Elo`. It was the start of the
+successful lineage, not a sufficiently trained endpoint.
 
-The canonical per-run `build.json` shape is:
+Use the mature foundation schedule that produced `enyo-1.0.0-rc1`. Starting
+from random initialization, that accepted path used the same pylon data and
+all-layer training for five consecutive `196608`-superbatch passes followed by
+two `98304`-superbatch passes: `1179648` superbatches total. The successive
+full-pass gains fell from `+93.2` to `+45.9`, `+25.8`, `+16.0`, and `+7.4`
+Elo, demonstrating both that the first pass was undertrained and that the later
+passes were approaching diminishing returns. The two half-dose passes then
+scored `+0.5` and `+4.9` Elo. This is the minimum historically justified
+scratch foundation for architecture ranking.
+
+Every candidate and replicate follows the identical seven-block curriculum:
+
+| Block | Superbatches | WDL | LR endpoints | Trainable | Origin |
+| --- | ---: | ---: | --- | --- | --- |
+| 1 | 196608 | 0.05 | `0.001 -> 0.000005` | all | random initialization |
+| 2 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
+| 3 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
+| 4 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
+| 5 | 196608 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
+| 6 | 98304 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
+| 7 | 98304 | 0.05 | `0.001 -> 0.000005` | all | previous block checkpoint |
+
+`continue_from` in blocks 2-7 must preserve the candidate's own weights and
+optimizer state; it never crosses architectures or replicates. Each block
+repeats the historical LR schedule used by the accepted lineage. Do not collapse
+the seven blocks into one nominally equivalent schedule without first proving
+optimizer and LR-schedule equivalence.
+
+Use the canonical source directly:
+`data/stockfish/master-binpacks/training_data_pylon.binpack`, offset `0`, limit
+`2800000000`, with `sfbinpack.min_ply=24`. Do not depend on the deleted
+`data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet` intermediate. Record the
+source SHA-256 and use the same explicit loader-order seed for every matched
+replicate so all architectures consume identical accepted rows in identical
+order. Do not independently convert, resample, or relabel the source per
+architecture.
+
+The canonical block-1 `build.json` shape is:
 
 ```json
 {
   "run": "enyo-A.P.0-rcN",
-  "hypothesis": "competition replicate: random-init ARCH under the fixed nine-epoch pylon protocol",
+  "hypothesis": "competition replicate block 1/7: random-init ARCH under the fixed mature pylon foundation protocol",
   "superbatches": 196608,
-  "save_rate": 49152,
   "wdl": 0.05,
+  "sfbinpack": {
+    "min_ply": 24
+  },
   "data": {
-    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "offset": 0,
+    "limit": 2800000000
   }
 }
 ```
 
-Do not add `continue_from` or `initialize_from`; every competition run starts
-from scratch. This omission is intentional and is authorized only for the
-competition runs after the kickoff confirmation. `lr`, `final_lr`, batches,
-batch size, loader, trainable scope, weight decay, and threads stay inherited
-from `defaults.json`; before kickoff, verify they still resolve respectively to
-`0.001`, `0.000005`, `64`, `2048`, `direct`, `all`, `0.0`, and `16`. The
-`save_rate=49152` override records common 25%, 50%, 75%, and 100% checkpoints
-without changing optimization.
+Block 1 omits both origins and starts from scratch. Blocks 2-7 change only
+`run`, `hypothesis`, `superbatches` where specified, and `continue_from` to the
+same replicate's preceding block. `lr`, `final_lr`, batches, batch size, loader,
+trainable scope, weight decay, and threads stay inherited from `defaults.json`;
+before kickoff, verify they still resolve respectively to `0.001`, `0.000005`,
+`64`, `2048`, `direct`, `all`, `0.0`, and `16`.
+
+The later accepted lineage gained further Elo from WDL `0.15`, activation L1,
+lower learning rates, and disjoint Farseer/T60T70 slices. Those are valuable
+post-foundation optimization evidence but are not folded into this competition:
+doing so would test a long sequence of objective and corpus interactions rather
+than architecture/feature capacity. The race selects the best architecture
+after the mature common foundation; it does not claim to finish all subsequent
+net tuning.
 
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`,
@@ -299,8 +343,8 @@ provenance.
      training loss.
 
 3. Freeze the training input.
-   - Verify the SHA-256 and row count of
-     `data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet`.
+   - Verify and record the SHA-256 and size of the pylon source plus the resolved
+     offset, limit, filters, and loader-order seed.
    - Confirm that every run reads identical rows in identical order and processes
      the same number of positions at each checkpoint.
    - Do not regenerate, filter, resample, or relabel the corpus between candidates.
@@ -315,10 +359,10 @@ provenance.
 5. Run all full scratch trainings.
    - Launch exactly one Forge-owned iteration at a time through the repository
      workflow; never duplicate or interfere with active jobs.
-   - Train every configuration for all `196608` superbatches even when an early
-     checkpoint looks weak.
-   - Preserve checkpoints at `49152`, `98304`, `147456`, and `196608`, including
-     optimizer state, hashes, elapsed time, and processed-position count.
+   - Train every configuration through all seven blocks and all `1179648`
+     superbatches even when an early block looks weak.
+   - Preserve the final checkpoint of every block, including optimizer state,
+     hashes, elapsed time, and processed-position count.
    - A failed job is retried only from its verified optimizer checkpoint and
      schedule position. Never restart it under the same run identity with new
      random state.
@@ -332,7 +376,7 @@ provenance.
      promote the winner. Game results decide.
 
 7. Measure learning curves.
-   - Test the four common checkpoints from every replicate with the same fixed
+   - Test the seven common block checkpoints from every replicate with the same fixed
      paired-opening sample against one frozen Enyo anchor.
    - Use fixed-size matches, not SPRT early stopping, for ranking.
    - Plot Elo against processed positions with seed uncertainty. If a richer
