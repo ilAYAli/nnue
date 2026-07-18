@@ -17,3 +17,6 @@ __pycache__/
 /runs/
 /artifacts/
 /tools/bullet/train
+
+# Local Fastchess validation state
+/config.json

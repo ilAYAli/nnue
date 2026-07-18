@@ -187,6 +187,191 @@ Next:
 4. Treat FullThreats/architecture expansion as secondary until the output-scale
    pathology is resolved.
 
+## Unified scratch architecture and feature competition
+
+This competition supersedes the earlier architecture freeze and the staged
+architecture-screening proposal for this one purpose. It is a single fixed
+competition: every eligible configuration is trained from random initialization
+to the full dose, no candidate is eliminated early, and all selection rules are
+declared before the first run. The result identifies the best tested
+architecture/feature combination for Enyo under the fixed corpus, objective,
+training budget, quantized runtime, and game protocol. It does not claim that an
+untested architecture or a different training regime cannot be stronger.
+
+### Competition field
+
+All Enyo-mode candidates use `l2_size=16`, `eval_scale=400`, `l0_std=8`,
+`l1_std=1`, `l1_export_scale=1`, and the current native container format unless
+the row explicitly changes a field. `oN` means `output_buckets=N`.
+
+| ID | Configuration | Purpose |
+| --- | --- | --- |
+| A | `1x12-1024-o8`, unfactorised | No-HalfKA/king-independent control. |
+| B | `4x12-1024-o8`, factorised | Light king conditioning with shared factoriser. |
+| C | `8x12-1024-o8`, factorised | Medium king conditioning; retest the historically positive eight-bucket idea. |
+| D | `16x12-1024-o8`, factorised | Current Enyo architecture control. |
+| E | `10x11-768-o8`, factorised | Compact HalfKAv2-style layout and prior short-screen winner. |
+| F | `32x11-1024-o8`, factorised | High-capacity, data-hungry HalfKAv2-style extreme. |
+| G | `16x12-768-o8`, factorised | Width-only challenger that beat the 1024-wide short control. |
+| H | `16x12-1024-o4`, factorised | Output-bucket challenger that beat the o8 short control. |
+| I | `10x11-768-o4`, factorised | Compact interaction candidate combining the strongest prior layout and o4 result. |
+| J | native Reckless topology | Ten mirrored input buckets, factorised input, pairwise-multiply first activation, and bucket-specific dense path. |
+| K | `10x11-768-o8`, unfactorised | Matched control for FullThreats. |
+| L | `10x11-768-o8`, unfactorised, FullThreats | Tactical-feature challenger. |
+
+Candidate J is eligible only after its exact trainer/export/scalar/SIMD runtime
+contract passes parity; do not substitute an Enyo forward path and call it
+Reckless. Candidate L must be compared directly with K because FullThreats does
+not support the input factoriser. Its final game result includes its runtime
+cost; historical FullThreats NPS loss must not be ignored.
+
+### Fixed training method
+
+Use the historically strongest scratch method, introduced by
+`enyo-scratch-long-1.0.0-rc1`: random initialization, the materialized 2.8B
+pylon Bullet corpus, nine-epoch `196608`-superbatch all-layer training,
+`wdl=0.05`, and the shared learning-rate endpoints `0.001 -> 0.000005`. That
+candidate gained `+93.2 Elo` against the prior broad lineage and is stronger
+evidence for scratch architecture selection than the later 128-superbatch
+continuation recipes.
+
+The canonical per-run `build.json` shape is:
+
+```json
+{
+  "run": "enyo-A.P.0-rcN",
+  "hypothesis": "competition replicate: random-init ARCH under the fixed nine-epoch pylon protocol",
+  "superbatches": 196608,
+  "save_rate": 49152,
+  "wdl": 0.05,
+  "data": {
+    "source_binpack": "data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet"
+  }
+}
+```
+
+Do not add `continue_from` or `initialize_from`; every competition run starts
+from scratch. This omission is intentional and is authorized only for the
+competition runs after the kickoff confirmation. `lr`, `final_lr`, batches,
+batch size, loader, trainable scope, weight decay, and threads stay inherited
+from `defaults.json`; before kickoff, verify they still resolve respectively to
+`0.001`, `0.000005`, `64`, `2048`, `direct`, `all`, `0.0`, and `16`. The
+`save_rate=49152` override records common 25%, 50%, 75%, and 100% checkpoints
+without changing optimization.
+
+Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
+run names. Assign one architecture number to each configuration and use `rc1`,
+`rc2`, and `rc3` for its three random-initialization replicates; record the
+human-readable ID and full fields in `hypothesis`, never in the run name.
+
+### Replication and randomness contract
+
+Train three replicates of every configuration. For replicate 1, 2, or 3, every
+configuration uses the same declared initialization seed and the same declared
+data-order seed. Initialization and data ordering must use independent random
+streams so a different parameter count cannot shift the data order.
+
+The current `build.json` training schema does not expose these seeds. Before
+kickoff, prove that trainer initialization and direct-loader order are
+deterministic and controllable. If they are not, stop and obtain approval for a
+narrow seed-plumbing change plus deterministic regression tests. The game
+runner's `config.json` seed is not a training seed and must not be presented as
+one. Record effective seeds in each run's resolved configuration and
+provenance.
+
+### Documented execution steps
+
+1. Freeze the field and protocol.
+   - Record the twelve IDs, exact architecture JSON, three seed pairs, corpus
+     hash, trainer hash, Enyo engine hash, opening-suite hash, time control, and
+     game count before training.
+   - Do not add, remove, or modify candidates after observing results. Any later
+     idea belongs to a new competition.
+
+2. Verify architecture support.
+   - For every configuration, verify trainer construction, checkpoint sizing,
+     export, loader metadata, scalar evaluation, SIMD evaluation, and incremental
+     accumulator refresh.
+   - Require trainer/runtime feature-index parity and scalar/SIMD score parity on
+     the fixed suite.
+   - Measure start-position and multi-FEN evaluation speed for each architecture.
+     A parity or runtime failure makes the configuration ineligible; it is not a
+     training loss.
+
+3. Freeze the training input.
+   - Verify the SHA-256 and row count of
+     `data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet`.
+   - Confirm that every run reads identical rows in identical order and processes
+     the same number of positions at each checkpoint.
+   - Do not regenerate, filter, resample, or relabel the corpus between candidates.
+
+4. Verify the resolved training recipe.
+   - Materialize each run from the minimal `build.json` above and its candidate
+     `architecture.json`.
+   - Reject the launch if any resolved training field differs except the declared
+     architecture/feature fields and replicate seed.
+   - Confirm there is no origin net and archive the resolved config and provenance.
+
+5. Run all full scratch trainings.
+   - Launch exactly one Forge-owned iteration at a time through the repository
+     workflow; never duplicate or interfere with active jobs.
+   - Train every configuration for all `196608` superbatches even when an early
+     checkpoint looks weak.
+   - Preserve checkpoints at `49152`, `98304`, `147456`, and `196608`, including
+     optimizer state, hashes, elapsed time, and processed-position count.
+   - A failed job is retried only from its verified optimizer checkpoint and
+     schedule position. Never restart it under the same run identity with new
+     random state.
+
+6. Export and gate every checkpoint.
+   - Verify that the quantized export differs materially from initialization and
+     that no two candidates are accidentally byte-identical.
+   - Run load/search, static, move, feature parity, scalar/SIMD parity, activation,
+     clamp, and balanced endgame/high-evaluation audits.
+   - Gates detect broken artifacts; static or move metrics do not select or
+     promote the winner. Game results decide.
+
+7. Measure learning curves.
+   - Test the four common checkpoints from every replicate with the same fixed
+     paired-opening sample against one frozen Enyo anchor.
+   - Use fixed-size matches, not SPRT early stopping, for ranking.
+   - Plot Elo against processed positions with seed uncertainty. If a richer
+     HalfKA candidate is still improving materially faster at the final
+     checkpoint, report that the dose did not settle the architecture question.
+
+8. Run the final game competition.
+   - Test every final checkpoint against the same frozen Enyo anchor using the
+     same paired openings with colors reversed.
+   - Use a fixed real-time control, identical engine binary/settings, and equal
+     hardware. Do not use fixed nodes: slower Reckless or FullThreats evaluation
+     must pay its search cost.
+   - Run at least 1500 games per replicate/configuration; prefer 3000 when the
+     available Forge budget permits. Never stop a weak candidate early.
+   - If budget permits a full all-pairs round robin, declare and schedule it
+     before results are visible. Otherwise the common-anchor tournament is the
+     sole ranking dataset.
+
+9. Analyse all replicates jointly.
+   - Fit configuration, seed, and paired-opening effects and report Elo,
+     uncertainty interval, evaluation speed, and the probability that each
+     configuration is strongest.
+   - Do not choose the largest single-run point estimate. A candidate must be
+     consistent across seeds and strong under real-time search.
+   - Publish all losses, draws, wins, draw rate, Elo, confidence interval, LOS,
+     hashes, and exact game counts; do not report only the winning rows.
+
+10. Declare the outcome once.
+    - The winner is the configuration with at least 90% estimated probability of
+      being strongest whose lower uncertainty bound is no more than 3 Elo below
+      every alternative.
+    - If no configuration satisfies that rule, declare the statistically tied
+      winner set rather than inventing a unique winner.
+    - Promotion requires a clean runtime/parity record, a settled learning curve,
+      and no material balanced endgame/high-evaluation regression.
+    - Record the winner or tied set, complete protocol, and limitations in this
+      document. Any subsequent architecture/feature search is a new explicitly
+      authorized experiment, not an extension chosen after seeing these results.
+
 ## Stage 1: architecture support
 
 Support and verify the practical Enyo-native matrix before starting comparison

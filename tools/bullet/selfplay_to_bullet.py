@@ -4,7 +4,9 @@
 Label mode is an explicit, required choice, not an ad-hoc flag:
 
 - self-distillation: keep Enyo's own per-move search score, blended with the
-  real game WDL result. Matches Berserk's own self-play recipe.
+  real game WDL result. Matches Berserk's own self-play recipe. Scores remain
+  in runtime units because the Enyo trainer applies phase normalization once
+  when it loads every Bullet record.
 - outcome-only: discard all engine scores; train only on game result
   (score=0, wdl=1.0 at the training-config level). For the zero-signal
   lineage only.
@@ -83,8 +85,6 @@ def convert_shard(
     ]
     if label_mode == "outcome-only":
         convert_cmd.append("--zero-score")
-    else:
-        convert_cmd.append("--enyo-runtime-target")
     with bullet_stats_json.open("w") as stats_out:
         result = subprocess.run(convert_cmd, check=True, stdout=stats_out)
 
