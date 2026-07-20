@@ -1,9 +1,9 @@
 {
-  "run": "enyo-h4-v1-rc1",
+  "run": "enyo-h4-v1-rc2",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "architecture race h4 replicate 1/2 (seed 5090001): random-init 4x12-1024-o8 factorised under the fixed one-pass pylon protocol; trained originally as enyo-7.0.0-rc1",
+  "hypothesis": "architecture race h4 replicate 2/2 (seed 5090002): random-init 4x12-1024-o8 factorised under the fixed one-pass pylon protocol; trained originally as enyo-7.0.0-rc2",
   "superbatches": 196608,
-  "init_seed": 5090001,
+  "init_seed": 5090002,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet"
