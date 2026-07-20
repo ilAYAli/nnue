@@ -1,12 +1,11 @@
 {
-  "run": "enyo-1.33.0-rc1",
-  "initialize_from": "~/assets/nets/enyo-1.31.0-rc42.nn",
-  "hypothesis": "change only architecture: add Enyo FullThreats input features while holding the accepted rc42 parent, exact rc42 pylon slice, 128-superbatch dose, lr=0.00001, wdl=0.05, and input-only training scope fixed",
-  "superbatches": 128,
-  "lr": 1e-05,
+  "run": "enyo-11.0.0-rc2",
+  "reference": "enyo-1.30.0-rc3",
+  "hypothesis": "unified architecture race candidate F, replicate 2/2: random-init SF-like 32x11-1024-o8 factorised under the fixed one-pass pylon protocol; candidate E recorded ineligible because 11-channel HalfKAv2 requires 32 input buckets",
+  "superbatches": 196608,
+  "init_seed": 5090002,
   "wdl": 0.05,
-  "trainable": "input",
   "data": {
-    "source_binpack": "data/bullet/enyo-1.31.0-rc42.bullet"
+    "source_binpack": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet"
   }
 }

@@ -16,18 +16,6 @@ Enyo NNUE line uses a HalfKAv2-style factorised network trained with Bullet.
 Training data comes from Enyo self-play/generated positions and binpack datasets,
 with Stockfish used only as a labeling oracle where the dataset requires it.
 
-Current promoted architecture:
-
-| Component | Value |
-| --- | --- |
-| Type | HalfKAv2-style factorised NNUE |
-| Input buckets | 16 king buckets |
-| Feature channels | 12 |
-| Hidden width | 1024 |
-| L2 size | 16 |
-| Output buckets | 8 |
-| Export format | `enyo-native-v1` |
-
 ## Provenance
 
 Some training datasets come from `official-stockfish/master-binpacks`, licensed
