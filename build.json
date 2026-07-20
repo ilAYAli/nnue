@@ -1,9 +1,9 @@
 {
-  "run": "enyo-h16w768-v1-rc1",
+  "run": "enyo-h16w768-v1-rc2",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "architecture race h16w768 replicate 1/2 (seed 5090001): random-init 16x12-768-o8 factorised width challenger under the fixed one-pass pylon protocol",
+  "hypothesis": "architecture race h16w768 replicate 2/2 (seed 5090002): random-init 16x12-768-o8 factorised width challenger under the fixed one-pass pylon protocol",
   "superbatches": 196608,
-  "init_seed": 5090001,
+  "init_seed": 5090002,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet"
