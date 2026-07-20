@@ -110,7 +110,7 @@ save_result() {
 
 main() {
     run_sprt
-    save_result
+    #save_result
 
     local result elo llr
     result=$(forge status "$RUN" --json)
