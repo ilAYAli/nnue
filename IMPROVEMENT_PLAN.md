@@ -202,28 +202,38 @@ untested architecture or a different training regime cannot be stronger.
 
 All Enyo-mode candidates use `l2_size=16`, `eval_scale=400`, `l0_std=8`,
 `l1_std=1`, `l1_export_scale=1`, and the current native container format unless
-the row explicitly changes a field. `oN` means `output_buckets=N`.
+the row explicitly changes a field. Every candidate starts from scratch using
+the same deterministic initialization method and distributions; `rc1` uses seed
+`5090001` and `rc2` uses seed `5090002` for every architecture. Different tensor
+shapes cannot contain byte-identical weights, but no candidate receives a
+pretrained or otherwise privileged initialization. `oN` means
+`output_buckets=N`.
 
-| ID | Configuration | Purpose |
-| --- | --- | --- |
-| A | `1x12-1024-o8`, unfactorised | No-HalfKA/king-independent control. |
-| B | `4x12-1024-o8`, factorised | Light king conditioning with shared factoriser. |
-| C | `8x12-1024-o8`, factorised | Medium king conditioning; retest the historically positive eight-bucket idea. |
-| D | `16x12-1024-o8`, factorised | Current Enyo architecture control. |
-| E | `10x11-768-o8`, factorised | Compact HalfKAv2-style layout and prior short-screen winner. |
-| F | `32x11-1024-o8`, factorised | High-capacity, data-hungry HalfKAv2-style extreme. |
-| G | `16x12-768-o8`, factorised | Width-only challenger that beat the 1024-wide short control. |
-| H | `16x12-1024-o4`, factorised | Output-bucket challenger that beat the o8 short control. |
-| I | `10x11-768-o4`, factorised | Compact interaction candidate combining the strongest prior layout and o4 result. |
-| J | native Reckless topology | Ten mirrored input buckets, factorised input, pairwise-multiply first activation, and bucket-specific dense path. |
-| K | `10x11-768-o8`, unfactorised | Matched control for FullThreats. |
-| L | `10x11-768-o8`, unfactorised, FullThreats | Tactical-feature challenger. |
+The lineage slug is the stable architecture identity used in artifact names:
+`enyo-<lineage>-v1-rc1` and `rc2` are the two matched scratch seeds.
 
-Candidate J is eligible only after its exact trainer/export/scalar/SIMD runtime
-contract passes parity; do not substitute an Enyo forward path and call it
-Reckless. Candidate L must be compared directly with K because FullThreats does
-not support the input factoriser. Its final game result includes its runtime
-cost; historical FullThreats NPS loss must not be ignored.
+| ID | Lineage | Configuration | Status and purpose |
+| --- | --- | --- | --- |
+| A | `h1` | `1x12-1024-o8`, unfactorised | Completed. No-HalfKA/king-independent control. |
+| B | `h4` | `4x12-1024-o8`, factorised | Completed. Light king conditioning with shared factoriser. |
+| C | `h8` | `8x12-1024-o8`, factorised | Completed. Medium king conditioning and the historically positive eight-bucket idea. |
+| D | `h16` | `16x12-1024-o8`, factorised | Completed. Current Enyo architecture control. |
+| E | `h10w768` | `10x11-768-o8`, factorised | Ineligible under the current runtime: the 11-channel HalfKAv2 mapping requires 32 input buckets. |
+| F | `sf32` | `32x11-1024-o8`, factorised | Completed. High-capacity, data-hungry Stockfish-like HalfKAv2 extreme. |
+| G | `h16w768` | `16x12-768-o8`, factorised | Active. Width-only challenger that beat the 1024-wide short control. |
+| H | `h16o4` | `16x12-1024-o4`, factorised | Queued. Output-bucket challenger that beat the o8 short control. |
+| I | `h10w768o4` | `10x11-768-o4`, factorised | Ineligible under the current 11-channel input-bucket contract. |
+| J | `reckless` | Native Reckless topology | Requires exact trainer/export/scalar/SIMD parity before it becomes eligible. |
+| K | `h10w768u` | `10x11-768-o8`, unfactorised | Proposed matched control for FullThreats; requires a compatible 11-channel input-bucket contract. |
+| L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Proposed tactical-feature challenger; requires the same compatible contract as K. |
+
+The candidate letter is only a compact table reference; use the lineage slug in
+run names, results, and discussion. Candidate J is eligible only after its exact
+trainer/export/scalar/SIMD runtime contract passes parity; do not substitute an
+Enyo forward path and call it Reckless. Candidate L must be compared directly
+with K because FullThreats does not support the input factoriser. Its final game
+result includes its runtime cost; historical FullThreats NPS loss must not be
+ignored.
 
 ### Fixed training method
 
