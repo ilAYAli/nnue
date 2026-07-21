@@ -10,12 +10,10 @@ resolve_path() {
     fi
 }
 
-STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
-CANDIDATE=${CANDIDATE:-candidate}
+ENGINE=${ENGINE:-reference}
+REFERENCE_NET=${REFERENCE_NET:-nn-0ee0657fb25e.nnue}
+CANDIDATE_NET=${CANDIDATE_NET:-candidate.net}
 GAMES=${GAMES:-500}
-
-REFERENCE_NET=$(resolve_path "$STOCKFISH_NET")
-CANDIDATE_NET=$(resolve_path candidate.net)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -28,7 +26,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --engine)
-            CANDIDATE="$2"
+            ENGINE="$2"
             shift 2
             ;;
         *)
@@ -38,24 +36,48 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "$CANDIDATE" =~ ^(/|\./|\.\./) ]]; then
-    ENGINE="$CANDIDATE"
+REFERENCE_NET=$(resolve_path "$REFERENCE_NET")
+CANDIDATE_NET=$(resolve_path "$CANDIDATE_NET")
+
+if [[ "$ENGINE" =~ ^(/|\./|\.\./) ]]; then
+    :
 else
-    ENGINE="$HOME/assets/engines/$CANDIDATE"
+    ENGINE="$HOME/assets/engines/$ENGINE"
 fi
 ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
 RUN="sprt-$(basename "$CANDIDATE_NET")-vs-$(basename "$REFERENCE_NET")-$GAMES-$(date +%Y%m%d-%H%M%S)"
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-REFERENCE=$(basename "$REFERENCE_NET")
+REFERENCE_NAME=$(basename "$REFERENCE_NET")
 LEDGER=
 SPRT_ARGS=()
 
-case "$REFERENCE" in
+case "$REFERENCE_NAME" in
     *.nnue)      LEDGER=stockfish-net.jsonl ;;
 esac
 
 [[ -z $LEDGER ]] || SPRT_ARGS=(--elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300)
+
+check_engine_loads_net() {
+    local role="$1"
+    local net="$2"
+    local output rc=0
+
+    if command -v timeout >/dev/null 2>&1; then
+        output=$(printf 'setoption name nnue_file value %s\nquit\n' "$net" | timeout 20 "$ENGINE" 2>&1) || rc=$?
+    elif command -v gtimeout >/dev/null 2>&1; then
+        output=$(printf 'setoption name nnue_file value %s\nquit\n' "$net" | gtimeout 20 "$ENGINE" 2>&1) || rc=$?
+    else
+        output=$(printf 'setoption name nnue_file value %s\nquit\n' "$net" | "$ENGINE" 2>&1) || rc=$?
+    fi
+
+    if (( rc != 0 )) || ! grep -Fq "path='$net'" <<<"$output" \
+        || grep -Eq 'ERROR:|falling back' <<<"$output"; then
+        echo "Error: ENGINE cannot load $role: engine=$ENGINE net=$net" >&2
+        printf '%s\n' "$output" | tail -40 >&2
+        exit 1
+    fi
+}
 
 run_sprt() {
     forge sprt \
@@ -83,7 +105,7 @@ save_result() {
     forge status "$RUN" --json | jq -c \
         --arg candidate "$(basename "$(readlink -f "$CANDIDATE_NET")" .nn)" \
         --arg engine "$ENGINE_NAME" \
-        --arg reference "$REFERENCE" \
+        --arg reference "$REFERENCE_NAME" \
         --argjson requested_games "$GAMES" '
         (.progress_fields | map(split("=") | {(.[0]): .[1]}) | add) as $metrics
         | ($metrics.games | split("/") | map(tonumber)) as $games
@@ -109,6 +131,11 @@ save_result() {
 }
 
 main() {
+    [[ -x $ENGINE ]] || { echo "Error: ENGINE is not executable: $ENGINE" >&2; exit 1; }
+    [[ -f $CANDIDATE_NET ]] || { echo "Error: CANDIDATE_NET not found: $CANDIDATE_NET" >&2; exit 1; }
+    [[ -f $REFERENCE_NET ]] || { echo "Error: REFERENCE_NET not found: $REFERENCE_NET" >&2; exit 1; }
+    check_engine_loads_net CANDIDATE_NET "$CANDIDATE_NET"
+    check_engine_loads_net REFERENCE_NET "$REFERENCE_NET"
     run_sprt
     #save_result
 
