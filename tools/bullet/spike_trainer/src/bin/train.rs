@@ -617,8 +617,8 @@ fn load_config(args: &[String]) -> (String, Config, bool) {
     reject_poison(&config);
     validate_config_contract(&config);
 
-    if string_at(&config.arch, "lineage") != Some("native") {
-        eprintln!("error: architecture.json lineage must be native");
+    if !matches!(string_at(&config.arch, "lineage"), Some("native" | "recklessft")) {
+        eprintln!("error: unsupported architecture.json lineage");
         process::exit(2);
     }
 
