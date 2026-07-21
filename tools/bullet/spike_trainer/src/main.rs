@@ -1298,7 +1298,10 @@ fn main() {
                 .quantise::<i16>(255),
             SavedFormat::id("l0w")
                 .transform(move |_store, weights| {
-                    weights[PIECE_INPUTS * hidden..(PIECE_INPUTS + THREAT_INPUTS) * hidden].to_vec()
+                    weights[PIECE_INPUTS * hidden..(PIECE_INPUTS + THREAT_INPUTS) * hidden]
+                        .iter()
+                        .map(|weight| weight.clamp(-127.0 / 255.0, 127.0 / 255.0))
+                        .collect()
                 })
                 .round()
                 .quantise::<i8>(255),
