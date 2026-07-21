@@ -54,15 +54,18 @@ const ENYO_V2_HEADER_MAGIC: &[u8; 8] = b"ENYONN2\0";
 const ENYO_V3_HEADER_MAGIC: &[u8; 8] = b"ENYONN3\0";
 const ENYO_V4_HEADER_MAGIC: &[u8; 8] = b"ENYONN4\0";
 const ENYO_V5_HEADER_MAGIC: &[u8; 8] = b"ENYONN5\0";
+const ENYO_V6_HEADER_MAGIC: &[u8; 8] = b"ENYONN6\0";
 const ENYO_V2_FORMAT_VERSION: u32 = 2;
 const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_V4_FORMAT_VERSION: u32 = 4;
 const ENYO_V5_FORMAT_VERSION: u32 = 5;
+const ENYO_V6_FORMAT_VERSION: u32 = 6;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
 const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
 const ENYO_NETWORK_FLAG_MIXED_ACTIVATION: u32 = 4;
 const ENYO_NETWORK_FLAG_PSQT_RESIDUAL: u32 = 8;
+const ENYO_NETWORK_FLAG_PAIRWISE: u32 = 16;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 60_720;
 const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 15,
@@ -940,6 +943,34 @@ fn validate_layout(config: &Config) {
     let full_heads = arch_full_heads(config);
     let mixed_activation = arch_mixed_activation(config);
     let psqt_residual = arch_psqt_residual(config);
+    let mode = string_at(&config.arch, "mode").unwrap_or("enyo");
+    if mode == "reckless" {
+        if input_buckets != 10
+            || runtime_input_buckets != 10
+            || feature_channels != 12
+            || output_buckets != 8
+            || hidden != 768
+            || l2 != 16
+            || !bool_at(&config.arch, "input_factoriser", false)
+            || !full_heads
+            || full_threats
+            || mixed_activation
+            || psqt_residual
+            || export_format != "enyo-native-v6-reckless"
+        {
+            eprintln!("error: native Reckless requires 10x12-768-o8, factorised input, full heads, and enyo-native-v6-reckless");
+            process::exit(2);
+        }
+        if training_lr_superbatches(config) < training_superbatches(config) {
+            eprintln!("error: lr_superbatches cannot be smaller than superbatches");
+            process::exit(2);
+        }
+        return;
+    }
+    if mode != "enyo" {
+        eprintln!("error: unsupported architecture mode={mode}");
+        process::exit(2);
+    }
     if !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&input_buckets)
         || !ENYO_SUPPORTED_INPUT_BUCKETS.contains(&runtime_input_buckets)
     {
@@ -1860,6 +1891,7 @@ fn enyo_container(
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
+    pairwise: bool,
     format_version: u32,
 ) -> Vec<u8> {
     let payload_size = u32::try_from(payload.len()).unwrap_or_else(|_| {
@@ -1867,7 +1899,9 @@ fn enyo_container(
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    let magic = if format_version == ENYO_V5_FORMAT_VERSION {
+    let magic = if format_version == ENYO_V6_FORMAT_VERSION {
+        ENYO_V6_HEADER_MAGIC
+    } else if format_version == ENYO_V5_FORMAT_VERSION {
         ENYO_V5_HEADER_MAGIC
     } else if format_version == ENYO_V4_FORMAT_VERSION {
         ENYO_V4_HEADER_MAGIC
@@ -1906,11 +1940,56 @@ fn enyo_container(
             ENYO_NETWORK_FLAG_PSQT_RESIDUAL
         } else {
             0
+        }) | (if pairwise {
+            ENYO_NETWORK_FLAG_PAIRWISE
+        } else {
+            0
         }),
     );
     write_u32_le(&mut output, 52, payload_size);
     output[ENYO_NETWORK_HEADER_SIZE..].copy_from_slice(payload);
     output
+}
+
+fn reckless_payload(raw: &[u8], hidden: usize, l2: usize, output_buckets: usize) -> Vec<u8> {
+    let features = 10 * 12 * 64;
+    let source_l0w = features * hidden * 2;
+    let source_l0b = hidden * 2;
+    let l1w = output_buckets * hidden * l2;
+    let l1b = output_buckets * l2 * 4;
+    let l2w = output_buckets * l2 * 32 * 4;
+    let l2b = output_buckets * 32 * 4;
+    let l3w = output_buckets * 32 * 4;
+    let l3b = output_buckets * 4;
+    let expected = source_l0w + source_l0b + l1w + l1b + l2w + l2b + l3w + l3b;
+    if raw.len() < expected {
+        eprintln!("error: Reckless checkpoint is {} bytes, expected at least {expected}", raw.len());
+        process::exit(1);
+    }
+    if raw[expected..]
+        .iter()
+        .enumerate()
+        .any(|(idx, byte)| *byte != b"bullet"[idx % 6])
+    {
+        eprintln!("error: Reckless checkpoint has unexpected {} byte trailer", raw.len() - expected);
+        process::exit(1);
+    }
+
+    let target_l0w = features * ENYO_RUNTIME_HIDDEN * 2;
+    let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
+    let source_tail = source_l0w + source_l0b;
+    let target_tail = target_l0w + target_l0b;
+    let mut payload = vec![0_u8; target_tail + expected - source_tail];
+    for feature in 0..features {
+        let source = feature * hidden * 2;
+        let target = feature * ENYO_RUNTIME_HIDDEN * 2;
+        payload[target..target + hidden * 2]
+            .copy_from_slice(&raw[source..source + hidden * 2]);
+    }
+    payload[target_l0w..target_l0w + source_l0b]
+        .copy_from_slice(&raw[source_l0w..source_tail]);
+    payload[target_tail..].copy_from_slice(&raw[source_tail..expected]);
+    payload
 }
 
 fn checkpoint_dirs(output: &Path, net_id: &str) -> Vec<(usize, PathBuf)> {
@@ -2328,6 +2407,39 @@ fn write_model(config: &Config) {
         eprintln!("error: cannot read {}: {err}", checkpoint.display());
         process::exit(1);
     });
+    if string_at(&config.arch, "mode") == Some("reckless") {
+        let hidden = usize_at(&config.arch, "hidden", 768);
+        let l2 = usize_at(&config.arch, "l2_size", 16);
+        let output_buckets = usize_at(&config.arch, "output_buckets", 8);
+        let payload = reckless_payload(&raw, hidden, l2, output_buckets);
+        let model = enyo_container(
+            &payload,
+            10,
+            12,
+            hidden,
+            l2,
+            output_buckets,
+            false,
+            true,
+            false,
+            false,
+            true,
+            ENYO_V6_FORMAT_VERSION,
+        );
+        let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
+        if let Some(parent) = model_path.parent() {
+            fs::create_dir_all(parent).unwrap_or_else(|err| {
+                eprintln!("error: cannot create {}: {err}", parent.display());
+                process::exit(1);
+            });
+        }
+        fs::write(&model_path, model).unwrap_or_else(|err| {
+            eprintln!("error: cannot write {}: {err}", model_path.display());
+            process::exit(1);
+        });
+        println!("wrote {}", model_path.display());
+        return;
+    }
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
     let feature_channels = usize_at(&config.arch, "feature_channels", 12);
@@ -2375,6 +2487,7 @@ fn write_model(config: &Config) {
             false,
             false,
             false,
+            false,
             ENYO_V2_FORMAT_VERSION,
         ),
         Some("enyo-native-v3") => enyo_container(
@@ -2386,6 +2499,7 @@ fn write_model(config: &Config) {
             output_buckets,
             false,
             full_heads,
+            false,
             false,
             false,
             ENYO_V3_FORMAT_VERSION,
@@ -2401,6 +2515,7 @@ fn write_model(config: &Config) {
             false,
             mixed_activation,
             false,
+            false,
             ENYO_V4_FORMAT_VERSION,
         ),
         Some("enyo-native-v5") => enyo_container(
@@ -2414,6 +2529,7 @@ fn write_model(config: &Config) {
             false,
             false,
             psqt_residual,
+            false,
             ENYO_V5_FORMAT_VERSION,
         ),
         _ => model,
@@ -2927,6 +3043,7 @@ mod tests {
             true,
             false,
             false,
+            false,
             ENYO_V3_FORMAT_VERSION,
         );
         assert_eq!(&container[..8], ENYO_V3_HEADER_MAGIC);
@@ -2953,6 +3070,48 @@ mod tests {
             32
         );
         assert_eq!(&container[ENYO_NETWORK_HEADER_SIZE..], payload);
+    }
+
+    #[test]
+    fn reckless_payload_pads_only_accumulator_width_and_preserves_dense_tail() {
+        let hidden = 768;
+        let l2 = 16;
+        let output_buckets = 8;
+        let features = 10 * 12 * 64;
+        let source_l0w = features * hidden * 2;
+        let source_l0b = hidden * 2;
+        let dense_tail = output_buckets * hidden * l2
+            + output_buckets * l2 * 4
+            + output_buckets * l2 * 32 * 4
+            + output_buckets * 32 * 4
+            + output_buckets * 32 * 4
+            + output_buckets * 4;
+        let mut raw = vec![0_u8; source_l0w + source_l0b + dense_tail];
+        raw[0..4].copy_from_slice(&[1, 2, 3, 4]);
+        raw[(hidden * 2)..(hidden * 2 + 4)].copy_from_slice(&[5, 6, 7, 8]);
+        raw[source_l0w..source_l0w + 4].copy_from_slice(&[9, 10, 11, 12]);
+        raw[source_l0w + source_l0b..].fill(13);
+        raw.extend_from_slice(b"bulletbullet");
+
+        let payload = reckless_payload(&raw, hidden, l2, output_buckets);
+        let target_l0w = features * ENYO_RUNTIME_HIDDEN * 2;
+        let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
+        assert_eq!(&payload[0..4], &[1, 2, 3, 4]);
+        assert!(payload[hidden * 2..ENYO_RUNTIME_HIDDEN * 2]
+            .iter()
+            .all(|byte| *byte == 0));
+        assert_eq!(
+            &payload[ENYO_RUNTIME_HIDDEN * 2..ENYO_RUNTIME_HIDDEN * 2 + 4],
+            &[5, 6, 7, 8]
+        );
+        assert_eq!(&payload[target_l0w..target_l0w + 4], &[9, 10, 11, 12]);
+        assert!(payload[target_l0w + source_l0b..target_l0w + target_l0b]
+            .iter()
+            .all(|byte| *byte == 0));
+        assert!(payload[target_l0w + target_l0b..]
+            .iter()
+            .all(|byte| *byte == 13));
+        assert_eq!(payload.len(), target_l0w + target_l0b + dense_tail);
     }
 }
 

@@ -138,6 +138,50 @@ fn write_seeded_enyo_weights(
     Ok(())
 }
 
+fn write_seeded_reckless_weights(
+    path: &Path,
+    seed: u64,
+    hidden: usize,
+    l2_size: usize,
+    output_buckets: usize,
+) -> io::Result<()> {
+    let mut output = File::create(path)?;
+    let input_size = 10 * 12 * 64;
+    write_tensor(
+        &mut output,
+        seed,
+        "l0w",
+        hidden * input_size,
+        Some((2.0 / 32.0_f32).sqrt()),
+    )?;
+    write_tensor(&mut output, seed, "l0b", hidden, None)?;
+    write_tensor(&mut output, seed, "l0f", hidden * 12 * 64, None)?;
+    write_tensor(
+        &mut output,
+        seed,
+        "l1w",
+        output_buckets * l2_size * hidden,
+        Some((2.0 / hidden as f32).sqrt()),
+    )?;
+    write_tensor(&mut output, seed, "l1b", output_buckets * l2_size, None)?;
+    write_tensor(
+        &mut output,
+        seed,
+        "l2w",
+        output_buckets * 32 * l2_size,
+        Some((2.0 / l2_size as f32).sqrt()),
+    )?;
+    write_tensor(&mut output, seed, "l2b", output_buckets * 32, None)?;
+    write_tensor(
+        &mut output,
+        seed,
+        "l3w",
+        output_buckets * 32,
+        Some((2.0 / 32.0_f32).sqrt()),
+    )?;
+    write_tensor(&mut output, seed, "l3b", output_buckets, None)
+}
+
 fn env_string(name: &str, default: &str) -> String {
     env::var(name).unwrap_or_else(|_| default.to_owned())
 }
@@ -1240,6 +1284,41 @@ fn main() {
     trainer
         .optimiser
         .set_params_for_weight("l0f", stricter_clipping);
+
+    let resume_checkpoint = env_string("ENYO_BULLET_RESUME_CHECKPOINT", "");
+    let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
+    let init_seed = env::var("ENYO_BULLET_INIT_SEED")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok());
+    if !resume_checkpoint.is_empty() {
+        if !init_weights.is_empty() {
+            panic!("checkpoint resume and initial weights are mutually exclusive");
+        }
+        trainer.load_from_checkpoint(&resume_checkpoint);
+        println!("loaded_checkpoint={resume_checkpoint}");
+    } else if !init_weights.is_empty() {
+        trainer
+            .optimiser
+            .load_weights_from_file(&init_weights)
+            .expect("failed to load initial Reckless weights");
+        println!("loaded_init_weights={init_weights}");
+    } else if let Some(seed) = init_seed {
+        let seeded_path = Path::new(&output).join(format!("{net_id}-seeded-init.bin"));
+        write_seeded_reckless_weights(
+            &seeded_path,
+            seed,
+            hidden,
+            l2_size,
+            NUM_OUTPUT_BUCKETS,
+        )
+        .expect("failed to write deterministic Reckless initial weights");
+        trainer
+            .optimiser
+            .load_weights_from_file(seeded_path.to_str().expect("UTF-8 init path"))
+            .expect("failed to load deterministic Reckless initial weights");
+        println!("loaded_init_seed={seed}");
+        trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+    }
 
     let schedule = TrainingSchedule {
         net_id,

@@ -223,14 +223,15 @@ The lineage slug is the stable architecture identity used in artifact names:
 | G | `h16w768` | `16x12-768-o8`, factorised | Active. Width-only challenger that beat the 1024-wide short control. |
 | H | `h16o4` | `16x12-1024-o4`, factorised | Queued. Output-bucket challenger that beat the o8 short control. |
 | I | `h10w768o4` | `10x11-768-o4`, factorised | Ineligible under the current 11-channel input-bucket contract. |
-| J | `reckless` | Native Reckless topology | Requires exact trainer/export/scalar/SIMD parity before it becomes eligible. |
+| J | `reckless` | `10x12-768-o8`, factorised, pairwise CReLU, full dense heads | Native trainer, deterministic scratch initialization, v6 export, Enyo loader, scalar forward path, and AVX2 L1 path are implemented. It remains queued until an exported checkpoint passes end-to-end score parity and the fixed NPS gate. |
 | K | `h10w768u` | `10x11-768-o8`, unfactorised | Proposed matched control for FullThreats; requires a compatible 11-channel input-bucket contract. |
 | L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Proposed tactical-feature challenger; requires the same compatible contract as K. |
 
 The candidate letter is only a compact table reference; use the lineage slug in
-run names, results, and discussion. Candidate J is eligible only after its exact
-trainer/export/scalar/SIMD runtime contract passes parity; do not substitute an
-Enyo forward path and call it Reckless. Candidate L must be compared directly
+run names, results, and discussion. Candidate J uses the native Reckless
+pairwise activation and input-major dense layout in both trainer and Enyo; it
+becomes eligible only after an actual exported checkpoint passes end-to-end
+score parity and the fixed runtime gate. Candidate L must be compared directly
 with K because FullThreats does not support the input factoriser. Its final game
 result includes its runtime cost; historical FullThreats NPS loss must not be
 ignored.
