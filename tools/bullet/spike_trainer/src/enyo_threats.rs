@@ -3,6 +3,7 @@ use std::sync::OnceLock;
 use bullet_lib::game::formats::bulletformat::ChessBoard;
 
 pub const DIMENSIONS: usize = 60_720;
+pub const RECKLESS_DIMENSIONS: usize = 66_864;
 pub const MAX_ACTIVE: usize = 128;
 
 const SQUARES: usize = 64;
@@ -101,20 +102,26 @@ impl BoardView {
     }
 }
 
-fn tables() -> &'static IndexTables {
+fn tables(reckless: bool) -> &'static IndexTables {
     static TABLES: OnceLock<IndexTables> = OnceLock::new();
-    TABLES.get_or_init(IndexTables::new)
+    static RECKLESS_TABLES: OnceLock<IndexTables> = OnceLock::new();
+    if reckless {
+        RECKLESS_TABLES.get_or_init(|| IndexTables::new(true))
+    } else {
+        TABLES.get_or_init(|| IndexTables::new(false))
+    }
 }
 
 impl IndexTables {
-    fn new() -> Self {
+    fn new(reckless: bool) -> Self {
+        let dimensions = if reckless { RECKLESS_DIMENSIONS } else { DIMENSIONS };
         let mut tables = Self {
             helper: [HelperOffset {
                 piece_span: 0,
                 global: 0,
             }; PIECES],
             offsets: [[0; SQUARES]; PIECES],
-            target_offsets: [[[DIMENSIONS; 2]; PIECES]; PIECES],
+            target_offsets: [[[dimensions; 2]; PIECES]; PIECES],
             attack_offsets: [[[0; SQUARES]; SQUARES]; PIECES],
         };
 
@@ -124,43 +131,57 @@ impl IndexTables {
             for square in 0..SQUARES {
                 tables.offsets[piece][square] = piece_span;
                 if piece_type(piece) != 1 || (8..56).contains(&square) {
-                    piece_span += pseudo_attacks(piece, square).count_ones() as usize;
+                    piece_span += pseudo_attacks(piece, square, reckless).count_ones() as usize;
                 }
             }
             tables.helper[piece] = HelperOffset { piece_span, global };
-            global += VALID_TARGETS[piece] * piece_span;
+            let valid_targets = if reckless && piece_type(piece) == 6 {
+                8
+            } else {
+                VALID_TARGETS[piece]
+            };
+            global += valid_targets * piece_span;
 
             for from in 0..SQUARES {
-                let attacks = pseudo_attacks(piece, from);
+                let attacks = pseudo_attacks(piece, from, reckless);
                 for to in 0..SQUARES {
                     let below = if to == 0 { 0 } else { (1_u64 << to) - 1 };
                     tables.attack_offsets[piece][from][to] = (attacks & below).count_ones() as u8;
                 }
             }
         }
-        assert_eq!(global, DIMENSIONS);
+        assert_eq!(global, dimensions);
 
         for &attacker in &ALL_PIECES {
             for &attacked in &ALL_PIECES {
                 let attacker_type = piece_type(attacker);
                 let attacked_type = piece_type(attacked);
-                let mapped_target = TARGET_MAP[attacker_type - 1][attacked_type - 1];
+                let mapped_target = if reckless && attacker_type == 6 {
+                    [0, 1, 2, 3, -1, -1][attacked_type - 1]
+                } else {
+                    TARGET_MAP[attacker_type - 1][attacked_type - 1]
+                };
                 let excluded = mapped_target < 0;
                 let enemy = (attacker ^ attacked) == 8;
                 let same_type_excluded =
                     attacker_type == attacked_type && (enemy || attacker_type != 1);
                 let base = if excluded {
-                    DIMENSIONS
+                    dimensions
                 } else {
                     let helper = tables.helper[attacker];
+                    let valid_targets = if reckless && attacker_type == 6 {
+                        8
+                    } else {
+                        VALID_TARGETS[attacker]
+                    };
                     helper.global
-                        + (piece_color(attacked) * (VALID_TARGETS[attacker] / 2)
+                        + (piece_color(attacked) * (valid_targets / 2)
                             + mapped_target as usize)
                             * helper.piece_span
                 };
                 tables.target_offsets[attacker][attacked][0] = base;
                 tables.target_offsets[attacker][attacked][1] = if excluded || same_type_excluded {
-                    DIMENSIONS
+                    dimensions
                 } else {
                     base
                 };
@@ -268,8 +289,24 @@ fn pawn_push_or_attacks(color: usize, square: usize) -> u64 {
     attacks
 }
 
-fn pseudo_attacks(piece: usize, square: usize) -> u64 {
+fn pawn_attacks(color: usize, square: usize) -> u64 {
+    let file = (square % 8) as i32;
+    let rank = (square / 8) as i32;
+    let rank_delta = if color == 0 { 1 } else { -1 };
+    let mut attacks = 0_u64;
+    for file_delta in [-1, 1] {
+        let to_file = file + file_delta;
+        let to_rank = rank + rank_delta;
+        if on_board(to_file, to_rank) {
+            attacks |= 1_u64 << (to_rank * 8 + to_file);
+        }
+    }
+    attacks
+}
+
+fn pseudo_attacks(piece: usize, square: usize, reckless: bool) -> u64 {
     match piece_type(piece) {
+        1 if reckless => pawn_attacks(piece_color(piece), square),
         1 => pawn_push_or_attacks(piece_color(piece), square),
         2 | 6 => leaper_attacks(piece_type(piece), square),
         _ => slider_attacks(piece_type(piece), square, 0),
@@ -283,6 +320,7 @@ fn make_index(
     to: usize,
     attacked: usize,
     king_square: usize,
+    reckless: bool,
 ) -> usize {
     let orientation = (if king_square % 8 < 4 { 0 } else { 7 }) ^ (56 * perspective);
     let oriented_from = from ^ orientation;
@@ -290,11 +328,12 @@ fn make_index(
     let color_swap = 8 * perspective;
     let oriented_attacker = attacker ^ color_swap;
     let oriented_attacked = attacked ^ color_swap;
-    let tables = tables();
+    let tables = tables(reckless);
     let target_offset = tables.target_offsets[oriented_attacker][oriented_attacked]
         [usize::from(oriented_from < oriented_to)];
-    if target_offset >= DIMENSIONS {
-        return DIMENSIONS;
+    let dimensions = if reckless { RECKLESS_DIMENSIONS } else { DIMENSIONS };
+    if target_offset >= dimensions {
+        return dimensions;
     }
     target_offset
         + tables.offsets[oriented_attacker][oriented_from]
@@ -327,6 +366,7 @@ pub fn active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
                 to,
                 attacked,
                 king_square[perspective],
+                false,
             );
             if index < DIMENSIONS {
                 features[perspective].push(index);
@@ -392,6 +432,57 @@ pub fn active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
         }
     }
 
+    features[0].sort();
+    features[1].sort();
+    features
+}
+
+pub fn reckless_active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
+    let board = BoardView::from_bullet(pos);
+    let king_square = [
+        board.pieces[0][5].trailing_zeros() as usize,
+        board.pieces[1][5].trailing_zeros() as usize,
+    ];
+    let mut features = [ActiveFeatures::new(), ActiveFeatures::new()];
+
+    for color in 0..2 {
+        for piece_type_index in 0..6 {
+            let attacker = piece_type_index + 1 + color * 8;
+            let mut attackers = board.pieces[color][piece_type_index];
+            while attackers != 0 {
+                let from = attackers.trailing_zeros() as usize;
+                attackers &= attackers - 1;
+                let mut hits = match piece_type_index {
+                    0 => pawn_attacks(color, from),
+                    1 => leaper_attacks(2, from),
+                    2 => slider_attacks(3, from, board.occupied),
+                    3 => slider_attacks(4, from, board.occupied),
+                    4 => slider_attacks(3, from, board.occupied)
+                        | slider_attacks(4, from, board.occupied),
+                    _ => leaper_attacks(6, from),
+                } & board.occupied;
+                while hits != 0 {
+                    let to = hits.trailing_zeros() as usize;
+                    hits &= hits - 1;
+                    let attacked = stockfish_piece(board.piece_at[to]);
+                    for perspective in 0..2 {
+                        let index = make_index(
+                            perspective,
+                            attacker,
+                            from,
+                            to,
+                            attacked,
+                            king_square[perspective],
+                            true,
+                        );
+                        if index < RECKLESS_DIMENSIONS {
+                            features[perspective].push(index);
+                        }
+                    }
+                }
+            }
+        }
+    }
     features[0].sort();
     features[1].sort();
     features

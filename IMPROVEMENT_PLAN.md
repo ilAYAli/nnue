@@ -220,18 +220,20 @@ The lineage slug is the stable architecture identity used in artifact names:
 | D | `h16` | `16x12-1024-o8`, factorised | Completed. Current Enyo architecture control. |
 | E | `h10w768` | `10x11-768-o8`, factorised | Ineligible under the current runtime: the 11-channel HalfKAv2 mapping requires 32 input buckets. |
 | F | `sf32` | `32x11-1024-o8`, factorised | Completed. High-capacity, data-hungry Stockfish-like HalfKAv2 extreme. |
-| G | `h16w768` | `16x12-768-o8`, factorised | Active. Width-only challenger that beat the 1024-wide short control. |
-| H | `h16o4` | `16x12-1024-o4`, factorised | Queued. Output-bucket challenger that beat the o8 short control. |
+| G | `h16w768` | `16x12-768-o8`, factorised | Completed. Width-only challenger. |
+| H | `h16o4` | `16x12-1024-o4`, factorised | Completed. Output-bucket challenger. |
 | I | `h10w768o4` | `10x11-768-o4`, factorised | Ineligible under the current 11-channel input-bucket contract. |
-| J | `reckless` | `10x12-768-o8`, factorised, pairwise CReLU, full dense heads | Native trainer, deterministic scratch initialization, v6 export, Enyo loader, scalar forward path, and AVX2 L1 path are implemented. It remains queued until an exported checkpoint passes end-to-end score parity and the fixed NPS gate. |
+| J | `recklessft` | current Reckless `10x12-768-o8`: native mirrored king buckets, 66,864 occupied-piece threat features, factorised piece inputs, pairwise CReLU, explicit eight-bucket material map, and full dense heads | Implementation/validation in progress. The earlier piece-only `enyo-reckless-v1-rc1` run was stopped at superbatch 92,966/196,608 and is ineligible: it represented an abandoned architecture and receives no Elo result. |
 | K | `h10w768u` | `10x11-768-o8`, unfactorised | Proposed matched control for FullThreats; requires a compatible 11-channel input-bucket contract. |
 | L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Proposed tactical-feature challenger; requires the same compatible contract as K. |
 
 The candidate letter is only a compact table reference; use the lineage slug in
-run names, results, and discussion. Candidate J uses the native Reckless
-pairwise activation and input-major dense layout in both trainer and Enyo; it
-becomes eligible only after an actual exported checkpoint passes end-to-end
-score parity and the fixed runtime gate. Candidate L must be compared directly
+run names, results, and discussion. Candidate J follows current Reckless rather
+than the abandoned piece-only network: its piece bucket map, threat indexing,
+output bucket boundaries, pairwise activation, quantisation, and input-major
+dense layout must all match between trainer and Enyo. It becomes eligible only
+after an exported checkpoint passes feature and score parity plus the fixed NPS
+gate. Candidate L must be compared directly
 with K because FullThreats does not support the input factoriser. Its final game
 result includes its runtime cost; historical FullThreats NPS loss must not be
 ignored.

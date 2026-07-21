@@ -10,8 +10,8 @@ use std::{
 use bullet_lib::{
     game::{
         formats::bulletformat::ChessBoard,
-        inputs::{get_num_buckets, ChessBucketsMirrored, SparseInputType},
-        outputs::MaterialCount,
+        inputs::{ChessBucketsMirrored, SparseInputType},
+        outputs::{MaterialCount, OutputBuckets},
     },
     nn::{
         optimiser::{AdamW, AdamWParams},
@@ -146,16 +146,18 @@ fn write_seeded_reckless_weights(
     output_buckets: usize,
 ) -> io::Result<()> {
     let mut output = File::create(path)?;
-    let input_size = 10 * 12 * 64;
-    write_tensor(
-        &mut output,
-        seed,
-        "l0w",
-        hidden * input_size,
-        Some((2.0 / 32.0_f32).sqrt()),
-    )?;
+    let input_size = 10 * 12 * 64 + enyo_threats::RECKLESS_DIMENSIONS + 768;
+    output.write_all(b"l0w\n")?;
+    output.write_all(&(hidden * input_size).to_le_bytes())?;
+    let normal = Normal::new(0.0_f32, (2.0 / 32.0_f32).sqrt()).expect("positive stdev");
+    let mut rng = tensor_rng(seed, "l0w");
+    for _ in 0..hidden * (10 * 12 * 64 + enyo_threats::RECKLESS_DIMENSIONS) {
+        output.write_all(&normal.sample(&mut rng).to_le_bytes())?;
+    }
+    for _ in 0..hidden * 768 {
+        output.write_all(&0.0_f32.to_le_bytes())?;
+    }
     write_tensor(&mut output, seed, "l0b", hidden, None)?;
-    write_tensor(&mut output, seed, "l0f", hidden * 12 * 64, None)?;
     write_tensor(
         &mut output,
         seed,
@@ -283,6 +285,65 @@ struct EnyoInputs<
     const FEATURE_CHANNELS: usize,
     const FULL_THREATS: bool,
 >;
+
+#[derive(Clone, Copy, Default)]
+struct RecklessInputs;
+
+const RECKLESS_BUCKET_LAYOUT: [usize; 32] = [
+    0, 1, 2, 3, 4, 5, 6, 7,
+    8, 8, 8, 8, 9, 9, 9, 9,
+    9, 9, 9, 9, 9, 9, 9, 9,
+    9, 9, 9, 9, 9, 9, 9, 9,
+];
+
+impl SparseInputType for RecklessInputs {
+    type RequiredDataType = ChessBoard;
+
+    fn num_inputs(&self) -> usize {
+        10 * 768 + enyo_threats::RECKLESS_DIMENSIONS + 768
+    }
+
+    fn max_active(&self) -> usize {
+        64 + enyo_threats::MAX_ACTIVE
+    }
+
+    fn map_features<F: FnMut(usize, usize)>(&self, pos: &ChessBoard, mut f: F) {
+        let factor_base = 10 * 768 + enyo_threats::RECKLESS_DIMENSIONS;
+        ChessBucketsMirrored::new(RECKLESS_BUCKET_LAYOUT).map_features(pos, |stm, ntm| {
+            f(stm, ntm);
+            f(factor_base + stm % 768, factor_base + ntm % 768);
+        });
+        let threats = enyo_threats::reckless_active_features(pos);
+        assert_eq!(threats[0].len(), threats[1].len());
+        for i in 0..threats[0].len() {
+            f(10 * 768 + threats[0].get(i), 10 * 768 + threats[1].get(i));
+        }
+    }
+
+    fn shorthand(&self) -> String {
+        "reckless-current".to_string()
+    }
+
+    fn description(&self) -> String {
+        "Reckless current 10-bucket piece plus 66864 threat inputs".to_string()
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+struct RecklessOutputBuckets;
+
+impl OutputBuckets<ChessBoard> for RecklessOutputBuckets {
+    const BUCKETS: usize = 8;
+
+    fn bucket(&self, pos: &ChessBoard) -> u8 {
+        const LAYOUT: [u8; 33] = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0,
+            1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4,
+            5, 5, 5, 6, 6, 6, 7, 7, 7, 7,
+        ];
+        LAYOUT[pos.occ().count_ones() as usize]
+    }
+}
 
 #[rustfmt::skip]
 const ENYO_KING_BUCKETS_16: [usize; 64] = [
@@ -1202,18 +1263,11 @@ fn main() {
     }
 
     const NUM_OUTPUT_BUCKETS: usize = 8;
-    #[rustfmt::skip]
-    const BUCKET_LAYOUT: [usize; 32] = [
-        0, 1, 2, 3,
-        4, 5, 6, 7,
-        8, 8, 8, 8,
-        9, 9, 9, 9,
-        9, 9, 9, 9,
-        9, 9, 9, 9,
-        9, 9, 9, 9,
-        9, 9, 9, 9,
-    ];
-    const NUM_INPUT_BUCKETS: usize = get_num_buckets(&BUCKET_LAYOUT);
+    const NUM_INPUT_BUCKETS: usize = 10;
+    const PIECE_INPUTS: usize = NUM_INPUT_BUCKETS * 768;
+    const THREAT_INPUTS: usize = enyo_threats::RECKLESS_DIMENSIONS;
+    const FACTOR_INPUTS: usize = 768;
+    const TOTAL_INPUTS: usize = PIECE_INPUTS + THREAT_INPUTS + FACTOR_INPUTS;
 
     println!("mode=reckless");
     println!("dataset={dataset}");
@@ -1227,20 +1281,27 @@ fn main() {
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
-        .inputs(ChessBucketsMirrored::new(BUCKET_LAYOUT))
-        .output_buckets(MaterialCount::<NUM_OUTPUT_BUCKETS>)
+        .inputs(RecklessInputs)
+        .output_buckets(RecklessOutputBuckets)
         .save_format(&[
             SavedFormat::id("l0w")
-                .transform(|store, weights| {
-                    let factoriser = store.get("l0f").values.f32().repeat(NUM_INPUT_BUCKETS);
-                    weights
-                        .into_iter()
-                        .zip(factoriser)
+                .transform(move |_store, weights| {
+                    let factoriser = weights[(PIECE_INPUTS + THREAT_INPUTS) * hidden..].to_vec();
+                    weights[..PIECE_INPUTS * hidden]
+                        .iter()
+                        .copied()
+                        .zip(factoriser.repeat(NUM_INPUT_BUCKETS))
                         .map(|(a, b)| a + b)
                         .collect()
                 })
                 .round()
                 .quantise::<i16>(255),
+            SavedFormat::id("l0w")
+                .transform(move |_store, weights| {
+                    weights[PIECE_INPUTS * hidden..(PIECE_INPUTS + THREAT_INPUTS) * hidden].to_vec()
+                })
+                .round()
+                .quantise::<i8>(255),
             SavedFormat::id("l0b").round().quantise::<i16>(255),
             SavedFormat::id("l1w")
                 .transpose()
@@ -1254,12 +1315,8 @@ fn main() {
         ])
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
         .build(|builder, stm_inputs, ntm_inputs, output_buckets| {
-            let l0f = builder.new_weights("l0f", Shape::new(hidden, 768), InitSettings::Zeroed);
-            let expanded_factoriser = l0f.repeat(NUM_INPUT_BUCKETS);
-
-            let mut l0 = builder.new_affine("l0", 768 * NUM_INPUT_BUCKETS, hidden);
+            let l0 = builder.new_affine("l0", TOTAL_INPUTS, hidden);
             l0.init_with_effective_input_size(32);
-            l0.weights = l0.weights + expanded_factoriser;
 
             let l1 = builder.new_affine("l1", hidden, NUM_OUTPUT_BUCKETS * l2_size);
             let l2 = builder.new_affine("l2", l2_size, NUM_OUTPUT_BUCKETS * 32);
@@ -1281,9 +1338,6 @@ fn main() {
     trainer
         .optimiser
         .set_params_for_weight("l0w", stricter_clipping);
-    trainer
-        .optimiser
-        .set_params_for_weight("l0f", stricter_clipping);
 
     let resume_checkpoint = env_string("ENYO_BULLET_RESUME_CHECKPOINT", "");
     let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");

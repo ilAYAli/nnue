@@ -55,17 +55,21 @@ const ENYO_V3_HEADER_MAGIC: &[u8; 8] = b"ENYONN3\0";
 const ENYO_V4_HEADER_MAGIC: &[u8; 8] = b"ENYONN4\0";
 const ENYO_V5_HEADER_MAGIC: &[u8; 8] = b"ENYONN5\0";
 const ENYO_V6_HEADER_MAGIC: &[u8; 8] = b"ENYONN6\0";
+const ENYO_V7_HEADER_MAGIC: &[u8; 8] = b"ENYONN7\0";
 const ENYO_V2_FORMAT_VERSION: u32 = 2;
 const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_V4_FORMAT_VERSION: u32 = 4;
 const ENYO_V5_FORMAT_VERSION: u32 = 5;
 const ENYO_V6_FORMAT_VERSION: u32 = 6;
+const ENYO_V7_FORMAT_VERSION: u32 = 7;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
 const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
 const ENYO_NETWORK_FLAG_MIXED_ACTIVATION: u32 = 4;
 const ENYO_NETWORK_FLAG_PSQT_RESIDUAL: u32 = 8;
 const ENYO_NETWORK_FLAG_PAIRWISE: u32 = 16;
+const ENYO_NETWORK_FLAG_RECKLESS_THREATS: u32 = 32;
+const RECKLESS_THREAT_DIMENSIONS: usize = 66_864;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 60_720;
 const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 15,
@@ -956,9 +960,9 @@ fn validate_layout(config: &Config) {
             || full_threats
             || mixed_activation
             || psqt_residual
-            || export_format != "enyo-native-v6-reckless"
+            || export_format != "enyo-native-v7-reckless-threats"
         {
-            eprintln!("error: native Reckless requires 10x12-768-o8, factorised input, full heads, and enyo-native-v6-reckless");
+            eprintln!("error: current native Reckless requires 10x12-768-o8, factorised input, full heads, and enyo-native-v7-reckless-threats");
             process::exit(2);
         }
         if training_lr_superbatches(config) < training_superbatches(config) {
@@ -1899,7 +1903,9 @@ fn enyo_container(
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    let magic = if format_version == ENYO_V6_FORMAT_VERSION {
+    let magic = if format_version == ENYO_V7_FORMAT_VERSION {
+        ENYO_V7_HEADER_MAGIC
+    } else if format_version == ENYO_V6_FORMAT_VERSION {
         ENYO_V6_HEADER_MAGIC
     } else if format_version == ENYO_V5_FORMAT_VERSION {
         ENYO_V5_HEADER_MAGIC
@@ -1944,6 +1950,10 @@ fn enyo_container(
             ENYO_NETWORK_FLAG_PAIRWISE
         } else {
             0
+        }) | (if format_version == ENYO_V7_FORMAT_VERSION {
+            ENYO_NETWORK_FLAG_RECKLESS_THREATS
+        } else {
+            0
         }),
     );
     write_u32_le(&mut output, 52, payload_size);
@@ -1954,6 +1964,7 @@ fn enyo_container(
 fn reckless_payload(raw: &[u8], hidden: usize, l2: usize, output_buckets: usize) -> Vec<u8> {
     let features = 10 * 12 * 64;
     let source_l0w = features * hidden * 2;
+    let threat_l0w = RECKLESS_THREAT_DIMENSIONS * hidden;
     let source_l0b = hidden * 2;
     let l1w = output_buckets * hidden * l2;
     let l1b = output_buckets * l2 * 4;
@@ -1961,7 +1972,7 @@ fn reckless_payload(raw: &[u8], hidden: usize, l2: usize, output_buckets: usize)
     let l2b = output_buckets * 32 * 4;
     let l3w = output_buckets * 32 * 4;
     let l3b = output_buckets * 4;
-    let expected = source_l0w + source_l0b + l1w + l1b + l2w + l2b + l3w + l3b;
+    let expected = source_l0w + threat_l0w + source_l0b + l1w + l1b + l2w + l2b + l3w + l3b;
     if raw.len() < expected {
         eprintln!("error: Reckless checkpoint is {} bytes, expected at least {expected}", raw.len());
         process::exit(1);
@@ -1977,8 +1988,10 @@ fn reckless_payload(raw: &[u8], hidden: usize, l2: usize, output_buckets: usize)
 
     let target_l0w = features * ENYO_RUNTIME_HIDDEN * 2;
     let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
-    let source_tail = source_l0w + source_l0b;
-    let target_tail = target_l0w + target_l0b;
+    let source_bias = source_l0w + threat_l0w;
+    let source_tail = source_bias + source_l0b;
+    let target_bias = target_l0w + threat_l0w;
+    let target_tail = target_bias + target_l0b;
     let mut payload = vec![0_u8; target_tail + expected - source_tail];
     for feature in 0..features {
         let source = feature * hidden * 2;
@@ -1986,8 +1999,9 @@ fn reckless_payload(raw: &[u8], hidden: usize, l2: usize, output_buckets: usize)
         payload[target..target + hidden * 2]
             .copy_from_slice(&raw[source..source + hidden * 2]);
     }
-    payload[target_l0w..target_l0w + source_l0b]
-        .copy_from_slice(&raw[source_l0w..source_tail]);
+    payload[target_l0w..target_bias].copy_from_slice(&raw[source_l0w..source_bias]);
+    payload[target_bias..target_bias + source_l0b]
+        .copy_from_slice(&raw[source_bias..source_tail]);
     payload[target_tail..].copy_from_slice(&raw[source_tail..expected]);
     payload
 }
@@ -2424,7 +2438,7 @@ fn write_model(config: &Config) {
             false,
             false,
             true,
-            ENYO_V6_FORMAT_VERSION,
+            ENYO_V7_FORMAT_VERSION,
         );
         let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
         if let Some(parent) = model_path.parent() {
@@ -3079,6 +3093,7 @@ mod tests {
         let output_buckets = 8;
         let features = 10 * 12 * 64;
         let source_l0w = features * hidden * 2;
+        let threat_l0w = RECKLESS_THREAT_DIMENSIONS * hidden;
         let source_l0b = hidden * 2;
         let dense_tail = output_buckets * hidden * l2
             + output_buckets * l2 * 4
@@ -3086,15 +3101,18 @@ mod tests {
             + output_buckets * 32 * 4
             + output_buckets * 32 * 4
             + output_buckets * 4;
-        let mut raw = vec![0_u8; source_l0w + source_l0b + dense_tail];
+        let mut raw = vec![0_u8; source_l0w + threat_l0w + source_l0b + dense_tail];
         raw[0..4].copy_from_slice(&[1, 2, 3, 4]);
         raw[(hidden * 2)..(hidden * 2 + 4)].copy_from_slice(&[5, 6, 7, 8]);
-        raw[source_l0w..source_l0w + 4].copy_from_slice(&[9, 10, 11, 12]);
-        raw[source_l0w + source_l0b..].fill(13);
+        raw[source_l0w..source_l0w + 4].copy_from_slice(&[21, 22, 23, 24]);
+        raw[source_l0w + threat_l0w..source_l0w + threat_l0w + 4]
+            .copy_from_slice(&[9, 10, 11, 12]);
+        raw[source_l0w + threat_l0w + source_l0b..].fill(13);
         raw.extend_from_slice(b"bulletbullet");
 
         let payload = reckless_payload(&raw, hidden, l2, output_buckets);
         let target_l0w = features * ENYO_RUNTIME_HIDDEN * 2;
+        let target_threat = RECKLESS_THREAT_DIMENSIONS * hidden;
         let target_l0b = ENYO_RUNTIME_HIDDEN * 2;
         assert_eq!(&payload[0..4], &[1, 2, 3, 4]);
         assert!(payload[hidden * 2..ENYO_RUNTIME_HIDDEN * 2]
@@ -3104,14 +3122,15 @@ mod tests {
             &payload[ENYO_RUNTIME_HIDDEN * 2..ENYO_RUNTIME_HIDDEN * 2 + 4],
             &[5, 6, 7, 8]
         );
-        assert_eq!(&payload[target_l0w..target_l0w + 4], &[9, 10, 11, 12]);
-        assert!(payload[target_l0w + source_l0b..target_l0w + target_l0b]
+        assert_eq!(&payload[target_l0w..target_l0w + 4], &[21, 22, 23, 24]);
+        assert_eq!(&payload[target_l0w + target_threat..target_l0w + target_threat + 4], &[9, 10, 11, 12]);
+        assert!(payload[target_l0w + target_threat + source_l0b..target_l0w + target_threat + target_l0b]
             .iter()
             .all(|byte| *byte == 0));
-        assert!(payload[target_l0w + target_l0b..]
+        assert!(payload[target_l0w + target_threat + target_l0b..]
             .iter()
             .all(|byte| *byte == 13));
-        assert_eq!(payload.len(), target_l0w + target_l0b + dense_tail);
+        assert_eq!(payload.len(), target_l0w + target_threat + target_l0b + dense_tail);
     }
 }
 

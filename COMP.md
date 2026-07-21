@@ -56,9 +56,16 @@ elo=-134.5  llr=-2.39/2.20 (-109%)  los=0.0%  ci=34.0  draw=32.5%  games=366/100
 
 Net: `enyo-h16-v1-rc2.nn`
 
-sprt-enyo-h16-v1-rc2.nn-vs-reference.net-1000-20260719-193607 19 Jul 19:36 · 9m
+sprt-enyo-h16-v1-rc2.nn-vs-reference.net-1000-20260721-093650 21 Jul 09:36 · 20m
 "candidate=enyo-h16-v1-rc2.nn vs reference=reference.net"
-elo=-136.1  llr=-2.38/2.20 (-108%)  los=0.0%  ci=34.7  draw=33.9%  games=354/1000  tasks=24/24
+elo=-48.9  llr=-2.27/2.20 (-103%)  los=0.0%  ci=21.9  draw=12.9%  games=922/1000  tasks=24/24
+
+Direct seed diagnostic (the supplied Forge state still said `active` although
+all 1,000 games and 24 tasks were complete):
+
+sprt-enyo-h16-v1-rc2.nn-vs-enyo-h16-v1-rc1.nn-1000-20260721-102937 21 Jul 10:29 · 24m
+"candidate=enyo-h16-v1-rc2.nn vs reference=enyo-h16-v1-rc1.nn"
+elo=+4.9  llr=0.15/2.20 (7%)  los=70.3%  ci=17.9  draw=34.0%  games=1000/1000  tasks=24/24
 
 Net: `enyo-h16-v1-rc1.nn`
 
