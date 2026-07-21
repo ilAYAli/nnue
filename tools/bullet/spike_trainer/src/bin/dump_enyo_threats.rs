@@ -14,9 +14,13 @@ fn values(features: &enyo_threats::ActiveFeatures) -> Vec<usize> {
     (0..features.len()).map(|idx| features.get(idx)).collect()
 }
 
-fn dump(fen: &str) {
+fn dump(fen: &str, reckless: bool) {
     let board = parse_board(fen);
-    let features = enyo_threats::active_features(&board);
+    let features = if reckless {
+        enyo_threats::reckless_active_features(&board)
+    } else {
+        enyo_threats::active_features(&board)
+    };
     println!(
         "{}",
         json!({
@@ -29,17 +33,19 @@ fn dump(fen: &str) {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let reckless = args.first().is_some_and(|arg| arg == "--reckless");
+    let args = if reckless { &args[1..] } else { &args[..] };
     if args.is_empty() {
         for line in io::stdin().lock().lines() {
             let fen = line.expect("stdin read failed");
             let fen = fen.trim();
             if !fen.is_empty() {
-                dump(fen);
+                dump(fen, reckless);
             }
         }
     } else {
         for fen in args {
-            dump(&fen);
+            dump(&fen, reckless);
         }
     }
 }
