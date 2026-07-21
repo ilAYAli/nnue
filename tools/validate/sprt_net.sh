@@ -137,7 +137,7 @@ main() {
     check_engine_loads_net CANDIDATE_NET "$CANDIDATE_NET"
     check_engine_loads_net REFERENCE_NET "$REFERENCE_NET"
     run_sprt
-    #save_result
+    save_result
 
     local result elo llr
     result=$(forge status "$RUN" --json)
