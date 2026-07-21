@@ -1383,7 +1383,7 @@ fn main() {
         steps: TrainingSteps {
             batch_size,
             batches_per_superbatch,
-            start_superbatch: 1,
+            start_superbatch,
             end_superbatch,
         },
         wdl_scheduler: wdl::ConstantWDL {
