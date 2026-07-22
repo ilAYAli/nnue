@@ -356,6 +356,18 @@ Elo. At the 256-superbatch checkpoint, the four lineage means are `h4 +15.1`,
 `h8 +16.6`, `h16 +23.0`, and `sf32 +15.1` Elo, all with approximately
 `+/-10.3` to `+/-10.4` uncertainty. No pair is significantly separated.
 
+Continue all four lineages and both seeds rather than selecting the numerical
+leader. Each `v3` descendant continues its exact `v2` seed for 7,600
+superbatches with the same `lr=0.0001`, `wdl=0.05`, and
+`activation_l1=0.00001` objective. Use the next disjoint
+`T60T70wIsRightFarseer.binpack` range (`offset=200,000,000`,
+`limit=1,000,000,000`), which covers the 996,147,200 requested positions
+without wrapping the short checkpoint's data. Test each descendant against its
+own `v2` parent for at most 1,500 games. This measures whether architecture
+learning trajectories diverge with materially more training; mature-reference
+and direct finalist matches remain deferred until all eight long continuations
+are complete.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
