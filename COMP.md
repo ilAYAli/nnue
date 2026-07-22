@@ -7,6 +7,15 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Direct refined comparison: `h8` versus `h16`
+
+sprt-enyo-h8-v2-rc1.nn-vs-enyo-h16-v2-rc1.nn-1500-20260722-162438 22 Jul 16:24
+"candidate=enyo-h8-v2-rc1.nn vs reference=enyo-h16-v2-rc1.nn"
+elo=+1.4  llr=-0.07/2.20 (-3%)  los=57.5%  ci=14.4  draw=35.1%  games=1500/1500  tasks=24/24
+
+The refined seed-1 nets are indistinguishable. This supplies no reason to
+replace the incumbent h16 architecture with h8.
+
 ## Long continuation: `sf32` seed 1 (`enyo-sf32-v3-rc1`)
 
 `enyo-sf32-v3-rc1.nn` continued `enyo-sf32-v2-rc1.nn` for 7,600

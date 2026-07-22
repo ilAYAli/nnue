@@ -396,6 +396,11 @@ between the valid `v2` seed-1 checkpoints next, beginning with `h8` versus the
 incumbent `h16`; advance the winner through `h4` and `sf32`, then confirm the
 surviving comparison with seed 2.
 
+The direct refined seed-1 comparison scored `h8 +1.4 +/-14.4` Elo versus h16
+(`-0.07/2.20` LLR, `57.5%` LOS, `35.1%` draws) in 1,500 games. The two are
+indistinguishable, so stop the bucket-only race and redirect architecture work
+to genuinely new tactical information.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
