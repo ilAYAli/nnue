@@ -7,6 +7,20 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Long continuation: `h8` seed 1 (`enyo-h8-v3-rc1`)
+
+`enyo-h8-v3-rc1.nn` continued `enyo-h8-v2-rc1.nn` for 7,600 superbatches on
+the matched disjoint slice. SHA-256:
+`c15aaac4a9a7b1ac7648c6d901fd17ce1cd6563ed3ce01ceaa2e6e76f54ab4e1`.
+Static evaluation was `mae=138.153`, `sign=84.03%`, `corr=0.874558`,
+`bias=-0.242`, and `slope=0.823114`. Residual MAE improved for endgame
+`420.366 -> 412.136` and eval 800+ `643.374 -> 625.768`, but regressed for
+eval 300-799 `350.209 -> 350.921`.
+
+Status: rejected by `residual_gate`; no SPRT was run. The regression is small
+(`-0.713` MAE gain) but violates the fixed gate, so this checkpoint supplies no
+game-strength evidence.
+
 ## Long continuation: `h4` seed 1 (`enyo-h4-v3-rc1`)
 
 `enyo-h4-v3-rc1.nn` continues `enyo-h4-v2-rc1.nn` for 7,600 superbatches on

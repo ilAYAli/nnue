@@ -375,6 +375,11 @@ long seed of `h8`, `h16`, and `sf32` next; only then decide which lineages merit
 the second long seed, avoiding another eight-run commitment when the learning
 curves may already separate.
 
+The first long `h8` continuation failed the fixed residual gate: endgame MAE
+improved `420.366 -> 412.136` and eval 800+ improved `643.374 -> 625.768`, but
+eval 300-799 regressed `350.209 -> 350.921`. Do not run its SPRT. Continue with
+the first long `h16` and `sf32` seeds before making the candidate cut.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
