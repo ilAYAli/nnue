@@ -1750,6 +1750,102 @@ sprt_gate
             self.assertNotEqual(0, proc.returncode)
             self.assertEqual("sprt:800:sprt\n", trace.read_text(encoding="utf-8"))
 
+    def test_direct_sprt_success_emits_one_done_event_with_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            trace = tmp / "trace.txt"
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+run=candidate
+last_sprt_elo=7.5
+last_sprt_llr='2.21/2.20 (100%)'
+last_sprt_line='games=800/800 elo=+7.5 ci=12.0 llr=2.21/2.20 los=88.0% draw=35.0%'
+last_sprt_log=run.log
+sprt_gate() { return 0; }
+notify_sprt() { printf '%s|%s|%s|%s|%s|%s\n' "$1" "$2" "$3" "$4" "$last_sprt_elo" "$last_sprt_llr" >> "$TRACE"; }
+sprt_command
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env["TRACE"] = str(trace)
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(0, proc.returncode, proc.stderr)
+            event = trace.read_text(encoding="utf-8")
+            self.assertEqual(1, len(event.splitlines()))
+            self.assertIn("done|sprt|SPRT completed for candidate", event)
+            self.assertIn("|7.5|2.21/2.20 (100%)", event)
+
+    def test_direct_sprt_rejection_emits_one_fail_event_with_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            trace = tmp / "trace.txt"
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+run=candidate
+last_sprt_elo=-25.0
+last_sprt_llr='-2.21/2.20 (-100%)'
+last_sprt_line='games=800/800 elo=-25.0 ci=12.0 llr=-2.21/2.20 los=0.0% draw=35.0%'
+last_sprt_log=run.log
+sprt_gate() { return 1; }
+notify_sprt() { printf '%s|%s|%s|%s|%s|%s\n' "$1" "$2" "$3" "$4" "$last_sprt_elo" "$last_sprt_llr" >> "$TRACE"; }
+sprt_command
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env["TRACE"] = str(trace)
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(0, proc.returncode)
+            event = trace.read_text(encoding="utf-8")
+            self.assertEqual(1, len(event.splitlines()))
+            self.assertIn("fail|sprt|SPRT rejected candidate", event)
+            self.assertIn("|-25.0|-2.21/2.20 (-100%)", event)
+
+    def test_direct_terminal_events_default_to_ai_stdin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+printf '%s\n' "$NNUE_AI_STDIN_EVENTS"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.pop("NNUE_AI_STDIN_EVENTS", None)
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertEqual("done,fail\n", proc.stdout)
+
     def test_sprt_waits_matching_active_forge_run_for_build_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

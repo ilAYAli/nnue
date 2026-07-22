@@ -70,6 +70,8 @@ RESIDUAL_ROWS=${RESIDUAL_ROWS:-50000}
 
 EVENT_HOOK=${EVENT_HOOK:-tools/events/nnue_event_ntfy.sh}
 NNUE_NTFY=${NNUE_NTFY:-1}
+NNUE_AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-done,fail}
+export NNUE_AI_STDIN_EVENTS
 NNUE_ITERATE_LOCK_DIR=${NNUE_ITERATE_LOCK_DIR:-runs/.nnue-iterate.lock}
 
 run=
@@ -826,6 +828,18 @@ full_sprt_gate() {
   notify_sprt phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
 }
 
+sprt_command() {
+  if sprt_gate; then
+    notify_sprt done sprt "SPRT completed for $run: ${last_sprt_line:-result unavailable}" \
+      "$last_sprt_log" 1
+    return 0
+  fi
+
+  notify_sprt fail sprt "SPRT rejected $run: ${last_sprt_line:-result unavailable}" \
+    "$last_sprt_log" 1
+  return 1
+}
+
 next_run_name() {
   if [[ "$1" =~ ^(.*-v|.*v)([0-9]+)$ ]]; then
     printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
@@ -1160,7 +1174,7 @@ case "$cmd" in
   plan) plan ;;
   train) train ;;
   gates) gates ;;
-  sprt) sprt_gate ;;
+  sprt) sprt_command ;;
   status) status ;;
   help|-h|--help) help ;;
   *) fail "unknown command: $cmd" ;;
