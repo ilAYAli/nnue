@@ -7,6 +7,23 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Matched continuation: `h8` seed 1 (`enyo-h8-v2-rc1`)
+
+`enyo-h8-v2-rc1.nn` applies the matched 256-superbatch continuation to
+`enyo-h8-v1-rc1.nn`. SHA-256:
+`c37f5492ac279a094ca3f2531518360fb4784e01c880b580fa8be929c7a13168`.
+Gates passed with static `mae=136.068`, `sign=83.94%`, `corr=0.867272`,
+`bias=-0.987`, and `slope=0.800557`. Residual MAE improved for endgame
+`463.751 -> 420.366`, eval 800+ `692.500 -> 643.374`, and eval 300-799
+`387.137 -> 350.209`.
+
+enyo-h8-v2-rc1-sprt-1500-20260722-102300 22 Jul 10:23
+"candidate=enyo-h8-v2-rc1.nn vs reference=enyo-h8-v1-rc1.nn"
+elo=+22.5  llr=1.04/2.20 (47%)  los=99.9%  ci=14.3  draw=40.5%  games=1500/1500  tasks=88/88
+
+This is a positive first-seed refinement signal. It does not select `h8` until
+the matched second seed and the remaining lineages are measured.
+
 ## Matched continuation: `h4` seed 1 (`enyo-h4-v2-rc1`)
 
 `enyo-h4-v2-rc1.nn` continues `enyo-h4-v1-rc1.nn` for 256 superbatches on
