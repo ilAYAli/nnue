@@ -431,7 +431,7 @@ Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
 eight material-specific dense heads from the shared `enyo-1.30.0-rc3` head, so
 the untrained candidate is evaluation-identical to its parent. Freeze the
 accumulator and train only the dense heads for 256 superbatches with `lr=0.0001`,
-`wdl=0.05`, and activation L1 `0.00001`. This isolates the full-head mechanism
+`wdl=0.05`, and no activation penalty because the accumulator is frozen. This isolates the full-head mechanism
 that the Reckless candidate confounded with different king buckets, width,
 factorisation, pairwise activation, and threat features. It directly targets
 the measured material-bucket calibration problem. Run the fixed gates and, if
