@@ -444,6 +444,14 @@ by `162.372` in endgames, `269.120` at eval 800+, and `225.504` at eval
 retain sub-integer updates, so this does not have the export-resolution problem
 of the integer x-ray rows. Close the full-head line if RC2 fails.
 
+RC2 started evaluation-identical to the mature shared-head net, preserved the
+accumulator exactly, and reduced most dense update magnitudes, but repeated the
+same calibration collapse: residual MAE regressed `162.744` in endgames,
+`268.615` at eval 800+, and `222.064` at eval 300-799. Close the full-head line
+without an SPRT. Proceed to the documented matched 10-bucket/11-channel
+piece-only and FullThreats pair only after implementing one shared runtime and
+trainer bucket contract; the piece-only control runs first.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
