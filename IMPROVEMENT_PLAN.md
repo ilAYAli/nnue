@@ -380,6 +380,13 @@ improved `420.366 -> 412.136` and eval 800+ improved `643.374 -> 625.768`, but
 eval 300-799 regressed `350.209 -> 350.921`. Do not run its SPRT. Continue with
 the first long `h16` and `sf32` seeds before making the candidate cut.
 
+The first long `h16` continuation also failed the residual gate: endgame MAE
+improved `409.651 -> 405.158` and eval 800+ improved `626.343 -> 616.099`, but
+eval 300-799 regressed `352.789 -> 354.122`. Do not run its SPRT. The repeated
+failure in the same band means the 7,600-superbatch regimen cannot currently be
+used to eliminate `h8` relative to the incumbent. Run `sf32` seed 1, then
+reassess the common continuation dose/objective before any second seeds.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the

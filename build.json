@@ -1,8 +1,8 @@
 {
-  "run": "enyo-h8-v3-rc1",
-  "continue_from": "enyo-h8-v2-rc1",
-  "reference": "enyo-h8-v2-rc1",
-  "hypothesis": "matched long continuation competition h8 seed 1/2: continue the positive h8 checkpoint for 7600 superbatches on the next disjoint T60T70wIsRightFarseer slice to measure longer-run architecture learning",
+  "run": "enyo-h16-v3-rc1",
+  "continue_from": "enyo-h16-v2-rc1",
+  "reference": "enyo-h16-v2-rc1",
+  "hypothesis": "matched long continuation competition h16 seed 1/2: continue the positive h16 checkpoint for 7600 superbatches on the next disjoint T60T70wIsRightFarseer slice to measure longer-run architecture learning",
   "superbatches": 7600,
   "lr": 0.0001,
   "wdl": 0.05,

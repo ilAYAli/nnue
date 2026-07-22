@@ -7,6 +7,20 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Long continuation: `h16` seed 1 (`enyo-h16-v3-rc1`)
+
+`enyo-h16-v3-rc1.nn` continued `enyo-h16-v2-rc1.nn` for 7,600 superbatches
+on the matched disjoint slice. SHA-256:
+`e62e2e6b8021d0ff7f113661d524ecffd8e2e9eb1228deb07911e95fbab9536d`.
+Static evaluation was `mae=138.418`, `sign=84.30%`, `corr=0.871557`,
+`bias=0.143`, and `slope=0.806396`. Residual MAE improved for endgame
+`409.651 -> 405.158` and eval 800+ `626.343 -> 616.099`, but regressed for
+eval 300-799 `352.789 -> 354.122`.
+
+Status: rejected by `residual_gate`; no SPRT was run. Because `h8` failed the
+same band, this is evidence against the common long-continuation regimen rather
+than evidence that uniquely eliminates `h8`.
+
 ## Long continuation: `h8` seed 1 (`enyo-h8-v3-rc1`)
 
 `enyo-h8-v3-rc1.nn` continued `enyo-h8-v2-rc1.nn` for 7,600 superbatches on
