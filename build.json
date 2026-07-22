@@ -1,15 +1,15 @@
 {
-  "run": "enyo-sf32-v3-rc1",
-  "continue_from": "enyo-sf32-v2-rc1",
-  "reference": "enyo-sf32-v2-rc1",
-  "hypothesis": "matched long continuation competition sf32 seed 1/2: continue the positive sf32 checkpoint for 7600 superbatches on the next disjoint T60T70wIsRightFarseer slice to measure longer-run architecture learning",
-  "superbatches": 7600,
+  "run": "enyo-sliderxray-v1-rc1",
+  "initialize_from": "enyo-1.30.0-rc3",
+  "reference": "enyo-1.30.0-rc3",
+  "hypothesis": "bounded slider x-ray probe: warm-start mature h16 weights, zero-initialize only the new revealed-behind-blocker interaction rows, and train for 256 superbatches with the historically positive T60T70wIsRightFarseer regimen",
+  "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
   "activation_l1": 0.00001,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
-    "offset": 200000000,
-    "limit": 1000000000
+    "offset": 0,
+    "limit": 200000000
   }
 }
