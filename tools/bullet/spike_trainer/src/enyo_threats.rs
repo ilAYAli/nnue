@@ -114,7 +114,11 @@ fn tables(reckless: bool) -> &'static IndexTables {
 
 impl IndexTables {
     fn new(reckless: bool) -> Self {
-        let dimensions = if reckless { RECKLESS_DIMENSIONS } else { DIMENSIONS };
+        let dimensions = if reckless {
+            RECKLESS_DIMENSIONS
+        } else {
+            DIMENSIONS
+        };
         let mut tables = Self {
             helper: [HelperOffset {
                 piece_span: 0,
@@ -175,8 +179,7 @@ impl IndexTables {
                         VALID_TARGETS[attacker]
                     };
                     helper.global
-                        + (piece_color(attacked) * (valid_targets / 2)
-                            + mapped_target as usize)
+                        + (piece_color(attacked) * (valid_targets / 2) + mapped_target as usize)
                             * helper.piece_span
                 };
                 tables.target_offsets[attacker][attacked][0] = base;
@@ -331,7 +334,11 @@ fn make_index(
     let tables = tables(reckless);
     let target_offset = tables.target_offsets[oriented_attacker][oriented_attacked]
         [usize::from(oriented_from < oriented_to)];
-    let dimensions = if reckless { RECKLESS_DIMENSIONS } else { DIMENSIONS };
+    let dimensions = if reckless {
+        RECKLESS_DIMENSIONS
+    } else {
+        DIMENSIONS
+    };
     if target_offset >= dimensions {
         return dimensions;
     }
@@ -457,8 +464,10 @@ pub fn reckless_active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
                     1 => leaper_attacks(2, from),
                     2 => slider_attacks(3, from, board.occupied),
                     3 => slider_attacks(4, from, board.occupied),
-                    4 => slider_attacks(3, from, board.occupied)
-                        | slider_attacks(4, from, board.occupied),
+                    4 => {
+                        slider_attacks(3, from, board.occupied)
+                            | slider_attacks(4, from, board.occupied)
+                    }
                     _ => leaper_attacks(6, from),
                 } & board.occupied;
                 while hits != 0 {
@@ -486,4 +495,97 @@ pub fn reckless_active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
     features[0].sort();
     features[1].sort();
     features
+}
+
+/// Activates only the first occupied square revealed behind the first blocker
+/// on each bishop, rook, or queen ray. Ordinary direct attacks are deliberately
+/// excluded so this feature family can be tested independently of FullThreats
+/// and Reckless threats. Indices use the established Reckless interaction
+/// FullThreats interaction schema for trainer/runtime parity.
+pub fn slider_xray_active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
+    let board = BoardView::from_bullet(pos);
+    let king_square = [
+        board.pieces[0][5].trailing_zeros() as usize,
+        board.pieces[1][5].trailing_zeros() as usize,
+    ];
+    let mut features = [ActiveFeatures::new(), ActiveFeatures::new()];
+
+    for color in 0..2 {
+        for piece_type_index in 2..=4 {
+            let attacker = piece_type_index + 1 + color * 8;
+            let mut attackers = board.pieces[color][piece_type_index];
+            while attackers != 0 {
+                let from = attackers.trailing_zeros() as usize;
+                attackers &= attackers - 1;
+                let attacks = match piece_type_index {
+                    2 => slider_attacks(3, from, board.occupied),
+                    3 => slider_attacks(4, from, board.occupied),
+                    _ => {
+                        slider_attacks(3, from, board.occupied)
+                            | slider_attacks(4, from, board.occupied)
+                    }
+                };
+                let mut blockers = attacks & board.occupied;
+                while blockers != 0 {
+                    let blocker = blockers.trailing_zeros() as usize;
+                    blockers &= blockers - 1;
+                    let occupied_without = board.occupied & !(1_u64 << blocker);
+                    let attacks_through = match piece_type_index {
+                        2 => slider_attacks(3, from, occupied_without),
+                        3 => slider_attacks(4, from, occupied_without),
+                        _ => {
+                            slider_attacks(3, from, occupied_without)
+                                | slider_attacks(4, from, occupied_without)
+                        }
+                    };
+                    let mut revealed = attacks_through & !attacks & occupied_without;
+                    while revealed != 0 {
+                        let to = revealed.trailing_zeros() as usize;
+                        revealed &= revealed - 1;
+                        let attacked = stockfish_piece(board.piece_at[to]);
+                        for perspective in 0..2 {
+                            let index = make_index(
+                                perspective,
+                                attacker,
+                                from,
+                                to,
+                                attacked,
+                                king_square[perspective],
+                                false,
+                            );
+                            if index < DIMENSIONS {
+                                features[perspective].push(index);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    features[0].sort();
+    features[1].sort();
+    features
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn slider_xray_excludes_direct_threat_indices() {
+        let board = ChessBoard::from_str("r3k2r/8/n7/p7/P7/8/8/R3K2R w KQkq - 0 1|0|0.5")
+            .expect("fixture FEN must parse");
+        let features = slider_xray_active_features(&board);
+        let expected = [
+            [11_418, 12_324, 43_462, 46_153].as_slice(),
+            [8_739, 11_418, 39_877, 46_153].as_slice(),
+        ];
+        for perspective in 0..2 {
+            assert_eq!(features[perspective].len(), expected[perspective].len());
+            for (offset, expected_index) in expected[perspective].iter().enumerate() {
+                assert_eq!(features[perspective].get(offset), *expected_index);
+            }
+        }
+    }
 }

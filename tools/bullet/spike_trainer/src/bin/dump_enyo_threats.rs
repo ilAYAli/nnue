@@ -14,12 +14,12 @@ fn values(features: &enyo_threats::ActiveFeatures) -> Vec<usize> {
     (0..features.len()).map(|idx| features.get(idx)).collect()
 }
 
-fn dump(fen: &str, reckless: bool) {
+fn dump(fen: &str, mode: &str) {
     let board = parse_board(fen);
-    let features = if reckless {
-        enyo_threats::reckless_active_features(&board)
-    } else {
-        enyo_threats::active_features(&board)
+    let features = match mode {
+        "--reckless" => enyo_threats::reckless_active_features(&board),
+        "--slider-xray" => enyo_threats::slider_xray_active_features(&board),
+        _ => enyo_threats::active_features(&board),
     };
     println!(
         "{}",
@@ -33,19 +33,26 @@ fn dump(fen: &str, reckless: bool) {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let reckless = args.first().is_some_and(|arg| arg == "--reckless");
-    let args = if reckless { &args[1..] } else { &args[..] };
+    let mode = args
+        .first()
+        .filter(|arg| matches!(arg.as_str(), "--reckless" | "--slider-xray"))
+        .map_or("", String::as_str);
+    let args = if mode.is_empty() {
+        &args[..]
+    } else {
+        &args[1..]
+    };
     if args.is_empty() {
         for line in io::stdin().lock().lines() {
             let fen = line.expect("stdin read failed");
             let fen = fen.trim();
             if !fen.is_empty() {
-                dump(fen, reckless);
+                dump(fen, mode);
             }
         }
     } else {
         for fen in args {
-            dump(&fen, reckless);
+            dump(&fen, mode);
         }
     }
 }

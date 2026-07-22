@@ -68,6 +68,7 @@ const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
 const ENYO_NETWORK_FLAG_MIXED_ACTIVATION: u32 = 4;
 const ENYO_NETWORK_FLAG_PSQT_RESIDUAL: u32 = 8;
 const ENYO_NETWORK_FLAG_PAIRWISE: u32 = 16;
+const ENYO_NETWORK_FLAG_SLIDER_XRAY_THREATS: u32 = 16;
 const ENYO_NETWORK_FLAG_RECKLESS_THREATS: u32 = 32;
 const RECKLESS_THREAT_DIMENSIONS: usize = 66_864;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 60_720;
@@ -782,6 +783,9 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
     if arch_full_threats(config) {
         command.arg("--full-threats");
     }
+    if arch_slider_xray_threats(config) {
+        command.arg("--slider-xray-threats");
+    }
     if arch_full_heads(config) {
         command.arg("--full-heads");
     }
@@ -909,6 +913,10 @@ fn arch_full_threats(config: &Config) -> bool {
     bool_at(&config.arch, "full_threats", false)
 }
 
+fn arch_slider_xray_threats(config: &Config) -> bool {
+    bool_at(&config.arch, "slider_xray_threats", false)
+}
+
 fn arch_full_heads(config: &Config) -> bool {
     match string_at(&config.arch, "output_bucket_scope").unwrap_or("final") {
         "final" => false,
@@ -944,6 +952,8 @@ fn validate_layout(config: &Config) {
     let l2 = usize_at(&config.arch, "l2_size", 16);
     let export_format = string_at(&config.arch, "export_format").unwrap_or("enyo-native-v1");
     let full_threats = arch_full_threats(config);
+    let slider_xray_threats = arch_slider_xray_threats(config);
+    let threat_features = full_threats || slider_xray_threats;
     let full_heads = arch_full_heads(config);
     let mixed_activation = arch_mixed_activation(config);
     let psqt_residual = arch_psqt_residual(config);
@@ -957,7 +967,7 @@ fn validate_layout(config: &Config) {
             || l2 != 16
             || !bool_at(&config.arch, "input_factoriser", false)
             || !full_heads
-            || full_threats
+            || threat_features
             || mixed_activation
             || psqt_residual
             || export_format != "enyo-native-v7-reckless-threats"
@@ -1015,8 +1025,12 @@ fn validate_layout(config: &Config) {
         eprintln!("error: non-1024 hidden widths require export_format=enyo-native-v2");
         process::exit(2);
     }
-    if full_threats && export_format != "enyo-native-v2" {
-        eprintln!("error: full_threats requires export_format=enyo-native-v2");
+    if threat_features && export_format != "enyo-native-v2" {
+        eprintln!("error: threat features require export_format=enyo-native-v2");
+        process::exit(2);
+    }
+    if full_threats && slider_xray_threats {
+        eprintln!("error: full_threats and slider_xray_threats are mutually exclusive");
         process::exit(2);
     }
     if full_heads && export_format != "enyo-native-v3" {
@@ -1043,11 +1057,11 @@ fn validate_layout(config: &Config) {
         eprintln!("error: enyo-native-v5 requires psqt_residual=true");
         process::exit(2);
     }
-    if psqt_residual && (mixed_activation || full_heads || full_threats || output_buckets != 8) {
+    if psqt_residual && (mixed_activation || full_heads || threat_features || output_buckets != 8) {
         eprintln!("error: PSQT residual requires the shared-head 8-bucket base architecture");
         process::exit(2);
     }
-    if mixed_activation && (full_heads || full_threats || output_buckets != 8) {
+    if mixed_activation && (full_heads || threat_features || output_buckets != 8) {
         eprintln!("error: mixed activation requires the shared-head 8-bucket base architecture");
         process::exit(2);
     }
@@ -1063,18 +1077,18 @@ fn validate_layout(config: &Config) {
         eprintln!("error: full-head output bucketing requires at least 2 output buckets");
         process::exit(2);
     }
-    if full_heads && full_threats {
+    if full_heads && threat_features {
         eprintln!(
             "error: full-head and FullThreats architecture changes must be tested separately"
         );
         process::exit(2);
     }
-    if full_threats && bool_at(&config.arch, "input_factoriser", false) {
-        eprintln!("error: full_threats does not support input_factoriser yet");
+    if threat_features && bool_at(&config.arch, "input_factoriser", false) {
+        eprintln!("error: threat features do not support input_factoriser yet");
         process::exit(2);
     }
-    if full_threats && input_buckets != runtime_input_buckets {
-        eprintln!("error: full_threats does not support runtime_input_buckets expansion yet");
+    if threat_features && input_buckets != runtime_input_buckets {
+        eprintln!("error: threat features do not support runtime_input_buckets expansion yet");
         process::exit(2);
     }
     if training_lr_superbatches(config) < training_superbatches(config) {
@@ -1124,12 +1138,13 @@ fn cmd_plan(config: &Config) {
     println!();
     println!("resolved:");
     println!(
-        "  layout={} buckets, {} channels, hidden={}, output_buckets={}, full_threats={}, full_heads={}",
+        "  layout={} buckets, {} channels, hidden={}, output_buckets={}, full_threats={}, slider_xray_threats={}, full_heads={}",
         usize_at(&config.arch, "input_buckets", 1),
         usize_at(&config.arch, "feature_channels", 12),
         usize_at(&config.arch, "hidden", 1024),
         usize_at(&config.arch, "output_buckets", 1),
         arch_full_threats(config),
+        arch_slider_xray_threats(config),
         arch_full_heads(config),
     );
     println!(
@@ -1623,6 +1638,10 @@ fn cmd_run(config: &Config) {
         usize::from(arch_full_threats(config)),
     );
     set_env(
+        "ENYO_BULLET_ENYO_SLIDER_XRAY_THREATS",
+        usize::from(arch_slider_xray_threats(config)),
+    );
+    set_env(
         "ENYO_BULLET_ENYO_FULL_HEADS",
         usize::from(arch_full_heads(config)),
     );
@@ -1892,6 +1911,7 @@ fn enyo_container(
     l2: usize,
     output_buckets: usize,
     full_threats: bool,
+    slider_xray_threats: bool,
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
@@ -1932,6 +1952,10 @@ fn enyo_container(
         48,
         (if full_threats {
             ENYO_NETWORK_FLAG_FULL_THREATS
+        } else {
+            0
+        }) | (if slider_xray_threats {
+            ENYO_NETWORK_FLAG_SLIDER_XRAY_THREATS
         } else {
             0
         }) | (if full_heads {
@@ -2434,6 +2458,7 @@ fn write_model(config: &Config) {
             l2,
             output_buckets,
             false,
+            false,
             true,
             false,
             false,
@@ -2461,6 +2486,8 @@ fn write_model(config: &Config) {
     let hidden = usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN);
     let l2 = usize_at(&config.arch, "l2_size", 16);
     let full_threats = arch_full_threats(config);
+    let slider_xray_threats = arch_slider_xray_threats(config);
+    let threat_features = full_threats || slider_xray_threats;
     let full_heads = arch_full_heads(config);
     let psqt_residual = arch_psqt_residual(config);
     let mixed_activation = arch_mixed_activation(config);
@@ -2472,7 +2499,7 @@ fn write_model(config: &Config) {
         output_buckets,
         hidden,
         l2,
-        full_threats,
+        threat_features,
         full_heads,
         mixed_activation,
         psqt_residual,
@@ -2484,7 +2511,7 @@ fn write_model(config: &Config) {
         output_buckets,
         hidden,
         l2,
-        full_threats,
+        threat_features,
         full_heads,
         mixed_activation,
         psqt_residual,
@@ -2498,6 +2525,7 @@ fn write_model(config: &Config) {
             l2,
             output_buckets,
             full_threats,
+            slider_xray_threats,
             false,
             false,
             false,
@@ -2511,6 +2539,7 @@ fn write_model(config: &Config) {
             hidden,
             l2,
             output_buckets,
+            false,
             false,
             full_heads,
             false,
@@ -2527,6 +2556,7 @@ fn write_model(config: &Config) {
             output_buckets,
             false,
             false,
+            false,
             mixed_activation,
             false,
             false,
@@ -2539,6 +2569,7 @@ fn write_model(config: &Config) {
             hidden,
             l2,
             output_buckets,
+            false,
             false,
             false,
             false,
@@ -3053,6 +3084,7 @@ mod tests {
             768,
             16,
             8,
+            false,
             false,
             true,
             false,

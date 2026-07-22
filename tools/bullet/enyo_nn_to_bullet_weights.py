@@ -250,6 +250,7 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "target_feature_channels": args.feature_channels,
         "target_hidden": args.hidden,
         "full_threats": bool(args.full_threats),
+        "slider_xray_threats": bool(args.slider_xray_threats),
         "full_heads": bool(args.full_heads),
         "mixed_activation": bool(args.mixed_activation),
         "legacy_inputs": bool(args.legacy_inputs),
@@ -278,6 +279,11 @@ def main() -> int:
         "--full-threats",
         action="store_true",
         help="Append zero-initialized FullThreats rows for warm-starting that architecture.",
+    )
+    parser.add_argument(
+        "--slider-xray-threats",
+        action="store_true",
+        help="Append zero-initialized slider x-ray rows for warm-starting that architecture.",
     )
     parser.add_argument(
         "--full-heads",
@@ -326,7 +332,9 @@ def main() -> int:
         target_buckets=args.input_buckets,
         target_channels=args.feature_channels,
     )[:, :args.hidden]
-    if args.full_threats:
+    if args.full_threats and args.slider_xray_threats:
+        raise SystemExit("--full-threats and --slider-xray-threats are mutually exclusive")
+    if args.full_threats or args.slider_xray_threats:
         input_weights = add_full_threat_rows(input_weights)
     input_biases = np.asarray(net.input_biases, dtype=np.float32)[:args.hidden]
     l1_weights = np.concatenate((
