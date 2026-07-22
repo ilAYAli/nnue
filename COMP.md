@@ -29,6 +29,24 @@ separate mature-reference run was intentionally cancelled at 388/1500 games
 to avoid spending matches that can be reserved for the final leading lineages;
 it is invalid for ranking and receives no benchmark result.
 
+## Matched continuation: `h4` seed 2 (`enyo-h4-v2-rc2`)
+
+`enyo-h4-v2-rc2.nn` applies the identical continuation to
+`enyo-h4-v1-rc2.nn`. SHA-256:
+`ed64efe813c7ebb9e7271dd414b20ec2fe810aa0b6775aa4f7b0961327dc2423`.
+Gates passed with static `mae=136.365`, `sign=83.63%`, `corr=0.864225`,
+`bias=-1.784`, and `slope=0.799118`. Residual MAE improved for endgame
+`459.057 -> 418.856`, eval 800+ `685.284 -> 641.567`, and eval 300-799
+`386.169 -> 354.467`.
+
+enyo-h4-v2-rc2-sprt-1500-20260722-094515 22 Jul 09:45
+"candidate=enyo-h4-v2-rc2.nn vs reference=enyo-h4-v1-rc2.nn"
+elo=+8.8  llr=0.38/2.20 (17%)  los=87.7%  ci=14.9  draw=36.7%  games=1500/1500  tasks=88/88
+
+Across both seeds, the matched `h4` continuation gain is approximately
+`+15.1 +/-10.4` Elo. This is a replicated positive refinement signal, not an
+architecture-selection result; the other lineages receive the same treatment.
+
 ## J: current Reckless 10x12-768-o8 with threats (`recklessft`)
 
 Net: `enyo-recklessft-v1-rc1.nn`

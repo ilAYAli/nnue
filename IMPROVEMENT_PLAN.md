@@ -321,6 +321,12 @@ LOS, `39.2%` draws). Continue the matched field; do not select `h4` from one
 seed. Direct mature-reference matches are deferred until the leading refined
 lineages are known.
 
+The second `h4` seed gained `+8.8 +/-14.9` Elo (`0.38/2.20` LLR, `87.7%`
+LOS, `36.7%` draws) over its own ancestor. The approximate two-seed mean is
+`+15.1 +/-10.4` Elo. This establishes a replicated positive `h4` refinement
+response; continue with the same two-seed protocol for `h8`, `h16`, and
+`sf32`.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the

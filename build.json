@@ -1,8 +1,8 @@
 {
-  "run": "enyo-h4-v2-rc1",
-  "continue_from": "enyo-h4-v1-rc1",
-  "reference": "enyo-h4-v1-rc1",
-  "hypothesis": "matched continuation competition h4 seed 1/2: continue the h4 scratch foundation with the historically positive T60T70wIsRightFarseer 256-superbatch lr=0.0001 activation-L1 regimen",
+  "run": "enyo-h4-v2-rc2",
+  "continue_from": "enyo-h4-v1-rc2",
+  "reference": "enyo-h4-v1-rc2",
+  "hypothesis": "matched continuation competition h4 seed 2/2: continue the h4 scratch foundation with the historically positive T60T70wIsRightFarseer 256-superbatch lr=0.0001 activation-L1 regimen",
   "superbatches": 256,
   "lr": 0.0001,
   "wdl": 0.05,
