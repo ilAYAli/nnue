@@ -6,6 +6,7 @@ __pycache__/
 *.nn
 *.jsonl
 *.jsonl.zst
+!benchmarks/architecture-race.jsonl
 *.pgn
 *.pgn.zst
 *.binpack
