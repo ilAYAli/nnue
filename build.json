@@ -1,10 +1,10 @@
 {
-  "run": "enyo-sliderxray-v1-rc3",
+  "run": "enyo-h16fh-v1-rc1",
   "initialize_from": "enyo-1.30.0-rc3",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "export-visible slider x-ray adaptation probe: warm-start mature h16 weights, freeze all mature piece rows, input bias, and dense weights, and train only the zero-initialized revealed-behind-blocker rows for 256 superbatches at the historically effective learning rate",
+  "hypothesis": "isolated material-specific full-head probe: warm-start the mature h16 accumulator, clone the shared dense path into all eight material heads, freeze the accumulator, and train only the dense heads for 256 superbatches",
   "superbatches": 256,
-  "trainable": "xray-only",
+  "trainable": "dense-head",
   "lr": 0.0001,
   "wdl": 0.05,
   "weight_decay": 0.0,
