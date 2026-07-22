@@ -1,17 +1,16 @@
 {
-  "name": "native-h16-12ch-1024-v3-full-heads",
+  "name": "native-h10-11ch-768-v2-unfactorised",
   "lineage": "native",
   "mode": "enyo",
-  "hidden": 1024,
+  "hidden": 768,
   "l2_size": 16,
-  "feature_channels": 12,
-  "input_buckets": 16,
+  "feature_channels": 11,
+  "input_buckets": 10,
   "output_buckets": 8,
   "input_factoriser": false,
-  "output_bucket_scope": "full-head",
   "eval_scale": 400.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
-  "export_format": "enyo-native-v3"
+  "export_format": "enyo-native-v2"
 }

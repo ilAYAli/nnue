@@ -1,17 +1,17 @@
 {
-  "run": "enyo-h16fh-v1-rc2",
-  "initialize_from": "enyo-1.30.0-rc3",
+  "run": "enyo-h10w768u-v1-rc1",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "reduced-rate material-specific full-head probe: warm-start the mature h16 accumulator, clone the shared dense path into all eight material heads, freeze the accumulator, and train only the dense heads for 256 superbatches at one-tenth the rejected rc1 learning rate",
-  "superbatches": 256,
-  "trainable": "dense-head",
-  "lr": 0.00001,
+  "hypothesis": "matched tactical-feature control seed 1/2 (5090001): random-init 10x11-768-o8 unfactorised piece-only network under the fixed one-pass pylon architecture-race protocol",
+  "superbatches": 196608,
+  "init_seed": 5090001,
   "wdl": 0.05,
-  "weight_decay": 0.0,
-  "activation_l1": 0.0,
+  "sfbinpack": {
+    "min_ply": 24
+  },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
+    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
+    "bullet_output": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet",
     "offset": 0,
-    "limit": 200000000
+    "limit": 2800000000
   }
 }
