@@ -23,7 +23,8 @@ class FenScoreDataset(Dataset):
     def __init__(self, rows: Iterable[dict], *,
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                  feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
-                 full_threats: bool = False):
+                 full_threats: bool = False,
+                 slider_xray_threats: bool = False):
         self.items: list[
             tuple[list[int], list[int], int, int, float, float, float, int]
         ] = []
@@ -40,10 +41,10 @@ class FenScoreDataset(Dataset):
             self.items.append((
                 nn2.features_from_pieces(
                     pieces, nn2.WHITE, input_buckets, feature_channels,
-                    full_threats),
+                    full_threats, slider_xray_threats),
                 nn2.features_from_pieces(
                     pieces, nn2.BLACK, input_buckets, feature_channels,
-                    full_threats),
+                    full_threats, slider_xray_threats),
                 len(pieces),
                 stm,
                 float(row["score"]),
@@ -58,6 +59,7 @@ class FenScoreDataset(Dataset):
                    input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                    feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
                    full_threats: bool = False,
+                   slider_xray_threats: bool = False,
                    ) -> "FenScoreDataset":
         rows = []
         with Path(path).open() as f:
@@ -74,7 +76,8 @@ class FenScoreDataset(Dataset):
             rows,
             input_buckets=input_buckets,
             feature_channels=feature_channels,
-            full_threats=full_threats)
+            full_threats=full_threats,
+            slider_xray_threats=slider_xray_threats)
 
     def __len__(self) -> int:
         return len(self.items)
@@ -137,11 +140,13 @@ class BulletDataScoreDataset(Dataset):
                  limit: int = 0, skip: int = 0,
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                  feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
-                 full_threats: bool = False) -> None:
+                 full_threats: bool = False,
+                 slider_xray_threats: bool = False) -> None:
         self.path = Path(path)
         self.input_buckets = input_buckets
         self.feature_channels = feature_channels
         self.full_threats = full_threats
+        self.slider_xray_threats = slider_xray_threats
         size = self.path.stat().st_size
         if size % bullet_format.RECORD_BYTES:
             raise ValueError(
@@ -193,10 +198,10 @@ class BulletDataScoreDataset(Dataset):
         pieces.sort(key=lambda item: item[2])
         w_feats = nn2.features_from_pieces(
             pieces, nn2.WHITE, self.input_buckets, self.feature_channels,
-            self.full_threats)
+            self.full_threats, self.slider_xray_threats)
         b_feats = nn2.features_from_pieces(
             pieces, nn2.BLACK, self.input_buckets, self.feature_channels,
-            self.full_threats)
+            self.full_threats, self.slider_xray_threats)
         phase_scale = nn2.phase_scale_from_pieces(pieces)
         return (
             torch.tensor(w_feats, dtype=torch.long),
@@ -293,11 +298,12 @@ def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
                        input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                        feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
                        full_threats: bool = False,
+                       slider_xray_threats: bool = False,
                        ) -> tuple[Dataset, Callable]:
     p = Path(path)
     if p.is_dir():
-        if full_threats:
-            raise ValueError("packed datasets do not include FullThreats features")
+        if full_threats or slider_xray_threats:
+            raise ValueError("packed datasets do not include threat features")
         return PackedFenScoreDataset(
             p, limit=limit, skip=skip, in_memory=in_memory), collate_packed
     if p.suffix == ".data":
@@ -312,11 +318,13 @@ def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
             skip=skip,
             input_buckets=input_buckets,
             feature_channels=feature_channels,
-            full_threats=full_threats), collate
+            full_threats=full_threats,
+            slider_xray_threats=slider_xray_threats), collate
     return FenScoreDataset.from_jsonl(
         p,
         limit=limit,
         skip=skip,
         input_buckets=input_buckets,
         feature_channels=feature_channels,
-        full_threats=full_threats), collate
+        full_threats=full_threats,
+        slider_xray_threats=slider_xray_threats), collate

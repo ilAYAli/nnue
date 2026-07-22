@@ -106,6 +106,16 @@ def test_full_threats_features_extend_base_features() -> None:
     assert max(full) < nn2.input_feature_count(16, 12, True)
 
 
+def test_slider_xray_features_match_trainer_and_engine() -> None:
+    pieces, _stm = nn2.parse_fen(
+        "r3k2r/8/n7/p7/P7/8/8/R3K2R w KQkq - 0 1")
+    pieces.sort(key=lambda item: item[2])
+    assert nn2.slider_xray_features_from_pieces(pieces, nn2.WHITE) == [
+        11_418, 12_324, 43_462, 46_153]
+    assert nn2.slider_xray_features_from_pieces(pieces, nn2.BLACK) == [
+        8_739, 11_418, 39_877, 46_153]
+
+
 def test_halfka_v2_channel_net_round_trip(tmp_path: Path) -> None:
     path = tmp_path / "zero32x11.nn"
     nn2.write_net(_zero_net(32, feature_channels=11), path)

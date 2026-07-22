@@ -127,7 +127,8 @@ def main() -> None:
         skip=args.skip,
         input_buckets=model.input_buckets,
         feature_channels=model.feature_channels,
-        full_threats=model.full_threats)
+        full_threats=model.full_threats,
+        slider_xray_threats=model.slider_xray_threats)
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
                         collate_fn=collate_fn)
 

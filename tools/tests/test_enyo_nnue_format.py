@@ -17,9 +17,11 @@ def zero_net(*, input_buckets: int = 16,
              trained_hidden: int = nn2.N_HIDDEN,
              format_version: int = 1,
              full_threats: bool = False,
+             slider_xray_threats: bool = False,
              full_heads: bool = False) -> nn2.Net:
     features = nn2.input_feature_count(
-        input_buckets, feature_channels, full_threats)
+        input_buckets, feature_channels,
+        full_threats or slider_xray_threats)
     head_count = output_buckets if full_heads else 1
     l1_shape = (head_count, nn2.N_L2, 2 * trained_hidden)
     l2_shape = (head_count, nn2.N_L3, nn2.N_L2)
@@ -48,11 +50,28 @@ def zero_net(*, input_buckets: int = 16,
         trained_hidden=trained_hidden,
         format_version=format_version,
         full_threats=full_threats,
+        slider_xray_threats=slider_xray_threats,
         full_heads=full_heads,
     )
 
 
 class EnyoNNUEFormatTests(unittest.TestCase):
+    def test_slider_xray_v2_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "slider-xray.nn"
+            nn2.write_net(zero_net(
+                output_buckets=8,
+                format_version=2,
+                slider_xray_threats=True,
+            ), path)
+            loaded = nn2.load_net(path)
+            self.assertFalse(loaded.full_threats)
+            self.assertTrue(loaded.slider_xray_threats)
+            self.assertEqual(
+                loaded.input_weights.shape,
+                (nn2.input_feature_count(16, 12, True), nn2.N_HIDDEN),
+            )
+
     def test_full_head_v3_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "full-heads.nn"

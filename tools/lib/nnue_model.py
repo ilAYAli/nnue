@@ -20,6 +20,7 @@ class EnyoNNUE(nn_pt.Module):
                  trained_hidden: int = nn2.N_HIDDEN,
                  format_version: int = 1,
                  full_threats: bool = False,
+                 slider_xray_threats: bool = False,
                  full_heads: bool = False):
         super().__init__()
         self.input_buckets = input_buckets
@@ -29,9 +30,12 @@ class EnyoNNUE(nn_pt.Module):
         self.trained_hidden = trained_hidden
         self.format_version = format_version
         self.full_threats = full_threats
+        self.slider_xray_threats = slider_xray_threats
         self.full_heads = full_heads
         self.embed = nn_pt.EmbeddingBag(
-            nn2.input_feature_count(input_buckets, feature_channels, full_threats),
+            nn2.input_feature_count(
+                input_buckets, feature_channels,
+                full_threats or slider_xray_threats),
             nn2.N_HIDDEN,
             mode="sum")
         self.input_bias = nn_pt.Parameter(torch.zeros(nn2.N_HIDDEN))
@@ -213,6 +217,7 @@ def load_model_from_nn(
         trained_hidden=net.trained_hidden,
         format_version=net.format_version,
         full_threats=net.full_threats,
+        slider_xray_threats=net.slider_xray_threats,
         full_heads=net.full_heads)
     with torch.no_grad():
         model.embed.weight.copy_(torch.from_numpy(net.input_weights.astype(np.float32)))
@@ -289,6 +294,7 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         trained_hidden=model.trained_hidden,
         format_version=model.format_version,
         full_threats=model.full_threats,
+        slider_xray_threats=model.slider_xray_threats,
         full_heads=model.full_heads,
     )
     nn2.write_net(net, path)

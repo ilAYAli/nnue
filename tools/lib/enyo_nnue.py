@@ -50,6 +50,7 @@ NETWORK_FLAG_FULL_THREATS = 1
 NETWORK_FLAG_FULL_HEADS = 2
 NETWORK_FLAG_MIXED_ACTIVATION = 4
 NETWORK_FLAG_PSQT_RESIDUAL = 8
+NETWORK_FLAG_SLIDER_XRAY_THREATS = 16
 NETWORK_HEADER = struct.Struct("<8s14I")
 NETWORK_HEADER_SIZE = NETWORK_HEADER.size
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
@@ -239,6 +240,7 @@ class Net:
     trained_hidden: int = N_HIDDEN
     format_version: int = 1
     full_threats: bool = False
+    slider_xray_threats: bool = False
     full_heads: bool = False
     mixed_activation: bool = False
     psqt_residual: bool = False
@@ -554,6 +556,60 @@ def threat_features_from_pieces(
     return active
 
 
+def slider_xray_features_from_pieces(
+    pieces: Sequence[tuple[int, int, int]],
+    view: int,
+) -> list[int]:
+    occupied = 0
+    pt_bb = [[0 for _ in range(7)] for _ in range(2)]
+    piece_at = [_THREAT_NONE for _ in range(N_SQUARES)]
+    color_at = [WHITE for _ in range(N_SQUARES)]
+    for pt, color, sq in pieces:
+        occupied |= 1 << sq
+        pt_bb[color][pt] |= 1 << sq
+        piece_at[sq] = pt
+        color_at[sq] = color
+    king_square = [
+        _trailing_square(pt_bb[WHITE][KING]) ^ 7,
+        _trailing_square(pt_bb[BLACK][KING]) ^ 7,
+    ]
+    active: list[int] = []
+    for color in (WHITE, BLACK):
+        for pt in (BISHOP, ROOK, QUEEN):
+            attacker = pt + (color << 3)
+            attackers = pt_bb[color][pt]
+            while attackers:
+                from_sq = _trailing_square(attackers)
+                attackers &= attackers - 1
+
+                def attacks_for(occupancy: int) -> int:
+                    attacks = 0
+                    if pt in (BISHOP, QUEEN):
+                        attacks |= _slider_attacks(BISHOP, from_sq, occupancy)
+                    if pt in (ROOK, QUEEN):
+                        attacks |= _slider_attacks(ROOK, from_sq, occupancy)
+                    return attacks
+
+                direct = attacks_for(occupied)
+                blockers = direct & occupied
+                while blockers:
+                    blocker = _trailing_square(blockers)
+                    blockers &= blockers - 1
+                    occupied_without = occupied & ~(1 << blocker)
+                    revealed = attacks_for(occupied_without) & ~direct & occupied_without
+                    while revealed:
+                        to_sq = _trailing_square(revealed)
+                        revealed &= revealed - 1
+                        attacked = piece_at[to_sq] + (color_at[to_sq] << 3)
+                        index = _threat_make_index(
+                            view, attacker, from_sq ^ 7, to_sq ^ 7,
+                            attacked, king_square[view])
+                        if index < N_THREAT_FEATURES:
+                            active.append(index)
+    active.sort()
+    return active
+
+
 def parse_fen(fen: str) -> tuple[list[tuple[int, int, int]], int]:
     parts = fen.split()
     board_part, stm_part = parts[0], parts[1]
@@ -582,7 +638,8 @@ def features_from_pieces(pieces: Sequence[tuple[int, int, int]],
                          view: int,
                          input_buckets: int = DEFAULT_N_KING_BUCKETS,
                          feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
-                         full_threats: bool = False) -> list[int]:
+                         full_threats: bool = False,
+                         slider_xray_threats: bool = False) -> list[int]:
     king_sq = next(sq for pt, color, sq in pieces
                    if pt == KING and color == view)
     features = [
@@ -592,6 +649,10 @@ def features_from_pieces(pieces: Sequence[tuple[int, int, int]],
     if full_threats:
         base = feature_count(input_buckets, feature_channels)
         features.extend(base + index for index in threat_features_from_pieces(pieces, view))
+    if slider_xray_threats:
+        base = feature_count(input_buckets, feature_channels)
+        features.extend(
+            base + index for index in slider_xray_features_from_pieces(pieces, view))
     return features
 
 
@@ -635,6 +696,7 @@ def load_net(path: str | Path) -> Net:
     trained_hidden = N_HIDDEN
     format_version = 1
     full_threats = False
+    slider_xray_threats = False
     full_heads = False
     mixed_activation = False
     psqt_residual = False
@@ -679,33 +741,37 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: unsupported output bucket count")
         if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
             raise ValueError(f"{path}: unsupported output head feature count")
-        allowed_flags = NETWORK_FLAG_FULL_THREATS | (
+        allowed_flags = NETWORK_FLAG_FULL_THREATS | NETWORK_FLAG_SLIDER_XRAY_THREATS | (
             NETWORK_FLAG_FULL_HEADS if format_version == 3 else 0) | (
             NETWORK_FLAG_MIXED_ACTIVATION if format_version == 4 else 0) | (
             NETWORK_FLAG_PSQT_RESIDUAL if format_version == 5 else 0)
         if (flags & ~allowed_flags) or reserved0 or reserved1:
             raise ValueError(f"{path}: unsupported header flags or reserved fields")
         full_threats = bool(flags & NETWORK_FLAG_FULL_THREATS)
+        slider_xray_threats = bool(flags & NETWORK_FLAG_SLIDER_XRAY_THREATS)
+        if full_threats and slider_xray_threats:
+            raise ValueError(f"{path}: multiple threat feature modes")
+        threat_features = full_threats or slider_xray_threats
         full_heads = bool(flags & NETWORK_FLAG_FULL_HEADS)
         mixed_activation = bool(flags & NETWORK_FLAG_MIXED_ACTIVATION)
         psqt_residual = bool(flags & NETWORK_FLAG_PSQT_RESIDUAL)
         if full_heads != (format_version == 3):
             raise ValueError(f"{path}: v3 and full-head flag must be used together")
-        if full_heads and (output_buckets <= 1 or full_threats):
+        if full_heads and (output_buckets <= 1 or threat_features):
             raise ValueError(f"{path}: unsupported full-head architecture")
         if mixed_activation != (format_version == 4):
             raise ValueError(f"{path}: v4 and mixed-activation flag must be used together")
-        if mixed_activation and (full_heads or full_threats or output_buckets != 8):
+        if mixed_activation and (full_heads or threat_features or output_buckets != 8):
             raise ValueError(f"{path}: unsupported mixed-activation architecture")
         if psqt_residual != (format_version == 5):
             raise ValueError(f"{path}: v5 and PSQT-residual flag must be used together")
-        if psqt_residual and (full_heads or full_threats or mixed_activation
+        if psqt_residual and (full_heads or threat_features or mixed_activation
                               or output_buckets != 8):
             raise ValueError(f"{path}: unsupported PSQT-residual architecture")
         payload = data[header_size:]
         expected_payload = network_size(
             input_buckets, output_buckets, output_head_features,
-            feature_channels, full_threats, full_heads, mixed_activation, psqt_residual)
+            feature_channels, threat_features, full_heads, mixed_activation, psqt_residual)
         if payload_size != expected_payload or len(payload) != expected_payload:
             raise ValueError(
                 f"{path}: payload size {len(payload)} does not match {expected_payload}")
@@ -715,7 +781,8 @@ def load_net(path: str | Path) -> Net:
                 len(data))
         except ValueError as exc:
             raise ValueError(f"{path}: {exc}") from exc
-    n_features = input_feature_count(input_buckets, feature_channels, full_threats)
+    threat_features = full_threats or slider_xray_threats
+    n_features = input_feature_count(input_buckets, feature_channels, threat_features)
     output_width = N_L3 + output_head_features
     head_count = output_buckets if full_heads else 1
 
@@ -768,6 +835,7 @@ def load_net(path: str | Path) -> Net:
         trained_hidden=trained_hidden,
         format_version=format_version,
         full_threats=full_threats,
+        slider_xray_threats=slider_xray_threats,
         full_heads=full_heads,
         mixed_activation=mixed_activation,
         psqt_residual=psqt_residual,
@@ -779,7 +847,8 @@ def load_net(path: str | Path) -> Net:
 
 def write_net(net: Net, path: str | Path) -> None:
     expected_features = input_feature_count(
-        net.input_buckets, net.feature_channels, net.full_threats)
+        net.input_buckets, net.feature_channels,
+        net.full_threats or net.slider_xray_threats)
     if net.trained_hidden not in SUPPORTED_TRAINED_HIDDEN:
         raise ValueError(f"unsupported trained hidden width {net.trained_hidden}")
     input_weights = np.asarray(net.input_weights, dtype=np.int16)
@@ -843,7 +912,8 @@ def write_net(net: Net, path: str | Path) -> None:
         raise ValueError(
             f"unsupported output head feature count {net.output_head_features}")
     if net.full_heads and (
-            net.output_buckets <= 1 or net.full_threats
+            net.output_buckets <= 1
+            or net.full_threats or net.slider_xray_threats
             or net.output_head_features != 0):
         raise ValueError("unsupported full-head architecture")
     output_width = net.output_width
@@ -914,6 +984,7 @@ def write_net(net: Net, path: str | Path) -> None:
             net.output_buckets,
             net.output_head_features,
             (NETWORK_FLAG_FULL_THREATS if net.full_threats else 0)
+            | (NETWORK_FLAG_SLIDER_XRAY_THREATS if net.slider_xray_threats else 0)
             | (NETWORK_FLAG_FULL_HEADS if net.full_heads else 0)
             | (NETWORK_FLAG_MIXED_ACTIVATION if net.mixed_activation else 0)
             | (NETWORK_FLAG_PSQT_RESIDUAL if net.psqt_residual else 0),
@@ -930,7 +1001,7 @@ def write_net(net: Net, path: str | Path) -> None:
     size = out.stat().st_size
     expected = network_size(
         net.input_buckets, net.output_buckets, net.output_head_features,
-        net.feature_channels, net.full_threats, net.full_heads,
+        net.feature_channels, net.full_threats or net.slider_xray_threats, net.full_heads,
         net.mixed_activation, net.psqt_residual)
     if net.format_version in (2, 3, 4, 5):
         expected += NETWORK_HEADER_SIZE
