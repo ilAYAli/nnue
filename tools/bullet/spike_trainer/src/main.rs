@@ -304,14 +304,22 @@ fn freeze_base_input_rows<'a>(
     total_features: usize,
     hidden: usize,
 ) -> Affine<'a> {
-    let flat = affine.weights.reshape(Shape::new(hidden * total_features, 1));
     let split = hidden * base_features;
-    let frozen_base = builder.no_grad(|| flat.slice_rows(0, split));
-    let trainable_xray = flat.slice_rows(split, hidden * total_features);
+    let frozen_base = builder.no_grad(|| {
+        affine
+            .weights
+            .reshape(Shape::new(hidden * total_features, 1))
+            .slice_rows(0, split)
+    });
+    let trainable_xray = affine
+        .weights
+        .reshape(Shape::new(hidden * total_features, 1))
+        .slice_rows(split, hidden * total_features);
     affine.weights = frozen_base
         .concat(trainable_xray)
         .reshape(Shape::new(hidden, total_features));
-    affine.bias = builder.no_grad(|| affine.bias.slice_rows(0, hidden));
+    let frozen_bias = builder.no_grad(|| affine.bias.slice_rows(0, hidden));
+    affine.bias = frozen_bias + affine.bias * 0.0;
     affine
 }
 
