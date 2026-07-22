@@ -24,6 +24,24 @@ elo=+25.3  llr=1.15/2.20 (52%)  los=100.0%  ci=14.7  draw=38.6%  games=1500/1500
 This is the largest first-seed gain so far, but its confidence interval overlaps
 the `h4` and `h8` results. Await the matched second seed.
 
+## Matched continuation: `h16` seed 2 (`enyo-h16-v2-rc2`)
+
+`enyo-h16-v2-rc2.nn` applies the identical continuation to
+`enyo-h16-v1-rc2.nn`. SHA-256:
+`44da0e11c3c2d4ab07a204299ee2561d3e3fa39c51f97444eecfff1e2951833c`.
+Gates passed with static `mae=136.275`, `sign=83.60%`, `corr=0.865994`,
+`bias=-0.493`, and `slope=0.794574`. Residual MAE improved for endgame
+`441.404 -> 411.199`, eval 800+ `663.214 -> 631.183`, and eval 300-799
+`390.174 -> 359.073`.
+
+enyo-h16-v2-rc2-sprt-1500-20260722-121338 22 Jul 12:13
+"candidate=enyo-h16-v2-rc2.nn vs reference=enyo-h16-v1-rc2.nn"
+elo=+20.6  llr=1.01/2.20 (46%)  los=99.7%  ci=14.5  draw=39.7%  games=1500/1500  tasks=88/88
+
+Across both seeds, the matched `h16` continuation gain is approximately
+`+23.0 +/-10.3` Elo. This is numerically above `h4` and `h8`, but the lineage
+means still overlap substantially.
+
 ## Matched continuation: `h8` seed 1 (`enyo-h8-v2-rc1`)
 
 `enyo-h8-v2-rc1.nn` applies the matched 256-superbatch continuation to
