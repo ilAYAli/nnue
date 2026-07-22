@@ -855,7 +855,7 @@ fn training_trainable(config: &Config) -> String {
 fn supported_trainable(value: &str) -> bool {
     matches!(
         value,
-        "all" | "input" | "dense-head" | "float-head" | "output" | "squared-branch" | "psqt"
+        "all" | "input" | "xray-only" | "dense-head" | "float-head" | "output" | "squared-branch" | "psqt"
     )
 }
 
@@ -2727,6 +2727,7 @@ mod tests {
     #[test]
     fn dense_head_is_supported_and_unknown_mode_is_rejected() {
         assert!(supported_trainable("dense-head"));
+        assert!(supported_trainable("xray-only"));
         assert!(supported_trainable("squared-branch"));
         assert!(!supported_trainable("typo"));
     }

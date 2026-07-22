@@ -297,6 +297,24 @@ fn maybe_frozen<'a, T>(builder: &'a ModelBuilder, frozen: bool, mut f: impl FnMu
     }
 }
 
+fn freeze_base_input_rows<'a>(
+    builder: &'a ModelBuilder,
+    mut affine: Affine<'a>,
+    base_features: usize,
+    total_features: usize,
+    hidden: usize,
+) -> Affine<'a> {
+    let flat = affine.weights.reshape(Shape::new(hidden * total_features, 1));
+    let split = hidden * base_features;
+    let frozen_base = builder.no_grad(|| flat.slice_rows(0, split));
+    let trainable_xray = flat.slice_rows(split, hidden * total_features);
+    affine.weights = frozen_base
+        .concat(trainable_xray)
+        .reshape(Shape::new(hidden, total_features));
+    affine.bias = builder.no_grad(|| affine.bias.slice_rows(0, hidden));
+    affine
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct EnyoInputs<
     const INPUT_BUCKETS: usize,
@@ -692,11 +710,14 @@ fn train_enyo<
 
     if !matches!(
         trainable.as_str(),
-        "all" | "input" | "dense-head" | "float-head" | "output" | "squared-branch" | "psqt"
+        "all" | "input" | "xray-only" | "dense-head" | "float-head" | "output" | "squared-branch" | "psqt"
     ) {
         panic!("unsupported trainable mode: {trainable}");
     }
-    let train_input = trainable == "all" || trainable == "input";
+    let train_input = trainable == "all" || trainable == "input" || trainable == "xray-only";
+    if trainable == "xray-only" && !SLIDER_XRAY_THREATS {
+        panic!("xray-only requires slider x-ray threat features");
+    }
     let train_l1 = trainable == "all" || trainable == "dense-head";
     let train_l2 = trainable == "all"
         || trainable == "dense-head"
@@ -848,6 +869,15 @@ fn train_enyo<
                     l0_stdev,
                 )
             });
+            if trainable == "xray-only" {
+                l0 = freeze_base_input_rows(
+                    $builder,
+                    l0,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64 + enyo_threats::DIMENSIONS,
+                    hidden,
+                );
+            }
             if input_factoriser {
                 let l0f = maybe_frozen($builder, !train_input, || {
                     $builder.new_weights(
@@ -932,6 +962,15 @@ fn train_enyo<
                     l0_stdev,
                 )
             });
+            if trainable == "xray-only" {
+                l0 = freeze_base_input_rows(
+                    $builder,
+                    l0,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64 + enyo_threats::DIMENSIONS,
+                    hidden,
+                );
+            }
             if input_factoriser {
                 let l0f = maybe_frozen($builder, !train_input, || {
                     $builder.new_weights(
