@@ -401,6 +401,18 @@ The direct refined seed-1 comparison scored `h8 +1.4 +/-14.4` Elo versus h16
 indistinguishable, so stop the bucket-only race and redirect architecture work
 to genuinely new tactical information.
 
+### Slider x-ray feature probe
+
+Test one isolated tactical addition on the mature native h16 foundation:
+`enyo-sliderxray-v1-rc1` adds only bishop, rook, and queen interactions with
+the first occupied piece revealed behind a blocker. It excludes ordinary
+direct threats and uses the existing 60,720-row FullThreats index space. Warm
+start from `enyo-1.30.0-rc3.nn`, preserving every existing weight and
+zero-initializing the new rows. First run only the historically positive
+256-superbatch continuation regimen, then test directly against
+`enyo-1.30.0-rc3.nn`. Stop after this bounded probe if parity, runtime cost,
+gates, or Elo is poor; do not spend a long training dose on a rejected feature.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
