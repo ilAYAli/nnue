@@ -224,8 +224,8 @@ The lineage slug is the stable architecture identity used in artifact names:
 | H | `h16o4` | `16x12-1024-o4`, factorised | Completed. Output-bucket challenger. |
 | I | `h10w768o4` | `10x11-768-o4`, factorised | Ineligible under the current 11-channel input-bucket contract. |
 | J | `recklessft` | current Reckless `10x12-768-o8`: native mirrored king buckets, 66,864 occupied-piece threat features, factorised piece inputs, pairwise CReLU, explicit eight-bucket material map, and full dense heads | Rejected. After fixing the dense-export layout and re-exporting the preserved checkpoint, rc1 scored `1-1486-13` (`-919.54 +/-93.68` Elo, `0.0%` LOS) versus `enyo-1.30.0-rc3`; do not train rc2. The earlier broken export and piece-only run are invalid provenance, not architecture results. |
-| K | `h10w768u` | `10x11-768-o8`, unfactorised | Eligible piece-only control: Enyo and the trainer share the tested 10-bucket/11-channel contract. Run before L. |
-| L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Eligible tactical-feature challenger under the same tested bucket contract; run only after K establishes the matched baseline. |
+| K | `h10w768u` | `10x11-768-o8`, unfactorised | Rejected. Static MAE `156.450`; residual MAE regressed by `141.043` in endgames, `200.953` at eval 800+, and `193.731` at eval 300-799. No SPRT. |
+| L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Do not run: its required matched piece-only control K failed, and seven historical FullThreats scratch/warm-start/scope/LR variants were already decisively negative. |
 
 The candidate letter is only a compact table reference; use the lineage slug in
 run names, results, and discussion. Candidate J follows current Reckless rather
@@ -451,7 +451,8 @@ same calibration collapse: residual MAE regressed `162.744` in endgames,
 without an SPRT. Proceed to the documented matched 10-bucket/11-channel
 piece-only and FullThreats pair. The shared runtime/trainer bucket contract is
 implemented and covered by the feature-index and ten-bucket coverage tests; the
-piece-only control runs first.
+piece-only control runs first. K failed every required residual band by a wide
+margin, so do not spend GPU time on L.
 
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
