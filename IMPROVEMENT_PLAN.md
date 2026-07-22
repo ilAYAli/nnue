@@ -437,6 +437,13 @@ factorisation, pairwise activation, and threat features. It directly targets
 the measured material-bucket calibration problem. Run the fixed gates and, if
 they pass, at most 1,500 games against `enyo-1.30.0-rc3.nn`.
 
+RC1 preserved the accumulator exactly and updated every dense head, but
+`lr=0.0001` over-updated the smaller per-bucket samples: residual MAE regressed
+by `162.372` in endgames, `269.120` at eval 800+, and `225.504` at eval
+300-799. RC2 changes only the learning rate to `0.00001`. Dense float layers
+retain sub-integer updates, so this does not have the export-resolution problem
+of the integer x-ray rows. Close the full-head line if RC2 fails.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
