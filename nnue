@@ -437,9 +437,22 @@ static_gate() {
   )
   local full_heads
   full_heads=$(jq -r '.output_bucket_scope == "full-head"' "$ARCH")
-  [[ "$full_heads" == true ]] && eval_args+=(--material-buckets)
-  "$PYTHON" tools/validate/eval_dataset.py \
-    "${eval_args[@]}" 2>&1 | tee "$log"
+  local mode
+  mode=$(jq -r '.mode // "enyo"' "$ARCH")
+  if [[ "$mode" == reckless ]]; then
+    local engine_static_jsonl
+    engine_static_jsonl=${ENGINE_STATIC_JSONL:-$HOME/assets/enyo_nnue_data/sf_labels/sf_combined_904k.val.jsonl}
+    [[ -f "$engine_static_jsonl" ]] \
+      || fail "missing engine static JSONL: $engine_static_jsonl" static_eval
+    "$PYTHON" tools/validate/eval_jsonl_engine.py \
+      --engine "$ENGINE" --net "$candidate_net" --jsonl "$engine_static_jsonl" \
+      --rows "$ROWS" --threads 1 --hash 64 --buckets \
+      --material-buckets reckless 2>&1 | tee "$log"
+  else
+    [[ "$full_heads" == true ]] && eval_args+=(--material-buckets)
+    "$PYTHON" tools/validate/eval_dataset.py \
+      "${eval_args[@]}" 2>&1 | tee "$log"
+  fi
   local mae sign corr bias slope
   mae=$(metric mae "$log")
   sign=$(metric sign "$log")
@@ -477,7 +490,12 @@ static_gate() {
 
   if [[ "$full_heads" == true ]]; then
     local init_weights trained_weights trainable
-    init_weights="runs/$run/init/optimiser_state/weights.bin"
+    if [[ "$mode" == reckless ]]; then
+      init_weights="runs/$run/checkpoints/$(jq -r --slurpfile defaults "$DEFAULTS" \
+        '.net_id // $defaults[0].net_id' "$BUILD")-seeded-init.bin"
+    else
+      init_weights="runs/$run/init/optimiser_state/weights.bin"
+    fi
     trained_weights=$(find "runs/$run/checkpoints" -path '*/optimiser_state/weights.bin' \
       -printf '%p\n' 2>/dev/null | sort -V | tail -1)
     trainable=$(jq -r --slurpfile defaults "$DEFAULTS" \

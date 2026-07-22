@@ -163,6 +163,7 @@ class Evaluation:
     side: dict[str, Stats] = field(default_factory=lambda: defaultdict(Stats))
     source: dict[str, Stats] = field(default_factory=lambda: defaultdict(Stats))
     bucket: dict[str, Stats] = field(default_factory=lambda: defaultdict(Stats))
+    material_bucket: dict[int, Stats] = field(default_factory=lambda: defaultdict(Stats))
     skipped: int = 0
 
 
@@ -183,6 +184,17 @@ def score_bucket(target: float) -> str:
 
 def source_name(row: dict[str, object]) -> str:
     return str(row.get("source_type") or row.get("teacher") or "unknown")
+
+
+RECKLESS_OUTPUT_BUCKETS = (
+    0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4,
+    5, 5, 5, 6, 6, 6, 7, 7, 7, 7,
+)
+
+
+def fen_piece_count(fen: str) -> int:
+    return sum(char.isalpha() for char in fen.split()[0])
 
 
 def read_rows(path: Path, *, limit: int, skip: int,
@@ -233,6 +245,7 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--buckets", action="store_true")
     parser.add_argument("--sources", action="store_true")
+    parser.add_argument("--material-buckets", choices=("reckless",))
     parser.add_argument("--progress", type=int, default=1000)
     args = parser.parse_args()
 
@@ -266,12 +279,22 @@ def main() -> int:
             result.side[side].update(pred, target)
             result.source[source].update(pred, target)
             result.bucket[score_bucket(target)].update(pred, target)
+            if args.material_buckets == "reckless":
+                # Some external validation rows contain illegal promoted-piece
+                # counts above 32. Reckless maps every such position to its
+                # highest material bucket.
+                piece_count = min(fen_piece_count(fen), 32)
+                result.material_bucket[RECKLESS_OUTPUT_BUCKETS[piece_count]].update(
+                    pred, target)
             if args.progress > 0 and i % args.progress == 0:
                 print(f"evaluated {i}/{len(rows)}", flush=True)
     finally:
         engine.close()
 
     print_stats("all", result.total)
+    overall = result.total.derived()
+    for key in ("mae", "sign", "corr", "bias", "slope"):
+        print(f"{key}={overall[key]:.6f}")
     print(f"skipped={result.skipped}", flush=True)
     for side in ("w", "b"):
         if result.side[side].rows:
@@ -284,6 +307,13 @@ def main() -> int:
                        "800-1600", "1600+"):
             if result.bucket[bucket].rows:
                 print_stats(f"bucket:{bucket}", result.bucket[bucket])
+    if args.material_buckets:
+        for bucket in range(8):
+            stats = result.material_bucket[bucket]
+            derived = stats.derived()
+            print(f"material_bucket_{bucket}_rows={stats.rows}")
+            print(f"material_bucket_{bucket}_corr={derived['corr']:.6f}")
+            print(f"material_bucket_{bucket}_slope={derived['slope']:.6f}")
     return 0
 
 
