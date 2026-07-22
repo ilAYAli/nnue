@@ -1,15 +1,15 @@
 {
-  "run": "enyo-sf32-v2-rc2",
-  "continue_from": "enyo-sf32-v1-rc2",
-  "reference": "enyo-sf32-v1-rc2",
-  "hypothesis": "matched continuation competition sf32 seed 2/2: continue the sf32 scratch foundation with the historically positive T60T70wIsRightFarseer 256-superbatch lr=0.0001 activation-L1 regimen",
-  "superbatches": 256,
+  "run": "enyo-h4-v3-rc1",
+  "continue_from": "enyo-h4-v2-rc1",
+  "reference": "enyo-h4-v2-rc1",
+  "hypothesis": "matched long continuation competition h4 seed 1/2: continue the positive h4 checkpoint for 7600 superbatches on the next disjoint T60T70wIsRightFarseer slice to measure longer-run architecture learning",
+  "superbatches": 7600,
   "lr": 0.0001,
   "wdl": 0.05,
   "activation_l1": 0.00001,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
-    "offset": 0,
-    "limit": 200000000
+    "offset": 200000000,
+    "limit": 1000000000
   }
 }

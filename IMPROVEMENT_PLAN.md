@@ -368,6 +368,13 @@ learning trajectories diverge with materially more training; mature-reference
 and direct finalist matches remain deferred until all eight long continuations
 are complete.
 
+The first long `h4` continuation scored `+4.2 +/-14.8` Elo (`0.20/2.20` LLR,
+`71.0%` LOS, `37.6%` draws) over its `v2` parent. This is inconclusive but a
+much weaker marginal gain than its 256-superbatch checkpoint. Run the first
+long seed of `h8`, `h16`, and `sf32` next; only then decide which lineages merit
+the second long seed, avoiding another eight-run commitment when the learning
+curves may already separate.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the

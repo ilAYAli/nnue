@@ -7,6 +7,24 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Long continuation: `h4` seed 1 (`enyo-h4-v3-rc1`)
+
+`enyo-h4-v3-rc1.nn` continues `enyo-h4-v2-rc1.nn` for 7,600 superbatches on
+the next disjoint data slice. SHA-256:
+`df02792c3faf8f1f21796ff2be8b59f90e9108ccc647d259c5103e82247f87a1`.
+Gates passed with static `mae=136.116`, `sign=84.01%`, `corr=0.873809`,
+`bias=6.904`, and `slope=0.814035`. Residual MAE improved for endgame
+`428.738 -> 424.590`, eval 800+ `652.761 -> 646.411`, and eval 300-799
+`353.810 -> 349.234`.
+
+enyo-h4-v3-rc1-sprt-1500-20260722-144424 22 Jul 14:44
+"candidate=enyo-h4-v3-rc1.nn vs reference=enyo-h4-v2-rc1.nn"
+elo=+4.2  llr=0.20/2.20 (9%)  los=71.0%  ci=14.8  draw=37.6%  games=1500/1500  tasks=88/88
+
+The long continuation is inconclusive and shows a weak marginal learning rate.
+Compare the first long seed of every lineage before deciding whether `h4`
+warrants its second long seed.
+
 ## Matched continuation: `sf32` seed 1 (`enyo-sf32-v2-rc1`)
 
 `enyo-sf32-v2-rc1.nn` applies the matched 256-superbatch continuation to
