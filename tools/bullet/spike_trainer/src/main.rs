@@ -43,6 +43,24 @@ fn tensor_rng(seed: u64, id: &str) -> ChaCha8Rng {
     ChaCha8Rng::from_seed(digest)
 }
 
+fn bucketed_input_major(
+    weights: &[f32],
+    input_size: usize,
+    outputs_per_bucket: usize,
+    buckets: usize,
+) -> Vec<f32> {
+    let total_outputs = outputs_per_bucket * buckets;
+    assert_eq!(weights.len(), input_size * total_outputs);
+    let mut reordered = Vec::with_capacity(weights.len());
+    for bucket in 0..buckets {
+        for input in 0..input_size {
+            let base = input * total_outputs + bucket * outputs_per_bucket;
+            reordered.extend_from_slice(&weights[base..base + outputs_per_bucket]);
+        }
+    }
+    reordered
+}
+
 fn write_tensor<W: Write>(
     output: &mut W,
     seed: u64,
@@ -509,6 +527,25 @@ mod tests {
             used[bucket] = true;
         }
         assert!(used.into_iter().all(|value| value));
+    }
+
+    #[test]
+    fn bucketed_affine_export_is_bucket_then_input_then_output() {
+        // Bullet stores affine weights input-major across every output:
+        // [input][bucket][output]. Enyo's full Reckless heads require
+        // [bucket][input][output].
+        let weights = (0..24).map(|value| value as f32).collect::<Vec<_>>();
+        assert_eq!(
+            bucketed_input_major(&weights, 3, 4, 2),
+            vec![
+                0.0, 1.0, 2.0, 3.0,
+                8.0, 9.0, 10.0, 11.0,
+                16.0, 17.0, 18.0, 19.0,
+                4.0, 5.0, 6.0, 7.0,
+                12.0, 13.0, 14.0, 15.0,
+                20.0, 21.0, 22.0, 23.0,
+            ]
+        );
     }
 
     #[test]
@@ -1307,11 +1344,15 @@ fn main() {
                 .quantise::<i8>(255),
             SavedFormat::id("l0b").round().quantise::<i16>(255),
             SavedFormat::id("l1w")
-                .transpose()
+                .transform(move |_store, weights| {
+                    bucketed_input_major(&weights, hidden, l2_size, NUM_OUTPUT_BUCKETS)
+                })
                 .round()
                 .quantise::<i8>(64),
             SavedFormat::id("l1b"),
-            SavedFormat::id("l2w").transpose(),
+            SavedFormat::id("l2w").transform(move |_store, weights| {
+                bucketed_input_major(&weights, l2_size, 32, NUM_OUTPUT_BUCKETS)
+            }),
             SavedFormat::id("l2b"),
             SavedFormat::id("l3w").transpose(),
             SavedFormat::id("l3b"),
@@ -1375,6 +1416,13 @@ fn main() {
             .expect("failed to load deterministic Reckless initial weights");
         println!("loaded_init_seed={seed}");
         trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+    }
+
+    if env_parse("ENYO_BULLET_EXPORT_ONLY", 0usize) != 0 {
+        let path = format!("{output}/{net_id}-{end_superbatch}");
+        trainer.save_to_checkpoint(&path);
+        println!("exported_checkpoint={path}");
+        return;
     }
 
     let schedule = TrainingSchedule {
