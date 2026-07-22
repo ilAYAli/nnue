@@ -387,6 +387,15 @@ failure in the same band means the 7,600-superbatch regimen cannot currently be
 used to eliminate `h8` relative to the incumbent. Run `sf32` seed 1, then
 reassess the common continuation dose/objective before any second seeds.
 
+The first long `sf32` continuation likewise failed: endgame MAE improved
+`415.116 -> 406.494` and eval 800+ improved `634.993 -> 614.823`, while eval
+300-799 regressed `347.194 -> 352.502`. Do not run its parent-relative SPRT or
+any second long seeds. Since `h8`, `h16`, and `sf32` all failed the same band,
+the long regimen is not a valid discriminator. Use direct head-to-head games
+between the valid `v2` seed-1 checkpoints next, beginning with `h8` versus the
+incumbent `h16`; advance the winner through `h4` and `sf32`, then confirm the
+surviving comparison with seed 2.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the

@@ -7,6 +7,21 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Long continuation: `sf32` seed 1 (`enyo-sf32-v3-rc1`)
+
+`enyo-sf32-v3-rc1.nn` continued `enyo-sf32-v2-rc1.nn` for 7,600
+superbatches on the matched disjoint slice. SHA-256:
+`3bcb59ecd97fbfc15a7f8f8bc8bdfd8161b42cf3c5e0b2756c2dd101107b0a77`.
+Static evaluation was `mae=138.221`, `sign=83.53%`, `corr=0.870486`,
+`bias=-1.678`, and `slope=0.810398`. Residual MAE improved for endgame
+`415.116 -> 406.494` and eval 800+ `634.993 -> 614.823`, but regressed for
+eval 300-799 `347.194 -> 352.502`.
+
+Status: rejected by `residual_gate`; no SPRT was run. Three of four long
+continuations failed the same residual band, so this regimen cannot provide a
+sound architecture cut. Continue with direct games between the valid `v2`
+checkpoints.
+
 ## Long continuation: `h16` seed 1 (`enyo-h16-v3-rc1`)
 
 `enyo-h16-v3-rc1.nn` continued `enyo-h16-v2-rc1.nn` for 7,600 superbatches
