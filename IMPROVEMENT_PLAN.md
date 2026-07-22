@@ -223,7 +223,7 @@ The lineage slug is the stable architecture identity used in artifact names:
 | G | `h16w768` | `16x12-768-o8`, factorised | Completed. Width-only challenger. |
 | H | `h16o4` | `16x12-1024-o4`, factorised | Completed. Output-bucket challenger. |
 | I | `h10w768o4` | `10x11-768-o4`, factorised | Ineligible under the current 11-channel input-bucket contract. |
-| J | `recklessft` | current Reckless `10x12-768-o8`: native mirrored king buckets, 66,864 occupied-piece threat features, factorised piece inputs, pairwise CReLU, explicit eight-bucket material map, and full dense heads | Implementation/validation in progress. The earlier piece-only `enyo-reckless-v1-rc1` run was stopped at superbatch 92,966/196,608 and is ineligible: it represented an abandoned architecture and receives no Elo result. |
+| J | `recklessft` | current Reckless `10x12-768-o8`: native mirrored king buckets, 66,864 occupied-piece threat features, factorised piece inputs, pairwise CReLU, explicit eight-bucket material map, and full dense heads | Rejected. After fixing the dense-export layout and re-exporting the preserved checkpoint, rc1 scored `1-1486-13` (`-919.54 +/-93.68` Elo, `0.0%` LOS) versus `enyo-1.30.0-rc3`; do not train rc2. The earlier broken export and piece-only run are invalid provenance, not architecture results. |
 | K | `h10w768u` | `10x11-768-o8`, unfactorised | Proposed matched control for FullThreats; requires a compatible 11-channel input-bucket contract. |
 | L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Proposed tactical-feature challenger; requires the same compatible contract as K. |
 
@@ -295,6 +295,25 @@ doing so would test a long sequence of objective and corpus interactions rather
 than architecture/feature capacity. The race selects the best architecture
 under a common fixed compute budget; it does not claim to finish all subsequent
 net tuning.
+
+### Matched continuation competition
+
+The scratch scores are foundation measurements, not the final architecture
+ranking. Four lineages form the credible cluster and advance: `h4`, `h8`,
+`h16`, and `sf32`. Both scratch seeds advance for every lineage; selecting only
+the strongest seed would bias the comparison. The weaker `h1`, `h16w768`, and
+`h16o4` controls do not advance, and the catastrophic corrected `recklessft`
+result rejects that lineage.
+
+Each of the eight descendants uses its exact scratch net as `continue_from` and
+receives the same historically successful continuation treatment: 256
+superbatches from `T60T70wIsRightFarseer.binpack` at offset 0 and limit
+200,000,000, `lr=0.0001`, `wdl=0.05`, and `activation_l1=0.00001`. Architecture
+and all other resolved settings remain unchanged. First test each descendant
+against its own ancestor to measure refinement gain, then against immutable
+`enyo-1.30.0-rc3.nn` to measure absolute strength. Rank lineage trajectories by
+the paired two-seed evidence and directly test the leading refined lineages;
+never declare an architecture winner from the best isolated scratch RC.
 
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`

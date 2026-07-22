@@ -1,9 +1,9 @@
 {
-  "run": "enyo-h16o4-v1-rc2",
+  "run": "enyo-recklessft-v1-rc1",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "architecture race h16o4 replicate 2/2 (seed 5090002): random-init 16x12-1024-o4 factorised output-bucket challenger under the fixed one-pass pylon protocol",
+  "hypothesis": "architecture race recklessft replicate 1/2 (seed 5090001): random-init current Reckless 10x12-768-o8 with native king buckets, 66864 threat features, factorised piece inputs, pairwise CReLU, explicit material buckets, and full dense heads under the fixed one-pass pylon protocol",
   "superbatches": 196608,
-  "init_seed": 5090002,
+  "init_seed": 5090001,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet"

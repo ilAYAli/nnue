@@ -1,5 +1,39 @@
 # Architecture competition results
 
+The scratch results below are baseline measurements, not the final architecture
+ranking. The competitive cluster (`h4`, `h8`, `h16`, and `sf32`) advances with
+both seeds into the same matched continuation regimen. The clearly weaker
+`h1`, `h16w768`, and `h16o4` controls do not advance. Architecture selection
+uses the refined two-seed results; it does not select the best isolated scratch
+score.
+
+## J: current Reckless 10x12-768-o8 with threats (`recklessft`)
+
+Net: `enyo-recklessft-v1-rc1.nn`
+
+The first export transposed both dense layers incorrectly. Its static result and
+`0-1499-1` game score are invalid and retained only as exporter-bug provenance.
+After fixing the dense layout, the preserved trained checkpoint was re-exported
+without additional training. The corrected net has SHA-256
+`93acbbcec2b67dea234effe57a4f51c5b7a65084d541e734436854be866a835c`.
+
+The corrected 50,000-position runtime evaluation was sane but failed the
+residual gate: `mae=348.059120`, `sign=75.427673%`, `corr=0.723222`,
+`bias=-27.901760`, and `slope=2.024792`. Endgame residual MAE regressed from
+`285.109` to `396.507`, eval `800+` from `432.990` to `508.697`, and eval
+`300-799` from `164.106` to `402.053`.
+
+enyo-recklessft-v1-rc1-sprt-1500-20260722-081235 22 Jul 08:12 · 20m
+"candidate=enyo-recklessft-v1-rc1.nn vs reference=enyo-1.30.0-rc3.nn"
+elo=-919.54  llr=-13.11/2.20  los=0.0%  ci=93.68  draw=0.9%  games=1500/1500  tasks=88/88
+
+The all-shard score was `1-1486-13` (wins-losses-draws), with zero task
+failures. Elo, CI, LOS, and draw rate are reconstructed from every shard. The
+LLR is the sum of the final per-shard LLRs at their available two-decimal
+precision. Forge's finite-shard aggregate (`-572.5` Elo, `-1.73/2.20` LLR,
+`6.2%` draws) omitted the 76 all-loss shards and is invalid. This corrected
+result rejects the trained `recklessft` candidate; do not train rc2.
+
 ## H: 16x12-1024-o4, factorised (`h16o4`)
 
 Net: `enyo-h16o4-v1-rc2.nn`
