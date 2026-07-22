@@ -24,6 +24,24 @@ elo=+22.5  llr=1.04/2.20 (47%)  los=99.9%  ci=14.3  draw=40.5%  games=1500/1500 
 This is a positive first-seed refinement signal. It does not select `h8` until
 the matched second seed and the remaining lineages are measured.
 
+## Matched continuation: `h8` seed 2 (`enyo-h8-v2-rc2`)
+
+`enyo-h8-v2-rc2.nn` applies the identical continuation to
+`enyo-h8-v1-rc2.nn`. SHA-256:
+`95e54bcff5f6ca1feb483fc3ddb5ca632dd601fb1301f07a9f5480ded10d2480`.
+Gates passed with static `mae=135.992`, `sign=83.39%`, `corr=0.866509`,
+`bias=-0.103`, and `slope=0.786493`. Residual MAE improved for endgame
+`445.692 -> 408.135`, eval 800+ `658.759 -> 617.356`, and eval 300-799
+`363.931 -> 332.552`.
+
+enyo-h8-v2-rc2-sprt-1500-20260722-105938 22 Jul 10:59
+"candidate=enyo-h8-v2-rc2.nn vs reference=enyo-h8-v1-rc2.nn"
+elo=+10.7  llr=0.47/2.20 (21%)  los=92.0%  ci=14.8  draw=36.9%  games=1500/1500  tasks=88/88
+
+Across both seeds, the matched `h8` continuation gain is approximately
+`+16.6 +/-10.3` Elo. It is statistically indistinguishable from the current
+`h4` mean of `+15.1 +/-10.4` Elo.
+
 ## Matched continuation: `h4` seed 1 (`enyo-h4-v2-rc1`)
 
 `enyo-h4-v2-rc1.nn` continues `enyo-h4-v1-rc1.nn` for 256 superbatches on
