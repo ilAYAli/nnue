@@ -413,8 +413,11 @@ zero-initializing the new rows. First run only the historically positive
 `enyo-1.30.0-rc3.nn`. RC1 trained the whole network and failed the residual
 gate catastrophically, so RC2 is the clean isolation test: freeze all mature
 piece rows, the input bias, and every dense weight; train only the zero-init
-x-ray rows for 256 superbatches at `lr=0.00001`, with no activation penalty or
-weight decay. Stop after RC2 if parity, runtime cost, gates, or Elo is poor; do
+x-ray rows for 256 superbatches, with no activation penalty or weight decay.
+RC2 at `lr=0.00001` preserved every mature tensor but produced no x-ray value
+large enough to survive integer export. RC3 therefore changes only the learning
+rate to `0.0001`, the smallest already-tested rate expected to cross export
+resolution. Stop after RC3 if parity, runtime cost, gates, or Elo is poor; do
 not spend a long training dose on a rejected feature.
 
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
