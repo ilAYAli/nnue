@@ -224,8 +224,8 @@ The lineage slug is the stable architecture identity used in artifact names:
 | H | `h16o4` | `16x12-1024-o4`, factorised | Completed. Output-bucket challenger. |
 | I | `h10w768o4` | `10x11-768-o4`, factorised | Ineligible under the current 11-channel input-bucket contract. |
 | J | `recklessft` | current Reckless `10x12-768-o8`: native mirrored king buckets, 66,864 occupied-piece threat features, factorised piece inputs, pairwise CReLU, explicit eight-bucket material map, and full dense heads | Rejected. After fixing the dense-export layout and re-exporting the preserved checkpoint, rc1 scored `1-1486-13` (`-919.54 +/-93.68` Elo, `0.0%` LOS) versus `enyo-1.30.0-rc3`; do not train rc2. The earlier broken export and piece-only run are invalid provenance, not architecture results. |
-| K | `h10w768u` | `10x11-768-o8`, unfactorised | Proposed matched control for FullThreats; requires a compatible 11-channel input-bucket contract. |
-| L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Proposed tactical-feature challenger; requires the same compatible contract as K. |
+| K | `h10w768u` | `10x11-768-o8`, unfactorised | Eligible piece-only control: Enyo and the trainer share the tested 10-bucket/11-channel contract. Run before L. |
+| L | `h10w768ft` | `10x11-768-o8`, unfactorised, FullThreats | Eligible tactical-feature challenger under the same tested bucket contract; run only after K establishes the matched baseline. |
 
 The candidate letter is only a compact table reference; use the lineage slug in
 run names, results, and discussion. Candidate J follows current Reckless rather
@@ -449,8 +449,9 @@ accumulator exactly, and reduced most dense update magnitudes, but repeated the
 same calibration collapse: residual MAE regressed `162.744` in endgames,
 `268.615` at eval 800+, and `222.064` at eval 300-799. Close the full-head line
 without an SPRT. Proceed to the documented matched 10-bucket/11-channel
-piece-only and FullThreats pair only after implementing one shared runtime and
-trainer bucket contract; the piece-only control runs first.
+piece-only and FullThreats pair. The shared runtime/trainer bucket contract is
+implemented and covered by the feature-index and ten-bucket coverage tests; the
+piece-only control runs first.
 
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
