@@ -7,6 +7,23 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Matched continuation: `sf32` seed 1 (`enyo-sf32-v2-rc1`)
+
+`enyo-sf32-v2-rc1.nn` applies the matched 256-superbatch continuation to
+`enyo-sf32-v1-rc1.nn`. SHA-256:
+`2b5f9aca41fa5df6594cb3f66a241de82fdd0a4fc84a11592d6a415f6f67cef9`.
+Gates passed with static `mae=136.372`, `sign=83.16%`, `corr=0.860505`,
+`bias=2.863`, and `slope=0.793384`. Residual MAE improved for endgame
+`457.526 -> 415.116`, eval 800+ `682.312 -> 634.993`, and eval 300-799
+`381.473 -> 347.194`.
+
+enyo-sf32-v2-rc1-sprt-1500-20260722-125307 22 Jul 12:53
+"candidate=enyo-sf32-v2-rc1.nn vs reference=enyo-sf32-v1-rc1.nn"
+elo=+15.3  llr=0.67/2.20 (30%)  los=97.9%  ci=14.7  draw=38.4%  games=1500/1500  tasks=88/88
+
+This is a positive first-seed refinement signal. Complete the matched second
+seed before comparing the `sf32` learning trajectory with the other lineages.
+
 ## Matched continuation: `h16` seed 1 (`enyo-h16-v2-rc1`)
 
 `enyo-h16-v2-rc1.nn` applies the matched 256-superbatch continuation to

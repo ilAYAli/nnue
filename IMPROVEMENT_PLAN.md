@@ -346,6 +346,10 @@ LOS, `39.7%` draws). The approximate `h16` two-seed mean is `+23.0 +/-10.3`
 Elo. It leads numerically but is not significantly separated from `h4` or
 `h8`; complete both `sf32` seeds before deciding the next depth.
 
+The first `sf32` continuation seed gained `+15.3 +/-14.7` Elo (`0.67/2.20`
+LLR, `97.9%` LOS, `38.4%` draws) over `enyo-sf32-v1-rc1`. Complete the matched
+second seed before comparing lineage means or selecting the next training dose.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
