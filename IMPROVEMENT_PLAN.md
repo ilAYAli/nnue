@@ -420,6 +420,23 @@ rate to `0.0001`, the smallest already-tested rate expected to cross export
 resolution. Stop after RC3 if parity, runtime cost, gates, or Elo is poor; do
 not spend a long training dose on a rejected feature.
 
+RC3 made 1,975 x-ray weights export-visible while preserving every mature
+tensor, but failed the residual gate: endgame MAE improved only `0.020`, while
+eval 800+ regressed `0.042` and eval 300-799 regressed `0.354`. Close the
+slider-xray line without an SPRT.
+
+### Material-specific full-head probe
+
+Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
+eight material-specific dense heads from the shared `enyo-1.30.0-rc3` head, so
+the untrained candidate is evaluation-identical to its parent. Freeze the
+accumulator and train only the dense heads for 256 superbatches with `lr=0.0001`,
+`wdl=0.05`, and activation L1 `0.00001`. This isolates the full-head mechanism
+that the Reckless candidate confounded with different king buckets, width,
+factorisation, pairwise activation, and threat features. It directly targets
+the measured material-bucket calibration problem. Run the fixed gates and, if
+they pass, at most 1,500 games against `enyo-1.30.0-rc3.nn`.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
