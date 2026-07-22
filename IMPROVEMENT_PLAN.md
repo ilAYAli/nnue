@@ -410,8 +410,12 @@ direct threats and uses the existing 60,720-row FullThreats index space. Warm
 start from `enyo-1.30.0-rc3.nn`, preserving every existing weight and
 zero-initializing the new rows. First run only the historically positive
 256-superbatch continuation regimen, then test directly against
-`enyo-1.30.0-rc3.nn`. Stop after this bounded probe if parity, runtime cost,
-gates, or Elo is poor; do not spend a long training dose on a rejected feature.
+`enyo-1.30.0-rc3.nn`. RC1 trained the whole network and failed the residual
+gate catastrophically, so RC2 is the clean isolation test: freeze all mature
+piece rows, the input bias, and every dense weight; train only the zero-init
+x-ray rows for 256 superbatches at `lr=0.00001`, with no activation penalty or
+weight decay. Stop after RC2 if parity, runtime cost, gates, or Elo is poor; do
+not spend a long training dose on a rejected feature.
 
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
