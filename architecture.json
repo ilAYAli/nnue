@@ -1,18 +1,16 @@
 {
-  "name": "native-recklessft-10x12-768-o8-v7-factorised",
-  "lineage": "recklessft",
-  "mode": "reckless",
-  "hidden": 768,
+  "name": "native-h4-12ch-1024-v2-factorised",
+  "lineage": "native",
+  "mode": "enyo",
+  "hidden": 1024,
   "l2_size": 16,
   "feature_channels": 12,
-  "input_buckets": 10,
-  "runtime_input_buckets": 10,
+  "input_buckets": 4,
   "output_buckets": 8,
   "input_factoriser": true,
-  "output_bucket_scope": "full-head",
   "eval_scale": 400.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
-  "export_format": "enyo-native-v7-reckless-threats"
+  "export_format": "enyo-native-v2"
 }

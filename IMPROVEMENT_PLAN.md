@@ -315,6 +315,12 @@ against its own ancestor to measure refinement gain, then against immutable
 the paired two-seed evidence and directly test the leading refined lineages;
 never declare an architecture winner from the best isolated scratch RC.
 
+First continuation result: `enyo-h4-v2-rc1` gained `+21.3 +/-14.5` Elo over
+its own `enyo-h4-v1-rc1` ancestor in 1,500 games (`0.93/2.20` LLR, `99.8%`
+LOS, `39.2%` draws). Continue the matched field; do not select `h4` from one
+seed. Direct mature-reference matches are deferred until the leading refined
+lineages are known.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the

@@ -7,6 +7,28 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Matched continuation: `h4` seed 1 (`enyo-h4-v2-rc1`)
+
+`enyo-h4-v2-rc1.nn` continues `enyo-h4-v1-rc1.nn` for 256 superbatches on
+the first 200M T60T70/Farseer positions with `lr=0.0001`, `wdl=0.05`, and
+`activation_l1=0.00001`. SHA-256:
+`daedb7b9265fb6eb26e05fbbb88ad5aea42accc14e3ce6d79fdd7cd4c5ba71a9`.
+
+Gates passed: start position `+48cp`; static `mae=138.493`, `sign=83.62%`,
+`corr=0.863823`, `bias=2.286`, `slope=0.800089`. Residual MAE improved in all
+required bands: endgame `470.484 -> 428.738`, eval 800+ `702.237 -> 652.761`,
+and eval 300-799 `390.252 -> 353.810`. The optional move gate was skipped
+because its cases file was absent and strict mode was disabled.
+
+enyo-h4-v2-rc1-sprt-1500-20260722-090106 22 Jul 09:01
+"candidate=enyo-h4-v2-rc1.nn vs reference=enyo-h4-v1-rc1.nn"
+elo=+21.3  llr=0.93/2.20 (42%)  los=99.8%  ci=14.5  draw=39.2%  games=1500/1500  tasks=88/88
+
+The same-regimen continuation is a positive local refinement signal. The
+separate mature-reference run was intentionally cancelled at 388/1500 games
+to avoid spending matches that can be reserved for the final leading lineages;
+it is invalid for ranking and receives no benchmark result.
+
 ## J: current Reckless 10x12-768-o8 with threats (`recklessft`)
 
 Net: `enyo-recklessft-v1-rc1.nn`

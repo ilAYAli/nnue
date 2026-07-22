@@ -1,11 +1,15 @@
 {
-  "run": "enyo-recklessft-v1-rc1",
-  "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "architecture race recklessft replicate 1/2 (seed 5090001): random-init current Reckless 10x12-768-o8 with native king buckets, 66864 threat features, factorised piece inputs, pairwise CReLU, explicit material buckets, and full dense heads under the fixed one-pass pylon protocol",
-  "superbatches": 196608,
-  "init_seed": 5090001,
+  "run": "enyo-h4-v2-rc1",
+  "continue_from": "enyo-h4-v1-rc1",
+  "reference": "enyo-h4-v1-rc1",
+  "hypothesis": "matched continuation competition h4 seed 1/2: continue the h4 scratch foundation with the historically positive T60T70wIsRightFarseer 256-superbatch lr=0.0001 activation-L1 regimen",
+  "superbatches": 256,
+  "lr": 0.0001,
   "wdl": 0.05,
+  "activation_l1": 0.00001,
   "data": {
-    "source_binpack": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet"
+    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
+    "offset": 0,
+    "limit": 200000000
   }
 }
