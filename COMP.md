@@ -7,6 +7,23 @@ both seeds into the same matched continuation regimen. The clearly weaker
 uses the refined two-seed results; it does not select the best isolated scratch
 score.
 
+## Matched continuation: `h16` seed 1 (`enyo-h16-v2-rc1`)
+
+`enyo-h16-v2-rc1.nn` applies the matched 256-superbatch continuation to
+`enyo-h16-v1-rc1.nn`. SHA-256:
+`d792eb683cf96409f37d61ce75d0b3c6635158b38332dfbf20d600d642945f31`.
+Gates passed with static `mae=134.376`, `sign=83.88%`, `corr=0.870559`,
+`bias=3.539`, and `slope=0.798668`. Residual MAE improved for endgame
+`458.345 -> 409.651`, eval 800+ `680.086 -> 626.343`, and eval 300-799
+`392.206 -> 352.789`.
+
+enyo-h16-v2-rc1-sprt-1500-20260722-113608 22 Jul 11:36
+"candidate=enyo-h16-v2-rc1.nn vs reference=enyo-h16-v1-rc1.nn"
+elo=+25.3  llr=1.15/2.20 (52%)  los=100.0%  ci=14.7  draw=38.6%  games=1500/1500  tasks=88/88
+
+This is the largest first-seed gain so far, but its confidence interval overlaps
+the `h4` and `h8` results. Await the matched second seed.
+
 ## Matched continuation: `h8` seed 1 (`enyo-h8-v2-rc1`)
 
 `enyo-h8-v2-rc1.nn` applies the matched 256-superbatch continuation to

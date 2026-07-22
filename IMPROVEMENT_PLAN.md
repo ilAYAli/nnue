@@ -336,6 +336,11 @@ LOS, `36.9%` draws). The approximate `h8` two-seed mean is `+16.6 +/-10.3`
 Elo, indistinguishable from `h4` at this depth. Continue with `h16` and
 `sf32`; do not break the tie using isolated RCs.
 
+The first `h16` continuation seed gained `+25.3 +/-14.7` Elo (`1.15/2.20`
+LLR, `100.0%` LOS, `38.6%` draws) over `enyo-h16-v1-rc1`. This is the largest
+first-seed gain so far but overlaps the other lineages; run `h16` seed 2 before
+comparison.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
