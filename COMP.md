@@ -24,6 +24,24 @@ elo=+15.3  llr=0.67/2.20 (30%)  los=97.9%  ci=14.7  draw=38.4%  games=1500/1500 
 This is a positive first-seed refinement signal. Complete the matched second
 seed before comparing the `sf32` learning trajectory with the other lineages.
 
+## Matched continuation: `sf32` seed 2 (`enyo-sf32-v2-rc2`)
+
+`enyo-sf32-v2-rc2.nn` applies the identical continuation to
+`enyo-sf32-v1-rc2.nn`. SHA-256:
+`7beaa45a0e47fa13e681517ba6e5882de0537ed4dc3d5ae9c63b1accdf316720`.
+Gates passed with static `mae=138.326`, `sign=82.60%`, `corr=0.861523`,
+`bias=3.556`, and `slope=0.803956`. Residual MAE improved for endgame
+`461.610 -> 419.533`, eval 800+ `689.476 -> 644.096`, and eval 300-799
+`388.997 -> 354.893`.
+
+enyo-sf32-v2-rc2-sprt-1500-20260722-132928 22 Jul 13:29
+"candidate=enyo-sf32-v2-rc2.nn vs reference=enyo-sf32-v1-rc2.nn"
+elo=+14.8  llr=0.71/2.20 (32%)  los=97.8%  ci=14.4  draw=40.3%  games=1500/1500  tasks=88/88
+
+Across both seeds, the matched `sf32` continuation gain is approximately
+`+15.1 +/-10.3` Elo. It is statistically indistinguishable from `h4` and `h8`
+at this depth and numerically below `h16`.
+
 ## Matched continuation: `h16` seed 1 (`enyo-h16-v2-rc1`)
 
 `enyo-h16-v2-rc1.nn` applies the matched 256-superbatch continuation to

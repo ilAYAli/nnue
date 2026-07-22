@@ -350,6 +350,12 @@ The first `sf32` continuation seed gained `+15.3 +/-14.7` Elo (`0.67/2.20`
 LLR, `97.9%` LOS, `38.4%` draws) over `enyo-sf32-v1-rc1`. Complete the matched
 second seed before comparing lineage means or selecting the next training dose.
 
+The second `sf32` seed gained `+14.8 +/-14.4` Elo (`0.71/2.20` LLR, `97.8%`
+LOS, `40.3%` draws). The approximate two-seed `sf32` mean is `+15.1 +/-10.3`
+Elo. At the 256-superbatch checkpoint, the four lineage means are `h4 +15.1`,
+`h8 +16.6`, `h16 +23.0`, and `sf32 +15.1` Elo, all with approximately
+`+/-10.3` to `+/-10.4` uncertainty. No pair is significantly separated.
+
 Use canonical `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 run names. Assign one architecture number to each configuration and use `rc1`
 and `rc2` for its two random-initialization replicates; record the
