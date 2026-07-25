@@ -718,18 +718,28 @@ fn train_enyo<
 
     if !matches!(
         trainable.as_str(),
-        "all" | "input" | "xray-only" | "dense-head" | "float-head" | "output" | "squared-branch" | "psqt"
+        "all"
+            | "input"
+            | "xray-only"
+            | "dense-head"
+            | "float-head"
+            | "output"
+            | "frozen-output"
+            | "squared-branch"
+            | "psqt"
     ) {
         panic!("unsupported trainable mode: {trainable}");
     }
-    let train_input = trainable == "all" || trainable == "input" || trainable == "xray-only";
+    let train_input =
+        trainable == "all" || trainable == "input" || trainable == "xray-only" || trainable == "frozen-output";
     if trainable == "xray-only" && !SLIDER_XRAY_THREATS {
         panic!("xray-only requires slider x-ray threat features");
     }
-    let train_l1 = trainable == "all" || trainable == "dense-head";
+    let train_l1 = trainable == "all" || trainable == "dense-head" || trainable == "frozen-output";
     let train_l2 = trainable == "all"
         || trainable == "dense-head"
-        || trainable == "float-head";
+        || trainable == "float-head"
+        || trainable == "frozen-output";
     let train_l3 = trainable == "all"
         || trainable == "dense-head"
         || trainable == "float-head"
