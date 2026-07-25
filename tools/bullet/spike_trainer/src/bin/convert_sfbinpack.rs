@@ -1,9 +1,11 @@
+#[path = "../enyo_threats.rs"]
+mod enyo_threats;
+
 use std::{
     env,
     fs::File,
     io::{BufWriter, Write},
-    mem,
-    process,
+    mem, process,
     time::Instant,
 };
 
@@ -20,6 +22,7 @@ struct Filter {
     min_ply: u16,
     max_abs_cp: u32,
     quiet_only: bool,
+    xray_active_only: bool,
 }
 
 impl Filter {
@@ -59,7 +62,7 @@ fn usage() -> ! {
     eprintln!(
         "usage: convert_sfbinpack --data PATH[;PATH...] --output PATH \
          [--buffer-mb N] [--threads N] [--offset N] [--limit N] [--min-ply N] \
-         [--max-abs-cp N] [--quiet-only 0|1]"
+         [--max-abs-cp N] [--quiet-only 0|1] [--xray-active-only 0|1]"
     );
     process::exit(2);
 }
@@ -75,21 +78,23 @@ fn main() {
         min_ply: 16,
         max_abs_cp: 10000,
         quiet_only: true,
+        xray_active_only: false,
     };
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut value = || args.next().unwrap_or_else(|| usage());
         match arg.as_str() {
-            "--data"       => data = value(),
-            "--output"     => output = value(),
-            "--buffer-mb"  => buffer_mb  = value().parse().unwrap_or_else(|_| usage()),
-            "--threads"    => threads    = value().parse().unwrap_or_else(|_| usage()),
-            "--offset"     => offset     = value().parse().unwrap_or_else(|_| usage()),
-            "--limit"      => limit      = value().parse().unwrap_or_else(|_| usage()),
-            "--min-ply"    => filter.min_ply    = value().parse().unwrap_or_else(|_| usage()),
+            "--data" => data = value(),
+            "--output" => output = value(),
+            "--buffer-mb" => buffer_mb = value().parse().unwrap_or_else(|_| usage()),
+            "--threads" => threads = value().parse().unwrap_or_else(|_| usage()),
+            "--offset" => offset = value().parse().unwrap_or_else(|_| usage()),
+            "--limit" => limit = value().parse().unwrap_or_else(|_| usage()),
+            "--min-ply" => filter.min_ply = value().parse().unwrap_or_else(|_| usage()),
             "--max-abs-cp" => filter.max_abs_cp = value().parse().unwrap_or_else(|_| usage()),
             "--quiet-only" => filter.quiet_only = value() != "0",
+            "--xray-active-only" => filter.xray_active_only = value() != "0",
             _ => usage(),
         }
     }
@@ -122,7 +127,20 @@ fn main() {
     let mut skipped: u64 = 0;
 
     loader.map_chunks(0, |chunk: &[ChessBoard]| {
+        let active_chunk;
         let mut chunk = chunk;
+        if filter.xray_active_only {
+            active_chunk = chunk
+                .iter()
+                .copied()
+                .filter(|pos| {
+                    enyo_threats::slider_xray_active_features(pos)
+                        .iter()
+                        .any(|features| features.len() > 0)
+                })
+                .collect::<Vec<_>>();
+            chunk = &active_chunk;
+        }
         if skipped < offset {
             let before = skipped;
             let skip = offset.saturating_sub(skipped).min(chunk.len() as u64) as usize;
