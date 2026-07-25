@@ -716,6 +716,37 @@ test the question that actually matters -- real game strength via SPRT --
 despite the narrow static-gate shortfall, since the gate exists to filter
 obviously-bad candidates and this is not that.
 
+### SPRT result: rejected despite the near-passing static gate
+
+`enyo-1.31.0-rc45-rescaled.nn` vs the actual reference `enyo-1.30.0-rc3.nn`,
+1500/1500 games: `elo=-8.1  llr=-0.78/2.20 (-35%)  los=13.2%  ci=14.2
+draw=36.3%`. Rejected. (A first SPRT attempt accidentally used
+`enyo-1.31.0-rc3.nn` -- an unrelated, older, already-neutral candidate from
+the July 14 quantkick sweep -- as the reference instead of
+`enyo-1.30.0-rc3.nn`; that comparison showed a misleading `+21` Elo trend and
+does not answer the real question. It was superseded before completion by the
+correct comparison above.)
+
+This is the real result: despite genuinely improving the residual gate's
+mae/slope metrics against Stockfish in two of three required groups and
+coming within noise of the third, `rc45-rescaled` is not stronger than the
+current champion. The eval_scale/output-scale mismatch mechanism (post-hoc
+`0.48` correction never folded into the training loss, so continuation
+training has a structural incentive to regrow output magnitude) is still very
+likely the correct explanation for why rc4/rc43/rc44 catastrophically
+regressed the same static metric this session -- fixing it did measurably fix
+that metric. But the static residual gate is a proxy, and this is a clean
+demonstration of exactly why this project's own rule exists: "game results
+decide promotion, static gates are rejection filters, not promotion
+evidence." A candidate can be less miscalibrated by every static measure
+available and still not play better chess.
+
+Do not chase further per-bucket static-metric refinement on this data slice;
+the fully-optimized fit already SPRT-tested negative. If the eval_scale
+mechanism is revisited, the next candidate needs a fresh data slice, and a
+near-passing static gate should not by itself justify a full 1500-game
+commitment again -- consider a cheaper smoke-scale game check first.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
