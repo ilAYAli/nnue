@@ -445,6 +445,31 @@ training mechanism (e.g. training it jointly with the dense head, or a materiall
 higher learning rate/dose), and treat any such retry as a new, separately
 justified hypothesis, not a repeat of this one.
 
+### All-layer fine-tune revival attempt
+
+2026-07-25: the ledger's only inconclusive-positive result, `enyo-1.31.0-rc17`
+(trainable=all, lr=0.00001, 64 superbatches, +3.7 +/-14.3 Elo over 1500 games),
+was never followed up with a fresh data slice per the Stage 6 "preserve the
+regimen, advance the data" rule, and its checkpoint no longer survives on disk.
+`enyo-1.31.0-rc43` repeated the same regimen exactly (continue_from
+enyo-1.30.0-rc3, trainable=all, lr=0.00001, 64 superbatches) on a disjoint
+T60T70wIsRightFarseer slice (offset 1,300,000,000, limit 100,000,000, min_ply=24).
+
+Result: decisive rejection, not a repeat of rc17's mild positive. Every residual
+band regressed hard: endgame `mae_gain=-173.510`, eval 800+
+`mae_gain=-278.136`, eval 300-799 `mae_gain=-228.132`. Candidate output stdev
+jumped from 709 (reference) to 892, and the >=2000cp clamp rate nearly doubled
+(3354/50000 -> 6301/50000). Slopes across every phase/bucket overshot to
+1.1-1.7 versus reference's near-1.0 fit. This means a short, low-LR, all-layer
+nudge from fresh data reliably re-opens the output-calibration pathology that
+the 0.48 scale-root fix (and everything built on it since) exists to suppress
+-- rc17's mild positive result looks like a fluke of that particular data
+slice, not a reliably repeatable regimen. Do not retry plain all-layer
+fine-tuning at this LR/dose against a fresh slice without either a materially
+lower learning rate, a materially shorter dose, or an explicit target-scale
+regularizer to keep the output distribution bounded during training, not just
+at gate time.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all

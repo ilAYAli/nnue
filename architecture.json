@@ -1,5 +1,5 @@
 {
-  "name": "native-h16-12ch-1024-v2-slider-xray",
+  "name": "native-h16-12ch-1024-v2",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
@@ -7,8 +7,8 @@
   "feature_channels": 12,
   "input_buckets": 16,
   "output_buckets": 8,
-  "input_factoriser": false,
-  "slider_xray_threats": true,
+  "input_factoriser": true,
+  "slider_xray_threats": false,
   "eval_scale": 400.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
