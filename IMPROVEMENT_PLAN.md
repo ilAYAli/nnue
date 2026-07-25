@@ -470,6 +470,42 @@ lower learning rate, a materially shorter dose, or an explicit target-scale
 regularizer to keep the output distribution bounded during training, not just
 at gate time.
 
+### Frozen-output isolation test
+
+2026-07-25: to isolate whether the output layer itself was the source of the
+rc43 blowup, added a new `frozen-output` trainable scope to the trainer
+(trains input/l1/l2, leaves l3/output untouched) and reran the identical rc43
+regimen (`enyo-1.31.0-rc44`: continue_from enyo-1.30.0-rc3, lr=0.00001, 64
+superbatches) on a fresh disjoint T60T70wIsRightFarseer slice (offset
+1,400,000,000).
+
+Result: still rejected, though less severely than rc43 -- endgame
+`mae_gain=-131.819` (vs rc43's -173.510), eval 800+ `mae_gain=-206.618` (vs
+-278.136), eval 300-799 `mae_gain=-169.975` (vs -228.132). Candidate output
+stdev was still hot (858.63 vs reference 709.10, clamp rate 5417/50000 vs
+3354/50000) even with the output layer frozen. This means the output-scale
+blowup is not localized to the final linear layer's weights: L1/L2 alone can
+widen the pre-output activation magnitudes enough that a frozen output layer
+still produces an inflated, poorly-calibrated final distribution. Freezing
+progressively more of the dense head (output frozen, half-severity regression;
+presumably l1+l2 frozen too, i.e. input-only, would regress least) trades off
+against how little of the network is actually free to learn anything new --
+which is consistent with input-only training's historically modest, rarely
+rejected-on-calibration results throughout this ledger.
+
+Combined with the rc4 slider-xray and rc43 all-layer results, three
+differently-scoped fine-tune attempts in one session all reopened this same
+calibration wound to varying degrees. The 0.48 output-scale correction is a
+static post-hoc patch, not a trained invariant, and essentially any gradient
+step through l1 or l2 (not just l3) erodes it proportionally to how much of
+the network is unfrozen. Do not keep varying trainable scope on this dataset/LR
+combination expecting a different outcome. The next hypothesis must either
+(a) make the calibration a trained invariant instead of a post-hoc patch, e.g.
+an explicit slope/scale regularization term against the reference net's output
+distribution during training, or (b) accept input-only as the only currently
+calibration-safe scope and focus dose/data/LR search there instead of trainable
+scope.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
