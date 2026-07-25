@@ -679,6 +679,43 @@ via a mechanism (eval_scale/output-scale mismatch during continuation
 training) that plausibly explains every other failed fine-tune this session
 too.
 
+### Offline coordinate-descent fit against the gate's actual groups
+
+Rather than keep re-running the 50k-position engine audit per trial (~1-2 min
+each), replicated `residual_gate.py`'s exact metric functions in a standalone
+script operating on the already-captured `/tmp/audit_rc45.json` scores
+(candidate raw values recovered by dividing the flat-0.48 audit's candidate
+column back out, since output scales linearly with the rescale factor). This
+let many rescale trials run in-process against cached data instead of the
+engine. Verified it exactly reproduces the flat-0.48 engine result before
+trusting it.
+
+Ran coordinate descent (8 output-bucket scale parameters) with a loss
+penalizing shortfall on both required metrics in all three gate groups, from
+several random restarts. Best result:
+`scales=[0.5466, 0.4994, 0.5622, 0.5842, 0.6326, 0.688, 0.6911, 0.6196]`:
+
+- phase:endgame: `mae_gain=+20.488`, `slope_gain=+0.00568` (passes both).
+- eval:800+: `mae_gain=+22.512`, `slope_gain=-0.00138` (mae passes, slope
+  misses by a hair).
+- eval:300-799: `mae_gain=-0.042`, `slope_gain=-0.00462` (both miss, but by
+  amounts an order of magnitude smaller than the multi-hundred-point
+  regressions everywhere else tonight).
+
+This is very likely close to the ceiling of what a single per-output-bucket
+*linear* rescale can achieve: `output_bucket` is a different partition of the
+50k rows than the gate's `material_bucket`/`eval_bucket(stockfish)` groups, so
+one scale value per output bucket cannot independently satisfy a mismatch that
+varies by Stockfish eval magnitude within a bucket. The remaining margins
+(0.001-0.05) are small enough to plausibly be within this specific 50k-FEN
+sample's noise. Two ways to close this exactly, neither attempted yet:
+(a) extend `scale_output_head.py`-style correction to an independent additive
+bias per bucket, not just a multiplicative scale, which is a genuinely
+different degree of freedom; or (b) accept this as a static near-miss and
+test the question that actually matters -- real game strength via SPRT --
+despite the narrow static-gate shortfall, since the gate exists to filter
+obviously-bad candidates and this is not that.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
