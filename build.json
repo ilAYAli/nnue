@@ -1,10 +1,10 @@
 {
-  "run": "enyo-1.31.0-rc44",
-  "continue_from": "enyo-1.30.0-rc3",
+  "run": "enyo-1.31.0-rc45",
+  "continue_from": "enyo-1.30.0-rc3-unscaled",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "frozen-output isolation test: repeat the rc43 regimen (lr=1e-5, 64 superbatches) but with the new frozen-output trainable scope, which trains input/l1/l2 while leaving the output layer (l3) untouched, since rc43 showed that any gradient flow through the output layer reliably re-inflates the 0.48 scale-root calibration regardless of dose",
+  "hypothesis": "eval_scale/output-scale mismatch test: undo the post-hoc 0.48 output-scale correction before training (continue_from the unscaled net, in the loss-consistent natural coordinate system) so the loss has no incentive to regrow the output magnitude, then reapply the 0.48 correction after training. Same trainable=all/lr=1e-5/64-superbatch regimen as the failed rc43, on a fresh disjoint T60T70wIsRightFarseer slice, to directly test whether this removes the calibration blowup",
   "superbatches": 64,
-  "trainable": "frozen-output",
+  "trainable": "all",
   "lr": 0.00001,
   "wdl": 0.05,
   "sfbinpack": {
@@ -12,7 +12,7 @@
   },
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
-    "offset": 1400000000,
+    "offset": 1500000000,
     "limit": 100000000
   }
 }

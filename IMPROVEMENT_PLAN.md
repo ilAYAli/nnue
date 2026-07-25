@@ -572,6 +572,74 @@ end-to-end, but this has not been confirmed empirically). Test by setting
 candidate and checking the residual gate and static eval for sane, non-garbage
 numbers before trusting it.
 
+### eval_scale/output-scale mismatch: confirmed mechanism, best result of the session
+
+2026-07-25: rather than touch `architecture.json`'s `eval_scale` directly
+(risky: `convert_initialize_from` dequantizes `continue_from`/`initialize_from`
+sources using the *current* `architecture.json` eval_scale, so changing it
+would misdequantize `enyo-1.30.0-rc3`'s existing 400-scale-quantized weights),
+tested the same mechanism via pure weight-space manipulation instead, using
+`tools/validate/scale_output_head.py` (already existing, no new tooling
+needed):
+
+1. Unscaled `enyo-1.30.0-rc3.nn` by `1/0.48 ~= 2.0833` to produce
+   `enyo-1.30.0-rc3-unscaled.nn`, undoing the post-hoc calibration and
+   returning the output layer to the "natural" coordinate system the fixed
+   `eval_scale=400` training loss actually assumes.
+2. `enyo-1.31.0-rc45`: `continue_from` the unscaled net (not rc3 directly),
+   `reference=enyo-1.30.0-rc3`, otherwise the exact rc43 regimen
+   (trainable=all, lr=0.00001, 64 superbatches) on a fresh disjoint
+   T60T70wIsRightFarseer slice (offset 1,500,000,000). Trained via `./nnue
+   train` only (not `iterate`), since the raw export needed rescaling before
+   any gate could be meaningful.
+3. Rescaled the trained output by 0.48 to return to reference-calibrated
+   coordinates, then ran the real residual gate audit
+   (`structural_net_audit.py` + `residual_gate.py`, same FEN set and engine
+   binary as the automated gate) directly against the rescaled net.
+
+Result at scale=0.48: endgame `mae_gain=+35.463`, eval 800+
+`mae_gain=+49.607` -- both genuinely **improved** versus reference, not just
+"less regressed." Only eval 300-799 stayed negative: `mae_gain=-11.338`. This
+is a dramatic, qualitative change from every other fine-tune tonight (rc4,
+rc43, rc44), which regressed all three bands by 130-280 mae. Candidate output
+stdev also dropped slightly *below* reference (651.72 vs 709.10) with a lower
+clamp rate (2605 vs 3354/50000) -- the opposite failure mode (mild
+under-confidence) instead of the previous "hot" blowup, confirming the
+eval_scale/output-scale mismatch was the dominant mechanism, not a red
+herring.
+
+Swept the rescale factor (which is free to re-tune post-hoc without
+retraining) from 0.48 to 0.62 in six more steps looking for a single global
+scale that clears all three bands simultaneously:
+
+| scale | endgame mae_gain | eval 800+ mae_gain | eval 300-799 mae_gain |
+| --- | --- | --- | --- |
+| 0.48 | +35.463 | +49.607 | -11.338 |
+| 0.50 | +28.729 | +40.396 | -6.742 |
+| 0.52 | +21.700 | +30.319 | -3.674 |
+| 0.55 | +10.305 | +13.077 | -1.750 |
+| 0.56 | +6.368 | +6.889 | -1.794 |
+| 0.58 | -1.826 | -6.207 | -2.943 |
+| 0.60 | -10.368 | -20.230 | -5.539 |
+| 0.62 | -19.142 | -34.884 | -9.461 |
+
+Endgame and eval 800+ decrease monotonically as scale increases past 0.48,
+crossing negative between 0.55 and 0.58. eval 300-799 is not monotonic: it
+improves from 0.48 to a apparent floor near 0.55-0.56 (`-1.75`/`-1.79`) and
+then gets worse again above that. No single global rescale factor clears all
+three bands at once; the closest points (0.55-0.56) miss eval 300-799 by only
+~2 mae while the other two bands are still solidly positive (+6 to +13). This
+is the best result by far in this session -- close enough that a per-bucket
+rescale (like the historical averaged Berserk/Stockfish per-bucket fit, see
+the "0.340267,0.548593,..." entry above) rather than one global scalar may
+close the remaining gap, since output buckets are not uniformly mis-scaled
+(0.48-scale bucket slopes ranged 0.735-0.936 across out0-out7 before this
+sweep). Do not discard this net or lineage; the next step is either a
+per-bucket rescale sweep or accepting the current small 300-799 shortfall and
+requesting an explicit decision on whether to SPRT despite the narrow gate
+miss, given the gate exists to filter obviously-bad candidates and this one
+is not obviously bad.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
