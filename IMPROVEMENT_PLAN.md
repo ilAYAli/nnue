@@ -425,6 +425,26 @@ tensor, but failed the residual gate: endgame MAE improved only `0.020`, while
 eval 800+ regressed `0.042` and eval 300-799 regressed `0.354`. Close the
 slider-xray line without an SPRT.
 
+2026-07-25 follow-up: the RC1-RC3 failures were suspected to be a diluted-gradient
+problem, since x-ray-active positions are a small minority of any general corpus.
+Added an opt-in `--xray-active-only` filter to `convert_sfbinpack` and built a
+40,000,000-position slice of `T60T70wIsRightFarseer.binpack` containing only
+positions where the x-ray feature actually fires. `enyo-sliderxray-v1-rc4` reran
+the exact RC3 protocol (warm-start from `enyo-1.30.0-rc3.nn`, freeze all mature
+weights, train only x-ray rows, 256 superbatches, `lr=0.0001`) against this dense
+data instead. It still failed the residual gate, and by essentially the same
+margins as RC3: endgame `mae_gain=0.054`, eval 800+ `mae_gain=-0.064`, eval
+300-799 `mae_gain=-1.133`. Candidate-vs-reference static deltas were also tiny
+across every phase and output bucket (endgame `mae=0.10`, opening `mae=25.47`
+at most), meaning the isolated x-ray weights barely moved network output at all
+even with a dense, active-only dataset. This rules out data dilution as the
+explanation and closes the slider-xray line more conclusively: the feature does
+not produce a residual-improving update under this isolated-training protocol
+regardless of data density. Do not retry slider x-ray again without a different
+training mechanism (e.g. training it jointly with the dense head, or a materially
+higher learning rate/dose), and treat any such retry as a new, separately
+justified hypothesis, not a repeat of this one.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all

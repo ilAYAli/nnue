@@ -1,17 +1,15 @@
 {
-  "run": "enyo-h10w768u-v1-rc1",
+  "run": "enyo-sliderxray-v1-rc4",
+  "initialize_from": "enyo-1.30.0-rc3",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "matched tactical-feature control seed 1/2 (5090001): random-init 10x11-768-o8 unfactorised piece-only network under the fixed one-pass pylon architecture-race protocol",
-  "superbatches": 196608,
-  "init_seed": 5090001,
+  "hypothesis": "slider x-ray retry with dense signal: same isolation protocol as rejected rc3 (warm-start mature h16 weights, freeze all mature piece rows/input bias/dense weights, train only zero-initialized x-ray rows, 256 superbatches, lr=0.0001) but sourced from a data slice pre-filtered to positions where the x-ray feature is actually active, instead of the original corpus where active rows were a small diluted minority",
+  "superbatches": 256,
+  "trainable": "xray-only",
+  "lr": 0.0001,
   "wdl": 0.05,
-  "sfbinpack": {
-    "min_ply": 24
-  },
+  "weight_decay": 0.0,
+  "activation_l1": 0.0,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/training_data_pylon.binpack",
-    "bullet_output": "data/bullet/enyo-architecture-race-pylon-2.8b.bullet",
-    "offset": 0,
-    "limit": 2800000000
+    "source_binpack": "data/bullet/enyo-sliderxray-active-only-20260725.bullet"
   }
 }
