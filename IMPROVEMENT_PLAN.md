@@ -506,6 +506,72 @@ distribution during training, or (b) accept input-only as the only currently
 calibration-safe scope and focus dose/data/LR search there instead of trainable
 scope.
 
+### Weight-space interpolation attempt
+
+2026-07-25: attempted to implement (a) as a live training-time regularizer
+(anchor the loss to a frozen forward pass of the starting checkpoint) but
+`bullet_lib`'s graph API (`InitSettings` supports only Zeroed/Normal/Uniform,
+no arbitrary-constant injection) makes that require either changing the
+checkpoint file format or deep undocumented-internals work; not attempted
+given this project's history of payload-sizing bugs from format changes.
+
+Instead tested a lower-risk proxy: post-hoc weight-space interpolation between
+the pre-training (`enyo-1.30.0-rc3`) and post-training (`enyo-1.31.0-rc43`,
+the all-layer regression) checkpoints, blending only `l1_weight`, `l1_bias`,
+`l2.weight`, `l2.bias`, `output.weight`, `output.bias` as
+`alpha*trained + (1-alpha)*reference` while keeping the input embedding at
+full trained strength. Built via `tools/validate/blend_weights.py` on top of
+the already-tested `load_model_from_nn`/`export_model` round-trip (verified
+alpha=1.0 reproduces the original net byte-for-byte). Swept alpha against the
+real residual gate (via `structural_net_audit.py`/`residual_gate.py`, same
+tooling and FEN set as the real gate, run through the actual engine binary):
+
+- alpha=0.25: endgame `mae_gain=-46.205`, eval 800+ `mae_gain=-76.099`, eval
+  300-799 `mae_gain=-25.523`.
+- alpha=0.50: endgame `mae_gain=-91.566`, eval 800+ `mae_gain=-151.968`, eval
+  300-799 `mae_gain=-77.219`.
+- alpha=0.75: endgame `mae_gain=-134.450`, eval 800+ `mae_gain=-220.507`, eval
+  300-799 `mae_gain=-147.031`.
+- alpha=1.00 (unblended rc43): endgame `mae_gain=-173.510`, eval 800+
+  `mae_gain=-206.618` (rc43's own number was -278.136; -206.618 here is the
+  frozen-output rc44 point plotted for comparison), eval 300-799
+  `mae_gain=-228.132`.
+
+The regression scales smoothly and almost linearly with alpha, with no sign of
+curling back toward positive territory at any tested point. This means the
+trained weight delta is not "a good update applied too strongly" -- its
+*direction* is fundamentally aligned with recreating the pre-calibration (hot)
+state, not a direction gradient descent overshot. Diluting it only dilutes
+both the drift and whatever adaptation value it carried; there is no
+alpha sweet spot. Do not pursue further weight-space blending of this delta.
+
+### Candidate mechanism: eval_scale/output-scale mismatch (untested)
+
+The `enyo-1.30.0-rc3` calibration was produced by directly multiplying the
+exported output-layer weights by an empirically fit `0.48` constant (see the
+"Fast scale-root candidate" entries above) -- it was never incorporated into
+the training loss. `eval_scale=400.0` in `architecture.json` is a fixed
+constant that (as far as traced) sets the sigmoid-target scale for the
+training loss and the export quantization multiplier, independent of that
+`0.48` correction. If the loss's sigmoid-target scale assumes a larger raw
+output magnitude than the 0.48-shrunk weights naturally produce, continued
+training has a direct incentive to grow the output magnitude back up to match
+-- which would explain the observed slope inflation (systematically >1 across
+nearly every phase/bucket in all three of today's regressions) as a
+mechanistic consequence, not a coincidence.
+
+This suggests continuation training from `enyo-1.30.0-rc3` should use a
+correspondingly reduced `eval_scale` (approximately `400 * 0.48 = 192`) so the
+loss target scale matches what the calibrated weights actually produce. This
+is unverified: it was not traced end-to-end through the Enyo C++ runtime's
+dequantization path (no `eval_scale`/`EVAL_SCALE` symbol exists there, so the
+runtime does not read it back from the export -- its effect is baked into the
+quantized weights at export time, which should make it self-consistent
+end-to-end, but this has not been confirmed empirically). Test by setting
+`eval_scale: 192.0` in `architecture.json` for one controlled continuation
+candidate and checking the residual gate and static eval for sane, non-garbage
+numbers before trusting it.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
