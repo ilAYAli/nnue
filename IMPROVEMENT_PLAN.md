@@ -640,6 +640,45 @@ requesting an explicit decision on whether to SPRT despite the narrow gate
 miss, given the gate exists to filter obviously-bad candidates and this one
 is not obviously bad.
 
+### Correction: the gate compares against Stockfish, not against reference
+
+Re-read `tools/validate/residual_gate.py` after the global-scale sweep plateaued
+short of passing. The gate's `mae_gain`/`slope_gain` are NOT "candidate vs
+reference" -- they compare `reference vs stockfish` (fixed baseline) against
+`candidate vs stockfish` (the fitted subject), grouped by `material_bucket`
+and by `eval_bucket(stockfish_score)`. Both `mae_gain > 0` and
+`slope_gain > 0` (slope_gain = reference's `|slope-1|` minus candidate's) are
+required per group. The "candidate vs reference" table in
+`structural_net_audit.py`'s printed output was the wrong thing to optimize
+against; the per-output-bucket scale fit above was derived from
+candidate-vs-reference slopes, not candidate-vs-stockfish slopes.
+
+Recomputed per-output-bucket regression slopes of `candidate` (at the flat
+0.48 rescale) directly against `stockfish` (matching `residual_gate.py`'s own
+`slope()` function) and solved each bucket's rescale for slope=1.0 against
+Stockfish: `0.4592, 0.5074, 0.5528, 0.5744, 0.6416, 0.6852, 0.6984, 0.6308`
+for out0-out7. Result: endgame `mae_gain=+26.219`, eval 800+
+`mae_gain=+33.956` (both still solidly positive), eval 300-799
+`mae_gain=-0.120` (essentially zero, the closest miss yet). All three
+`slope_gain` values are still slightly negative (`-0.018`, `-0.029`,
+`-0.005`), which is what fails the gate despite near-zero/positive mae_gain
+everywhere.
+
+The remaining gap is a grouping mismatch: the per-bucket fit corrects
+`output_bucket` slopes, but the gate groups by `material_bucket` and by
+`eval_bucket(stockfish_score)`, which are different partitions of the same
+50k rows. A scale fit that directly targets the gate's own two groupings
+(rather than output_bucket, which was a convenient proxy) would likely close
+this small remaining gap. That is unfinished: the mechanism is confirmed and
+the fix is a rescale-only problem now (no more retraining needed, the trained
+checkpoint `enyo-1.31.0-rc45.nn` already contains the useful signal), but the
+exact per-group scale vector that clears the gate's actual criteria has not
+yet been fit. This is by a wide margin the best-positioned candidate of the
+whole session -- much closer to passing than anything else tried tonight, and
+via a mechanism (eval_scale/output-scale mismatch during continuation
+training) that plausibly explains every other failed fine-tune this session
+too.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
