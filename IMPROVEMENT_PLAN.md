@@ -830,6 +830,26 @@ not solved). None of these are small asks; the low-cost experiment space
 (config/data-slice variations on the current lineage tip) looks exhausted
 for this session.
 
+### rc49: same recipe, different corpus, near-identical near-miss margin
+
+`enyo-1.31.0-rc49` repeated the exact rc47 recipe (trainable=input, 128
+superbatches, lr=5e-5, wdl=0.05) on `wrongNNUE_02_d9` instead of
+`wrongIsRight_nodes5000pv2`. Result: `phase:endgame mae_gain=-0.721
+slope_gain=-0.000901`, `eval:800+ mae_gain=-0.811 slope_gain=+0.001223`,
+`eval:300-799 mae_gain=+0.469 slope_gain=+0.008590` -- nearly identical to
+rc47's numbers (`-0.790/-0.001177`, `-0.854/+0.001153`, `+0.648/+0.008649`).
+Confirmed via SHA256 that rc47.nn and rc49.nn are genuinely different exports
+(not a data-pipeline bug producing byte-identical output).
+
+This means the near-miss margin is a property of the *recipe* (this dose/LR/
+scope combination), not the specific corpus -- swapping data source within
+this conservative recipe keeps landing in the same narrow "just short" zone.
+Did not spend an SPRT on rc49; it would very likely reproduce rc47's small
+negative result rather than reveal new information. Redirected to dose
+interpolation on `wrongIsRight` instead (which has real SPRT ground truth at
+128 and 256 superbatches already), rather than trying a third untested
+corpus at the same fixed dose.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
