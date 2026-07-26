@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.31.0-rc54",
+  "run": "enyo-1.31.0-rc56",
   "continue_from": "enyo-1.30.0-rc3-unscaled",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "rc53 collapsed the candidate slope vs Stockfish to 0.52-0.77, losing discriminative range, consistent with trusting a weak-generator search score (wdl=0.05) over real game outcomes on a narrow self-play distribution. Same regimen as rc53 (unscaled continue_from, trainable=all, lr=1e-5, 64 superbatches, same 19.7M-row self-play corpus) but wdl raised to 0.3 to weight real game results more heavily, the one variable changed",
-  "superbatches": 64,
+  "hypothesis": "rc55 did not actually test more data volume: the direct loader reads sequentially from the start of the file, and 64 superbatches only consumes ~8.4M of the 46.4M available rows, so it almost certainly retrained on the same prefix as rc53 (matching loss trajectory was the tell). Raising superbatches to 360 (~354 needed to consume the full 46.4M-row file once at batch_size=2048/64 batches-per-superbatch) to genuinely test whether full data volume changes the slope-collapse result, same wdl=0.05/lr=1e-5/trainable=all/unscaled-continue_from regimen otherwise",
+  "superbatches": 360,
   "trainable": "all",
   "lr": 0.00001,
-  "wdl": 0.3,
+  "wdl": 0.05,
   "data": {
     "source_binpack": "data/selfplay/gen1-live/gen1-live-distill.bullet"
   }

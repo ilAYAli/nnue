@@ -1013,6 +1013,46 @@ scale, the more likely fix is a stronger data-generation reference (later
 self-play generations from an improved net, once/if one exists) rather than
 more of the same generator's output.
 
+### rc55/rc56: data volume also falsified (with a real pitfall caught mid-experiment)
+
+Self-play generation completed (300k games); converted the remaining 253
+shards incrementally, final corpus 46,446,083 rows (up from 19.7M).
+
+`enyo-1.31.0-rc55` first attempted the volume retest with the same 64-
+superbatch dose as rc53. Its running-loss trajectory matched rc53's almost
+exactly (both `0.006918` at superbatch 64), which is the known
+[[nnue-sequential-loader-prefix]] pitfall: the direct loader reads
+sequentially from the start of the file, and 64 superbatches only consumes
+~8.4M of 46.4M rows, so rc55 almost certainly retrained on the same prefix as
+rc53 rather than testing new data. Caught before spending an audit on it.
+Checkpoint SHA256 did differ from rc53's (GPU non-determinism), so this
+wasn't a wasted no-op, but it was not a valid volume test.
+
+`enyo-1.31.0-rc56` corrected this: same regimen, `superbatches=360` (~354
+needed to consume the full 46.4M-row file once at batch_size=2048/64
+batches-per-superbatch; confirmed by training time scaling from 6.3s to
+33.7s). Result: `phase:endgame mae_gain=+35.025 slope_gain=-0.208890`,
+`eval:800+ mae_gain=-6.334 slope_gain=-0.261145`, `eval:300-799
+mae_gain=-96.191 slope_gain=-0.438905` -- within noise of rc53's numbers
+(`+32.595/-0.212202`, `-11.776/-0.266050`, `-98.085/-0.441932`) despite 5.6x
+more data genuinely consumed this time.
+
+This falsifies the data-volume hypothesis alongside the already-falsified
+wdl-blend hypothesis (rc54). Both readily-testable levers for this specific
+self-play generation are exhausted. Conclusion: the current champion
+generating self-play at 5000 nodes/move, ~150-180 Elo behind Stockfish, does
+not yet produce data with enough decisive-position signal to teach good
+calibration, regardless of blend ratio or volume -- this is the standard
+self-play bootstrap chicken-and-egg problem. One generation from a
+mediocre-strength starting engine does not escape it; Berserk-style
+compounding requires the *next* generation's data to come from a materially
+improved net, which does not exist yet in this lineage. Do not retry
+wdl/volume variations on this exact corpus; if the self-play direction is
+revisited, the next real lever is either a stronger initial generator (not
+available) or accepting that gen1 alone will not produce a promotable
+candidate and treating it purely as infrastructure validation for a possible
+future multi-generation effort.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
