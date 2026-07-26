@@ -797,6 +797,39 @@ exact data/recipe combination is unlikely to be worth it; either accept
 (`multinet_pv-2_diff-100_nodes-5000` or `wrongNNUE_02_d9` are the next most
 targeted candidates) rather than continuing to tune dose/LR on this one.
 
+### SPRT result: rc47 also rejected (closer to neutral than rc45)
+
+`enyo-1.31.0-rc47.nn` vs `enyo-1.30.0-rc3.nn`, 1500/1500 games:
+`elo=-4.4  llr=-0.49/2.20 (-22%)  los=27.2%  ci=14.2  draw=36.9%`. Rejected.
+
+Less severe than rc45's -8.1, and the wide CI (+/-14.2) means the true value
+plausibly spans a range from mildly negative to mildly positive -- this is an
+inconclusive-slightly-negative result, not a clear loss. But it is a second
+case this session where a static near-miss (arguably the closest of the
+night before rc45's hand-fitted candidate) did not produce a real win. Static
+gate proximity has now failed to predict SPRT outcome twice in one session;
+do not treat a near-passing residual gate as meaningfully predictive of Elo
+without a completed SPRT.
+
+Session summary for anyone picking this up later: three fine-tune scopes
+(slider-xray retry, all-layer, frozen-output) catastrophically regressed the
+residual gate via a confirmed mechanism (the post-hoc 0.48 output-scale
+correction was never folded into the training loss, so continuation training
+has a structural incentive to regrow output magnitude). Fixing that
+mechanism (rc45) and probing untested official Stockfish corpora with a
+conservative recipe (rc47, on wrongIsRight_nodes5000pv2) both produced the
+closest static near-misses of the session, and both lost real games. No
+positive Elo result tonight. Remaining untested, larger-scope ideas: other
+unused master-binpack corpora (multinet_pv-2_diff-100_nodes-5000,
+wrongNNUE_02_d9, dfrc_n5000, nodes5000pv2_UHO) with the same safe recipe;
+warm-started self-distillation from the current champion at real scale
+(explicitly not attempted before -- prior selfdistill work was scratch-only
+on a small corpus from a weak generator); an explicit calibration-preserving
+regularizer during training (attempted, blocked on bullet_lib's graph API,
+not solved). None of these are small asks; the low-cost experiment space
+(config/data-slice variations on the current lineage tip) looks exhausted
+for this session.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
