@@ -936,6 +936,60 @@ this as confirming rather than contradicting the session-wide conclusion:
 small continuations of the current lineage tip are not currently finding
 positive Elo through any of the readily available levers.
 
+## 2026-07-26 Fresh warm-started self-distillation lineage
+
+Launched a genuinely new self-play generation from the current champion
+(`enyo-1.30.0-rc3`, via the Forge `selfplay` template, node budget 5000/move,
+UHO_XXL opening book), correcting the two real gaps in the historical
+`enyo-selfdistill-1.0.0-rc1..rc5` investigation: that work was a from-scratch
+retrain (not warm-started) on only ~14.6M positions from a generator itself
+~150 Elo behind, and its own conclusion said this made the result
+inconclusive rather than a real answer either way. Confirmed via research
+that the LC0-data alternative was already tried extensively in May/June 2026
+(direct value-scalar mixing, hard-disagreement targeting, and a move-policy
+sidecar bridge) and specifically failed to transfer to Enyo's own loss-gate
+cases despite the LC0 data itself being verified clean and Stockfish-oracle-
+accurate -- narrowing the live hypothesis to self-consistent (self-generated,
+self-labeled) data specifically, which is the one cell of the "who generates
+/ who labels" grid not yet tested at real warm-started scale.
+
+`selfplay_to_bullet.py`'s known pipeline bugs (missing `--include-mates`,
+unforwarded `--max-abs-cp`) were confirmed already fixed in the current
+tooling. Converted the first 168/187 completed PGN shards (141k of the
+target 300k games) incrementally via the tool's built-in shard-tracking
+state file, no need to wait for full generation: 19,732,081 self-distillation
+rows (own search score blended with real game WDL), win/draw/loss roughly
+24%/50%/24% across shards -- a healthy, non-degenerate distribution.
+
+`enyo-1.31.0-rc53`: continue_from the unscaled `enyo-1.30.0-rc3-unscaled.nn`
+(same calibration fix as rc45/rc51), trainable=all, lr=1e-5, 64 superbatches,
+wdl=0.05, rescaled by 0.48 after training -- same regimen as rc45/rc51 for
+direct comparability, data source swapped to this self-play corpus.
+
+Result: decisive rejection, worse than the wdl-safe-corpus near-misses.
+`phase:endgame mae_gain=+32.595` but `slope_gain=-0.212202`; `eval:800+
+mae_gain=-11.776 slope_gain=-0.266050`; `eval:300-799 mae_gain=-98.085
+slope_gain=-0.441932`. Candidate slope vs Stockfish collapsed to 0.52-0.77
+across every band (well below 1.0) -- the opposite failure mode from the
+"hot" blowups everywhere else this session, but equally severe: the network
+lost discriminative range rather than gaining it. Consistent with a known
+self-distillation failure mode when the generator is not much stronger than
+what it is teaching -- self-play between two copies of a ~150-180-Elo-behind
+engine produces a narrower, more draw-heavy, less extreme position/outcome
+distribution (53% draws in this corpus) than the broad Stockfish corpora used
+everywhere else, and training against it partially erases the network's
+ability to recognize decisive positions.
+
+Did not SPRT this candidate; the static result is a clear rejection, not a
+near-miss worth spending game budget on. Not treating this as closing the
+self-play direction, since only one point in the hyperparameter space has
+been tried (`wdl=0.05`, which mostly trusts the self-play search score over
+the real game result). The generation run continues in the background
+(target 300k games); next controlled variable to change once more data is in
+is `wdl` weighted toward the real game outcome, closer to how Berserk
+actually blends self-play signal, rather than mostly trusting a search score
+from an engine only ~150-180 Elo ahead of random continuation noise.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
