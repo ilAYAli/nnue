@@ -1,18 +1,13 @@
 {
-  "run": "enyo-1.31.0-rc51",
-  "continue_from": "enyo-1.30.0-rc3-unscaled",
+  "run": "enyo-1.31.0-rc52",
+  "continue_from": "enyo-1.30.0-rc3",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "combine the two confirmed insights from this session: train in the unscaled coordinate system (continue_from the pre-0.48-correction net, exactly rc45's mechanism fix, so the dense head can adapt without the calibration incentive fighting it) using full trainable=all scope (not input-only, which rc47/49/50 showed is too limited to extract much from new data) on the untested wrongIsRight_nodes5000pv2 corpus (unlike rc45 which reused old heavily-mined T60T70 data). Same lr=1e-5/64-superbatch dose as rc45. Will rescale output by ~0.48 after training, same as rc45",
-  "superbatches": 64,
-  "trainable": "all",
-  "lr": 0.00001,
+  "hypothesis": "first-ever test of the self-play-augmented data prepared on 2026-07-16 but never used: gen1-interleaved-augmented-rc43.bullet (105M rows, 20:1 interleave of the rc42 pylon slice with 5M self-play positions matched to pylon material/eval distribution, score-normalization repaired). Same safe/conservative recipe as tonight's baseline (trainable=input, 128 superbatches, lr=5e-5, wdl=0.05) for the cleanest possible test of whether this blend carries real signal versus pure Stockfish-labeled data",
+  "superbatches": 128,
+  "trainable": "input",
+  "lr": 0.00005,
   "wdl": 0.05,
-  "sfbinpack": {
-    "min_ply": 24
-  },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack",
-    "offset": 0,
-    "limit": 100000000
+    "source_binpack": "data/selfplay/gen1/gen1-interleaved-augmented-rc43.bullet"
   }
 }

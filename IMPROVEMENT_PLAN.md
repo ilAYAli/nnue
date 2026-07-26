@@ -905,6 +905,37 @@ warm-started self-distillation at real scale; a fundamentally different
 corpus like `multinet_pv-2_diff-100_nodes-5000` or `dfrc_n5000` rather than
 another `wrongIsRight`/`wrongNNUE` variant) -- none of them small asks.
 
+### rc52: the abandoned self-play-augmented data, finally tested
+
+Found `data/selfplay/gen1/gen1-{augmented,matched,interleaved}-*.bullet`:
+substantial data engineering from 2026-07-16 (never referenced in any
+committed build.json since) blending self-play positions into the pylon
+Stockfish data, properly -- self-play rows selected to match pylon material/
+eval distribution, score-normalization repaired, not naive concatenation.
+`gen1-interleaved-augmented-rc43.bullet` (105M rows: 100M pylon + 5M matched
+self-play, interleaved 20:1) is the most sophisticated variant.
+
+`enyo-1.31.0-rc52` trained on this data with the same safe recipe as
+tonight's baseline (trainable=input, 128 superbatches, lr=5e-5, wdl=0.05).
+Result: `phase:endgame mae_gain=-3.332`, `eval:800+ mae_gain=-4.874`,
+`eval:300-799 mae_gain=-3.331`. Worse on raw mae than the equivalent
+pure-Stockfish-data test (rc47 on wrongIsRight: `-0.790`, `-0.854`, `+0.648`
+at the same recipe), though eval:300-799 slope_gain was notably better
+(`+0.0206` vs rc47's `+0.0086`). Not a breakthrough either way -- the 5%
+self-play blend ratio in this file doesn't show a clear advantage over plain
+fresh Stockfish data at this conservative recipe, and is arguably a very
+slightly worse near-miss than rc47's.
+
+Did not chase further: `gen1-matched-rc42.bullet` (pure matched self-play,
+no pylon mixing, only 4M rows) would isolate the self-play signal more
+directly, but this session has now tested both mechanisms (calibration fix,
+untested corpora), multiple doses, and now the one piece of previously-
+abandoned self-play engineering in this repo, all converging to the same
+"close but not passing, and when SPRT-tested, not winning" result. Treat
+this as confirming rather than contradicting the session-wide conclusion:
+small continuations of the current lineage tip are not currently finding
+positive Elo through any of the readily available levers.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
