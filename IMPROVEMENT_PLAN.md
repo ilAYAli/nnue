@@ -990,6 +990,29 @@ is `wdl` weighted toward the real game outcome, closer to how Berserk
 actually blends self-play signal, rather than mostly trusting a search score
 from an engine only ~150-180 Elo ahead of random continuation noise.
 
+### rc54: wdl hypothesis falsified
+
+`enyo-1.31.0-rc54` repeated rc53 exactly except `wdl=0.05 -> 0.3` (weight
+real game outcome more, trust the generator's own search score less), same
+19.7M-row self-play corpus. Result barely moved: `phase:endgame
+mae_gain=+26.714 slope_gain=-0.243425`, `eval:800+ mae_gain=-6.244
+slope_gain=-0.285878`, `eval:300-799 mae_gain=-77.455 slope_gain=-0.399067`.
+Slope vs Stockfish still collapsed to 0.57-0.74 (rc53 was 0.52-0.77) --
+marginally less severe but the same fundamental failure.
+
+This falsifies the wdl-blend hypothesis: the failure is not about which of
+the two self-play label components (own search score vs real game result) is
+trusted more, because both are drawn from the same narrow, low-decisiveness
+distribution produced by a generator only ~150-180 Elo ahead of what it's
+teaching. Reweighting between two signals of similar limited information
+content does not add information. Do not keep tuning wdl on this corpus;
+the real constraint is generator strength and/or data volume, not the score/
+outcome blend ratio. Next real test (once more of the 300k-game generation
+lands) is a materially larger data volume; if slope collapse persists at
+scale, the more likely fix is a stronger data-generation reference (later
+self-play generations from an improved net, once/if one exists) rather than
+more of the same generator's output.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
