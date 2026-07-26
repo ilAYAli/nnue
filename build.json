@@ -1,18 +1,18 @@
 {
-  "run": "enyo-1.31.0-rc45",
-  "continue_from": "enyo-1.30.0-rc3-unscaled",
+  "run": "enyo-1.31.0-rc48",
+  "continue_from": "enyo-1.30.0-rc3",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "eval_scale/output-scale mismatch test: undo the post-hoc 0.48 output-scale correction before training (continue_from the unscaled net, in the loss-consistent natural coordinate system) so the loss has no incentive to regrow the output magnitude, then reapply the 0.48 correction after training. Same trainable=all/lr=1e-5/64-superbatch regimen as the failed rc43, on a fresh disjoint T60T70wIsRightFarseer slice, to directly test whether this removes the calibration blowup",
-  "superbatches": 64,
-  "trainable": "all",
-  "lr": 0.00001,
+  "hypothesis": "rc47 nearly passed the residual gate (eval:300-799 passed both metrics, eval:800+ passed slope, only phase:endgame and eval:800+ mae missed by under 1 point) on the untested wrongIsRight_nodes5000pv2 corpus at a conservative input-only/128-superbatch/lr=5e-5 dose. Doubling dose to 256 superbatches, everything else unchanged, since higher LR previously made input-only training worse in this project's history and more dose is the safer lever",
+  "superbatches": 256,
+  "trainable": "input",
+  "lr": 0.00005,
   "wdl": 0.05,
   "sfbinpack": {
     "min_ply": 24
   },
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack",
-    "offset": 1500000000,
+    "source_binpack": "data/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack",
+    "offset": 0,
     "limit": 100000000
   }
 }

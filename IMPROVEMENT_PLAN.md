@@ -747,6 +747,56 @@ mechanism is revisited, the next candidate needs a fresh data slice, and a
 near-passing static gate should not by itself justify a full 1500-game
 commitment again -- consider a cheaper smoke-scale game check first.
 
+### Untested-corpus probe: official Stockfish master-binpacks beyond pylon/T60T70
+
+Inventory of `data/stockfish/master-binpacks/` (~275GB, the official
+Stockfish nnue-pytorch training collection) showed only `T60T70wIsRightFarseer`
+and `training_data_pylon` have ever been used in this repo (checked commit
+history per filename). `dfrc_n5000`, `farseerT74`, `multinet_pv-2_diff-100_nodes-5000`,
+`nodes5000pv2_UHO`, `test80-2022-08-aug-16tb7p.v6-dd.min`,
+`wrongIsRight_nodes5000pv2`, and `wrongNNUE_02_d9` are untouched. All are
+publicly documented Stockfish-labeled data (permitted under this project's
+provenance rules), already downloaded, no generation time required --
+unlike self-play, which was independently re-scoped down (see the
+`enyo-selfdistill` history and the 2026-07-26 discussion of Berserk's own
+iterative self-play training: real, warm-started self-distillation at proper
+scale was never actually tried, but is a multi-day Forge commitment judged
+not worth it right now).
+
+`enyo-1.31.0-rc46` replayed the historically-safe input-only recipe
+(trainable=input, 128 superbatches, wdl=0.05) unchanged except for data
+source (`wrongIsRight_nodes5000pv2`, offset 0, limit 100M) at the old
+`lr=5e-6`. Exported byte-identical to its parent -- the known quantization-
+threshold bug (input-only training below a certain LR changes `raw.bin` but
+not `quantised.bin`; see the 2026-07-14 Quantized Input Export Finding
+above). `enyo-1.31.0-rc47` corrected only the LR to `5e-5` (the smallest
+rate previously found to survive quantization) and came very close to
+passing: `eval:300-799` passed both metrics (`mae_gain=+0.648`,
+`slope_gain=+0.0086`), `eval:800+` passed slope (`+0.0012`) and missed mae by
+`-0.854`, `phase:endgame` missed both narrowly (`-0.790`, `-0.0012`).
+Candidate-vs-reference deltas were tiny everywhere (mae 2-5, corr >=0.9995),
+a gentle, well-controlled change unlike every dense-layer experiment
+tonight.
+
+`enyo-1.31.0-rc48` doubled the dose to 256 superbatches, same LR/data,
+hypothesizing rc47 was undershooting. Wrong: doubling dose made every band
+much worse (`phase:endgame mae_gain=-30.791`, `eval:800+ mae_gain=-43.197`,
+`eval:300-799 mae_gain=-27.741`, slopes overshooting to 1.04-1.35) -- the
+same "hot" overshoot pattern as the dense-layer blowups, just reached via
+dose instead of trainable scope. rc47's 128-superbatch dose was already near
+the sweet spot for this data/recipe combination, not undershooting it.
+
+rc47 is the best-positioned untested-data candidate: closest static near-miss
+of the session after rc45's per-bucket fit, reached on the first try with a
+conservative, previously-proven-safe recipe, on a corpus with zero prior
+history in this repo. Given rc45's lesson that a near-passing static gate
+does not reliably predict SPRT outcome, further static grid-search on this
+exact data/recipe combination is unlikely to be worth it; either accept
+`enyo-1.31.0-rc47.nn` as-is for a real 1500-game SPRT against
+`enyo-1.30.0-rc3.nn`, or try a genuinely different untested corpus next
+(`multinet_pv-2_diff-100_nodes-5000` or `wrongNNUE_02_d9` are the next most
+targeted candidates) rather than continuing to tune dose/LR on this one.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
