@@ -1,11 +1,11 @@
 {
-  "run": "enyo-1.31.0-rc48",
-  "continue_from": "enyo-1.30.0-rc3",
+  "run": "enyo-1.31.0-rc51",
+  "continue_from": "enyo-1.30.0-rc3-unscaled",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "rc47 nearly passed the residual gate (eval:300-799 passed both metrics, eval:800+ passed slope, only phase:endgame and eval:800+ mae missed by under 1 point) on the untested wrongIsRight_nodes5000pv2 corpus at a conservative input-only/128-superbatch/lr=5e-5 dose. Doubling dose to 256 superbatches, everything else unchanged, since higher LR previously made input-only training worse in this project's history and more dose is the safer lever",
-  "superbatches": 256,
-  "trainable": "input",
-  "lr": 0.00005,
+  "hypothesis": "combine the two confirmed insights from this session: train in the unscaled coordinate system (continue_from the pre-0.48-correction net, exactly rc45's mechanism fix, so the dense head can adapt without the calibration incentive fighting it) using full trainable=all scope (not input-only, which rc47/49/50 showed is too limited to extract much from new data) on the untested wrongIsRight_nodes5000pv2 corpus (unlike rc45 which reused old heavily-mined T60T70 data). Same lr=1e-5/64-superbatch dose as rc45. Will rescale output by ~0.48 after training, same as rc45",
+  "superbatches": 64,
+  "trainable": "all",
+  "lr": 0.00001,
   "wdl": 0.05,
   "sfbinpack": {
     "min_ply": 24

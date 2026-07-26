@@ -850,6 +850,61 @@ interpolation on `wrongIsRight` instead (which has real SPRT ground truth at
 128 and 256 superbatches already), rather than trying a third untested
 corpus at the same fixed dose.
 
+### rc50: dose interpolation confirms 128 was already the local optimum
+
+`enyo-1.31.0-rc50` tried 160 superbatches (between rc47's 128 and rc48's
+256) on the same wrongIsRight/input-only/lr=5e-5 recipe. Result:
+`phase:endgame mae_gain=-7.806`, `eval:800+ mae_gain=-10.005`,
+`eval:300-799 mae_gain=-1.098` -- worse than rc47 (128) in every band, better
+than rc48 (256) but clearly monotonically degrading with dose, not U-shaped.
+128 superbatches was already the local optimum along this axis; there is no
+better point between 128 and 256. Dose-tuning this recipe is exhausted.
+
+### rc51: combine the eval_scale fix with new data and full trainable scope
+
+Combined both confirmed mechanisms in one candidate: `continue_from` the
+unscaled `enyo-1.30.0-rc3-unscaled.nn` (rc45's calibration fix, so dense
+layers can adapt without the output-scale incentive fighting back),
+`trainable=all` (not input-only, which rc47/49/50 showed is too limited to
+extract much from new data), on `wrongIsRight_nodes5000pv2` (untested
+corpus, unlike rc45's reused T60T70 data), same lr=1e-5/64-superbatch dose as
+rc45, rescaled by 0.48 after training.
+
+At flat 0.48: `phase:endgame mae_gain=+43.979` `slope_gain=-0.073`,
+`eval:800+ mae_gain=+63.625` `slope_gain=-0.099`, `eval:300-799
+mae_gain=-9.860` `slope_gain=-0.177`. Raw mae improvement is actually
+somewhat better than rc45's flat-0.48 result (`+43.98`/`+63.63` vs rc45's
+`+35.46`/`+49.61`), suggesting the new data does carry marginally more
+signal than reused T60T70 data. But ran the same offline coordinate-descent
+bucket-scale fit used for rc45, and the fitted result is not a meaningful
+improvement over rc45's fitted candidate: `phase:endgame
+{mae_gain: +21.255, slope_gain: +0.00867}` (passes, slightly better than
+rc45), `eval:800+ {mae_gain: +26.663, slope_gain: -0.00703}` (worse slope
+margin than rc45's -0.00138), `eval:300-799 {mae_gain: -0.309,
+slope_gain: -0.0171}` (worse than rc45's -0.042/-0.0046). Did not spend an
+SPRT on this: rc45's near-identical-shaped fitted near-miss already lost
+-8.1 Elo in real games, and this candidate is not clearly better, so
+another SPRT would very likely just reconfirm the same lesson rather than
+reveal new information.
+
+### Where this leaves the session
+
+Every lever pulled on the current lineage tip and the two confirmed
+mechanisms (output-scale/eval_scale mismatch; untested official Stockfish
+corpora) converges to the same shape: static near-misses in the 128-input-
+only-dose and unscaled-all-layer-64-dose families, and every one that was
+actually SPRT-tested (rc45, rc47) lost real games despite the promising
+static signal. This is not "we haven't found the right config yet" --
+across roughly a dozen candidates spanning both mechanisms, multiple doses,
+and multiple corpora, the pattern is consistent enough to trust: small,
+well-controlled continuations of `enyo-1.30.0-rc3` are not currently finding
+positive Elo, regardless of which of these specific levers moves. The
+remaining untested ideas are all larger-scope (a real calibration-aware
+training-time regularizer solving the bullet_lib graph API blocker properly;
+warm-started self-distillation at real scale; a fundamentally different
+corpus like `multinet_pv-2_diff-100_nodes-5000` or `dfrc_n5000` rather than
+another `wrongIsRight`/`wrongNNUE` variant) -- none of them small asks.
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
