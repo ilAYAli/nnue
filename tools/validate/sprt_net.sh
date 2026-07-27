@@ -13,7 +13,7 @@ resolve_path() {
 ENGINE=${ENGINE:-reference}
 REFERENCE_NET=${REFERENCE_NET:-nn-0ee0657fb25e.nnue}
 CANDIDATE_NET=${CANDIDATE_NET:-candidate.net}
-GAMES=${GAMES:-500}
+GAMES=${GAMES:-1500}
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
