@@ -71,7 +71,9 @@ check_engine_loads_net() {
         output=$(printf 'setoption name nnue_file value %s\nquit\n' "$net" | "$ENGINE" 2>&1) || rc=$?
     fi
 
-    if (( rc != 0 )) || ! grep -Fq "path='$net'" <<<"$output" \
+    local resolved_net
+    resolved_net=$(readlink -f "$net" 2>/dev/null || printf '%s' "$net")
+    if (( rc != 0 )) || ! grep -Fq "path='$resolved_net'" <<<"$output" \
         || grep -Eq 'ERROR:|falling back' <<<"$output"; then
         echo "Error: ENGINE cannot load $role: engine=$ENGINE net=$net" >&2
         printf '%s\n' "$output" | tail -40 >&2
