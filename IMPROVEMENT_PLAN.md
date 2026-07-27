@@ -1108,6 +1108,39 @@ gate rejection -- the same operator-discretion override rc45 used for a
 near-passing static result, justified here by the magnitude of improvement
 over the established rc53-56 baseline rather than gate proximity alone.
 
+### rc1 (enyo-1.32.0): epoch-count dose test -- no signal beyond one pass
+
+Continuing from the newly-accepted `enyo-1.31.0-rc57` itself (parent-relative
+test), same `gen1-sf-oracle.bullet` data, same wdl=0.05/lr=1e-5/trainable=all
+regimen, only `superbatches` doubled from 354 (one full pass) to 708 (two
+full passes, confirmed safe: `bullet_lib`'s `DirectSequentialDataLoader`
+wraps and re-reads its files in an infinite outer loop rather than erroring
+past EOF, so overshooting the exact row count only means the wraparound
+boundary falls mid-buffer, not an out-of-bounds read).
+
+Result: `phase:endgame mae_gain=+5.267 slope_gain=-0.005369`, `eval:800+
+mae_gain=+8.419 slope_gain=-0.006097`, `eval:300-799 mae_gain=+1.164
+slope_gain=+0.000172`. Rejected (all three groups need `>0.05` on both
+metrics), but candidate-vs-reference itself is nearly a no-op: mae 2-34cp
+and correlation 0.98-0.999 against rc57 across every band, an order of
+magnitude tighter than any other candidate-vs-reference comparison this
+session. The second epoch essentially left the network where rc57 already
+was -- training has saturated this corpus after one pass. Confirms the
+epoch-count lever is exhausted for this data; the constraint is the data
+itself; not training duration. Do not retry more superbatches on this exact
+file.
+
+Next real lever: a new self-play generation, but using
+`~/assets/nets/nn-0ee0657fb25e.nnue` (the Stockfish net) as the *playing*
+engine via `--uci nnue_file=...` on the self-play template, not just as a
+post-hoc relabeler. Since self-play games already embed the playing engine's
+own search score per move, generating games with the Stockfish net actually
+making moves (not rc57's) produces PGNs with Stockfish-quality labels for
+free, eliminating the entire separate `relabel_with_stockfish.py` /
+`sf-oracle-relabel` Forge pass rc57's data needed. Also produces a stronger,
+more decisive game distribution than any self-play from the current Enyo
+lineage.
+
 
 ### Material-specific full-head probe
 

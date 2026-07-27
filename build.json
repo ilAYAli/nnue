@@ -1,8 +1,7 @@
 {
-  "run": "enyo-1.31.0-rc57",
-  "continue_from": "enyo-1.30.0-rc3-unscaled",
-  "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "rc53-56 falsified both the wdl-blend and data-volume hypotheses for self-distillation from the current (weak, ~150-180 Elo behind) champion's own self-play games labeled with its own search score. This tests whether the failure is specifically the label source rather than the self-play position distribution: same self-play games (data/selfplay/gen1-live/gen1-live-distill.bullet's source PGNs), relabeled with a fresh Stockfish static eval per position instead of Enyo's own weak eval (tools/posgen/relabel_with_stockfish.py + tools/bullet/selfplay_to_bullet_sf_oracle.py, run via Forge template sf-oracle-relabel, 196 shards, 46,446,083 positions). superbatches=354 is floor(46446083/(2048*64)) to consume one full pass of the new file without reading past EOF (this run's own row count, not reused from rc55/56 which used a different-sized source file). Same wdl=0.05/lr=1e-5/trainable=all/unscaled-continue_from regimen as rc53-56 otherwise, changing only the data source and the superbatches value mechanically required by its size.",
+  "run": "enyo-1.32.0-rc2",
+  "continue_from": "enyo-1.31.0-rc57",
+  "hypothesis": "STAGED, blocked on new data: rc1 (superbatches=708, two full epochs of gen1-sf-oracle.bullet) rejected on residual_gate with candidate-vs-reference essentially a no-op versus rc57 (mae 2-34cp, corr 0.98-0.999 across every band) -- confirms the epoch-count lever is exhausted on this corpus, the constraint is the data itself. Next real candidate needs a new self-play generation using ~/assets/nets/nn-0ee0657fb25e.nnue as the *playing* engine (not just a post-hoc relabeler), producing Stockfish-quality PGN scores directly and skipping the whole relabel_with_stockfish.py pass. data.source_binpack below still points at the old gen1-sf-oracle.bullet as a placeholder -- do not train against this build.json until it is updated to the new corpus path once that generation completes.",
   "superbatches": 354,
   "trainable": "all",
   "lr": 0.00001,
