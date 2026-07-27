@@ -86,17 +86,12 @@ run_sprt() {
         --run "$RUN" \
         --verify \
         --comment "candidate=$(basename "$CANDIDATE_NET") vs reference=$(basename "$REFERENCE_NET")" \
-        --book "$BOOK" \
-        --candidate "$ENGINE" \
-        --candidate-uci nnue_file="$CANDIDATE_NET" \
-        --concurrency 1 \
-        --games "$GAMES" \
         --reference "$ENGINE" \
+        --candidate "$ENGINE" \
         --reference-uci nnue_file="$REFERENCE_NET" \
+        --candidate-uci nnue_file="$CANDIDATE_NET" \
         --restart on \
-        --shards 24 \
-        --tc 10+0.1 \
-        --threads 1 \
+        --games "$GAMES" \
         "${SPRT_ARGS[@]}"
 }
 
