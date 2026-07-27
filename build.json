@@ -1,10 +1,10 @@
 {
   "run": "enyo-1.32.0-rc2",
   "continue_from": "enyo-1.31.0-rc57",
-  "hypothesis": "STAGED, blocked on new data: rc1 (superbatches=708, two full epochs of gen1-sf-oracle.bullet) rejected on residual_gate with candidate-vs-reference essentially a no-op versus rc57 (mae 2-34cp, corr 0.98-0.999 across every band) -- confirms the epoch-count lever is exhausted on this corpus, the constraint is the data itself. Next real candidate needs a new self-play generation using ~/assets/nets/nn-0ee0657fb25e.nnue as the *playing* engine (not just a post-hoc relabeler), producing Stockfish-quality PGN scores directly and skipping the whole relabel_with_stockfish.py pass. data.source_binpack below still points at the old gen1-sf-oracle.bullet as a placeholder -- do not train against this build.json until it is updated to the new corpus path once that generation completes.",
+  "hypothesis": "Syzygy+Stockfish oracle labels: exact WDL for \u22646-piece positions, Stockfish static eval for 7+ pieces. Same regimen as rc57 (superbatches=354, wdl=0.05, lr=1e-5).",
   "superbatches": 354,
   "trainable": "all",
-  "lr": 0.00001,
+  "lr": 1e-05,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/selfplay/gen1-live-sfo/gen1-sf-oracle.bullet"
