@@ -1,13 +1,13 @@
 {
-  "run": "enyo-1.31.0-rc56",
+  "run": "enyo-1.31.0-rc57",
   "continue_from": "enyo-1.30.0-rc3-unscaled",
   "reference": "enyo-1.30.0-rc3",
-  "hypothesis": "rc55 did not actually test more data volume: the direct loader reads sequentially from the start of the file, and 64 superbatches only consumes ~8.4M of the 46.4M available rows, so it almost certainly retrained on the same prefix as rc53 (matching loss trajectory was the tell). Raising superbatches to 360 (~354 needed to consume the full 46.4M-row file once at batch_size=2048/64 batches-per-superbatch) to genuinely test whether full data volume changes the slope-collapse result, same wdl=0.05/lr=1e-5/trainable=all/unscaled-continue_from regimen otherwise",
-  "superbatches": 360,
+  "hypothesis": "rc53-56 falsified both the wdl-blend and data-volume hypotheses for self-distillation from the current (weak, ~150-180 Elo behind) champion's own self-play games labeled with its own search score. This tests whether the failure is specifically the label source rather than the self-play position distribution: same self-play games (data/selfplay/gen1-live/gen1-live-distill.bullet's source PGNs), relabeled with a fresh Stockfish static eval per position instead of Enyo's own weak eval (tools/posgen/relabel_with_stockfish.py + tools/bullet/selfplay_to_bullet_sf_oracle.py, run via Forge template sf-oracle-relabel, 196 shards, 46,446,083 positions). superbatches=354 is floor(46446083/(2048*64)) to consume one full pass of the new file without reading past EOF (this run's own row count, not reused from rc55/56 which used a different-sized source file). Same wdl=0.05/lr=1e-5/trainable=all/unscaled-continue_from regimen as rc53-56 otherwise, changing only the data source and the superbatches value mechanically required by its size.",
+  "superbatches": 354,
   "trainable": "all",
   "lr": 0.00001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/selfplay/gen1-live/gen1-live-distill.bullet"
+    "source_binpack": "data/selfplay/gen1-live-sfo/gen1-sf-oracle.bullet"
   }
 }
