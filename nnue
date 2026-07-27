@@ -727,9 +727,7 @@ run_sprt_once() {
       --alpha "$SPRT_ALPHA"
       --beta "$SPRT_BETA"
     )
-    local hypothesis
-    hypothesis=$(json '.hypothesis // empty')
-    [[ -z "$hypothesis" ]] || forge_cmd+=(--comment "$hypothesis")
+    forge_cmd+=(--comment "$run vs $(reference_label)")
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
       fail "could not launch Forge SPRT for $run ($forge_run)" sprt
