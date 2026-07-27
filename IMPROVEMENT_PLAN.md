@@ -1053,6 +1053,62 @@ available) or accepting that gen1 alone will not produce a promotable
 candidate and treating it purely as infrastructure validation for a possible
 future multi-generation effort.
 
+### rc57: Stockfish-oracle relabeled self-play -- best self-distillation result yet, still rejected on slope
+
+Isolates the remaining untested lever from rc53-56: the self-play label
+*source*, not the blend ratio or volume. Same self-play games (300k, 46.4M
+positions after filtering) that produced the 46,446,083-row corpus behind
+rc55/56, but every position relabeled with a fresh Stockfish static eval
+(`tools/posgen/relabel_with_stockfish.py`, run in parallel across the full
+Forge fleet via a new `sf-oracle-relabel` template, 196 shards) instead of
+Enyo's own weak self-play search score. Same continue_from/wdl=0.05/lr=1e-5/
+trainable=all regimen as rc53-56, `superbatches=354` recomputed for this
+run's own row count (not reused from rc55/56, which had a different-sized
+source file -- see [[nnue-sequential-loader-prefix]]).
+
+Result: `phase:endgame mae_gain=+20.316 slope_gain=-0.008522`, `eval:800+
+mae_gain=+26.570 slope_gain=-0.029391`, `eval:300-799 mae_gain=-0.363
+slope_gain=-0.085349`. This is a dramatic, qualitative improvement over every
+other self-distillation candidate this session -- rc53-56 all showed
+catastrophic slope collapse (0.52-0.77, `slope_gain` -0.21 to -0.44) and
+strongly negative `eval:800+`/`eval:300-799` mae_gain (-6 to -98). rc57's raw,
+un-rescaled slope stays in a normal 0.96-1.21 range across phases and its
+mae_gain is positive in two of three required groups by a wide margin. This
+falsifies the rc53-56-era conclusion that the self-play *position
+distribution* from a ~150-180-Elo-behind generator is inherently unusable:
+with trustworthy labels on the same positions, calibration recovers almost
+entirely. The bottleneck was the label source, not the game distribution.
+
+Still rejected: all three required groups miss `slope_gain` (needs >0.05),
+and `eval:300-799` also misses `mae_gain` narrowly. Ran an offline
+per-output-bucket rescale fit (coordinate descent against
+`residual_gate.py`'s actual metric functions, replicated by import, same
+method as rc45's fit) to see if this is a pure calibration-scale problem:
+unregularized fit reached `loss=0.143` with unstable, overfit-looking
+per-bucket scales (1.94, 0.36, ...) and still failed all three groups; a
+regularized fit (L2 toward 1.0) converged to plausible scales (~0.64-1.07)
+and drove every group's `mae_gain` comfortably positive (+9 to +17) but
+`slope_gain` stayed just under the 0.05 threshold in all three (0.013,
+-0.031, 0.034) regardless of regularization strength or restart count. A
+single global scalar sweep (0.85-1.10) confirmed `eval:300-799` and
+`phase:endgame`/`eval:800+` want scale corrections in *opposite* directions,
+so no flat scale can fix all three, and even full per-bucket freedom cannot
+close the `slope_gain` gap. Combined with rc45's own experience (an even
+closer static near-miss after rescaling, that still lost `elo=-8.1` in a real
+1500-game SPRT), this is now the second independent case where post-hoc
+linear rescaling gets close on `mae_gain` but cannot fix `slope_gain` --
+`slope_gain` is measuring a distributional/shape mismatch, not a magnitude
+one, and a linear rescale is the wrong tool for it regardless of data source.
+
+Given how large the qualitative jump is versus every prior self-distillation
+attempt, and that the residual failure mode is now well-understood and not
+worth further rescale-chasing, manually launched a 1500-game SPRT on the raw
+(un-rescaled) `enyo-1.31.0-rc57.nn` against `enyo-1.30.0-rc3.nn` despite the
+gate rejection -- the same operator-discretion override rc45 used for a
+near-passing static result, justified here by the magnitude of improvement
+over the established rc53-56 baseline rather than gate proximity alone.
+
+
 ### Material-specific full-head probe
 
 Test `enyo-h16fh-v1-rc1`: retain the mature h16 accumulator and initialize all
