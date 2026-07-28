@@ -1580,3 +1580,48 @@ Concrete current candidate:
 - Verified the target/runtime contract: side orientation, centipawn units, WDL blend, phase normalization, output-bucket selection, and export quantization. Added deterministic contract tests and retained trainer feature-index parity tests.
 - Corrected the largest mismatch by clamping training targets to the runtime +/-2045 cp limit before inverse phase normalization. The residual gate now runs the balanced 50k audit and requires endgame, 300-799 cp, and 800+ cp MAE and slope-distance improvement before any SPRT.
 - The unchanged-candidate gate test rejects with exit 1. No SPRT has been launched for rc7; its build config is staged as the single controlled follow-up.
+
+## 2026-07-29 The validation target and the training target are different quantities
+
+The residual gate, the static-eval gate, and the Stockfish-net ledger all score
+the candidate against Stockfish's **static evaluation**:
+`structural_net_audit.py`'s `default_command` maps a `.nnue` subject to the UCI
+`eval` command, and `relabel_with_stockfish.py` builds its labels the same way
+(`Subject(..., command="eval")`). The whole gen1/gen3 self-play lineage is
+therefore trained toward, and judged against, one consistent quantity.
+
+`data/stockfish/master-binpacks/` is not that quantity. `nodes5000pv2_UHO`,
+`data_pv-2_diff-100_nodes-5000`, `dfrc_n5000` and the rest carry Stockfish
+**search scores** (5000 nodes, PV 2), which resolve tactics that static eval
+misses and are systematically more extreme in magnitude.
+
+`enyo-1.32.0-rc5` made this visible for the first time, because it is the first
+candidate to consume enough binpack data to express the difference (524M
+positions; candidate-vs-reference mae 142.29 against 16.79 for every self-play
+run). Its output slope rose to 1.12-1.63 versus the reference's 0.97-0.98. That
+is the expected consequence of learning a search target and being measured
+against a static one - not evidence of a damaged net.
+
+Consequences to weigh before the next data decision:
+
+- A global output rescale cannot reconcile the two. Simulated over rc5's stored
+  50k audit, mae is best near scale 0.65 (endgame +39.0, 800+ +61.7, 300-799
+  +1.5) while slope wants ~0.90; the distortion is magnitude-dependent. This
+  reproduces the 2026-07-25 finding in 7331d1c by a different route.
+- The gate cannot arbitrate a search-labeled candidate at all, since its target
+  is static eval. It has now rejected six consecutive candidates and passed one
+  that measured -5.3 Elo in games.
+- Mixing search-labeled and static-labeled corpora in one run trains toward two
+  different functions at once and should be avoided until the target is chosen
+  deliberately.
+
+The open question is which target the lineage should aim at. Search-derived
+labels are what strong engines train on; static-eval agreement is what this
+harness measures. Those goals are not the same, and the lineage has been
+optimizing the measurable one.
+
+Operational note: binpack sources require `data.limit`. Uncapped, a 40 GB
+binpack expands past 313 GB of BulletFormat (9,797,894,144 positions converted
+before ENOSPC on a disk with 293 GB free), which is the most likely reason
+enyo-1.31.0-rc44 through rc48 all ran 64-256 superbatches over the same file
+prefix.
