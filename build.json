@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.32.0-rc3",
+  "run": "enyo-1.32.0-rc4",
   "continue_from": "enyo-1.31.0-rc57",
   "reference": "enyo-1.31.0-rc57",
-  "hypothesis": "Syzygy-corrected endgame labels: an unrecorded dose sweep over gen3 at 114/355/710 superbatches left phase:endgame residuals pinned at mae_gain -5.5/-6.6/-7.3, and 710 superbatches reproduced 355 almost exactly (candidate-vs-reference mae 16.79 vs 16.41), so endgame error is a label-quality wall rather than a training-budget one. Hold that best dose of 355 and change only the labels of the 28% of positions with <=6 pieces, whose scores and results now come from Syzygy instead of the Stockfish oracle.",
+  "hypothesis": "Weight the corrected outcomes: rc3's Syzygy relabel rewrote 1,467,008 game results to ground truth, but at wdl=0.05 the result channel carries only 5% of the target, so that correction was nearly inert and rc3 came out Elo-neutral (-5.3 +/- 13.0). Raise wdl to 0.20 on the same TB-corrected corpus, holding architecture, data, dose, learning rate, and trainable scope fixed, so the exact outcomes actually reach the loss.",
   "superbatches": 355,
   "trainable": "all",
   "lr": 1e-05,
-  "wdl": 0.05,
+  "wdl": 0.2,
   "data": {
     "source_binpack": "data/selfplay/gen3/selfplay-sf-oracle-tb.bullet"
   }
