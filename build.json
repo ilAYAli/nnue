@@ -1,13 +1,14 @@
 {
-  "run": "enyo-1.32.0-rc4",
+  "run": "enyo-1.32.0-rc5",
   "continue_from": "enyo-1.31.0-rc57",
   "reference": "enyo-1.31.0-rc57",
-  "hypothesis": "Weight the corrected outcomes: rc3's Syzygy relabel rewrote 1,467,008 game results to ground truth, but at wdl=0.05 the result channel carries only 5% of the target, so that correction was nearly inert and rc3 came out Elo-neutral (-5.3 +/- 13.0). Raise wdl to 0.20 on the same TB-corrected corpus, holding architecture, data, dose, learning rate, and trainable scope fixed, so the exact outcomes actually reach the loss.",
-  "superbatches": 355,
+  "hypothesis": "The Stockfish master binpacks were never actually consumed. Every prior binpack candidate (enyo-1.31.0-rc44 through rc48) ran 64-256 superbatches, i.e. 8.4M-33.5M positions, and the loader reads sequentially from the start of the file, so each retrained on the same sub-0.3% prefix. The falsified data-volume result (rc55/rc56) was measured on self-play data, not on these binpacks. Hold the accepted rc57 regimen and raise the dose to 4000 superbatches (524M positions, ~40x any previous binpack run) over nodes5000pv2_UHO.binpack, whose UHO openings match the SPRT book. data.limit caps the BulletFormat conversion at 600M rows (19 GB); an uncapped conversion of this binpack expands to roughly 313 GB and exhausts the disk.",
+  "superbatches": 4000,
   "trainable": "all",
-  "lr": 1e-05,
-  "wdl": 0.2,
+  "lr": 0.00001,
+  "wdl": 0.05,
   "data": {
-    "source_binpack": "data/selfplay/gen3/selfplay-sf-oracle-tb.bullet"
+    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
+    "limit": 600000000
   }
 }
