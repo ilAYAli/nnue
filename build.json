@@ -1,12 +1,13 @@
 {
-  "run": "enyo-1.32.0-rc2",
+  "run": "enyo-1.32.0-rc3",
   "continue_from": "enyo-1.31.0-rc57",
-  "hypothesis": "Syzygy+Stockfish oracle labels: exact WDL for \u22646-piece positions, Stockfish static eval for 7+ pieces. Same regimen as rc57 (superbatches=354, wdl=0.05, lr=1e-5).",
-  "superbatches": 354,
+  "reference": "enyo-1.31.0-rc57",
+  "hypothesis": "Gen2 self-play data: continue from the accepted rc57 parent for one complete pass over the 14,817,510-row corpus, holding architecture, objective, learning rate, and trainable scope fixed.",
+  "superbatches": 114,
   "trainable": "all",
-  "lr": 1e-05,
+  "lr": 0.00001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/selfplay/gen1-live-sfo/gen1-sf-oracle.bullet"
+    "source_binpack": "data/selfplay/gen2/gen2.bullet"
   }
 }
