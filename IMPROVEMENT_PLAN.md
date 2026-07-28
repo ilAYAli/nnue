@@ -1625,3 +1625,28 @@ binpack expands past 313 GB of BulletFormat (9,797,894,144 positions converted
 before ENOSPC on a disk with 293 GB free), which is the most likely reason
 enyo-1.31.0-rc44 through rc48 all ran 64-256 superbatches over the same file
 prefix.
+
+### enyo-1.32.0-rc5-s0.65: first positive result from binpack data
+
+1500 games versus `enyo-1.31.0-rc57`: **elo=+8.1 ci=14.1 los=87.1%
+llr=0.55/2.20 (25%) draw=50.6%**.
+
+The candidate is `enyo-1.32.0-rc5` with its output head scaled by 0.65 via
+`tools/validate/scale_output_head.py`. rc5 itself failed the residual gate
+outright (all three bands strongly negative) because it was trained on
+search-labeled data and the gate measures static-eval agreement.
+
+This is the first candidate-versus-parent gain in the enyo-1.32.0 series, and
+it came from the corpus the gate rejected hardest. For comparison on the same
+harness: `enyo-1.32.0-rc3` (Syzygy-corrected self-play, passed five of six gate
+criteria) measured -5.3 with los=21.1%, and the accepted `enyo-1.31.0-rc57`
+was promoted at elo=8.6 llr=0.37/2.20 (17%).
+
+Not yet conclusive: the interval spans -6 to +22 and the LLR is 25% toward the
+acceptance bound. Extending to a larger game count before any promotion.
+
+If it holds, the implications are that the Stockfish master binpacks are a live
+source of Elo for this lineage, that they must be dosed far above the 64-256
+superbatch range used historically, and that a post-hoc output rescale is
+required to bring a search-labeled net back into this engine's coordinate
+system.
