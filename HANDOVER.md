@@ -13,42 +13,24 @@ Authoritative repos:
 - Enyo: `~/code/cpp/chess/enyo`
 - Forge: `~/code/cpp/chess/forge`
 
-Current engine support:
+Worker engines must be built on each worker from source. Do not copy Linux
+binaries to macOS workers. Linux workers should report ELF, macOS Mach-O, and
+all should print the expected Enyo git hash on startup.
 
-- Enyo commit: `ac7ada8 feat: load Enyo FullThreats nets`
-- NNUE commit: `f3549bc feat: train Enyo FullThreats nets`
-- `ac7ada8` is pushed to Enyo `origin/main`.
-- `f3549bc` exists on NNUE `main`; pwa-5090 was ahead of `origin/main` when
-  this file was written.
-- Worker engines must be built on each worker from source. Do not copy Linux
-  binaries to macOS workers.
-- Verified worker `~/assets/engines/candidate` targets after deployment:
-  `enyo_ac7ada8` on Linux hosts as ELF and on macOS as Mach-O.
+Active NNUE line:
 
-Active NNUE run:
-
-- Run: `enyo-2.0.0-rc1`
-- Architecture: scratch Enyo FullThreats, `16x12x1024-o8`
-- Reference for gates: `enyo-1.16.0-rc3`
-- Data: `data/bullet/enyo-scratch-broad-1.0.0-rc1.bullet`
-- Dose: `32768` superbatches
-- WDL: `0.15`
-- LR: `0.001 -> 0.000005`
-- Activation L1: `0.00001`
-- Trainable: `all`
-- Launch command used in `nnue_cmd`:
+- Lineage: `enyo-1.32.x`, the Enyo-native HalfKA-style architecture
+  (`16x12x1024-o8`, `full_threats=false`)
+- Accepted parent and gate reference: `enyo-1.31.0-rc57`
+- Launch command, always from the `nnue_cmd` tmux window:
 
 ```sh
 NNUE_AI_STDIN_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate
 ```
 
-Because this is a scratch architecture, the loop asked:
-
-```text
-continue_from not found. Start a new scratch net? [y/N]
-```
-
-The prompt was answered with `y`.
+There is no active FullThreats or scratch run. The `enyo-2.0.0` FullThreats
+experiment described in earlier revisions of this file was abandoned; do not
+resume it without a deliberate decision.
 
 ## Current Lineage
 
@@ -68,12 +50,44 @@ Do not blindly trust `~/assets/nets/candidate.net` as the strongest net. At the
 time this handover was written, pwa-5090 had pointed it at `enyo-1.19.0-rc2`,
 which was weaker in the Stockfish-net ledger than `enyo-1.16.0-rc3`.
 
-The current experiment deliberately starts a new architecture major:
+## What Is Known As Of 2026-07-29
 
-- `enyo-2.x`: Enyo FullThreats architecture
-- It is scratch-trained, not initialized from another engine or net.
-- It uses the proven broad Bullet corpus and WDL/L1 recipe as the first
-  calibration test.
+Run naming: an `rc` is consumed only when a run **completes training**. A launch
+that dies before training reuses the same number. Violating this produced a
+badly tangled `enyo-1.32.0` sequence that had to be renumbered.
+
+Watch for stale artifacts under old run names. `resume_training`
+(`tools/bullet/spike_trainer/src/bin/train.rs`) early-returns only when neither
+`runs/<run>/model.nn` nor `~/assets/nets/<run>.nn` exists; a leftover net from an
+abandoned series makes it demand a `train.provenance.json` that does not exist
+and abort with "missing or invalid provenance". The error does not name the file
+it tripped on.
+
+Falsified on this self-play generation:
+
+- **Dose.** A sweep at 114/355/710 superbatches over the 46.5M-row gen3 corpus
+  converged by one epoch: 710 reproduced 355 almost exactly (candidate-vs-
+  reference mae 16.41 vs 16.79). 355 is the saturation point.
+- **WDL blend.** Raising `wdl` 0.05 -> 0.20 regressed all three gate bands
+  hard (endgame -27.0, 800+ -39.0, 300-799 -12.8). If revisited, probe 0.08-0.10.
+- **Syzygy endgame labels.** Correcting every <=6-piece position (13,240,569
+  rows, zero misses) turned endgame residuals positive for the first time
+  (-6.6 -> +0.6) but came out Elo-neutral at -5.3 +/- 13.0 over 1500 games.
+
+Two measurement traps worth knowing:
+
+- **The residual gate is a weak Elo proxy.** It rejected five candidates, then
+  passed the one that measured -5.3. Its required bands (`phase:endgame`,
+  `eval:800+`) are the two with the *lowest* relative error - endgame mae looks
+  large only because endgame evals are large. Normalized against mean |eval|,
+  the opening is the worst phase at 50% and the endgame the best at 29%.
+- **`phase:endgame` is not tablebase range.** The bucket is `piece_count < 10`,
+  and only 13.1% of it is <=6 pieces. Syzygy 6-man cannot touch the other 87%.
+
+Engine options that cancel in this harness: `use_syzygy` is `false` by default,
+and every measurement (candidate-vs-reference, and the Stockfish-net benchmark)
+runs the same Enyo binary on both sides, so enabling tablebases changes the
+engine's strength but measures ~0 here and does nothing for the net.
 
 ## Iteration Flow
 
@@ -214,33 +228,34 @@ current target is the Stockfish net.
 
 ## Path Forward
 
-Immediate next step:
+The self-play corpus is exhausted. Dose, WDL blend, and Syzygy endgame labels
+have each been tested against it and none produced Elo. The positions come from
+roughly 300k games of a ~-150 Elo engine at 10+0.1, so the labels can be
+corrected but the distribution cannot - the standard bootstrap problem.
 
-1. Let `enyo-2.0.0-rc1` finish training and gates.
-2. If it fails static/startpos/load gates, fix only the FullThreats
-   implementation bug and relaunch the same declared experiment.
-3. If it passes gates but fails badly versus `enyo-1.16.0-rc3`, record the
-   rejection and decide whether FullThreats needs:
-   - lower LR,
-   - smaller dose,
-   - different WDL,
-   - or a smaller hidden width before more expensive training.
-4. If it is positive or close versus `enyo-1.16.0-rc3`, run/record the
-   Stockfish-net benchmark immediately.
+The untapped resource is `data/stockfish/master-binpacks/`: 282 GB, roughly
+**11.9 billion** filtered positions across 12 Stockfish binpacks. Stockfish-
+labeled data is permitted; only foreign *weights* are forbidden.
 
-Promising follow-up experiments if `enyo-2.0.0-rc1` is alive:
+That data has been touched but never actually consumed. Every prior binpack
+candidate (`enyo-1.31.0-rc44` through `rc48`) ran 64-256 superbatches, i.e.
+8.4M-33.5M positions, and the loader reads sequentially from the start of the
+file - so each one retrained on the same sub-0.3% prefix. The "data volume
+hypothesis falsified" result in `1abbcbe` was measured on **self-play** data
+(`gen1-live-distill.bullet`), not on these binpacks.
 
-- Same FullThreats architecture with reduced LR, for example `0.0005`.
-- Same architecture with shorter dose, for example `8192` or `16384`
-  superbatches, if the first run overtrains.
-- Same architecture with hidden 768 only after the 1024-wide version has a clear
-  result.
-- Consider sparse/activation-L1 continuation only after a FullThreats baseline
-  is known to be competitive.
+Immediate next steps:
 
-Do not resume incremental `enyo-1.x` same-architecture tuning unless the
-FullThreats line clearly fails. The `enyo-1.x` line appeared saturated around
-`-150` to `-180` Elo versus the Stockfish net.
+1. Train on the binpacks at a dose that actually consumes them. A full pass over
+   a single 40 GB binpack is on the order of 13,000 superbatches.
+2. Prefer sources whose openings match the SPRT book
+   (`nodes5000pv2_UHO.binpack` against `UHO_XXL_2022_+120_+149.epd`). Avoid
+   `dfrc_n5000.binpack` unless Fischer-random distribution is wanted.
+3. Treat the residual gate as advisory here, not as the decision. Let games
+   decide, and check the Stockfish-net ledger for absolute movement.
+4. If a large binpack dose moves nothing either, the next lever is a real
+   training run rather than continued fine-tuning at `lr=1e-5` from `rc57`,
+   which is polish on a saturated net.
 
 ## Recovery Notes
 
