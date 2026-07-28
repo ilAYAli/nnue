@@ -2,12 +2,12 @@
   "run": "enyo-1.32.0-rc3",
   "continue_from": "enyo-1.31.0-rc57",
   "reference": "enyo-1.31.0-rc57",
-  "hypothesis": "Gen2 self-play data: continue from the accepted rc57 parent for one complete pass over the 14,817,510-row corpus, holding architecture, objective, learning rate, and trainable scope fixed.",
-  "superbatches": 114,
+  "hypothesis": "Syzygy-corrected endgame labels: an unrecorded dose sweep over gen3 at 114/355/710 superbatches left phase:endgame residuals pinned at mae_gain -5.5/-6.6/-7.3, and 710 superbatches reproduced 355 almost exactly (candidate-vs-reference mae 16.79 vs 16.41), so endgame error is a label-quality wall rather than a training-budget one. Hold that best dose of 355 and change only the labels of the 28% of positions with <=6 pieces, whose scores and results now come from Syzygy instead of the Stockfish oracle.",
+  "superbatches": 355,
   "trainable": "all",
-  "lr": 0.00001,
+  "lr": 1e-05,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/selfplay/gen2/gen2.bullet"
+    "source_binpack": "data/selfplay/gen3/selfplay-sf-oracle-tb.bullet"
   }
 }
