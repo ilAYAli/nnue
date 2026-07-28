@@ -57,6 +57,7 @@ def convert_shard(
     skip_plies: int,
     min_depth: int,
     max_abs_cp: int,
+    bullet_manifest: Path,
 ) -> tuple[Path, dict]:
     stem = pgn_path.stem
     rows_jsonl = tmp_dir / f"{stem}.rows.jsonl"
@@ -103,6 +104,7 @@ def convert_shard(
     run([
         str(VENV_PYTHON), str(REPO_ROOT / "tools/bullet/bullet.py"), "format",
         "--input", str(bulletfmt), "--output", str(chunk_bullet), "--validate",
+        "--bullet-manifest", str(bullet_manifest),
     ])
 
     pgn_stats = json.loads(stats_json.read_text()) if stats_json.exists() else {}
@@ -134,6 +136,56 @@ def save_state(state_path: Path, state: dict) -> None:
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def save_forge_stats(
+    path: Path | None,
+    *,
+    shard_index: int,
+    pgns: int,
+    written: int,
+) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "enyo.label-stats.v1",
+                "shard_index": shard_index,
+                "read": pgns,
+                "selected": written,
+                "written": written,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def parse_shard_slice(value: str) -> tuple[int, int]:
+    index_text, separator, count_text = value.partition("/")
+    try:
+        index = int(index_text)
+        count = int(count_text) if separator else 0
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f"invalid shard slice {value!r}; expected INDEX/COUNT"
+        ) from exc
+    if not separator or count < 1 or index < 0 or index >= count:
+        raise argparse.ArgumentTypeError(
+            f"invalid shard slice {value!r}; expected 0 <= INDEX < COUNT"
+        )
+    return index, count
+
+
+def select_shards(paths: list[Path], shard_slice: tuple[int, int] | None) -> list[Path]:
+    if shard_slice is None:
+        return paths
+    index, count = shard_slice
+    return paths[index::count]
+
+
 @contextmanager
 def locked(lock_path: Path):
     """Serialize concurrent invocations for the same --output.
@@ -159,10 +211,27 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pgn-dir", type=Path, required=True, help="Directory of *.pgn shards (e.g. a Forge selfplay run's outputs/ dir); incremental across re-runs")
     ap.add_argument("--output", type=Path, required=True, help="Final .bullet path, appended to incrementally")
+    ap.add_argument(
+        "--stats",
+        type=Path,
+        help="Optional Forge-compatible shard statistics JSON",
+    )
     ap.add_argument("--label-mode", required=True, choices=["self-distillation", "outcome-only"])
     ap.add_argument("--skip-plies", type=int, default=8)
     ap.add_argument("--min-depth", type=int, default=1)
     ap.add_argument("--max-abs-cp", type=int, default=10000)
+    ap.add_argument(
+        "--bullet-manifest",
+        type=Path,
+        default=Path("~/source/bullet/Cargo.toml"),
+        help="Bullet Cargo.toml used by bullet-utils",
+    )
+    ap.add_argument(
+        "--shard-slice",
+        type=parse_shard_slice,
+        metavar="INDEX/COUNT",
+        help="Process only this deterministic slice of the sorted PGN files",
+    )
     ap.add_argument("--reset", action="store_true", help="Ignore/clear prior incremental state and reconvert everything")
     args = ap.parse_args()
 
@@ -184,13 +253,40 @@ def main() -> int:
                 f"{state_path} was built with label_mode={state['label_mode']!r}; "
                 f"pass --reset to switch to {args.label_mode!r}"
             )
+        shard_slice = (
+            f"{args.shard_slice[0]}/{args.shard_slice[1]}"
+            if args.shard_slice is not None
+            else None
+        )
+        previous_slice = state.get("shard_slice")
+        slice_changed = (
+            previous_slice != shard_slice
+            if "shard_slice" in state
+            else bool(state.get("processed_shards")) and shard_slice is not None
+        )
+        if slice_changed:
+            raise SystemExit(
+                f"{state_path} was built with shard_slice={previous_slice!r}; "
+                f"pass --reset to switch to {shard_slice!r}"
+            )
         state["label_mode"] = args.label_mode
+        state["shard_slice"] = shard_slice
 
-        all_shards = sorted(args.pgn_dir.glob("*.pgn"))
+        all_shards = select_shards(
+            sorted(args.pgn_dir.glob("*.pgn")),
+            args.shard_slice,
+        )
         processed = set(state["processed_shards"])
         new_shards = [s for s in all_shards if s.name not in processed]
 
         if not new_shards:
+            args.output.touch(exist_ok=True)
+            save_forge_stats(
+                args.stats,
+                shard_index=args.shard_slice[0] if args.shard_slice else 0,
+                pgns=len(all_shards),
+                written=int(state.get("total_rows", 0)),
+            )
             print(f"no new shards in {args.pgn_dir} (already processed {len(processed)})")
             return 0
 
@@ -213,6 +309,7 @@ def main() -> int:
                     chunk, skipped = convert_shard(
                         shard, tmp_dir, args.label_mode,
                         args.skip_plies, args.min_depth, args.max_abs_cp,
+                        args.bullet_manifest.expanduser(),
                     )
                     chunk_bytes = chunk.stat().st_size
                     with chunk.open("rb") as src:
@@ -240,6 +337,12 @@ def main() -> int:
             f"label_mode={args.label_mode} output={args.output} "
             f"new_shards={len(new_shards)} total_shards={len(state['processed_shards'])} "
             f"total_rows={state['total_rows']}"
+        )
+        save_forge_stats(
+            args.stats,
+            shard_index=args.shard_slice[0] if args.shard_slice else 0,
+            pgns=len(all_shards),
+            written=int(state["total_rows"]),
         )
     return 0
 
