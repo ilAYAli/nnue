@@ -179,11 +179,34 @@ def parse_shard_slice(value: str) -> tuple[int, int]:
     return index, count
 
 
+def parse_shard_range(value: str) -> tuple[int, int]:
+    start_text, separator, count_text = value.partition("/")
+    try:
+        start = int(start_text)
+        count = int(count_text) if separator else 0
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f"invalid shard range {value!r}; expected START/COUNT"
+        ) from exc
+    if not separator or start < 0 or count < 1:
+        raise argparse.ArgumentTypeError(
+            f"invalid shard range {value!r}; expected START >= 0 and COUNT >= 1"
+        )
+    return start, count
+
+
 def select_shards(paths: list[Path], shard_slice: tuple[int, int] | None) -> list[Path]:
     if shard_slice is None:
         return paths
     index, count = shard_slice
     return paths[index::count]
+
+
+def select_shard_range(paths: list[Path], shard_range: tuple[int, int] | None) -> list[Path]:
+    if shard_range is None:
+        return paths
+    start, count = shard_range
+    return paths[start:start + count]
 
 
 @contextmanager
@@ -232,6 +255,12 @@ def main() -> int:
         metavar="INDEX/COUNT",
         help="Process only this deterministic slice of the sorted PGN files",
     )
+    ap.add_argument(
+        "--shard-range",
+        type=parse_shard_range,
+        metavar="START/COUNT",
+        help="Process COUNT consecutive files from the sorted PGN list",
+    )
     ap.add_argument("--reset", action="store_true", help="Ignore/clear prior incremental state and reconvert everything")
     args = ap.parse_args()
 
@@ -272,9 +301,11 @@ def main() -> int:
         state["label_mode"] = args.label_mode
         state["shard_slice"] = shard_slice
 
-        all_shards = select_shards(
-            sorted(args.pgn_dir.glob("*.pgn")),
-            args.shard_slice,
+        if args.shard_slice is not None and args.shard_range is not None:
+            raise SystemExit("--shard-slice and --shard-range are mutually exclusive")
+        all_shards = select_shard_range(
+            select_shards(sorted(args.pgn_dir.glob("*.pgn")), args.shard_slice),
+            args.shard_range,
         )
         processed = set(state["processed_shards"])
         new_shards = [s for s in all_shards if s.name not in processed]

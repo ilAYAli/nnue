@@ -23,7 +23,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from selfplay_to_bullet import parse_shard_slice, save_forge_stats, select_shards
+from selfplay_to_bullet import (
+    parse_shard_range,
+    parse_shard_slice,
+    save_forge_stats,
+    select_shard_range,
+    select_shards,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python3"
@@ -167,6 +173,12 @@ def main() -> int:
         metavar="INDEX/COUNT",
         help="Process only this deterministic slice of the sorted PGN files",
     )
+    ap.add_argument(
+        "--shard-range",
+        type=parse_shard_range,
+        metavar="START/COUNT",
+        help="Process COUNT consecutive files from the sorted PGN list",
+    )
     args = ap.parse_args()
 
     work_dir = args.output.parent
@@ -201,9 +213,11 @@ def main() -> int:
             )
         state["shard_slice"] = shard_slice
 
-        all_shards = select_shards(
-            sorted(args.pgn_dir.glob("*.pgn")),
-            args.shard_slice,
+        if args.shard_slice is not None and args.shard_range is not None:
+            raise SystemExit("--shard-slice and --shard-range are mutually exclusive")
+        all_shards = select_shard_range(
+            select_shards(sorted(args.pgn_dir.glob("*.pgn")), args.shard_slice),
+            args.shard_range,
         )
         processed = set(state["processed_shards"])
         new_shards = [s for s in all_shards if s.name not in processed]

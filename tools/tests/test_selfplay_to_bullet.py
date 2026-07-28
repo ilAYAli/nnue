@@ -42,6 +42,24 @@ class SelfplayToBulletTests(unittest.TestCase):
             ):
                 selfplay_to_bullet.parse_shard_slice(value)
 
+    def test_shard_ranges_partition_contiguous_pgns_without_overlap(self) -> None:
+        paths = [Path(f"{index}.pgn") for index in range(10)]
+
+        ranges = [
+            selfplay_to_bullet.select_shard_range(paths, (0, 3)),
+            selfplay_to_bullet.select_shard_range(paths, (3, 4)),
+            selfplay_to_bullet.select_shard_range(paths, (7, 3)),
+        ]
+
+        self.assertEqual(paths, [path for group in ranges for path in group])
+
+    def test_shard_range_rejects_invalid_values(self) -> None:
+        for value in ("", "0", "x/2", "-1/2", "0/0"):
+            with self.subTest(value=value), self.assertRaises(
+                selfplay_to_bullet.argparse.ArgumentTypeError
+            ):
+                selfplay_to_bullet.parse_shard_range(value)
+
     def test_empty_pgn_is_recorded_and_does_not_run_converter(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
