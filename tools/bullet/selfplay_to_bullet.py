@@ -38,6 +38,18 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
+def cleanup_shard_intermediates(pgn_path: Path, tmp_dir: Path, label_mode: str) -> None:
+    stem = pgn_path.stem
+    for path in (
+        tmp_dir / f"{stem}.rows.jsonl",
+        tmp_dir / f"{stem}.stats.json",
+        tmp_dir / f"{stem}.{label_mode}.bulletfmt",
+        tmp_dir / f"{stem}.chunk.bullet",
+        tmp_dir / f"{stem}.bullet_stats.json",
+    ):
+        path.unlink(missing_ok=True)
+
+
 def convert_shard(
     pgn_path: Path,
     tmp_dir: Path,
@@ -97,6 +109,7 @@ def convert_shard(
     bullet_stats = json.loads(bullet_stats_json.read_text()) if bullet_stats_json.exists() else {}
     skipped = {
         "shard": pgn_path.name,
+        "skip_reason": None,
         "pgn_skipped_mate": pgn_stats.get("skipped_mate"),
         "pgn_skipped_cp": pgn_stats.get("skipped_cp"),
         "pgn_skipped_depth": pgn_stats.get("skipped_depth"),
@@ -184,14 +197,27 @@ def main() -> int:
         skip_log_path = work_dir / f"{args.output.stem}.skips.jsonl"
         with args.output.open("ab") as out, skip_log_path.open("a") as skip_log:
             for index, shard in enumerate(new_shards, start=1):
-                chunk, skipped = convert_shard(
-                    shard, tmp_dir, args.label_mode,
-                    args.skip_plies, args.min_depth, args.max_abs_cp,
-                )
-                chunk_bytes = chunk.stat().st_size
-                with chunk.open("rb") as src:
-                    out.write(src.read())
-                chunk.unlink()
+                if shard.stat().st_size == 0:
+                    cleanup_shard_intermediates(shard, tmp_dir, args.label_mode)
+                    chunk_bytes = 0
+                    skipped = {
+                        "shard": shard.name,
+                        "skip_reason": "empty_pgn",
+                        "pgn_skipped_mate": None,
+                        "pgn_skipped_cp": None,
+                        "pgn_skipped_depth": None,
+                        "bullet_skipped_cp": None,
+                        "bullet_written": 0,
+                    }
+                else:
+                    chunk, skipped = convert_shard(
+                        shard, tmp_dir, args.label_mode,
+                        args.skip_plies, args.min_depth, args.max_abs_cp,
+                    )
+                    chunk_bytes = chunk.stat().st_size
+                    with chunk.open("rb") as src:
+                        out.write(src.read())
+                    chunk.unlink()
                 out.flush()
                 skip_log.write(json.dumps(skipped) + "\n")
                 skip_log.flush()
@@ -204,7 +230,8 @@ def main() -> int:
                 save_state(state_path, state)
                 print(
                     f"[{index}/{len(new_shards)}] {shard.name} -> +{chunk_bytes // 32} rows "
-                    f"(pgn_skipped_mate={skipped['pgn_skipped_mate']} "
+                    f"(skip_reason={skipped['skip_reason']} "
+                    f"pgn_skipped_mate={skipped['pgn_skipped_mate']} "
                     f"bullet_skipped_cp={skipped['bullet_skipped_cp']})"
                 )
 
