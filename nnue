@@ -90,11 +90,11 @@ SPRT_ELO0=${SPRT_ELO0:-0.0}
 # close for a game to discriminate: enyo-1.33.0-rc1 sat at llr -0.37/2.20 after
 # 2168 games at -5.0 Elo, which extrapolates to about 12900 games to reject -
 # more than double the 6000 cap, so Forge's own early stop could never fire.
-# At elo1=10 the same candidate rejects near 2500 games on a proper 90% bound,
+# At elo1=8 the same candidate rejects near 3000 games on a proper 90% bound,
 # which is why the client-side LOS reject checkpoint is gone. Accepting is a
 # separate matter: H1 now means ">= 10 Elo", which a mature net making +3 will
 # never reach, so acceptance is still decided by SPRT_ACCEPT_LOS below.
-SPRT_ELO1=${SPRT_ELO1:-10.0}
+SPRT_ELO1=${SPRT_ELO1:-8.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.10}
 SPRT_BETA=${SPRT_BETA:-0.10}
 
@@ -782,7 +782,7 @@ wait_for_existing_forge_sprt() {
         fi
         if [[ -n "$verdict" ]]; then
           printf 'stopping Forge SPRT early, %s\n' "${verdict#*:}" | tee -a "$last_sprt_log"
-          "$FORGE" stop "$forge_run" 2>&1 | tee -a "$last_sprt_log" || true
+          "$FORGE" stop --force "$forge_run" </dev/null 2>&1 | tee -a "$last_sprt_log" || true
           last_sprt_line="Forge $forge_run stopped early, ${verdict#*:} (elo $last_sprt_elo los $last_sprt_los%)"
           if [[ "$verdict" == accept:* ]]; then
             last_sprt_early_accept=1
@@ -1277,7 +1277,7 @@ Useful overrides:
 
 Staged SPRT checkpoints (one run of GAMES, polled and stopped early):
   SMOKE_GAMES=500              reject if catastrophic (elo <= SMOKE_FAIL_ELO)
-  SPRT_ELO1=10                 H1; Forge stops a losing run on its own llr bound
+  SPRT_ELO1=8                  H1; Forge stops a losing run on its own llr bound
   SPRT_ACCEPT_LOS=75           accept once LOS reaches, after SPRT_MIN_ACCEPT_GAMES=3000
   GAMES=6000                   hard cap; ci is about 7 at this size
   SPRT_ACCEPT_LOS=90 ./nnue iterate  # stricter, but detects a true +3 only 32% of the time

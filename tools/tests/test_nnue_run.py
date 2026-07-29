@@ -1506,7 +1506,7 @@ check_smoke 4.0 -0.22/2.20 positive_elo
         self.assertIn("SPRT_ACCEPT_LOS=${SPRT_ACCEPT_LOS:-75}", text)
         # Rejection belongs to Forge's llr bound, which only fires if H1 is far
         # enough from H0; at elo1=3 a losing candidate cost a full run.
-        self.assertIn("SPRT_ELO1=${SPRT_ELO1:-10.0}", text)
+        self.assertIn("SPRT_ELO1=${SPRT_ELO1:-8.0}", text)
         self.assertNotIn("SPRT_REJECT_LOS", text)
         self.assertNotIn("SPRT_MIN_REJECT_GAMES", text)
         self.assertIn("SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-3000}", text)

@@ -1,5 +1,5 @@
 {
-  "run": "enyo-1.33.0-rc1",
+  "run": "enyo-1.33.0-rc2",
   "continue_from": "enyo-1.32.0-rc10",
   "hypothesis": "Volume on corrected labels. Dose saturated twice on miscalibrated data - 355 vs 710 superbatches on self-play and 4000 vs 12000 on the raw binpack both converged to the same net - but the label calibration was wrong in every one of those runs, so the net was converging on a distorted target and more of it changed nothing. enyo-1.32.0-rc10 corrected the labels and gained elo=+3.3 los=81.4% over 6000 games, so volume is worth retesting on a target the net can actually fit. Continue from the accepted rc10 at its exact regimen - lr 1e-5, wdl 0.05, trainable all - and take one full pass over the 2B-row recalibrated corpus at 15258 superbatches, roughly 4x rc10's 524M positions. Only the data volume changes.",
   "superbatches": 15258,
