@@ -1500,55 +1500,42 @@ check_smoke 4.0 -0.22/2.20 positive_elo
             self.assertIn("mild_negative=pass:1", proc.stdout)
             self.assertIn("positive_elo=pass:1", proc.stdout)
 
-    def test_signal_gate_requires_elo_above_its_confidence_interval(self) -> None:
+    def test_sprt_checkpoint_defaults_encode_the_los_policy(self) -> None:
+        text = (REPO / "nnue").read_text(encoding="utf-8")
+        self.assertIn("SPRT_ACCEPT_LOS=${SPRT_ACCEPT_LOS:-75}", text)
+        self.assertIn("SPRT_REJECT_LOS=${SPRT_REJECT_LOS:-35}", text)
+        self.assertIn("SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-3000}", text)
+        self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
+        self.assertIn("GAMES=${GAMES:-6000}", text)
+        # the superseded elo>ci rule must be gone, not merely unused
+        self.assertNotIn("SPRT_SIGNAL_MARGIN", text)
+        self.assertNotIn("signal_sprt_failed", text)
+
+    def test_early_los_acceptance_passes_the_full_sprt_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
-check_signal() {
-  SPRT_SIGNAL_MARGIN=${4:-1.0}
-  if signal_sprt_failed "$1" "$2"; then
-    printf '%s=reject\n' "$3"
-  else
-    printf '%s=continue:%s\n' "$3" "$?"
-  fi
-}
-# elo below its own ci is indistinguishable from zero
-check_signal 8.1 14.1 noise_positive
-check_signal -1.1 7.2 noise_negative
-# elo clearly above ci is a real signal
-check_signal 25.0 13.0 real_signal
-# margin 0 disables the rejection entirely
-check_signal 8.1 14.1 margin_off 0
-# half-width bar admits a smaller genuine gain
-check_signal 8.1 14.1 margin_half 0.5
-# unparsable ci must be reported, not silently treated as a pass
-check_signal 8.1 "" missing_ci
+last_sprt_early_accept=1
+last_sprt_los=81.0
+last_sprt_elo=5.2
+last_sprt_llr='0.44/2.20 (20%)'
+if full_sprt_pass; then printf 'pass:%s\n' "$full_sprt_label"; else printf 'fail\n'; fi
+# a run that never triggered an early accept still falls through to the
+# ordinary H1 / positive-at-cap logic
+last_sprt_early_accept=0
+last_sprt_elo=-1.1
+last_sprt_llr='-0.66/2.20 (-30%)'
+if full_sprt_pass; then printf 'unexpected_pass\n'; else printf 'reject\n'; fi
 """
-            harness_path = tmp / "signal_gate.sh"
+            harness_path = tmp / "accept.sh"
             harness_path.write_text(harness, encoding="utf-8")
-
             proc = subprocess.run(
                 ["bash", str(harness_path)],
-                cwd=tmp,
-                check=True,
-                text=True,
-                stdout=subprocess.PIPE,
+                cwd=tmp, check=True, text=True, stdout=subprocess.PIPE,
             )
-
-            self.assertIn("noise_positive=reject", proc.stdout)
-            self.assertIn("noise_negative=reject", proc.stdout)
-            self.assertIn("real_signal=continue:1", proc.stdout)
-            self.assertIn("margin_off=continue:1", proc.stdout)
-            self.assertIn("margin_half=continue:1", proc.stdout)
-            self.assertIn("missing_ci=continue:2", proc.stdout)
-
-    def test_sprt_ladder_defaults_escalate(self) -> None:
-        text = (REPO / "nnue").read_text(encoding="utf-8")
-        self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
-        self.assertIn("SPRT_SIGNAL_GAMES=${SPRT_SIGNAL_GAMES:-1500}", text)
-        self.assertIn("GAMES=${GAMES:-6500}", text)
-        self.assertIn("SPRT_SIGNAL_MARGIN=${SPRT_SIGNAL_MARGIN:-1.0}", text)
+            self.assertIn("pass:LOS 81.0% >= 75%", proc.stdout)
+            self.assertIn("reject", proc.stdout)
 
     def test_move_gate_skips_missing_cases_when_not_strict(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
@@ -1698,12 +1685,9 @@ sprt_gate
             )
 
             self.assertEqual("", proc.stderr)
-            self.assertEqual(
-                "smoke:500:sprt_smoke\nsignal:1500:sprt_signal\nsprt:800:sprt\n",
-                trace.read_text(encoding="utf-8"),
-            )
+            self.assertEqual("sprt:800:sprt\n", trace.read_text(encoding="utf-8"))
 
-    def test_sprt_gate_stops_at_signal_stage_when_elo_is_within_noise(self) -> None:
+    def test_sprt_gate_rejects_when_a_checkpoint_stops_the_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             home = tmp / "home"
@@ -1723,22 +1707,15 @@ sprt_gate
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
-GAMES=6500
+GAMES=6000
+# The checkpoint fires inside the Forge wait and reports it by returning 3.
 run_sprt_once() {
   printf '%s:%s:%s\n' "$1" "$2" "$3" >> "$TRACE"
-  if [[ "$1" == smoke ]]; then
-    last_sprt_elo=4.0
-    last_sprt_llr='0.10/2.20 (5%)'
-    last_sprt_ci=30.0
-    last_sprt_line='triage inconclusive'
-    return 0
-  fi
-  # The real enyo-1.32.0-rc5-s0.65 numbers: +8.1 with ci 14.1 at 1500 games,
-  # which measured -1.1 when taken to 6000. The ladder must stop here.
   last_sprt_elo=8.1
   last_sprt_llr='0.55/2.20 (25%)'
   last_sprt_ci=14.1
-  last_sprt_line='signal within noise'
+  last_sprt_line='Forge run stopped early, signal at 1500 games: elo 8.1 not above ci 14.1'
+  return 3
 }
 sprt_gate || printf 'rejected\n'
 """
@@ -1762,10 +1739,7 @@ sprt_gate || printf 'rejected\n'
             )
 
             self.assertIn("rejected", proc.stdout)
-            self.assertEqual(
-                "smoke:500:sprt_smoke\nsignal:1500:sprt_signal\n",
-                trace.read_text(encoding="utf-8"),
-            )
+            self.assertEqual("sprt:6000:sprt\n", trace.read_text(encoding="utf-8"))
 
     def test_skip_smoke_runs_full_sprt_directly(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
@@ -2002,16 +1976,13 @@ printf '%s\n' "$NNUE_AI_STDIN_EVENTS"
                 "  exit 0\n"
                 "fi\n"
                 "if [[ \"$1\" == status && \"$2\" == candidate-sprt-3000-20260623-123456 ]]; then\n"
-                "  if [[ -f \"$FAKE_DONE\" ]]; then\n"
-                "    printf '%s\\n' '{\"state\":\"done\",\"progress_fields\":[\"games=3000/3000\",\"elo=+4.2\",\"llr=0.31/2.20 (14%)\"]}'\n"
-                "  else\n"
-                "    printf '%s\\n' '{\"state\":\"current\",\"manifest\":\"/tmp/existing-manifest.json\",\"progress_fields\":[\"games=1200/3000\",\"elo=+1.0\",\"llr=0.01/2.20 (0%)\"]}'\n"
-                "  fi\n"
-                "  exit 0\n"
-                "fi\n"
-                "if [[ \"$1\" == wait ]]; then\n"
                 "  printf '%s\\n' \"$*\" >> \"$FAKE_CALLS\"\n"
-                "  touch \"$FAKE_DONE\"\n"
+                "  if [[ -f \"$FAKE_DONE\" ]]; then\n"
+                "    printf '%s\\n' '{\"state\":\"done\",\"progress_fields\":[\"games=3000/3000\",\"elo=+4.2\",\"llr=0.31/2.20 (14%)\",\"los=62.0%\"]}'\n"
+                "  else\n"
+                "    touch \"$FAKE_DONE\"\n"
+                "    printf '%s\\n' '{\"state\":\"current\",\"manifest\":\"/tmp/existing-manifest.json\",\"progress_fields\":[\"games=1200/3000\",\"elo=+1.0\",\"llr=0.01/2.20 (0%)\",\"los=55.0%\"]}'\n"
+                "  fi\n"
                 "  exit 0\n"
                 "fi\n"
                 "echo unexpected forge call: $* >&2\n"
@@ -2025,6 +1996,7 @@ printf '%s\n' "$NNUE_AI_STDIN_EVENTS"
             source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 NNUE_NTFY=0
+SPRT_POLL_SECONDS=1
 SOLO=0
 BUILD="$TEST_BUILD"
 FORGE="$TEST_FORGE"
@@ -2063,8 +2035,9 @@ printf 'llr=%s\n' "$last_sprt_llr"
             self.assertIn("elo=4.2", proc.stdout)
             self.assertIn("llr=0.31/2.20 (14%)", proc.stdout)
             self.assertNotIn("forge-should-not-run", proc.stderr)
-            self.assertEqual(
-                "wait --manifest /tmp/existing-manifest.json\n",
+            # the loop polls status rather than blocking on `forge wait`
+            self.assertIn(
+                "status candidate-sprt-3000-20260623-123456 --json",
                 calls.read_text(encoding="utf-8"),
             )
 
@@ -2122,6 +2095,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
             source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
 NNUE_NTFY=0
+SPRT_POLL_SECONDS=1
 SOLO=0
 BUILD="$TEST_BUILD"
 FORGE="$TEST_FORGE"
