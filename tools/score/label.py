@@ -86,7 +86,7 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "skipped_cp": 0,
     }
     start = time.monotonic()
-    engine = engine_type(args.engine, threads=args.threads, hash_mb=args.hash)
+    engine = engine_type(args.engine, threads=args.threads, hash_mb=args.hash, net=args.net)
     try:
         with output_tmp.open("wb") as dst:
             for row, ply in lc0_to_jsonl.iter_rows(
@@ -107,11 +107,18 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
                     continue
                 stats["selected"] = int(stats["selected"]) + 1
                 try:
-                    score, mate = engine.label(
-                        row["fen"],
-                        depth=args.depth,
-                        timeout_s=args.engine_timeout_s,
-                    )
+                    if args.static:
+                        score = engine.static_eval(
+                            row["fen"],
+                            timeout_s=args.engine_timeout_s,
+                        )
+                        mate = None
+                    else:
+                        score, mate = engine.label(
+                            row["fen"],
+                            depth=args.depth,
+                            timeout_s=args.engine_timeout_s,
+                        )
                 except EngineTimeout:
                     stats["skipped_timeout"] = int(stats["skipped_timeout"]) + 1
                     engine.restart()
@@ -184,6 +191,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--stats", required=True, type=Path)
     parser.add_argument("--engine", default="stockfish")
+    parser.add_argument("--net", default=None)
+    parser.add_argument("--static", action="store_true")
     parser.add_argument("--depth", type=int, default=12)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--hash", type=int, default=128)

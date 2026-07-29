@@ -18,6 +18,7 @@ from lib import bullet_format, bullet_text
 
 
 SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
+EVAL_RE = re.compile(r"^eval\s+(-?\d+)\s*$")
 
 
 class EngineTimeout(RuntimeError):
@@ -25,10 +26,11 @@ class EngineTimeout(RuntimeError):
 
 
 class UciEngine:
-    def __init__(self, path: str, *, threads: int, hash_mb: int) -> None:
+    def __init__(self, path: str, *, threads: int, hash_mb: int, net: str | None = None) -> None:
         self.path = path
         self.threads = threads
         self.hash_mb = hash_mb
+        self.net = net
         self.start()
 
     def start(self) -> None:
@@ -47,6 +49,8 @@ class UciEngine:
         self.wait_for("uciok", timeout_s=60.0)
         self.setoption("Threads", str(self.threads))
         self.setoption("Hash", str(self.hash_mb))
+        if self.net:
+            self.setoption("nnue_file", self.net)
         self.send("isready")
         self.wait_for("readyok", timeout_s=60.0)
 
@@ -125,6 +129,19 @@ class UciEngine:
                     mate = value
             if line.startswith("bestmove "):
                 return score_cp, mate
+
+    def static_eval(self, fen: str, *, timeout_s: float) -> int | None:
+        self.send(f"position fen {fen}")
+        self.send("eval")
+        deadline = time.monotonic() + timeout_s if timeout_s > 0 else None
+        while True:
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise EngineTimeout(f"engine timed out on static eval {fen}")
+            line = self.readline(timeout_s=remaining)
+            match = EVAL_RE.match(line)
+            if match:
+                return int(match.group(1))
 
 
 def main() -> None:
