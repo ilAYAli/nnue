@@ -1,15 +1,12 @@
 {
-  "run": "enyo-1.32.0-rc8",
+  "run": "enyo-1.32.0-rc10",
   "continue_from": "enyo-1.31.0-rc57",
-  "reference": "enyo-1.31.0-rc57",
-  "hypothesis": "Architecture experiment on the label scale. rc5/rc6/rc7 showed the net converges to slope ~1.20 against the reference regardless of data volume (524M vs 1.57B) or learning rate (1e-5 vs 5e-4), so the inflation is a fixed property of the binpack target distribution rather than an optimization artifact: Stockfish 5000-node search scores are roughly 20% larger in scale than the static evals this engine's coordinate system assumes. Raise architecture.json eval_scale 400 -> 480 (400 * 1.20) so sigmoid(search_score/480) lands where sigmoid(static_score/400) did, letting the net learn search-derived rankings while emitting static-eval-compatible magnitudes. eval_scale is a training-time target transform only: it is passed to the trainer as ENYO_BULLET_EVAL_SCALE, is not written into the exported net header, and the engine never reads it, so no engine support is required. Safe with continue_from because resolved_init_weights loads a raw optimiser-state checkpoint directly; the dequantization warning recorded in 7331d1c applies to initialize_from, which alone goes through convert_initialize_from. bullet_output reuses rc5's already-converted corpus so eval_scale is the only difference from rc5.",
+  "hypothesis": "Recalibrated binpack labels. Paired measurement on identical positions showed the nodes5000pv2 search labels sit above Stockfish static eval by a magnitude-dependent factor, 3.56x below 50cp falling to 1.24x above 800cp, giving slope(label ~ static) 1.277 and explaining the slope ~1.2 that rc5 through rc9 all reached regardless of dose, learning rate or eval_scale. tools/bullet/bullet_recalibrate_labels.py inverts that map; on 2500 held-out positions it moves slope 1.286 -> 1.008 while leaving the genuine search-versus-static disagreement intact. This is rc5's exact regimen (same parent, 4000 superbatches, lr 1e-5, wdl 0.05, same 600M positions) with only the label calibration changed, so the audit isolates its effect. Expect slope near 1.0 with no output rescale, against rc5's 1.2012.",
   "superbatches": 4000,
   "trainable": "all",
   "lr": 0.00001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
-    "bullet_output": "data/bullet/enyo-1.32.0-rc5.bullet",
-    "limit": 600000000
+    "source_binpack": "data/bullet/nodes5000pv2-recalibrated.bullet"
   }
 }
