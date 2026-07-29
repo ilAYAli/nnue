@@ -1504,7 +1504,11 @@ check_smoke 4.0 -0.22/2.20 positive_elo
     def test_sprt_checkpoint_defaults_encode_the_los_policy(self) -> None:
         text = (REPO / "nnue").read_text(encoding="utf-8")
         self.assertIn("SPRT_ACCEPT_LOS=${SPRT_ACCEPT_LOS:-75}", text)
-        self.assertIn("SPRT_REJECT_LOS=${SPRT_REJECT_LOS:-35}", text)
+        # Rejection belongs to Forge's llr bound, which only fires if H1 is far
+        # enough from H0; at elo1=3 a losing candidate cost a full run.
+        self.assertIn("SPRT_ELO1=${SPRT_ELO1:-10.0}", text)
+        self.assertNotIn("SPRT_REJECT_LOS", text)
+        self.assertNotIn("SPRT_MIN_REJECT_GAMES", text)
         self.assertIn("SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-3000}", text)
         self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
         self.assertIn("GAMES=${GAMES:-6000}", text)
