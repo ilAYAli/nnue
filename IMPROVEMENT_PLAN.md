@@ -1650,3 +1650,34 @@ source of Elo for this lineage, that they must be dosed far above the 64-256
 superbatch range used historically, and that a post-hoc output rescale is
 required to bring a search-labeled net back into this engine's coordinate
 system.
+
+#### Retraction: the +8.1 did not survive 6000 games
+
+`enyo-1.32.0-rc5-s0.65` re-tested against the same parent under identical
+conditions at 6000 games: **elo=-1.1 ci=7.2 los=38.2% llr=-0.66/2.20 (-30%)
+draw=49.8%**.
+
+The 1500-game +8.1 was noise. Its interval was +/-14.1, which comfortably
+contained zero; the point estimate should not have been treated as a signal.
+The candidate is Elo-neutral, not a gain.
+
+The measurement lesson is the durable part. At 1500 games this harness has
+ci ~= 14, so it cannot distinguish candidates separated by less than about 10
+Elo - which is the entire range this lineage has been working in. Every
+"near-miss" and "slight gain" recorded at 1500 games is unresolved, including
+the elo=8.6 llr=0.37/2.20 result that promoted the current parent
+`enyo-1.31.0-rc57`. Sub-10-Elo claims need 6000+ games before they mean
+anything.
+
+What survives from the binpack work:
+
+- Binpack data moves the net far harder than self-play (candidate-vs-reference
+  mae 142.29 against 16.79). That is a property of the weights, not evidence of
+  Elo.
+- After a 0.65 output rescale the net returns to parity rather than remaining
+  broken, so the rescale does correct the coordinate-system mismatch.
+- Binpack sources still require `data.limit`, and the search-label versus
+  static-eval target mismatch still stands.
+
+Binpack data at 4000 superbatches plus a global rescale reaches parity, not
+improvement. Whether more volume moves it past parity is untested.
