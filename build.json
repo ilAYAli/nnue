@@ -1,14 +1,15 @@
 {
-  "run": "enyo-1.32.0-rc7",
+  "run": "enyo-1.32.0-rc8",
   "continue_from": "enyo-1.31.0-rc57",
   "reference": "enyo-1.31.0-rc57",
-  "hypothesis": "Learning rate, not data, is the limiter. Dose has now saturated twice: 355 vs 710 superbatches on self-play gave candidate-vs-reference mae 16.79 vs 16.41, and 4000 vs 12000 superbatches on nodes5000pv2_UHO gave 142.29 vs 144.45 with identical residual bands, so at lr=1e-5 the net reaches a fixed point set by the data distribution and stays there no matter how much it is fed. rc5 measured elo=-1.1 ci=7.2 over 6000 games at that fixed point. Raise lr 50x to 0.0005 over rc5's 4000-superbatch binpack dose, holding architecture, parent, data, WDL and trainable scope fixed, to test whether escaping the fine-tuning regime moves the net somewhere new rather than back to the same attractor.",
+  "hypothesis": "Architecture experiment on the label scale. rc5/rc6/rc7 showed the net converges to slope ~1.20 against the reference regardless of data volume (524M vs 1.57B) or learning rate (1e-5 vs 5e-4), so the inflation is a fixed property of the binpack target distribution rather than an optimization artifact: Stockfish 5000-node search scores are roughly 20% larger in scale than the static evals this engine's coordinate system assumes. Raise architecture.json eval_scale 400 -> 480 (400 * 1.20) so sigmoid(search_score/480) lands where sigmoid(static_score/400) did, letting the net learn search-derived rankings while emitting static-eval-compatible magnitudes. eval_scale is a training-time target transform only: it is passed to the trainer as ENYO_BULLET_EVAL_SCALE, is not written into the exported net header, and the engine never reads it, so no engine support is required. Safe with continue_from because resolved_init_weights loads a raw optimiser-state checkpoint directly; the dequantization warning recorded in 7331d1c applies to initialize_from, which alone goes through convert_initialize_from. bullet_output reuses rc5's already-converted corpus so eval_scale is the only difference from rc5.",
   "superbatches": 4000,
   "trainable": "all",
-  "lr": 0.0005,
+  "lr": 0.00001,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
+    "bullet_output": "data/bullet/enyo-1.32.0-rc5.bullet",
     "limit": 600000000
   }
 }
