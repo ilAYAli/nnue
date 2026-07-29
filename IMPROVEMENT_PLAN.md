@@ -1681,3 +1681,49 @@ What survives from the binpack work:
 
 Binpack data at 4000 superbatches plus a global rescale reaches parity, not
 improvement. Whether more volume moves it past parity is untested.
+
+### 2026-07-29 overnight: four sweeps, one invariant, no Elo
+
+Five candidates were trained and gated overnight. None produced Elo. The result
+worth keeping is what turned out to be invariant.
+
+Baseline for all comparisons is `enyo-1.32.0-rc5`: 4000 superbatches, 524M
+positions of `nodes5000pv2_UHO.binpack`, continuing from `enyo-1.31.0-rc57` at
+lr=1e-5, wdl=0.05. It sits at candidate-vs-reference slope 1.2012, mae 142.29.
+
+  variable changed              factor   resulting slope   resulting mae
+  data volume       (rc6)          3x            1.1996          144.45
+  learning rate     (rc7)         50x            1.2089          150.37
+  eval_scale        (rc8)        1.2x            1.2053          148.01
+
+Nothing moves it. The net trained on search-labeled binpack data converges to
+the same point regardless of how much data it sees, how large a step it takes,
+or how the target is scaled.
+
+`eval_scale` is not a lever at all: it is applied to the training target as
+`sigmoid(score / eval_scale)` and again in export quantization as
+`w * eval_scale * 32.0` (`spike_trainer/src/main.rs:807`), so it cancels end to
+end. `architecture.json` has been reverted to 400. This also explains why
+`ca82491` (scale 450) went nowhere.
+
+The only thing that moves the output scale is a post-hoc rescale of the output
+head via `tools/validate/scale_output_head.py`. At 0.65 that brings the net to
+**parity**: elo=-1.1 ci=7.2 los=38.2% over 6000 games. Not past it.
+
+So: Stockfish search-labeled binpack data, at this architecture and from this
+parent, converges to a net that plays level with `enyo-1.31.0-rc57`. It moves
+the weights roughly 8.5x harder than any self-play corpus (mae 142 against 17),
+but that motion does not become strength.
+
+Two directions remain, and both are larger than a single build.json change:
+
+1. A scratch run rather than continued fine-tuning. Every candidate in this
+   series continues from rc57, and rc57 behaves as an attractor that neither
+   volume, step size, nor target scale escapes.
+2. An architecture change. If 16x12x1024-o8 has absorbed what this data can
+   teach it, more data of any kind will keep landing in the same place.
+
+Measurement caveat that governs both: at 1500 games this harness has ci ~= 14
+and cannot resolve sub-10-Elo effects. Nothing in that range should be believed
+without 6000+ games. `enyo-1.32.0-rc5-s0.65` read +8.1 at 1500 games and -1.1 at
+6000.
