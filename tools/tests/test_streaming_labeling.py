@@ -26,11 +26,14 @@ LABEL_SPEC.loader.exec_module(labeler)
 
 
 class FakeEngine:
-    def __init__(self, path: str, *, threads: int, hash_mb: int) -> None:
+    def __init__(self, path: str, *, threads: int, hash_mb: int, net: str | None = None) -> None:
         pass
 
     def label(self, fen: str, *, depth: int, timeout_s: float) -> tuple[int, None]:
         return 37, None
+
+    def static_eval(self, fen: str, *, timeout_s: float) -> int:
+        return 37
 
     def restart(self) -> None:
         pass
@@ -120,6 +123,8 @@ class StreamingLabelingTests(unittest.TestCase):
                 output=output,
                 stats=stats_path,
                 engine="stockfish",
+                net=None,
+                static=False,
                 depth=12,
                 threads=1,
                 hash=16,
