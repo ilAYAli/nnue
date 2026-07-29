@@ -673,6 +673,10 @@ train
     def test_stockfish_net_gate_reuses_champion_across_engine_versions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
+            home = tmp / "home"
+            candidate_path = home / "assets" / "nets" / "challenger.nn"
+            candidate_path.parent.mkdir(parents=True)
+            candidate_path.write_bytes(b"challenger")
             ledger = tmp / "stockfish-net.jsonl"
             trace = tmp / "trace"
             ledger.write_text(
@@ -685,6 +689,7 @@ train
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
+HOME={shlex.quote(str(home))}
 STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
 STOCKFISH_NET=nn-stockfish.nnue
 STOCKFISH_NET_GAMES=500
@@ -703,7 +708,7 @@ stockfish_net_gate challenger
             self.assertEqual("", proc.stderr)
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
-                "500 --candidate challenger.nn\n",
+                f"500 --candidate {candidate_path}\n",
                 trace.read_text(encoding="utf-8"),
             )
             self.assertIn("delta=8.9, upper90=35.0", proc.stdout)
@@ -737,6 +742,10 @@ stockfish_net_gate challenger
     def test_stockfish_net_gate_allows_small_negative_delta_within_noise(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
+            home = tmp / "home"
+            candidate_path = home / "assets" / "nets" / "challenger.nn"
+            candidate_path.parent.mkdir(parents=True)
+            candidate_path.write_bytes(b"challenger")
             ledger = tmp / "stockfish-net.jsonl"
             ledger.write_text(
                 '{"candidate":"champion","engine":"engine","reference":"nn-stockfish.nnue",'
@@ -748,6 +757,7 @@ stockfish_net_gate challenger
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
+HOME={shlex.quote(str(home))}
 STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
 STOCKFISH_NET=nn-stockfish.nnue
 STOCKFISH_NET_GAMES=500
@@ -774,6 +784,10 @@ printf '%s %s\n' "$stockfish_delta" "$stockfish_upper90"
     def test_stockfish_net_gate_allows_configured_negative_tolerance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
+            home = tmp / "home"
+            candidate_path = home / "assets" / "nets" / "challenger.nn"
+            candidate_path.parent.mkdir(parents=True)
+            candidate_path.write_bytes(b"challenger")
             ledger = tmp / "stockfish-net.jsonl"
             trace = tmp / "trace"
             ledger.write_text(
@@ -786,6 +800,7 @@ printf '%s %s\n' "$stockfish_delta" "$stockfish_upper90"
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
+HOME={shlex.quote(str(home))}
 STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
 STOCKFISH_NET=nn-stockfish.nnue
 STOCKFISH_NET_GAMES=500
@@ -805,7 +820,7 @@ stockfish_net_gate challenger
             self.assertEqual("", proc.stderr)
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
-                "500 --candidate challenger.nn\n",
+                f"500 --candidate {candidate_path}\n",
                 trace.read_text(encoding="utf-8"),
             )
             self.assertIn("delta=-6.3, upper90=19.9", proc.stdout)
@@ -813,6 +828,10 @@ stockfish_net_gate challenger
     def test_stockfish_net_gate_vetoes_regression_and_preserves_champion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
+            home = tmp / "home"
+            candidate_path = home / "assets" / "nets" / "challenger.nn"
+            candidate_path.parent.mkdir(parents=True)
+            candidate_path.write_bytes(b"challenger")
             ledger = tmp / "stockfish-net.jsonl"
             ledger.write_text(
                 '{"candidate":"champion","engine":"engine","reference":"nn-stockfish.nnue",'
@@ -824,6 +843,7 @@ stockfish_net_gate challenger
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
+HOME={shlex.quote(str(home))}
 STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
 STOCKFISH_NET=nn-stockfish.nnue
 STOCKFISH_NET_GAMES=500
@@ -849,9 +869,14 @@ printf '%s %s\\n' "$stockfish_delta" "$stockfish_upper90"
     def test_stockfish_net_gate_propagates_benchmark_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
+            home = tmp / "home"
+            candidate_path = home / "assets" / "nets" / "challenger.nn"
+            candidate_path.parent.mkdir(parents=True)
+            candidate_path.write_bytes(b"challenger")
             proc = self.run_sourced(
                 f"""
 NNUE_NTFY=0
+HOME={shlex.quote(str(home))}
 STOCKFISH_NET_LEDGER={shlex.quote(str(tmp / "stockfish-net.jsonl"))}
 QSPRT=qsprt_mock
 qsprt_mock() {{ return 9; }}
@@ -1413,6 +1438,7 @@ BUILD=build.json
 ARCH=architecture.json
 NNUE_NTFY=0
 ITERATIONS=2
+NNUE_ITERATE_LOCK_DIR=.nnue-iterate.lock
 train() { printf 'train:%s\n' "$run" >> "$TRACE"; }
 gates() { printf 'gates:%s\n' "$run" >> "$TRACE"; }
 stockfish_net_gate() { printf 'stockfish:%s\n' "$run" >> "$TRACE"; }
