@@ -1,14 +1,14 @@
 {
-  "run": "enyo-1.32.0-rc5",
+  "run": "enyo-1.32.0-rc6",
   "continue_from": "enyo-1.31.0-rc57",
   "reference": "enyo-1.31.0-rc57",
-  "hypothesis": "The Stockfish master binpacks were never actually consumed. Every prior binpack candidate (enyo-1.31.0-rc44 through rc48) ran 64-256 superbatches, i.e. 8.4M-33.5M positions, and the loader reads sequentially from the start of the file, so each retrained on the same sub-0.3% prefix. The falsified data-volume result (rc55/rc56) was measured on self-play data, not on these binpacks. Hold the accepted rc57 regimen and raise the dose to 4000 superbatches (524M positions, ~40x any previous binpack run) over nodes5000pv2_UHO.binpack, whose UHO openings match the SPRT book. data.limit caps the BulletFormat conversion at 600M rows (19 GB); an uncapped conversion of this binpack expands to roughly 313 GB and exhausts the disk.",
-  "superbatches": 4000,
+  "hypothesis": "Binpack volume past parity: enyo-1.32.0-rc5 consumed 524M positions (4000 superbatches) of nodes5000pv2_UHO and, after a 0.65 output rescale, measured elo=-1.1 ci=7.2 over 6000 games - parity with the parent rather than a gain, while moving the weights 8.5x harder than any self-play corpus (candidate-vs-reference mae 142.29 against 16.79). That dose is only about 5% of this single binpack. Triple it to 12000 superbatches (1.57B positions), holding architecture, parent, learning rate, WDL and trainable scope fixed, to test whether volume carries the binpack line past parity. data.limit caps conversion at 1.7B rows (54 GB); uncapped this binpack expands past 313 GB.",
+  "superbatches": 12000,
   "trainable": "all",
   "lr": 0.00001,
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/stockfish/master-binpacks/nodes5000pv2_UHO.binpack",
-    "limit": 600000000
+    "limit": 1700000000
   }
 }
