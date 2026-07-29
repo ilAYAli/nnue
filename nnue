@@ -1156,7 +1156,15 @@ stockfish_net_gate() {
 
   last_stockfish_line="Stockfish gate: $candidate ${candidate_elo} vs $champion ${champion_elo}; delta=${stockfish_delta}, upper90=${stockfish_upper90}"
   echo "$last_stockfish_line"
-  float_lt "$stockfish_delta" "$STOCKFISH_NET_MIN_DELTA" && return 1
+  # Veto on the one-sided 90% upper bound, not the point estimate. Both sides
+  # are measured at STOCKFISH_NET_GAMES (default 500), where ci is about 30, so
+  # the delta carries roughly +/-42. Testing the raw delta against 0 rejects a
+  # genuinely equal candidate half the time and a true +5 Elo candidate about
+  # 45% of the time - a coin flip standing in front of the SPRT that could
+  # actually measure it. This benchmark resolves gross drift, not small
+  # differences, so the gate should only fire when even the optimistic bound
+  # says the candidate is worse.
+  float_lt "$stockfish_upper90" "$STOCKFISH_NET_MIN_DELTA" && return 1
 
   local sprt_json
   sprt_json=$(jq -c --arg line "$last_stockfish_line" '
