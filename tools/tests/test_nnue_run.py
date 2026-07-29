@@ -1500,6 +1500,56 @@ check_smoke 4.0 -0.22/2.20 positive_elo
             self.assertIn("mild_negative=pass:1", proc.stdout)
             self.assertIn("positive_elo=pass:1", proc.stdout)
 
+    def test_signal_gate_requires_elo_above_its_confidence_interval(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+check_signal() {
+  SPRT_SIGNAL_MARGIN=${4:-1.0}
+  if signal_sprt_failed "$1" "$2"; then
+    printf '%s=reject\n' "$3"
+  else
+    printf '%s=continue:%s\n' "$3" "$?"
+  fi
+}
+# elo below its own ci is indistinguishable from zero
+check_signal 8.1 14.1 noise_positive
+check_signal -1.1 7.2 noise_negative
+# elo clearly above ci is a real signal
+check_signal 25.0 13.0 real_signal
+# margin 0 disables the rejection entirely
+check_signal 8.1 14.1 margin_off 0
+# half-width bar admits a smaller genuine gain
+check_signal 8.1 14.1 margin_half 0.5
+# unparsable ci must be reported, not silently treated as a pass
+check_signal 8.1 "" missing_ci
+"""
+            harness_path = tmp / "signal_gate.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            )
+
+            self.assertIn("noise_positive=reject", proc.stdout)
+            self.assertIn("noise_negative=reject", proc.stdout)
+            self.assertIn("real_signal=continue:1", proc.stdout)
+            self.assertIn("margin_off=continue:1", proc.stdout)
+            self.assertIn("margin_half=continue:1", proc.stdout)
+            self.assertIn("missing_ci=continue:2", proc.stdout)
+
+    def test_sprt_ladder_defaults_escalate(self) -> None:
+        text = (REPO / "nnue").read_text(encoding="utf-8")
+        self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
+        self.assertIn("SPRT_SIGNAL_GAMES=${SPRT_SIGNAL_GAMES:-1500}", text)
+        self.assertIn("GAMES=${GAMES:-6500}", text)
+        self.assertIn("SPRT_SIGNAL_MARGIN=${SPRT_SIGNAL_MARGIN:-1.0}", text)
+
     def test_move_gate_skips_missing_cases_when_not_strict(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
@@ -1610,11 +1660,20 @@ run_sprt_once() {
   if [[ "$1" == smoke ]]; then
     last_sprt_elo=4.0
     last_sprt_llr='0.10/2.20 (5%)'
-    last_sprt_line='smoke inconclusive'
+    last_sprt_ci=30.0
+    last_sprt_line='triage inconclusive'
+    return 0
+  fi
+  if [[ "$1" == signal ]]; then
+    last_sprt_elo=25.0
+    last_sprt_llr='0.40/2.20 (18%)'
+    last_sprt_ci=13.0
+    last_sprt_line='signal above ci'
     return 0
   fi
   last_sprt_elo=5.0
   last_sprt_llr='0.20/2.20 (9%)'
+  last_sprt_ci=9.0
   last_sprt_line='full positive'
 }
 sprt_gate
@@ -1640,7 +1699,71 @@ sprt_gate
 
             self.assertEqual("", proc.stderr)
             self.assertEqual(
-                "smoke:400:sprt_smoke\nsprt:800:sprt\n",
+                "smoke:500:sprt_smoke\nsignal:1500:sprt_signal\nsprt:800:sprt\n",
+                trace.read_text(encoding="utf-8"),
+            )
+
+    def test_sprt_gate_stops_at_signal_stage_when_elo_is_within_noise(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            nets = home / "assets" / "nets"
+            nets.mkdir(parents=True)
+            (nets / "candidate.nn").write_bytes(b"candidate")
+            (nets / "reference.nn").write_bytes(b"reference")
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","continue_from":"reference"}\n',
+                encoding="utf-8",
+            )
+            trace = tmp / "trace.txt"
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split('case "$cmd" in', 1)[0] + """
+BUILD="$TEST_BUILD"
+HOME="$TEST_HOME"
+NNUE_NTFY=0
+GAMES=6500
+run_sprt_once() {
+  printf '%s:%s:%s\n' "$1" "$2" "$3" >> "$TRACE"
+  if [[ "$1" == smoke ]]; then
+    last_sprt_elo=4.0
+    last_sprt_llr='0.10/2.20 (5%)'
+    last_sprt_ci=30.0
+    last_sprt_line='triage inconclusive'
+    return 0
+  fi
+  # The real enyo-1.32.0-rc5-s0.65 numbers: +8.1 with ci 14.1 at 1500 games,
+  # which measured -1.1 when taken to 6000. The ladder must stop here.
+  last_sprt_elo=8.1
+  last_sprt_llr='0.55/2.20 (25%)'
+  last_sprt_ci=14.1
+  last_sprt_line='signal within noise'
+}
+sprt_gate || printf 'rejected\n'
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_HOME": str(home),
+                "TRACE": str(trace),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertIn("rejected", proc.stdout)
+            self.assertEqual(
+                "smoke:500:sprt_smoke\nsignal:1500:sprt_signal\n",
                 trace.read_text(encoding="utf-8"),
             )
 
