@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.32.0-rc10",
-  "continue_from": "enyo-1.31.0-rc57",
-  "hypothesis": "Recalibrated binpack labels. Paired measurement on identical positions showed the nodes5000pv2 search labels sit above Stockfish static eval by a magnitude-dependent factor, 3.56x below 50cp falling to 1.24x above 800cp, giving slope(label ~ static) 1.277 and explaining the slope ~1.2 that rc5 through rc9 all reached regardless of dose, learning rate or eval_scale. tools/bullet/bullet_recalibrate_labels.py inverts that map; on 2500 held-out positions it moves slope 1.286 -> 1.008 while leaving the genuine search-versus-static disagreement intact. This is rc5's exact regimen (same parent, 4000 superbatches, lr 1e-5, wdl 0.05, same 600M positions) with only the label calibration changed, so the audit isolates its effect. Expect slope near 1.0 with no output rescale, against rc5's 1.2012.",
-  "superbatches": 4000,
+  "run": "enyo-1.33.0-rc1",
+  "continue_from": "enyo-1.32.0-rc10",
+  "hypothesis": "Volume on corrected labels. Dose saturated twice on miscalibrated data - 355 vs 710 superbatches on self-play and 4000 vs 12000 on the raw binpack both converged to the same net - but the label calibration was wrong in every one of those runs, so the net was converging on a distorted target and more of it changed nothing. enyo-1.32.0-rc10 corrected the labels and gained elo=+3.3 los=81.4% over 6000 games, so volume is worth retesting on a target the net can actually fit. Continue from the accepted rc10 at its exact regimen - lr 1e-5, wdl 0.05, trainable all - and take one full pass over the 2B-row recalibrated corpus at 15258 superbatches, roughly 4x rc10's 524M positions. Only the data volume changes.",
+  "superbatches": 15258,
   "trainable": "all",
   "lr": 0.00001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/bullet/nodes5000pv2-recalibrated.bullet"
+    "source_binpack": "data/bullet/nodes5000pv2-recalibrated-2b.bullet"
   }
 }
