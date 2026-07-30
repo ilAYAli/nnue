@@ -89,3 +89,14 @@ total dose - consistent with how the real historical chain was structured (7 suc
 Both rc3 and rc4 were rejected as promotion candidates against enyo-1.32.0-rc10 (the bar is much higher
 now than enyo-1.0.0-rc1's original starting point), which is expected and not evidence against the
 approach itself.
+
+*** orphaned candidates (2026-07-30) ***
+
+enyo-1.33.0-rc5.nn: trained and exported (continue_from rc10, lr 1e-5, farseerT74-recalibrated-600m.bullet,
+4000 superbatches) but never benchmarked before tonight's pivot - retroactively SPRT'd vs SF, see
+benchmarks/stockfish-net.jsonl for the result.
+
+enyo-1.33.0-rc6: continue_from rc4, 196608 superbatches on lc0-nodes5000pv2-2b.bullet (min_ply 16) - started,
+stopped almost immediately (only checkpoints/native-0 exists, no export) before the pivot to the
+enyo-ancestor.1.0.0-rc1 reconstruction work. No net was ever produced, so no Elo vs SF exists for this
+candidate.
