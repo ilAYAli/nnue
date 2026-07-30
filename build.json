@@ -1,12 +1,11 @@
 {
-  "run": "enyo-1.33.0-rc2",
-  "continue_from": "enyo-1.32.0-rc10",
-  "hypothesis": "Lc0 positions, direct static relabel. Every binpack fine-tune attempt on this lineage (rc4-rc10, rc1) has used either raw search labels or a magnitude-based recalibration of them; none has used a genuine per-position static eval the way self-play data always has. Lc0's own test91 self-play (161,704 V6 chunks) is discarded entirely - no Q-value, no policy - only the FEN survives, matching how gen1/gen3/gen4 self-play is treated. Positions extracted via tools/posgen/lc0_to_jsonl.py, then relabeled with a genuine zero-search eval (Enyo loading nn-0ee0657fb25e.nnue, static_eval() added to tools/score/label_with_uci.py, verified locally to match relabel_with_stockfish.py exactly on 5 sample positions) via the new forge label-static template, distributed across the full fleet. 11,955,404 positions survived quiet/min-ply filtering from the raw 19,158,026. One epoch (91 superbatches) at rc10's exact regimen - continue_from rc10, lr 1e-5, wdl 0.05, trainable all - so only the data source changes. A prior LC0 lane (June 2026) tried LC0's own Q-value as a training signal and was closed as not transferring; this is a different, untested combination - LC0 positions only, Enyo's own static label.",
-  "superbatches": 91,
+  "run": "enyo-1.33.0-rc3",
+  "reference": "enyo-1.32.0-rc10",
+  "hypothesis": "Real-dose scratch run, first serious attempt since the nodes5000pv2-only scratch disaster (1 epoch/4578 superbatches, elo=-460, proven undertrained not a bad-source signal - loss converged normally and residual corr to rc10 was 0.96, so the net fit the average value fine but never learned the local position-to-position consistency search depends on). This combines the two largest available corpora for real volume and diversity - lc0-static.bullet (11,955,404 positions, Lc0 test91 self-play with its own Q-value/policy fully discarded, only FEN survives, relabeled with a genuine zero-search Enyo+SF-net static eval) concatenated with nodes5000pv2-recalibrated-2b.bullet (2,000,000,000 positions, magnitude-recalibrated Stockfish search labels) for 2,011,955,404 total positions. Scratch: no continue_from, full lr schedule (0.001->0.000005) instead of a fine-tune polish rate, trainable all, wdl 0.05. Dose: 5 epochs (76762 superbatches), matching the order of magnitude of the historical scratch-long/sb32768 precedent but over more and more diverse data than that run used, and enough to actually learn position-to-position consistency rather than just the average value. Gated against enyo-1.32.0-rc10 same as any other candidate; if promising, a further round continuing from this run's own output is the natural next step, matching how scratch-long itself progressed over multiple rounds.",
+  "superbatches": 76762,
   "trainable": "all",
-  "lr": 0.00001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/bullet/lc0/lc0-static.bullet"
+    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-2b.bullet"
   }
 }
