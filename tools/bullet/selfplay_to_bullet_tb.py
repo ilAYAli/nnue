@@ -35,6 +35,7 @@ def convert_shard(
     sf_net: str,
     sf_hash: int,
     tb_pieces: int,
+    bullet_manifest: Path,
 ) -> tuple[Path, dict]:
     stem = pgn_path.stem
     rows_jsonl = tmp_dir / f"{stem}.rows.jsonl"
@@ -74,6 +75,7 @@ def convert_shard(
         run([
             str(VENV_PYTHON), str(REPO_ROOT / "tools/bullet/bullet.py"), "format",
             "--input", str(bulletfmt), "--output", str(chunk_bullet), "--validate",
+            "--bullet-manifest", str(bullet_manifest),
         ])
 
     pgn_stats = json.loads(stats_json.read_text()) if stats_json.exists() else {}
@@ -127,6 +129,12 @@ def main() -> int:
     ap.add_argument("--sf-net", default=str(Path.home() / "assets/nets/nn-0ee0657fb25e.nnue"))
     ap.add_argument("--sf-hash", type=int, default=64)
     ap.add_argument("--tb-pieces", type=int, default=6)
+    ap.add_argument(
+        "--bullet-manifest",
+        type=Path,
+        default=Path("~/source/bullet/Cargo.toml"),
+        help="Bullet Cargo.toml used by bullet-utils",
+    )
     ap.add_argument("--reset", action="store_true")
     ap.add_argument("--limit-shards", type=int, default=0, help="Process at most N new shards this run (0 = all)")
     ap.add_argument(
@@ -175,6 +183,7 @@ def main() -> int:
                     shard, tmp_dir,
                     args.skip_plies, args.min_depth, args.max_abs_cp,
                     args.sf_engine, args.sf_net, args.sf_hash, args.tb_pieces,
+                    args.bullet_manifest.expanduser(),
                 )
                 chunk_bytes = chunk.stat().st_size
                 with chunk.open("rb") as src:

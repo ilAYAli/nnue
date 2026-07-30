@@ -49,6 +49,10 @@ def convert_shard(
     sf_engine: str,
     sf_net: str,
     sf_hash: int,
+    mode: str,
+    depth: int,
+    net_option: str,
+    tb_pieces: int,
     bullet_manifest: Path,
 ) -> tuple[Path, dict]:
     stem = pgn_path.stem
@@ -76,6 +80,8 @@ def convert_shard(
         str(VENV_PYTHON), str(REPO_ROOT / "tools/posgen/relabel_with_stockfish.py"),
         "--input", str(rows_jsonl), "--output", str(sf_jsonl),
         "--engine", sf_engine, "--net", sf_net, "--hash", str(sf_hash),
+        "--mode", mode, "--depth", str(depth), "--net-option", net_option,
+        "--tb-pieces", str(tb_pieces),
         "--max-abs-cp", str(max_abs_cp),
     ])
 
@@ -159,6 +165,15 @@ def main() -> int:
     ap.add_argument("--sf-engine", default=str(Path.home() / "assets/engines/candidate"))
     ap.add_argument("--sf-net", default=str(Path.home() / "assets/nets/nn-0ee0657fb25e.nnue"))
     ap.add_argument("--sf-hash", type=int, default=64)
+    ap.add_argument("--mode", choices=("search", "static"), default="static")
+    ap.add_argument("--depth", type=int, default=12)
+    ap.add_argument("--net-option", default="nnue_file")
+    ap.add_argument(
+        "--tb-pieces",
+        type=int,
+        default=0,
+        help="Override engine labels with Syzygy WDL through this piece count; 0 disables it",
+    )
     ap.add_argument(
         "--bullet-manifest",
         type=Path,
@@ -255,6 +270,7 @@ def main() -> int:
                         shard, tmp_dir,
                         args.skip_plies, args.min_depth, args.max_abs_cp,
                         args.sf_engine, args.sf_net, args.sf_hash,
+                        args.mode, args.depth, args.net_option, args.tb_pieces,
                         args.bullet_manifest.expanduser(),
                     )
                     chunk_bytes = chunk.stat().st_size
