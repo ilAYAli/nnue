@@ -1,12 +1,12 @@
 {
-  "run": "enyo-ancestor.1.0.0-rc1",
-  "hypothesis": "Recreate the enyo-1 ancestor's exact architecture and regimen (196608 superbatches, wdl 0.05, min_ply 24, no continue_from) for an SPRT-vs-SF comparison. Original data (enyo-scratch-broad-1.0.0-rc1.bullet) no longer exists and its provenance isn't traceable from zsh history; substituting lc0-static + nodes5000pv2-recalibrated, both reconverted/relabeled at min_ply 24 (matching the original exactly, rather than the min_ply 16 baked into the earlier combined corpus). Weights will not be identical to the original, but this tests whether the historical regimen itself, on available data, produces something in the same strength ballpark as the actual ancestor (-181.2 vs SF at 1000 games).",
-  "superbatches": 196608,
+  "run": "enyo-1.33.0-rc7",
+  "continue_from": "enyo-1.32.0-rc10",
+  "hypothesis": "Replay the proven recipe behind this lineage's single biggest gain on record: enyo-1.31.0-rc57 (+8.6 vs parent) came from self-play relabeled with a genuine Stockfish static eval instead of the net's own weak search score. data/selfplay/gen3/selfplay-sf-oracle-tb.bullet (46,482,786 positions, generated 2026-07-28) is the same recipe on newer, larger self-play data - SF-oracle relabeled plus tablebase correction on top (13,240,569 positions hit exact TB scores, 100% hit rate, 0 misses), never previously used as a candidate. Standard fine-tune regimen matching rc57/every other promotion in this lineage's history: continue_from the current confirmed-clean champion enyo-1.32.0-rc10 (re-benchmarked today at -139.8 vs SF, ci=19.2), lr=1e-5 polish rate, wdl=0.05, trainable=all, one epoch (superbatches=354=floor(46482786/131072), matching rc57's own dose-sizing convention exactly). Gated against enyo-1.32.0-rc10.",
+  "superbatches": 354,
+  "trainable": "all",
+  "lr": 0.00001,
   "wdl": 0.05,
-  "sfbinpack": {
-    "min_ply": 24
-  },
   "data": {
-    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-2b-minply24.bullet"
+    "source_binpack": "data/selfplay/gen3/selfplay-sf-oracle-tb.bullet"
   }
 }

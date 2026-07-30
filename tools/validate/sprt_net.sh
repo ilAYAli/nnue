@@ -121,8 +121,8 @@ save_result() {
             ci: ($metrics.ci | tonumber),
             llr: ($llr.value | tonumber),
             llr_bound: ($llr.bound | tonumber),
-            los: ($metrics.los | rtrimstr("%") | tonumber),
-            draw: ($metrics.draw | rtrimstr("%") | tonumber)
+            los: ($metrics.los // null | if . then rtrimstr("%") | tonumber else null end),
+            draw: ($metrics.draw // null | if . then rtrimstr("%") | tonumber else null end)
         }
           end' >>"$ROOT/benchmarks/$LEDGER"
 }
