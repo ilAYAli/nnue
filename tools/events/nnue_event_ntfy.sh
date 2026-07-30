@@ -7,13 +7,13 @@ set -euo pipefail
 #   fail            → ping
 #   iteration_done  → nnue (phone notification)
 #   everything else → AI_stdout
-#   AI_stdin        → opt-in via NNUE_AI_STDIN_EVENTS
+#   AI_stdin        → opt-in via NNUE_HOOK_EVENTS
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
 AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
 PING_URL=${NNUE_PING_URL:-https://ntfy.wahlman.no/ping}
-AI_STDIN_EVENTS=${NNUE_AI_STDIN_EVENTS:-}
+HOOK_EVENTS=${NNUE_HOOK_EVENTS:-}
 AI_STDIN_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 NOTIFAI_ENABLE=${NNUE_NOTIFAI_ENABLE:-1}
 NOTIFAI_COMMAND=${NNUE_NOTIFAI_COMMAND:-notifai.sh}
@@ -314,7 +314,7 @@ case "$event_name" in
         ;;
 esac
 
-if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$AI_STDIN_EVENTS"; then
+if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$HOOK_EVENTS"; then
     if ! wake_agent; then
         priority=4
         [ "$event_name" = "fail" ] && priority=5

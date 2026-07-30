@@ -25,7 +25,7 @@ Active NNUE line:
 - Launch command, always from the `nnue_cmd` tmux window:
 
 ```sh
-NNUE_AI_STDIN_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate
+NNUE_HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate
 ```
 
 There is no active FullThreats or scratch run. The `enyo-2.0.0` FullThreats
@@ -244,7 +244,7 @@ tools/bullet/train plan --build build.json --arch architecture.json --defaults d
 3. Launch from tmux session `nnue_cmd` on `pwa-5090`:
 
 ```sh
-NNUE_AI_STDIN_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate
+NNUE_HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate
 ```
 
 4. The loop performs:
@@ -278,12 +278,12 @@ Routing in the hook:
 - `fail` goes to `ping`
 - `iteration_done` goes to `nnue`
 - other phase events go to `AI_stdout`
-- `AI_stdin` wakeups are opt-in via `NNUE_AI_STDIN_EVENTS`
+- `AI_stdin` wakeups are opt-in via `NNUE_HOOK_EVENTS`
 
 For the autonomous NNUE loop, launch with:
 
 ```sh
-NNUE_AI_STDIN_EVENTS=done,fail
+NNUE_HOOK_EVENTS=done,fail
 ```
 
 That should wake Codex only for done/fail events. Do not poll the loop in place

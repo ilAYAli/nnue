@@ -240,7 +240,7 @@ class RunForgeSprtTests(unittest.TestCase):
             hook = calls[0]["kwargs"]["hook_command"]
             self.assertIn("nnue_event_ntfy.sh", hook)
             self.assertIn("NNUE_NTFY_EVENTS=", hook)
-            self.assertIn("NNUE_AI_STDIN_EVENTS=done,fail", hook)
+            self.assertIn("NNUE_HOOK_EVENTS=done,fail", hook)
             self.assertNotIn("NNUE_AI_STDOUT_ENABLE=0", hook)
             self.assertEqual(root / "out" / "deploy.log", calls[0]["kwargs"]["log"])
 

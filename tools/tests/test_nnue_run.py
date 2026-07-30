@@ -1955,12 +1955,12 @@ sprt_command
             tmp = Path(tmp_name)
             source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
-printf '%s\n' "$NNUE_AI_STDIN_EVENTS"
+printf '%s\n' "$NNUE_HOOK_EVENTS"
 """
             harness_path = tmp / "harness.sh"
             harness_path.write_text(harness, encoding="utf-8")
             env = os.environ.copy()
-            env.pop("NNUE_AI_STDIN_EVENTS", None)
+            env.pop("NNUE_HOOK_EVENTS", None)
 
             proc = subprocess.run(
                 ["bash", str(harness_path)],

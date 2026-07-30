@@ -48,7 +48,7 @@ The long-running automated loop is normally launched from `nnue_cmd` on
 `pwa-5090`:
 
 ```sh
-NNUE_AI_STDIN_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate
+NNUE_HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate
 ```
 
 Game results decide promotion. Static evaluation, startpos, move, and

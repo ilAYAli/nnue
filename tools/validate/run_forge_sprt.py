@@ -596,7 +596,7 @@ def emit_completion_event(
         return
     hook = getattr(args, "event_command", None) or (
         f"NNUE_NTFY_EVENTS= "
-        f"NNUE_AI_STDIN_EVENTS=done,fail {repo_root() / 'tools' / 'events' / 'nnue_event_ntfy.sh'}"
+        f"NNUE_HOOK_EVENTS=done,fail {repo_root() / 'tools' / 'events' / 'nnue_event_ntfy.sh'}"
     )
     emit_event(
         args.nnue_run or run_dir,

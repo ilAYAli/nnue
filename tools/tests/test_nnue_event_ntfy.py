@@ -91,7 +91,7 @@ class NnueEventNtfyTests(unittest.TestCase):
         proc, log = self.run_hook({
             "NNUE_NTFY_EVENTS": "",
             "NNUE_AI_STDOUT_EVENTS": "done",
-            "NNUE_AI_STDIN_EVENTS": "",
+            "NNUE_HOOK_EVENTS": "",
         })
 
         self.assertEqual(0, proc.returncode, proc.stderr)
@@ -145,7 +145,7 @@ class NnueEventNtfyTests(unittest.TestCase):
 
     def test_iteration_done_can_wake_ai_stdin(self) -> None:
         proc, log = self.run_hook(
-            {"NNUE_AI_STDIN_EVENTS": "done,fail"},
+            {"NNUE_HOOK_EVENTS": "done,fail"},
             payload_extra={
                 "event": "iteration_done",
                 "stage": "iterate",
@@ -166,7 +166,7 @@ class NnueEventNtfyTests(unittest.TestCase):
             {
                 "NNUE_NTFY_EVENTS": "fail",
                 "NNUE_AI_STDOUT_EVENTS": "",
-                "NNUE_AI_STDIN_EVENTS": "",
+                "NNUE_HOOK_EVENTS": "",
             },
             payload_extra={
                 "event": "fail",
@@ -187,7 +187,7 @@ class NnueEventNtfyTests(unittest.TestCase):
 
     def test_fail_can_wake_ai_stdin(self) -> None:
         proc, log = self.run_hook(
-            {"NNUE_AI_STDIN_EVENTS": "fail"},
+            {"NNUE_HOOK_EVENTS": "fail"},
             payload_extra={
                 "event": "fail",
                 "stage": "train",
