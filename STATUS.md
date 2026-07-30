@@ -102,3 +102,18 @@ enyo-1.33.0-rc6: continue_from rc4, 196608 superbatches on lc0-nodes5000pv2-2b.b
 stopped almost immediately (only checkpoints/native-0 exists, no export) before the pivot to the
 enyo-ancestor.1.0.0-rc1 reconstruction work. No net was ever produced, so no Elo vs SF exists for this
 candidate.
+
+*** correction (2026-07-30, later same day) ***
+
+The rc57-vs-rc10 poison investigation above was resolved by clean re-benchmarks: both nets tested vs SF
+with matched conditions (current engine enyo_11ca4d7, 4000 games each, tight bounds elo0=0/elo1=10/
+alpha=beta=1e-300):
+
+enyo-1.31.0-rc57.nn: elo=-146.7  ci=21.0  (4000/4000 games)
+enyo-1.32.0-rc10.nn: elo=-139.8  ci=19.2  (4000/4000 games)
+
+Statistically indistinguishable, rc10 if anything very slightly ahead. The original ~38 Elo gap
+(-145.5 partial/invalid vs -183.5 at 500 games/older engine) that suggested rc10 had regressed from its
+own parent was a measurement artifact - small sample size and an engine-binary mismatch between the two
+original readings, not a real continue_from-chain regression. rc10 remains a perfectly good current
+lineage tip; no re-basing needed. The best net vs SF currently on record is rc10/rc57, both ~-140 to -147.
