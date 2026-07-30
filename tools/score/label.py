@@ -67,6 +67,8 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "inventory": str(args.inventory),
         "output": str(output),
         "engine": args.engine,
+        "net": args.net,
+        "net_option": args.net_option,
         "depth": args.depth,
         "threads": args.threads,
         "hash": args.hash,
@@ -86,7 +88,13 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "skipped_cp": 0,
     }
     start = time.monotonic()
-    engine = engine_type(args.engine, threads=args.threads, hash_mb=args.hash, net=args.net)
+    engine = engine_type(
+        args.engine,
+        threads=args.threads,
+        hash_mb=args.hash,
+        net=args.net,
+        net_option=args.net_option,
+    )
     try:
         with output_tmp.open("wb") as dst:
             for row, ply in lc0_to_jsonl.iter_rows(
@@ -192,6 +200,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stats", required=True, type=Path)
     parser.add_argument("--engine", default="stockfish")
     parser.add_argument("--net", default=None)
+    parser.add_argument("--net-option", default="nnue_file")
     parser.add_argument("--static", action="store_true")
     parser.add_argument("--depth", type=int, default=12)
     parser.add_argument("--threads", type=int, default=1)

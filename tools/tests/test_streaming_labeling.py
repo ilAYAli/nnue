@@ -26,8 +26,18 @@ LABEL_SPEC.loader.exec_module(labeler)
 
 
 class FakeEngine:
-    def __init__(self, path: str, *, threads: int, hash_mb: int, net: str | None = None) -> None:
-        pass
+    last_net_option: str | None = None
+
+    def __init__(
+        self,
+        path: str,
+        *,
+        threads: int,
+        hash_mb: int,
+        net: str | None = None,
+        net_option: str = "nnue_file",
+    ) -> None:
+        type(self).last_net_option = net_option
 
     def label(self, fen: str, *, depth: int, timeout_s: float) -> tuple[int, None]:
         return 37, None
@@ -124,6 +134,7 @@ class StreamingLabelingTests(unittest.TestCase):
                 stats=stats_path,
                 engine="stockfish",
                 net=None,
+                net_option="EvalFile",
                 static=False,
                 depth=12,
                 threads=1,
@@ -148,6 +159,8 @@ class StreamingLabelingTests(unittest.TestCase):
 
             with mock.patch.object(lc0_to_jsonl, "iter_rows", rows):
                 stats = labeler.label(args, engine_type=FakeEngine)
+
+            self.assertEqual("EvalFile", FakeEngine.last_net_option)
 
             self.assertEqual(64, output.stat().st_size)
             self.assertEqual(3, stats["read"])

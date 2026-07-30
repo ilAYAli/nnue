@@ -26,11 +26,20 @@ class EngineTimeout(RuntimeError):
 
 
 class UciEngine:
-    def __init__(self, path: str, *, threads: int, hash_mb: int, net: str | None = None) -> None:
+    def __init__(
+        self,
+        path: str,
+        *,
+        threads: int,
+        hash_mb: int,
+        net: str | None = None,
+        net_option: str = "nnue_file",
+    ) -> None:
         self.path = path
         self.threads = threads
         self.hash_mb = hash_mb
         self.net = net
+        self.net_option = net_option
         self.start()
 
     def start(self) -> None:
@@ -50,7 +59,7 @@ class UciEngine:
         self.setoption("Threads", str(self.threads))
         self.setoption("Hash", str(self.hash_mb))
         if self.net:
-            self.setoption("nnue_file", self.net)
+            self.setoption(self.net_option, self.net)
         self.send("isready")
         self.wait_for("readyok", timeout_s=60.0)
 
