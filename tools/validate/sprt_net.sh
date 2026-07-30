@@ -88,8 +88,8 @@ run_sprt() {
         --comment "candidate=$(basename "$CANDIDATE_NET") vs reference=$(basename "$REFERENCE_NET")" \
         --reference "$ENGINE" \
         --candidate "$ENGINE" \
-        --reference-uci nnue_file="$REFERENCE_NET" \
-        --candidate-uci nnue_file="$CANDIDATE_NET" \
+        --reference-net "$REFERENCE_NET" \
+        --candidate-net "$CANDIDATE_NET" \
         --restart on \
         --games "$GAMES" \
         "${SPRT_ARGS[@]}"
