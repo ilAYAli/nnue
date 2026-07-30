@@ -1,13 +1,12 @@
 {
-  "run": "enyo-1.33.0-rc4",
-  "continue_from": "enyo-1.33.0-rc3",
-  "reference": "enyo-1.32.0-rc10",
-  "hypothesis": "Second scratch round, continuing rc3's own checkpoint rather than restarting from random init - same pattern the historical scratch-long series used (successive rounds, not one monolithic run). rc3 (5 epochs/76762 superbatches from scratch on the combined lc0-static + nodes5000pv2-recalibrated-2b corpus, 2,011,955,404 positions) improved substantially over the 1-epoch disaster - elo -460 -> -213.8 vs rc10, static-eval slope 0.854 -> 0.984, residual bands showing large accuracy or calibration gains throughout - but still lost clearly (los=0.0%). The direction with more dose is unambiguous even though the magnitude of one more round is uncertain: undertrained-from-scratch nets need more total gradient exposure than any fine-tune here has used, and the trend from round 1 hasn't plateaued yet. Same data, same full lr schedule shape (0.001->0.000005) and dose (76762 superbatches, another 5 corpus epochs, 10 total across both rounds) as round 1, changing only the starting point - continuing from rc3 instead of random init - to isolate total-dose as the variable. Gated against enyo-1.32.0-rc10 same as every other candidate.",
-  "superbatches": 76762,
-  "trainable": "all",
-  "lr": 0.001,
+  "run": "enyo-ancestor.1.0.0-rc1",
+  "hypothesis": "Recreate the enyo-1 ancestor's exact architecture and regimen (196608 superbatches, wdl 0.05, min_ply 24, no continue_from) for an SPRT-vs-SF comparison. Original data (enyo-scratch-broad-1.0.0-rc1.bullet) no longer exists and its provenance isn't traceable from zsh history; substituting lc0-static + nodes5000pv2-recalibrated, both reconverted/relabeled at min_ply 24 (matching the original exactly, rather than the min_ply 16 baked into the earlier combined corpus). Weights will not be identical to the original, but this tests whether the historical regimen itself, on available data, produces something in the same strength ballpark as the actual ancestor (-181.2 vs SF at 1000 games).",
+  "superbatches": 196608,
   "wdl": 0.05,
+  "sfbinpack": {
+    "min_ply": 24
+  },
   "data": {
-    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-2b.bullet"
+    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-2b-minply24.bullet"
   }
 }
