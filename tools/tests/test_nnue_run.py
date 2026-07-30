@@ -2168,8 +2168,8 @@ printf 'llr=%s\n' "$last_sprt_llr"
             self.assertIn("sprt --run candidate-sprt-800-", calls)
             self.assertIn("--candidate ~/assets/engines/enyo_91ede5f", calls)
             self.assertIn("--reference ~/assets/engines/enyo_91ede5f", calls)
-            self.assertIn("--candidate-uci nnue_file=~/assets/nets/candidate.nn", calls)
-            self.assertIn("--reference-uci nnue_file=~/assets/nets/reference.nn", calls)
+            self.assertIn("--candidate-net ~/assets/nets/candidate.nn", calls)
+            self.assertIn("--reference-net ~/assets/nets/reference.nn", calls)
             self.assertIn("--run candidate-sprt-800-", calls)
             self.assertNotIn("--run candidate-sprt-800-old", calls)
 

@@ -390,8 +390,8 @@ def main() -> int:
                 "--threads", str(args.threads),
                 "--reference", str(engine),
                 "--candidate", str(engine),
-                "--reference-uci", f"nnue_file={reference_net}",
-                "--candidate-uci", f"nnue_file={candidate_net}",
+                "--reference-net", str(reference_net),
+                "--candidate-net", str(candidate_net),
                 "--games", str(args.games),
             ]
             code, output = run_command("sprt", sprt_cmd, logs_dir / f"sprt_{args.games}.log")
