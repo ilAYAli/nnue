@@ -19,3 +19,33 @@ as FullThreats.
 Look at the git log to investigate the different lineages.
 
 I am contemplating re-doing an earlier experiment and have a competition between multiple architecutes and/or features, trained without using existing tensors.
+
+
+*** This is the enyo-1 lineage ***
+
+commit: 9d829ac0
+"run:" enyo-1.0.0-rc1
+"continue_from": enyo-scratch-long-1.5.0-rc1
+
+commit: 8cea17a7
+"run": "enyo-scratch-long-1.5.0-rc1",
+"continue_from": "enyo-scratch-long-1.4.0-rc1"
+
+commit: d6c42e4c
+"run": "enyo-scratch-long-1.4.0-rc1"
+"continue_from": "enyo-scratch-long-1.3.0-rc1"
+
+commit: 1c22805e
+"enyo-scratch-long-1.3.0-rc1"
+"continue_from": "enyo-scratch-long-1.2.0-rc1"
+
+commit: a1c8368a
+"run": "enyo-scratch-long-1.2.0-rc1"
+"continue_from": "enyo-scratch-long-1.1.0-rc1"
+
+commit: 7c7a0764
+"run": "enyo-scratch-long-1.1.0-rc1",
+"continue_from": "enyo-scratch-long-1.0.0-rc1"
+
+commit: 5a6028ef
+"run": "enyo-scratch-long-1.0.0-rc1"
