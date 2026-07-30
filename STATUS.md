@@ -93,8 +93,10 @@ approach itself.
 *** orphaned candidates (2026-07-30) ***
 
 enyo-1.33.0-rc5.nn: trained and exported (continue_from rc10, lr 1e-5, farseerT74-recalibrated-600m.bullet,
-4000 superbatches) but never benchmarked before tonight's pivot - retroactively SPRT'd vs SF, see
-benchmarks/stockfish-net.jsonl for the result.
+4000 superbatches) but never benchmarked. A retroactive SPRT vs SF was started and then deliberately stopped
+before completion - farseerT74-recalibrated-600m.bullet uses the same calibration curve already flagged
+as likely mis-calibrated for this source, so spending a full 1500-game run on a presumed-bad candidate
+wasn't worth it. No Elo vs SF exists for this candidate.
 
 enyo-1.33.0-rc6: continue_from rc4, 196608 superbatches on lc0-nodes5000pv2-2b.bullet (min_ply 16) - started,
 stopped almost immediately (only checkpoints/native-0 exists, no export) before the pivot to the
