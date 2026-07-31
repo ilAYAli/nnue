@@ -1,4 +1,4 @@
-All development is done on pwa-5090 ~/code/cpp/chess/nnue
+All development is done on pwa-5090 ~/code/chess/nnue
 read AGENTS.md there and the associated SKILL.md's
 
 The best net is currently ~ -154 elo from SF and ~ -122 from Berserk:
@@ -147,10 +147,10 @@ rather than hanging mid-relabel - root cause NOT diagnosed. Did not attempt a se
 run given the fleet-time cost of the first attempt (~4 hours across dozens of workers).
 
 Template file is left in place on pwa-5090 at
-~/code/cpp/chess/forge/templates/selfplay-to-bullet-sf-oracle.template.json, uncommitted, NOT working.
-Test artifacts left for inspection: ~/code/cpp/chess/nnue/data/selfplay/.tmp-sfo-template-test/ (20 PGN
+~/code/chess/forge/templates/selfplay-to-bullet-sf-oracle.template.json, uncommitted, NOT working.
+Test artifacts left for inspection: ~/code/chess/nnue/data/selfplay/.tmp-sfo-template-test/ (20 PGN
 files) and the Forge run directory
-~/code/cpp/chess/forge/runs/selfplay-to-bullet-sf-oracle-.tmp-sfo-template-test-20260731-012513/.
+~/code/chess/forge/runs/selfplay-to-bullet-sf-oracle-.tmp-sfo-template-test-20260731-012513/.
 
 Next step if picking this back up: debug the template's setup phase specifically (materialize_inputs,
 the nnue source install step, or the bullet-utils cargo build) on a single worker directly before

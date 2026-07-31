@@ -5,8 +5,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../.." && pwd)"
 workspace_root="$(cd "$repo_root/.." && pwd)"
 assets_dir="$workspace_root/assets"
-if [[ ! -d "$assets_dir" && -d "$HOME/code/cpp/chess/assets" ]]; then
-    assets_dir="$HOME/code/cpp/chess/assets"
+if [[ ! -d "$assets_dir" && -d "$HOME/code/chess/assets" ]]; then
+    assets_dir="$HOME/code/chess/assets"
 fi
 
 runner=""

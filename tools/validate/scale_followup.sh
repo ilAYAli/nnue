@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$HOME/code/cpp/chess/nnue"
-ENGINE="$HOME/code/cpp/chess/enyo/build/enyo"
+ROOT="$HOME/code/chess/nnue"
+ENGINE="$HOME/code/chess/enyo/build/enyo"
 ORIGINAL="$HOME/assets/nets/enyo-1.28.0-rc16.nn"
 BERSERK="$HOME/assets/nets/berserk-9b84c340af7e.nn"
 RUN_052="sprt-enyo-scale-root-1.0.0-rc1.nn-vs-enyo-1.28.0-rc16.nn-1500-20260713-234121"

@@ -9,9 +9,9 @@ Authoritative machine for NNUE work: `pwa-5090`.
 
 Authoritative repos:
 
-- NNUE: `~/code/cpp/chess/nnue`
-- Enyo: `~/code/cpp/chess/enyo`
-- Forge: `~/code/cpp/chess/forge`
+- NNUE: `~/code/chess/nnue`
+- Enyo: `~/code/chess/enyo`
+- Forge: `~/code/chess/forge`
 
 Worker engines must be built on each worker from source. Do not copy Linux
 binaries to macOS workers. Linux workers should report ELF, macOS Mach-O, and
@@ -318,7 +318,7 @@ notifai.sh test
 
 ```sh
 forge '
-cd ~/code/cpp/chess/enyo
+cd ~/code/chess/enyo
 git switch main
 git fetch origin main
 git reset --hard <engine_commit>

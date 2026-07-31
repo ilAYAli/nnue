@@ -357,7 +357,7 @@ def grouped_pair_summary(
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--engine", default="/home/petter/code/cpp/chess/enyo/build/enyo")
+    ap.add_argument("--engine", default="/home/petter/code/chess/enyo/build/enyo")
     ap.add_argument("--subject", action="append", required=True,
                     help="NAME=NET or NAME=ENGINE,NET. First subject is baseline.")
     ap.add_argument("--fen-file", type=Path)

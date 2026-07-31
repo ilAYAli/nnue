@@ -725,19 +725,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reference-net", required=True, help="Reference NNUE file.")
     parser.add_argument("--tag", required=True, help="Forge run name and SPRT tag.")
     parser.add_argument("--description", default="")
-    parser.add_argument("--workers", default="~/code/cpp/chess/forge/runs/workers.json")
+    parser.add_argument("--workers", default="~/code/chess/forge/runs/workers.json")
     parser.add_argument("--forge", default="forge")
-    parser.add_argument("--forge-runs-dir", default="~/code/cpp/chess/forge/runs")
+    parser.add_argument("--forge-runs-dir", default="~/code/chess/forge/runs")
     parser.add_argument(
         "--forge-notify-command",
-        default="~/code/cpp/chess/forge/scripts/forge_event_ntfy.sh",
+        default="~/code/chess/forge/scripts/forge_event_ntfy.sh",
     )
-    parser.add_argument("--work-dir", default="~/code/cpp/chess/nnue")
+    parser.add_argument("--work-dir", default="~/code/chess/nnue")
     parser.add_argument("--output-dir")
     parser.add_argument("--nnue-run", help="NNUE run dir used for done/fail wake events.")
     parser.add_argument("--event-command", help="Event hook command for done/fail wake events.")
     parser.add_argument("--cache-dir", default="~/.cache/forge")
-    parser.add_argument("--book", default="~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd")
+    parser.add_argument("--book", default="~/code/chess/assets/books/UHO_Lichess_4852_v1.epd")
     parser.add_argument("--games", type=positive_int, default=4000)
     parser.add_argument(
         "--chunk-games",

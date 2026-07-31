@@ -2,7 +2,7 @@
 set -euo pipefail
 
 RUN="${RUN:-bullet-spike}"
-ROOT="${NNUE_ROOT:-$HOME/code/cpp/chess/nnue}"
+ROOT="${NNUE_ROOT:-$HOME/code/chess/nnue}"
 SOURCE_JSONL="${SOURCE_JSONL:-$ROOT/runs/imported/fresh_d12self18h64_d16_labels_20260519_113826/score/labeled.jsonl}"
 ROWS="${ROWS:-100000}"
 MAX_ABS_CP="${MAX_ABS_CP:-1600}"

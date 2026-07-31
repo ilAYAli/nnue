@@ -26,11 +26,11 @@ tools/validate/validate.py static \
   --event-command "$HOME/scripts/nnue_event_ntfy.sh"
 
 tools/validate/validate.py failure-suite \
-  --candidate ~/code/cpp/chess/assets/engines/candidate \
-  --reference ~/code/cpp/chess/assets/engines/reference \
+  --candidate ~/code/chess/assets/engines/candidate \
+  --reference ~/code/chess/assets/engines/reference \
   --output-dir run/failure-suite \
   --event-command "$HOME/scripts/nnue_event_ntfy.sh" \
-  ~/code/cpp/chess/enyo/bugs/*.log
+  ~/code/chess/enyo/bugs/*.log
 
 $PYTHON tools/validate/build_fixed_move_gate.py \
   --child-targets lc0=targets/lc0-oracle-1k-n50k-20260528/lc0_oracle_child_targets.jsonl \
@@ -43,8 +43,8 @@ $PYTHON tools/validate/build_fixed_move_gate.py \
 
 $PYTHON tools/validate/validate.py move-gate \
   --cases runs/fixed-move-gate/cases.jsonl \
-  --engine ~/code/cpp/chess/assets/engines/reference \
-  --reference-net ~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn \
+  --engine ~/code/chess/assets/engines/reference \
+  --reference-net ~/code/chess/enyo/net/berserk-d43206fe90e4.nn \
   --candidate-net run/candidate/model.nn \
   --fail-if-candidate-below-baseline \
   --fail-if-regressed-above 0

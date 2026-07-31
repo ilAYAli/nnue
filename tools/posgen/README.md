@@ -24,9 +24,9 @@ Typical flow:
 
 ```sh
 tools/posgen/posgen.py selfplay \
-  --engine ~/code/cpp/chess/assets/engines/reference \
-  --nnue-file ~/code/cpp/chess/enyo/net/berserk-d43206fe90e4.nn \
-  --book ~/code/cpp/chess/assets/books/UHO_Lichess_4852_v1.epd \
+  --engine ~/code/chess/assets/engines/reference \
+  --nnue-file ~/code/chess/enyo/net/berserk-d43206fe90e4.nn \
+  --book ~/code/chess/assets/books/UHO_Lichess_4852_v1.epd \
   --games 160000 \
   --depth 8 \
   --output run/selfplay.pgn
