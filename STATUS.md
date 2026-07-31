@@ -117,3 +117,42 @@ Statistically indistinguishable, rc10 if anything very slightly ahead. The origi
 own parent was a measurement artifact - small sample size and an engine-binary mismatch between the two
 original readings, not a real continue_from-chain regression. rc10 remains a perfectly good current
 lineage tip; no re-basing needed. The best net vs SF currently on record is rc10/rc57, both ~-140 to -147.
+
+*** self-play relabeling consistency investigation (2026-07-31 overnight) ***
+
+Investigated whether data/selfplay/gen1/gen2/gen3 use consistent labeling before combining them.
+Found they don't: gen1-live-sfo/gen1-sf-oracle.bullet (rc57's winning data) is SF-oracle static-eval
+only, no tablebase correction. gen2.bullet and gen3/selfplay-sf-oracle-tb.bullet are both SF-oracle +
+TB-corrected (manifest for gen2.bullet traces to a run literally named tb-sf-oracle-relabel-...).
+
+Ran enyo-1.33.0-rc8 (gen3's non-TB variant selfplay-sf-oracle.bullet, continue_from rc10, same regimen
+as the rejected rc7) as a single-variable isolation test. Result: elo=-2.7 ci=7.6 los=24.3% (6000/6000
+games, full sample, no early termination) - not promoted (los well below the 75% threshold), but a large
+improvement over rc7's clear rejection (elo=-23.1, los=6.1%). Consistent with (not proof of) tablebase
+correction distorting calibration - see the rc7 residual_gate note above about static-metrics-improve-
+but-play-doesn't.
+
+Attempted to build a Forge template (selfplay-to-bullet-sf-oracle.template.json, in the forge repo,
+NOT committed) to distribute tools/bullet/selfplay_to_bullet_sf_oracle.py across the fleet for
+relabeling gen2 consistently (gen2 is the one generation with raw PGNs still on disk - gen1/gen3's
+raw games were already cleaned up after their original conversion). Verified the underlying script
+and its exact default parameters (skip_plies=8, min_depth=1, max_abs_cp=10000, mode=static,
+tb_pieces=0, sf_net=nn-0ee0657fb25e.nnue) work correctly on a small local (non-distributed) sample.
+
+The distributed Forge deployment of the new template hung: a 20-PGN-file test run
+(selfplay-to-bullet-sf-oracle-.tmp-sfo-template-test-20260731-012513) sat at 0/20 done for ~3.7 hours
+before I caught it and force-stopped it (forge stop --force: released=7 killed=48 reset=7). No task
+logs were written at all, meaning tasks likely never got past setup (venv/cargo build install steps)
+rather than hanging mid-relabel - root cause NOT diagnosed. Did not attempt a second blind distributed
+run given the fleet-time cost of the first attempt (~4 hours across dozens of workers).
+
+Template file is left in place on pwa-5090 at
+~/code/cpp/chess/forge/templates/selfplay-to-bullet-sf-oracle.template.json, uncommitted, NOT working.
+Test artifacts left for inspection: ~/code/cpp/chess/nnue/data/selfplay/.tmp-sfo-template-test/ (20 PGN
+files) and the Forge run directory
+~/code/cpp/chess/forge/runs/selfplay-to-bullet-sf-oracle-.tmp-sfo-template-test-20260731-012513/.
+
+Next step if picking this back up: debug the template's setup phase specifically (materialize_inputs,
+the nnue source install step, or the bullet-utils cargo build) on a single worker directly before
+attempting another fleet-wide deploy - the hang happened before any task produced output, so it's a
+setup/deploy problem, not a labeling-script problem (the script itself is confirmed correct locally).
