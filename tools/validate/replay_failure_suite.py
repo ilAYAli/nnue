@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Run replay candidate/reference CSV and summarize failure-suite deltas."""
+"""Run replay candidate/reference JSONL and summarize failure-suite deltas."""
 
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import statistics
 import subprocess
@@ -13,39 +12,18 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def parse_cp(value: str) -> int | None:
-    value = value.strip()
-    if not value:
-        return None
-    if value.startswith("+M"):
-        return 32000
-    if value.startswith("-M"):
-        return -32000
-    if value.endswith("cp"):
-        value = value[:-2]
-    try:
-        return int(value)
-    except ValueError:
-        return None
-
-
-def int_field(row: dict[str, str], key: str) -> int:
-    try:
-        return int(row.get(key, "0"))
-    except ValueError:
-        return 0
-
-
 def run_replay(args: argparse.Namespace, logs: list[str]) -> str:
     cmd = [
         args.replay,
-        "--candidate", args.candidate,
-        "--reference", args.reference,
+        "--candidate", args.engine_bin,
+        "--reference", args.engine_bin,
+        "--candidate-uci", f"nnue_file={args.candidate}",
+        "--reference-uci", f"nnue_file={args.reference}",
         "--oracle", args.oracle,
         "--oracle-nodes", str(args.oracle_nodes),
         "--threads", str(args.threads),
         "--jobs", str(args.jobs),
-        "--csv",
+        "--jsonl",
     ]
     if args.fixed_nodes > 0:
         cmd.extend(["--fixed-nodes", str(args.fixed_nodes)])
@@ -66,9 +44,11 @@ def run_replay(args: argparse.Namespace, logs: list[str]) -> str:
     return proc.stdout
 
 
-def summarize(csv_text: str) -> tuple[list[dict[str, str]], dict[str, object]]:
-    rows = list(csv.DictReader(csv_text.splitlines()))
-    diffs = [int_field(row, "diff") for row in rows]
+def summarize(jsonl_text: str) -> tuple[list[dict], dict[str, object]]:
+    rows = [
+        json.loads(line) for line in jsonl_text.splitlines() if line.strip()
+    ]
+    diffs = [int(row.get("diff_cp") or 0) for row in rows]
     nonzero = [diff for diff in diffs if diff != 0]
     candidate_better = sum(1 for diff in diffs if diff > 0)
     reference_better = sum(1 for diff in diffs if diff < 0)
@@ -83,8 +63,8 @@ def summarize(csv_text: str) -> tuple[list[dict[str, str]], dict[str, object]]:
             "best_gain_cp": 0,
         })
     for row in rows:
-        log = row.get("log", "")
-        diff = int_field(row, "diff")
+        log = row.get("log_path", "")
+        diff = int(row.get("diff_cp") or 0)
         item = by_log[log]
         item["positions"] = int(item["positions"]) + 1
         item["sum_diff_cp"] = int(item["sum_diff_cp"]) + diff
@@ -110,17 +90,13 @@ def summarize(csv_text: str) -> tuple[list[dict[str, str]], dict[str, object]]:
 
 
 def write_outputs(
-        rows: list[dict[str, str]], summary: dict[str, object],
+        rows: list[dict], summary: dict[str, object],
         output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / "replay_failure_suite.csv"
-    if rows:
-        with csv_path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
-            writer.writeheader()
-            writer.writerows(rows)
-    else:
-        csv_path.write_text("", encoding="utf-8")
+    jsonl_path = output_dir / "replay_failure_suite.jsonl"
+    with jsonl_path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row) + "\n")
     (output_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n",
         encoding="utf-8")
@@ -138,8 +114,11 @@ def write_outputs(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("logs", nargs="+")
-    ap.add_argument("--candidate", required=True)
-    ap.add_argument("--reference", required=True)
+    ap.add_argument("--candidate", required=True, help="Candidate net file")
+    ap.add_argument("--reference", required=True, help="Reference net file")
+    ap.add_argument(
+        "--engine-bin", default="~/assets/engines/candidate",
+        help="Shared UCI engine executable both nets load into")
     ap.add_argument("--oracle", default="stockfish")
     ap.add_argument("--replay", default="replay")
     ap.add_argument("--threads", type=int, default=1)
@@ -151,9 +130,10 @@ def main() -> None:
     ap.add_argument("--output-dir", required=True, type=Path)
     ap.add_argument("--stderr", type=Path)
     args = ap.parse_args()
+    args.engine_bin = str(Path(args.engine_bin).expanduser())
 
-    csv_text = run_replay(args, args.logs)
-    rows, summary = summarize(csv_text)
+    jsonl_text = run_replay(args, args.logs)
+    rows, summary = summarize(jsonl_text)
     write_outputs(rows, summary, args.output_dir)
     print(f"positions={summary['positions']}")
     print(f"candidate_better={summary['candidate_better']}")
