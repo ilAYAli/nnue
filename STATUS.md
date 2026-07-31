@@ -156,3 +156,25 @@ Next step if picking this back up: debug the template's setup phase specifically
 the nnue source install step, or the bullet-utils cargo build) on a single worker directly before
 attempting another fleet-wide deploy - the hang happened before any task produced output, so it's a
 setup/deploy problem, not a labeling-script problem (the script itself is confirmed correct locally).
+
+*** update: root cause partially found (2026-07-31, later) ***
+
+Found and fixed one real bug in selfplay-to-bullet-sf-oracle.template.json: the nnue_repo include list
+was missing tools/score/** (relabel_with_stockfish.py imports label_with_uci from there), causing
+ModuleNotFoundError on every worker since only the included subset gets materialized - confirmed via
+manual single-host reproduction (ssh + exact task command), fixed, and manually re-verified working
+end-to-end on one worker (2156 positions converted and validated correctly, ~470 pos/sec).
+
+Redeploying via Forge after the fix still did not complete a 20-PGN-file test (0/20 done after several
+minutes). Diagnosed further: the PGN input directory was never materialized on the worker I checked
+(~/.cache/forge/inputs/selfplay/ did not contain this test's cache key, despite the run showing tasks
+as claimed/running). This is the materialize_inputs mechanism itself (core Forge behaviour, not
+something a template JSON can fix) failing to complete/sync for this template, even for a handful of
+small files. Stopped again (forge stop --force) rather than keep debugging Forge core solo - that's
+outside what a template-only fix can address and is the other Claude session's remit (Forge core).
+
+Net state: the template's own bug (missing include) is fixed and should be preserved if anyone picks
+this back up, but there's a second, deeper issue in the input-materialization path that needs either
+Forge-side debugging or the user's input before attempting gen2's real relabeling job again. Do not
+retry the full job blind - both attempts so far cost real fleet time (~4h then ~15min) for zero
+completed output.
