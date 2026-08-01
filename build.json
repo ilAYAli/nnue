@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.33.0-rc8",
+  "run": "enyo-1.33.0-rc9",
   "continue_from": "enyo-1.32.0-rc10",
-  "hypothesis": "Isolate whether tablebase-corrected labels themselves hurt, rather than just re-testing another self-play generation. enyo-1.33.0-rc7 (data/selfplay/gen3/selfplay-sf-oracle-tb.bullet, TB-corrected) was rejected (elo=-23.1 vs rc10, los=6.1%) despite a clean residual_gate pass with the largest gains concentrated exactly where TB correction concentrates (phase:endgame mae_gain=53.9, eval:800+ mae_gain=95.6, eval:300-799 mae_gain=68.3) - the same static-metrics-improve-but-play-doesn't disconnect flagged earlier this session. enyo-1.31.0-rc57 (this lineage's single biggest gain, +8.6) used gen1 self-play with SF-oracle labels but explicitly NO tablebase correction. Enyo probes Syzygy tablebases directly during search (src/probe.cpp), so exact WDL labels for <=6-piece positions are largely redundant with what search already gets there, and splicing a categorical won/drawn/lost signal (capped to win_floor=350/win_ceil=1200) into an otherwise continuous static-eval-style target risks distorting calibration without adding value the engine doesn't already have. This uses data/selfplay/gen3/selfplay-sf-oracle.bullet - the exact same self-play games and SF-oracle labels as rc7, minus the tablebase relabeling step - changing only that one variable. Same regimen as rc7: continue_from rc10, lr=1e-5, wdl=0.05, trainable=all, one epoch (superbatches=354).",
-  "superbatches": 354,
+  "hypothesis": "Fine-tune on gen4 self-play: fresh 300k-game self-play generated with Enyo search + Stockfish net for evaluation (the same recipe as rc57, this lineage's single biggest gain), labeled via Forge's to-bullet --label static (genuine zero-search static eval via nnue_file, no tablebase correction - matching the rc7/rc8 finding that TB-corrected labels hurt calibration since Enyo already probes Syzygy directly during search). Corpus: data/selfplay/gen4/gen4-sf-oracle.bullet, 47,944,357 positions, produced by the maintained Forge to-bullet template (not a custom template). Same regimen as rc7/rc8/rc10: continue_from rc10, lr=1e-5, wdl=0.05, trainable=all, one epoch (superbatches=365).",
+  "superbatches": 365,
   "trainable": "all",
   "lr": 0.00001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/selfplay/gen3/selfplay-sf-oracle.bullet"
+    "source_binpack": "data/selfplay/gen4/gen4-sf-oracle.bullet"
   }
 }
