@@ -1,12 +1,12 @@
 {
-  "run": "enyo-1.33.0-rc9",
+  "run": "enyo-1.33.0-rc10",
   "continue_from": "enyo-1.32.0-rc10",
-  "hypothesis": "Fine-tune on gen4 self-play: fresh 300k-game self-play generated with Enyo search + Stockfish net for evaluation (the same recipe as rc57, this lineage's single biggest gain), labeled via Forge's to-bullet --label static (genuine zero-search static eval via nnue_file, no tablebase correction - matching the rc7/rc8 finding that TB-corrected labels hurt calibration since Enyo already probes Syzygy directly during search). Corpus: data/selfplay/gen4/gen4-sf-oracle.bullet, 47,944,357 positions, produced by the maintained Forge to-bullet template (not a custom template). Same regimen as rc7/rc8/rc10: continue_from rc10, lr=1e-5, wdl=0.05, trainable=all, one epoch (superbatches=365).",
-  "superbatches": 365,
+  "hypothesis": "Corrected gen4-style fine-tune: enyo-1.33.0-rc9 was rejected (elo=-17.3 vs enyo-1.32.0-rc10 at 1708 games) not because self-play + genuine static-eval relabeling is a dead end, but because the self-play generation itself used the wrong policy net - Stockfish nn-0ee0657fb25e.nnue was loaded into the search engine to generate the games, not enyo-1.32.0-rc10 itself. That produced off-policy data (Stockfish evaluating its own near-tautological positions) with no self-distillation signal for what enyo-1.32.0-rc10 actually gets wrong. The original enyo-1.31.0-rc57 recipe (this lineage's single biggest gain, +8.6 Elo, commit 275682c6/3c464a3b) was: the current champion plays itself, then those actual game positions are relabeled with genuine Stockfish static eval. This build replicates that correctly: data/selfplay/gen5/gen5-sf-oracle.bullet is 300k games of enyo-1.32.0-rc10 playing itself (Forge run selfplay-enyo_032aaf7-300000-20260801-114003, net=enyo-1.32.0-rc10.nn confirmed in the run manifest), relabeled via Forge to-bullet --label static (genuine zero-search static eval via nnue_file, no tablebase correction, matching the rc7/rc8 finding). Same regimen as every other fine-tune this lineage: continue_from rc10, lr=1e-5, wdl=0.05, trainable=all, one epoch (superbatches=329).",
+  "superbatches": 329,
   "trainable": "all",
   "lr": 0.00001,
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/selfplay/gen4/gen4-sf-oracle.bullet"
+    "source_binpack": "data/selfplay/gen5/gen5-sf-oracle.bullet"
   }
 }
