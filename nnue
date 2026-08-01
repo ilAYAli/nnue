@@ -906,7 +906,13 @@ sprt_gate() {
     return 1
   fi
   (( sprt_rc == 0 )) || return 1
-  full_sprt_pass || return 1
+  if ! full_sprt_pass; then
+    printf '  ┌─────────────────────────────────────\n'
+    printf '  │ \033[1;31m✗ REJECT\033[0m  %s\n' "${last_sprt_line:-result unavailable}"
+    printf '  └─────────────────────────────────────\n'
+    notify_sprt phase_done sprt "SPRT rejected for $run: ${last_sprt_line:-result unavailable}" "$last_sprt_log" 1
+    return 1
+  fi
   printf '  ┌─────────────────────────────────────\n'
   printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
@@ -921,7 +927,13 @@ full_sprt_gate() {
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" sprt
 
   run_sprt_once sprt "$GAMES" sprt
-  full_sprt_pass || return 1
+  if ! full_sprt_pass; then
+    printf '  ┌─────────────────────────────────────\n'
+    printf '  │ \033[1;31m✗ REJECT\033[0m  %s\n' "${last_sprt_line:-result unavailable}"
+    printf '  └─────────────────────────────────────\n'
+    notify_sprt phase_done sprt "SPRT rejected for $run: ${last_sprt_line:-result unavailable}" "$last_sprt_log" 1
+    return 1
+  fi
   printf '  ┌─────────────────────────────────────\n'
   printf '  │ \033[1;32m✓ PASS\033[0m  sprt (%s)\n' "$full_sprt_label"
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
