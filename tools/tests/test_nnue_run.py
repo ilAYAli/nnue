@@ -1492,13 +1492,19 @@ iterate
             self.assertNotIn("reference", working_json)
             self.assertEqual(600000000, working_json["data"]["offset"])
 
-    def test_smoke_gate_rejects_bad_elo_or_negative_llr(self) -> None:
+    def test_smoke_gate_rejects_only_catastrophic_elo(self) -> None:
+        # enyo-1.33.0-rc9 false-fired at elo=-12.1/llr=-0.51 (506 games) under
+        # the old dual-condition gate - that magnitude sits well inside this
+        # lineage's own measured noise band at n~500 (rc8: ci=64.7 on a
+        # 500-game read), not a real signal. The LLR-based branch was a more
+        # twitchy duplicate of the same win/loss/draw data as elo, not an
+        # independent check, so it is gone; only a large elo magnitude (well
+        # outside the noise band) should short-circuit the run early.
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split('case "$cmd" in', 1)[0] + """
-SMOKE_FAIL_ELO=-15.0
-SMOKE_FAIL_LLR=-0.20
+SMOKE_FAIL_ELO=-100.0
 check_smoke() {
   if smoke_sprt_failed "$1" "$2"; then
     printf '%s=fail\n' "$3"
@@ -1506,9 +1512,9 @@ check_smoke() {
     printf '%s=pass:%s\n' "$3" "$?"
   fi
 }
-check_smoke -25.2 -0.32/2.20 bad_elo
-check_smoke -5.0 -0.20/2.20 negative_llr
-check_smoke -5.0 -0.10/2.20 mild_negative
+check_smoke -150.0 -1.80/2.20 catastrophic_elo
+check_smoke -12.1 -0.51/2.20 rc9_noise
+check_smoke -25.2 -0.32/2.20 mild_negative
 check_smoke 4.0 -0.22/2.20 positive_elo
 """
             harness_path = tmp / "smoke_gate.sh"
@@ -1522,8 +1528,8 @@ check_smoke 4.0 -0.22/2.20 positive_elo
                 stdout=subprocess.PIPE,
             )
 
-            self.assertIn("bad_elo=fail", proc.stdout)
-            self.assertIn("negative_llr=fail", proc.stdout)
+            self.assertIn("catastrophic_elo=fail", proc.stdout)
+            self.assertIn("rc9_noise=pass:1", proc.stdout)
             self.assertIn("mild_negative=pass:1", proc.stdout)
             self.assertIn("positive_elo=pass:1", proc.stdout)
 

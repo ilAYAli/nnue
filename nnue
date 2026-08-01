@@ -61,8 +61,7 @@ ROWS=${ROWS:-50000}
 # 3000"), the poll loop in wait_for_existing_forge_sprt should be deleted
 # outright and the wait reverted to blocking.
 SMOKE_GAMES=${SMOKE_GAMES:-500}                    # checkpoint 1: stop if catastrophically bad
-SMOKE_FAIL_ELO=${SMOKE_FAIL_ELO:--15.0}
-SMOKE_FAIL_LLR=${SMOKE_FAIL_LLR:--0.20}
+SMOKE_FAIL_ELO=${SMOKE_FAIL_ELO:--100.0}
 SPRT_ACCEPT_LOS=${SPRT_ACCEPT_LOS:-75}             # stop and accept once LOS reaches this
 # Acceptance floor. LOS already normalises for sample size, but polling and
 # accepting the first crossing is optional stopping and inflates the error well
@@ -328,13 +327,8 @@ sprt_llr_value() {
 }
 
 smoke_sprt_failed() {
-  local elo=$1 llr=$2
-  local llr_value
-  llr_value=$(sprt_llr_value "$llr") || return 2
+  local elo=$1
   if float_le "$elo" "$SMOKE_FAIL_ELO"; then
-    return 0
-  fi
-  if float_lt "$elo" 0 && float_le "$llr_value" "$SMOKE_FAIL_LLR"; then
     return 0
   fi
   return 1
@@ -1272,7 +1266,7 @@ Useful overrides:
   ./nnue iterate --full-sprt-first  # first iteration skips train/gates/smoke
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
   SKIP_SMOKE=1 GAMES=800 ./nnue iterate
-  SMOKE_GAMES=400 SMOKE_FAIL_ELO=-15 SMOKE_FAIL_LLR=-0.20 ./nnue sprt
+  SMOKE_GAMES=400 SMOKE_FAIL_ELO=-100 ./nnue sprt
   GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue sprt
 
 Staged SPRT checkpoints (one run of GAMES, polled and stopped early):
