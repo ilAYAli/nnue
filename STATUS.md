@@ -24,10 +24,12 @@ I am contemplating re-doing an earlier experiment and have a competition between
 *** This is the enyo-1 lineage ***
 
 commit: 9d829ac0
+Elo 4.9,LLR 0.18/2.20 (8%)
 "run:" enyo-1.0.0-rc1
 "continue_from": enyo-scratch-long-1.5.0-rc1
 
 commit: 8cea17a7
+Elo 0.5,LLR 0.02/2.20 (1%)
 "run": "enyo-scratch-long-1.5.0-rc1",
 "continue_from": "enyo-scratch-long-1.4.0-rc1"
 
@@ -36,10 +38,12 @@ commit: d6c42e4c
 "continue_from": "enyo-scratch-long-1.3.0-rc1"
 
 commit: 1c22805e
+Elo 7.4,LLR 0.35/2.20 (16%)
 "enyo-scratch-long-1.3.0-rc1"
 "continue_from": "enyo-scratch-long-1.2.0-rc1"
 
 commit: a1c8368a
+Elo 25.8,LLR 1.17/2.20 (53%)
 "run": "enyo-scratch-long-1.2.0-rc1"
 "continue_from": "enyo-scratch-long-1.1.0-rc1"
 
@@ -48,8 +52,65 @@ commit: 7c7a0764
 "continue_from": "enyo-scratch-long-1.0.0-rc1"
 
 commit: 5a6028ef
+Elo 93.2,LLR 2.26/2.20 (103%)
 "run": "enyo-scratch-long-1.0.0-rc1"
 
+  ┌──────────┬─────────────────────────────┬─────────────────────────────┬───────┬──────────────────┐
+  │  commit  │             run             │        continue_from        │  Elo  │       LLR        │
+  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
+  │ 9d829ac0 │ enyo-1.0.0-rc1              │ enyo-scratch-long-1.5.0-rc1 │ +4.9  │ 0.18/2.20 (8%)   │
+  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
+  │ 8cea17a7 │ enyo-scratch-long-1.5.0-rc1 │ enyo-scratch-long-1.4.0-rc1 │ +0.5  │ 0.02/2.20 (1%)   │
+  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
+  │ d6c42e4c │ enyo-scratch-long-1.4.0-rc1 │ enyo-scratch-long-1.3.0-rc1 │ +7.4  │ 0.35/2.20 (16%)  │
+  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
+  │ 1c22805e │ enyo-scratch-long-1.3.0-rc1 │ enyo-scratch-long-1.2.0-rc1 │ +16.0 │ 0.71/2.20 (32%)  │
+  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
+  │ a1c8368a │ enyo-scratch-long-1.2.0-rc1 │ enyo-scratch-long-1.1.0-rc1 │ +25.8 │ 1.17/2.20 (53%)  │
+  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
+  │ 7c7a0764 │ enyo-scratch-long-1.1.0-rc1 │ enyo-scratch-long-1.0.0-rc1 │ +45.9 │ 2.12/2.20 (96%)  │
+  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
+  │ 5a6028ef │ enyo-scratch-long-1.0.0-rc1 │ (scratch, no continue_from) │ +93.2 │ 2.26/2.20 (103%) │
+  └──────────┴─────────────────────────────┴─────────────────────────────┴───────┴──────────────────┘
+
+Near-tip chain (enyo-1.30.0-rc3 forward to the current champion) - verified separately,
+2026-08-02. This does NOT connect to the table above: enyo-1.30.0-rc3 itself has no
+recoverable commit anywhere in history (checked all commits' build.json content, not just
+subject-line grep) and the net file no longer exists on disk. Versions 1.1.0-1.29.0 were not
+traced since there is no endpoint to connect them to.
+
+  ┌──────────┬────────────────────────────────┬───────────────────────────────┬───────┬─────────────────────────┐
+  │  commit  │              run               │         continue_from         │  Elo  │           LLR           │
+  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
+  │    ?     │ enyo-1.30.0-rc3                │ (untraceable - no commit,      │   -   │            -            │
+  │          │                                │  no net file on disk)          │       │                         │
+  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
+  │    -     │ enyo-1.30.0-rc3-unscaled       │ enyo-1.30.0-rc3                │  n/a  │ not an independent run  │
+  │          │ (manual output-scale fix on    │                                │       │ (never SPRT-tested or  │
+  │          │  rc3's own weights)            │                                │       │  committed)             │
+  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
+  │ 3c464a3b │ enyo-1.31.0-rc57               │ enyo-1.30.0-rc3-unscaled       │ +8.6  │ 0.37/2.20 (17%)         │
+  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
+  │ 650a4fcc │ enyo-1.32.0-rc10               │ enyo-1.31.0-rc57               │ +3.3  │ los=81.4%, ci=7.3       │
+  │          │ (current champion)             │                                │       │                         │
+  └──────────┴────────────────────────────────┴───────────────────────────────┴───────┴─────────────────────────┘
+
+Naming collision: the name enyo-1.32.0-rc10 was used twice. An earlier, unrelated attempt was
+rejected on 2026-07-15 (commit 7e31912f, continue_from enyo-1.31.0-rc42, elo=-69.6) - a
+different net that happened to reuse the same name. Only commit 650a4fcc (2026-07-29, above)
+is the actual current champion file.
+
+Rejected side-branches off the current tip (2026-08-01/02, this session, not part of the
+accepted chain above):
+  enyo-1.33.0-rc9  (continue_from rc10, data/selfplay/gen4/gen4-sf-oracle.bullet - self-play
+                    generated with Stockfish's own net loaded into the search engine, i.e. the
+                    wrong policy net for self-distillation): elo=-17.3  llr=-2.40/2.20 (-109%)
+                    (1708/6000 games) - rejected.
+  enyo-1.33.0-rc10 (continue_from rc10, data/selfplay/gen5/gen5-sf-oracle.bullet - corrected
+                    recipe, rc10 plays itself, genuine SF static-eval relabel, matching rc57's
+                    actual recipe): elo=-9.0  llr=-2.25/2.20 (-102%) (3014/6000 games) - rejected.
+  Conclusion: even the corrected self-play recipe does not reproduce rc57's gain against the
+  now-mature rc10 - the incremental self-play-fine-tune path off rc10 appears saturated.
 
 *** default.net reference ***
 
