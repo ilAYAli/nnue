@@ -664,9 +664,6 @@ fn train_enyo<
         panic!("FullThreats and slider x-ray threats are mutually exclusive");
     }
     let threat_features = FULL_THREATS || SLIDER_XRAY_THREATS;
-    if FULL_HEADS && threat_features {
-        panic!("full-head and FullThreats changes must be trained separately");
-    }
     if MIXED_ACTIVATION && (FULL_HEADS || threat_features) {
         panic!("mixed activation must be tested independently");
     }
@@ -1350,6 +1347,7 @@ fn main() {
                     (2, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, true, false),
                     (4, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, true, false),
                     (8, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, true, false),
+                    (8, true, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, true, false),
                     _ => {
                         panic!(
                             "unsupported Enyo output/full-threat/full-head combination: \

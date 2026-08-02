@@ -334,7 +334,11 @@ def main() -> int:
     )[:, :args.hidden]
     if args.full_threats and args.slider_xray_threats:
         raise SystemExit("--full-threats and --slider-xray-threats are mutually exclusive")
-    if args.full_threats or args.slider_xray_threats:
+    source_threat_features = (
+        bool(getattr(net, "full_threats", False))
+        or bool(getattr(net, "slider_xray_threats", False))
+    )
+    if (args.full_threats or args.slider_xray_threats) and not source_threat_features:
         input_weights = add_full_threat_rows(input_weights)
     input_biases = np.asarray(net.input_biases, dtype=np.float32)[:args.hidden]
     l1_weights = np.concatenate((

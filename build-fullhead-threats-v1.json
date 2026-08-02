@@ -1,0 +1,13 @@
+{
+  "run": "enyo-fullhead-threats-v1-rc1",
+  "initialize_from": "enyo-1.32.0-rc10-fullthreats-fullhead-warm",
+  "reference": "enyo-1.32.0-rc10",
+  "hypothesis": "Test full_heads + FullThreats combined (matches how every reference engine that ships threat features also uses full-head - never tested together here since the format explicitly blocked it). Warm-started from rc10 (zero-padded threat rows, replicated L1/L2 heads), 20 epochs of gen5 self-play to let both differentiate from a cold start.",
+  "superbatches": 6585,
+  "trainable": "all",
+  "lr": 1e-05,
+  "wdl": 0.05,
+  "data": {
+    "source_binpack": "data/selfplay/gen5/gen5-sf-oracle.bullet"
+  }
+}

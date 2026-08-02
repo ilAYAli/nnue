@@ -1025,6 +1025,7 @@ fn validate_layout(config: &Config) {
     if !matches!(
         export_format,
         "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3" | "enyo-native-v4" | "enyo-native-v5"
+            | "enyo-native-v6"
     ) {
         eprintln!("error: unsupported export_format={export_format}");
         process::exit(2);
@@ -1033,20 +1034,24 @@ fn validate_layout(config: &Config) {
         eprintln!("error: non-1024 hidden widths require export_format=enyo-native-v2");
         process::exit(2);
     }
-    if threat_features && export_format != "enyo-native-v2" {
-        eprintln!("error: threat features require export_format=enyo-native-v2");
+    if threat_features && export_format != "enyo-native-v2" && export_format != "enyo-native-v6" {
+        eprintln!("error: threat features require export_format=enyo-native-v2 (alone) or enyo-native-v6 (with full-head)");
         process::exit(2);
     }
     if full_threats && slider_xray_threats {
         eprintln!("error: full_threats and slider_xray_threats are mutually exclusive");
         process::exit(2);
     }
-    if full_heads && export_format != "enyo-native-v3" {
-        eprintln!("error: output_bucket_scope=full-head requires export_format=enyo-native-v3");
+    if full_heads && export_format != "enyo-native-v3" && export_format != "enyo-native-v6" {
+        eprintln!("error: output_bucket_scope=full-head requires export_format=enyo-native-v3 (alone) or enyo-native-v6 (with threat features)");
         process::exit(2);
     }
     if export_format == "enyo-native-v3" && !full_heads {
         eprintln!("error: enyo-native-v3 requires output_bucket_scope=full-head");
+        process::exit(2);
+    }
+    if export_format == "enyo-native-v6" && !(full_heads && threat_features) {
+        eprintln!("error: enyo-native-v6 requires both output_bucket_scope=full-head and a threat-feature mode");
         process::exit(2);
     }
     if mixed_activation && export_format != "enyo-native-v4" {
@@ -1083,12 +1088,6 @@ fn validate_layout(config: &Config) {
     }
     if full_heads && output_buckets <= 1 {
         eprintln!("error: full-head output bucketing requires at least 2 output buckets");
-        process::exit(2);
-    }
-    if full_heads && threat_features {
-        eprintln!(
-            "error: full-head and FullThreats architecture changes must be tested separately"
-        );
         process::exit(2);
     }
     if threat_features && bool_at(&config.arch, "input_factoriser", false) {
@@ -2584,6 +2583,21 @@ fn write_model(config: &Config) {
             psqt_residual,
             false,
             ENYO_V5_FORMAT_VERSION,
+        ),
+        Some("enyo-native-v6") => enyo_container(
+            &model,
+            runtime_input_buckets,
+            feature_channels,
+            hidden,
+            l2,
+            output_buckets,
+            full_threats,
+            slider_xray_threats,
+            full_heads,
+            false,
+            false,
+            false,
+            ENYO_V6_FORMAT_VERSION,
         ),
         _ => model,
     };

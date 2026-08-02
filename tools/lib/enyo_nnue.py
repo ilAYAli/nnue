@@ -44,6 +44,7 @@ NETWORK_V2_HEADER_MAGIC = b"ENYONN2\0"
 NETWORK_V3_HEADER_MAGIC = b"ENYONN3\0"
 NETWORK_V4_HEADER_MAGIC = b"ENYONN4\0"
 NETWORK_V5_HEADER_MAGIC = b"ENYONN5\0"
+NETWORK_V6_HEADER_MAGIC = b"ENYONN6\0"
 NETWORK_HEADER_MAGIC = NETWORK_V2_HEADER_MAGIC
 NETWORK_FORMAT_VERSION = 2
 NETWORK_FLAG_FULL_THREATS = 1
@@ -702,7 +703,8 @@ def load_net(path: str | Path) -> Net:
     psqt_residual = False
     payload = data
     if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC,
-                        NETWORK_V4_HEADER_MAGIC, NETWORK_V5_HEADER_MAGIC)):
+                        NETWORK_V4_HEADER_MAGIC, NETWORK_V5_HEADER_MAGIC,
+                        NETWORK_V6_HEADER_MAGIC)):
         if len(data) < NETWORK_HEADER_SIZE:
             raise ValueError(f"{path}: truncated Enyo NNUE header")
         (
@@ -727,6 +729,7 @@ def load_net(path: str | Path) -> Net:
             (NETWORK_V3_HEADER_MAGIC, 3),
             (NETWORK_V4_HEADER_MAGIC, 4),
             (NETWORK_V5_HEADER_MAGIC, 5),
+            (NETWORK_V6_HEADER_MAGIC, 6),
         ):
             raise ValueError(f"{path}: unsupported Enyo NNUE header")
         if header_size != NETWORK_HEADER_SIZE:
@@ -742,7 +745,7 @@ def load_net(path: str | Path) -> Net:
         if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
             raise ValueError(f"{path}: unsupported output head feature count")
         allowed_flags = NETWORK_FLAG_FULL_THREATS | NETWORK_FLAG_SLIDER_XRAY_THREATS | (
-            NETWORK_FLAG_FULL_HEADS if format_version == 3 else 0) | (
+            NETWORK_FLAG_FULL_HEADS if format_version in (3, 6) else 0) | (
             NETWORK_FLAG_MIXED_ACTIVATION if format_version == 4 else 0) | (
             NETWORK_FLAG_PSQT_RESIDUAL if format_version == 5 else 0)
         if (flags & ~allowed_flags) or reserved0 or reserved1:
@@ -755,9 +758,13 @@ def load_net(path: str | Path) -> Net:
         full_heads = bool(flags & NETWORK_FLAG_FULL_HEADS)
         mixed_activation = bool(flags & NETWORK_FLAG_MIXED_ACTIVATION)
         psqt_residual = bool(flags & NETWORK_FLAG_PSQT_RESIDUAL)
-        if full_heads != (format_version == 3):
-            raise ValueError(f"{path}: v3 and full-head flag must be used together")
-        if full_heads and (output_buckets <= 1 or threat_features):
+        if full_heads != (format_version in (3, 6)):
+            raise ValueError(f"{path}: v3/v6 and full-head flag must be used together")
+        if full_heads and output_buckets <= 1:
+            raise ValueError(f"{path}: unsupported full-head architecture")
+        if format_version == 3 and threat_features:
+            raise ValueError(f"{path}: unsupported full-head architecture")
+        if format_version == 6 and not threat_features:
             raise ValueError(f"{path}: unsupported full-head architecture")
         if mixed_activation != (format_version == 4):
             raise ValueError(f"{path}: v4 and mixed-activation flag must be used together")
@@ -911,9 +918,9 @@ def write_net(net: Net, path: str | Path) -> None:
     if net.output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
         raise ValueError(
             f"unsupported output head feature count {net.output_head_features}")
+    threat_features = net.full_threats or net.slider_xray_threats
     if net.full_heads and (
             net.output_buckets <= 1
-            or net.full_threats or net.slider_xray_threats
             or net.output_head_features != 0):
         raise ValueError("unsupported full-head architecture")
     output_width = net.output_width
@@ -958,9 +965,13 @@ def write_net(net: Net, path: str | Path) -> None:
         if net.trained_hidden != N_HIDDEN:
             raise ValueError("non-1024 hidden widths require enyo-native-v2")
         data = payload
-    elif net.format_version in (2, 3, 4, 5):
-        if (net.format_version == 3) != net.full_heads:
-            raise ValueError("enyo-native-v3 and full_heads must be used together")
+    elif net.format_version in (2, 3, 4, 5, 6):
+        if net.full_heads != (net.format_version in (3, 6)):
+            raise ValueError("enyo-native-v3/v6 and full_heads must be used together")
+        if net.format_version == 3 and threat_features:
+            raise ValueError("enyo-native-v3 does not support threat features - use v6")
+        if net.format_version == 6 and not threat_features:
+            raise ValueError("enyo-native-v6 requires threat features - use v3")
         if (net.format_version == 4) != net.mixed_activation:
             raise ValueError("enyo-native-v4 and mixed activation must be used together")
         if (net.format_version == 5) != net.psqt_residual:
@@ -968,6 +979,7 @@ def write_net(net: Net, path: str | Path) -> None:
         magic = (
             NETWORK_V5_HEADER_MAGIC if net.psqt_residual
             else NETWORK_V4_HEADER_MAGIC if net.mixed_activation
+            else NETWORK_V6_HEADER_MAGIC if net.full_heads and threat_features
             else NETWORK_V3_HEADER_MAGIC if net.full_heads
             else NETWORK_V2_HEADER_MAGIC
         )
@@ -1003,7 +1015,7 @@ def write_net(net: Net, path: str | Path) -> None:
         net.input_buckets, net.output_buckets, net.output_head_features,
         net.feature_channels, net.full_threats or net.slider_xray_threats, net.full_heads,
         net.mixed_activation, net.psqt_residual)
-    if net.format_version in (2, 3, 4, 5):
+    if net.format_version in (2, 3, 4, 5, 6):
         expected += NETWORK_HEADER_SIZE
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")
