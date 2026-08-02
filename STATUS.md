@@ -82,17 +82,17 @@ traced since there is no endpoint to connect them to.
   ┌──────────┬────────────────────────────────┬───────────────────────────────┬───────┬─────────────────────────┐
   │  commit  │              run               │         continue_from         │  Elo  │           LLR           │
   ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │    ?     │ enyo-1.30.0-rc3                │ (untraceable - no commit,      │   -   │            -            │
-  │          │                                │  no net file on disk)          │       │                         │
+  │    ?     │ enyo-1.30.0-rc3                │ (untraceable - no commit,     │   -   │            -            │
+  │          │                                │  no net file on disk)         │       │                         │
   ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │    -     │ enyo-1.30.0-rc3-unscaled       │ enyo-1.30.0-rc3                │  n/a  │ not an independent run  │
-  │          │ (manual output-scale fix on    │                                │       │ (never SPRT-tested or  │
-  │          │  rc3's own weights)            │                                │       │  committed)             │
+  │    -     │ enyo-1.30.0-rc3-unscaled       │ enyo-1.30.0-rc3               │  n/a  │ not an independent run  │
+  │          │ (manual output-scale fix on    │                               │       │ (never SPRT-tested or   │
+  │          │  rc3's own weights)            │                               │       │  committed)             │
   ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │ 3c464a3b │ enyo-1.31.0-rc57               │ enyo-1.30.0-rc3-unscaled       │ +8.6  │ 0.37/2.20 (17%)         │
+  │ 3c464a3b │ enyo-1.31.0-rc57               │ enyo-1.30.0-rc3-unscaled      │ +8.6  │ 0.37/2.20 (17%)         │
   ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │ 650a4fcc │ enyo-1.32.0-rc10               │ enyo-1.31.0-rc57               │ +3.3  │ los=81.4%, ci=7.3       │
-  │          │ (current champion)             │                                │       │                         │
+  │ 650a4fcc │ enyo-1.32.0-rc10               │ enyo-1.31.0-rc57              │ +3.3  │ los=81.4%, ci=7.3       │
+  │          │ (current champion)             │                               │       │                         │
   └──────────┴────────────────────────────────┴───────────────────────────────┴───────┴─────────────────────────┘
 
 Naming collision: the name enyo-1.32.0-rc10 was used twice. An earlier, unrelated attempt was
