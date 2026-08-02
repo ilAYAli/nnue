@@ -1,0 +1,13 @@
+{
+  "run": "enyo-1.33.0-rc12",
+  "initialize_from": "enyo-1.32.0-rc10-fullhead-warm",
+  "reference": "enyo-1.32.0-rc10",
+  "hypothesis": "Test full_heads=true (independent L1/L2 per output bucket) built on the current lineage: warm-started from enyo-1.32.0-rc10 own weights (L1/L2 replicated identically into 8 copies via make_fullhead_warm_start.py), fine-tuned on rc10 own gen5 self-play data.",
+  "superbatches": 329,
+  "trainable": "all",
+  "lr": 1e-05,
+  "wdl": 0.05,
+  "data": {
+    "source_binpack": "data/selfplay/gen5/gen5-sf-oracle.bullet"
+  }
+}
