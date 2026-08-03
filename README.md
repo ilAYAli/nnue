@@ -45,7 +45,7 @@ Normal training and validation runs through `./nnue`:
 ```
 
 The long-running automated loop is normally launched from `nnue_cmd` on
-`pwa-5090`:
+`pwa-llm`:
 
 ```sh
 NNUE_HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=1500 ./nnue iterate

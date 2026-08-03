@@ -1,4 +1,4 @@
-All development is done on pwa-5090 ~/code/chess/nnue
+All development is done on pwa-llm ~/code/chess/nnue
 read AGENTS.md there and the associated SKILL.md's
 
 The best net is currently ~ -154 elo from SF and ~ -122 from Berserk:
@@ -207,7 +207,7 @@ logs were written at all, meaning tasks likely never got past setup (venv/cargo 
 rather than hanging mid-relabel - root cause NOT diagnosed. Did not attempt a second blind distributed
 run given the fleet-time cost of the first attempt (~4 hours across dozens of workers).
 
-Template file is left in place on pwa-5090 at
+Template file is left in place on pwa-llm at
 ~/code/chess/forge/templates/selfplay-to-bullet-sf-oracle.template.json, uncommitted, NOT working.
 Test artifacts left for inspection: ~/code/chess/nnue/data/selfplay/.tmp-sfo-template-test/ (20 PGN
 files) and the Forge run directory
