@@ -169,7 +169,7 @@ def test_feature_index_uses_horizontal_mirroring() -> None:
                         input_buckets, feature_channels)
 
 
-def test_pytorch_model_load_and_export_preserve_bucket_count(tmp_path: Path) -> None:
+def test_numpy_model_load_and_export_preserve_bucket_count(tmp_path: Path) -> None:
     source = tmp_path / "source32.nn"
     exported = tmp_path / "exported32.nn"
     nn2.write_net(_zero_net(32), source)
@@ -183,7 +183,7 @@ def test_pytorch_model_load_and_export_preserve_bucket_count(tmp_path: Path) -> 
     assert nn2.load_net(exported).input_buckets == 32
 
 
-def test_pytorch_model_load_and_export_preserve_full_threats(tmp_path: Path) -> None:
+def test_numpy_model_load_and_export_preserve_full_threats(tmp_path: Path) -> None:
     source = tmp_path / "source-full-threats.nn"
     exported = tmp_path / "exported-full-threats.nn"
     net = _zero_net(16, output_buckets=8, full_threats=True)
@@ -199,7 +199,7 @@ def test_pytorch_model_load_and_export_preserve_full_threats(tmp_path: Path) -> 
     assert loaded.output_buckets == 8
 
 
-def test_pytorch_model_expands_legacy_net_to_zero_material_head(
+def test_numpy_model_expands_legacy_net_to_zero_material_head(
         tmp_path: Path) -> None:
     source = tmp_path / "legacy.nn"
     exported = tmp_path / "head.nn"
@@ -232,7 +232,7 @@ def test_pytorch_model_expands_legacy_net_to_zero_material_head(
     )
 
 
-def test_pytorch_model_applies_material_head_features(tmp_path: Path) -> None:
+def test_numpy_model_applies_material_head_features(tmp_path: Path) -> None:
     source = tmp_path / "material-head.nn"
     net = _zero_net(16, output_head_features=nn2.N_HEAD_FEATURES)
     net.output_weights[0, nn2.N_L3:] = np.asarray([32.0, 64.0], dtype=np.float32)
@@ -256,7 +256,7 @@ def test_pytorch_model_applies_material_head_features(tmp_path: Path) -> None:
     np.testing.assert_allclose(pred, np.asarray([3.75], dtype=np.float32))
 
 
-def test_pytorch_model_selects_material_output_bucket(tmp_path: Path) -> None:
+def test_numpy_model_selects_material_output_bucket(tmp_path: Path) -> None:
     source = tmp_path / "bucketed.nn"
     net = _zero_net(16, output_buckets=4)
     net.output_biases[:] = np.asarray([0.0, 32.0, 64.0, 96.0], dtype=np.float32)
@@ -279,7 +279,7 @@ def test_pytorch_model_selects_material_output_bucket(tmp_path: Path) -> None:
         pred, np.asarray([0.0, 0.0, 1.0, 3.0], dtype=np.float32))
 
 
-def test_pytorch_model_selects_complete_material_head(tmp_path: Path) -> None:
+def test_numpy_model_selects_complete_material_head(tmp_path: Path) -> None:
     source = tmp_path / "full-heads.nn"
     exported = tmp_path / "full-heads-exported.nn"
     net = _zero_net(16, output_buckets=8, full_heads=True)
