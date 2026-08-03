@@ -10,7 +10,7 @@ tools/posgen/posgen.py --help
 tools/score/score.py --help
 tools/pack/pack.py --help
 tools/bullet/train --help
-tools/validate/validate.py --help
+../nnue help
 ```
 
 Phase meanings:

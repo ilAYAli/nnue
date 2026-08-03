@@ -26,13 +26,6 @@ It does not export a normal Enyo `.nn`. The experimental Enyo branch can load
 these raw `quantised.bin` checkpoints directly for architecture tests, but the
 current search path is still too slow for serious SPRT.
 
-Inspect a checkpoint:
-
-```sh
-tools/bullet/inspect_checkpoint.py \
-  runs/bullet-spike-100k/train/bullet-spike-100k/checkpoints/bullet-spike-100k-2
-```
-
 The current 1024-hidden spike writes `quantised.bin` as raw tensors with no
 header:
 
