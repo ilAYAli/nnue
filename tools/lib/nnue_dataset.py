@@ -3,13 +3,10 @@ from __future__ import annotations
 
 import json
 import struct
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
-import torch
-from torch.utils.data import Dataset
 
 from . import bullet_format
 from . import enyo_nnue as nn2
@@ -19,7 +16,22 @@ BULLET_CHESSBOARD_STRUCT = struct.Struct("<Q16shBBB3s")
 assert BULLET_CHESSBOARD_STRUCT.size == bullet_format.RECORD_BYTES
 
 
-class FenScoreDataset(Dataset):
+class SequentialLoader:
+    """Minimal no-shuffle batch iterator, replacing torch's DataLoader."""
+
+    def __init__(self, dataset: Sequence, batch_size: int, collate_fn: Callable):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.collate_fn = collate_fn
+
+    def __iter__(self) -> Iterator:
+        n = len(self.dataset)
+        for start in range(0, n, self.batch_size):
+            end = min(start + self.batch_size, n)
+            yield self.collate_fn([self.dataset[i] for i in range(start, end)])
+
+
+class FenScoreDataset:
     def __init__(self, rows: Iterable[dict], *,
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
                  feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
@@ -85,18 +97,18 @@ class FenScoreDataset(Dataset):
     def __getitem__(self, idx: int):
         w, b, count, stm, score, wdl, phase_scale, source_id = self.items[idx]
         return (
-            torch.tensor(w, dtype=torch.long),
-            torch.tensor(b, dtype=torch.long),
-            torch.tensor(count, dtype=torch.long),
-            torch.tensor(stm, dtype=torch.long),
-            torch.tensor(score, dtype=torch.float32),
-            torch.tensor(wdl, dtype=torch.float32),
-            torch.tensor(phase_scale, dtype=torch.float32),
-            torch.tensor(source_id, dtype=torch.long),
+            np.asarray(w, dtype=np.int64),
+            np.asarray(b, dtype=np.int64),
+            np.int64(count),
+            np.int64(stm),
+            np.float32(score),
+            np.float32(wdl),
+            np.float32(phase_scale),
+            np.int64(source_id),
         )
 
 
-class PackedFenScoreDataset(Dataset):
+class PackedFenScoreDataset:
     def __init__(self, path: str | Path, *,
                  limit: int = 0, skip: int = 0,
                  in_memory: bool = False) -> None:
@@ -135,7 +147,7 @@ class PackedFenScoreDataset(Dataset):
         )
 
 
-class BulletDataScoreDataset(Dataset):
+class BulletDataScoreDataset:
     def __init__(self, path: str | Path, *,
                  limit: int = 0, skip: int = 0,
                  input_buckets: int = nn2.DEFAULT_N_KING_BUCKETS,
@@ -204,14 +216,14 @@ class BulletDataScoreDataset(Dataset):
             self.full_threats, self.slider_xray_threats)
         phase_scale = nn2.phase_scale_from_pieces(pieces)
         return (
-            torch.tensor(w_feats, dtype=torch.long),
-            torch.tensor(b_feats, dtype=torch.long),
-            torch.tensor(len(pieces), dtype=torch.long),
-            torch.tensor(nn2.WHITE, dtype=torch.long),
-            torch.tensor(float(score), dtype=torch.float32),
-            torch.tensor(self._result_to_wdl(int(result)), dtype=torch.float32),
-            torch.tensor(phase_scale, dtype=torch.float32),
-            torch.tensor(0, dtype=torch.long),
+            np.asarray(w_feats, dtype=np.int64),
+            np.asarray(b_feats, dtype=np.int64),
+            np.int64(len(pieces)),
+            np.int64(nn2.WHITE),
+            np.float32(score),
+            np.float32(self._result_to_wdl(int(result))),
+            np.float32(phase_scale),
+            np.int64(0),
         )
 
 
@@ -232,31 +244,30 @@ def collate(batch):
         source_ids.append(source_id)
 
     return (
-        torch.cat(w_all) if w_all else torch.empty(0, dtype=torch.long),
-        torch.cat(b_all) if b_all else torch.empty(0, dtype=torch.long),
-        torch.tensor(w_offsets[:-1], dtype=torch.long),
-        torch.tensor(b_offsets[:-1], dtype=torch.long),
-        torch.stack(counts),
-        torch.stack(stms),
-        torch.stack(scores),
-        torch.stack(wdls),
-        torch.stack(phase_scales),
-        torch.stack(source_ids),
+        np.concatenate(w_all) if w_all else np.empty(0, dtype=np.int64),
+        np.concatenate(b_all) if b_all else np.empty(0, dtype=np.int64),
+        np.asarray(w_offsets[:-1], dtype=np.int64),
+        np.asarray(b_offsets[:-1], dtype=np.int64),
+        np.asarray(counts, dtype=np.int64),
+        np.asarray(stms, dtype=np.int64),
+        np.asarray(scores, dtype=np.float32),
+        np.asarray(wdls, dtype=np.float32),
+        np.asarray(phase_scales, dtype=np.float32),
+        np.asarray(source_ids, dtype=np.int64),
     )
 
 
 def collate_packed(batch):
     w_rows, b_rows, counts, stms, scores, wdls, phase_scales, source_ids = zip(
         *batch)
-    w_padded = torch.as_tensor(np.stack(w_rows), dtype=torch.long)
-    b_padded = torch.as_tensor(np.stack(b_rows), dtype=torch.long)
-    counts_t = torch.as_tensor(np.asarray(counts), dtype=torch.long)
+    w_padded = np.asarray(np.stack(w_rows), dtype=np.int64)
+    b_padded = np.asarray(np.stack(b_rows), dtype=np.int64)
+    counts_t = np.asarray(counts, dtype=np.int64)
     max_features = w_padded.shape[1]
-    mask = (torch.arange(max_features).unsqueeze(0)
-            < counts_t.unsqueeze(1))
-    offsets = torch.cat((
-        torch.zeros(1, dtype=torch.long),
-        torch.cumsum(counts_t, dim=0)[:-1],
+    mask = np.arange(max_features)[None, :] < counts_t[:, None]
+    offsets = np.concatenate((
+        np.zeros(1, dtype=np.int64),
+        np.cumsum(counts_t, dtype=np.int64)[:-1],
     ))
     return (
         w_padded[mask],
@@ -264,11 +275,11 @@ def collate_packed(batch):
         offsets,
         offsets,
         counts_t,
-        torch.as_tensor(np.asarray(stms), dtype=torch.long),
-        torch.as_tensor(np.asarray(scores), dtype=torch.float32),
-        torch.as_tensor(np.asarray(wdls), dtype=torch.float32),
-        torch.as_tensor(np.asarray(phase_scales), dtype=torch.float32),
-        torch.as_tensor(np.asarray(source_ids), dtype=torch.long),
+        np.asarray(stms, dtype=np.int64),
+        np.asarray(scores, dtype=np.float32),
+        np.asarray(wdls, dtype=np.float32),
+        np.asarray(phase_scales, dtype=np.float32),
+        np.asarray(source_ids, dtype=np.int64),
     )
 
 
@@ -299,7 +310,7 @@ def load_score_dataset(path: str | Path, *, limit: int = 0, skip: int = 0,
                        feature_channels: int = nn2.DEFAULT_N_FEATURE_CHANNELS,
                        full_threats: bool = False,
                        slider_xray_threats: bool = False,
-                       ) -> tuple[Dataset, Callable]:
+                       ) -> tuple[object, Callable]:
     p = Path(path)
     if p.is_dir():
         if full_threats or slider_xray_threats:

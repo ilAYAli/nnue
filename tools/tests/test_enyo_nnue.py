@@ -1,10 +1,9 @@
 from pathlib import Path
 
 import numpy as np
-import torch
 
 from tools.lib import enyo_nnue as nn2
-from tools.lib.nnue_model import EnyoNNUE, export_model, load_model_from_nn
+from tools.lib.nnue_forward import EnyoNNUE, export_model, load_model_from_nn
 
 
 def _zero_net(
@@ -200,21 +199,6 @@ def test_pytorch_model_load_and_export_preserve_full_threats(tmp_path: Path) -> 
     assert loaded.output_buckets == 8
 
 
-def test_export_model_does_not_move_module_to_cpu(tmp_path: Path) -> None:
-    source = tmp_path / "source.nn"
-    exported = tmp_path / "exported.nn"
-    nn2.write_net(_zero_net(16), source)
-    model = load_model_from_nn(source)
-
-    def fail_cpu():
-        raise AssertionError("export_model should copy tensors, not move module")
-
-    model.cpu = fail_cpu  # type: ignore[method-assign]
-    export_model(model, exported)
-
-    assert nn2.load_net(exported).input_buckets == 16
-
-
 def test_pytorch_model_expands_legacy_net_to_zero_material_head(
         tmp_path: Path) -> None:
     source = tmp_path / "legacy.nn"
@@ -227,21 +211,18 @@ def test_pytorch_model_expands_legacy_net_to_zero_material_head(
     expanded = load_model_from_nn(
         source, output_head_features=nn2.N_HEAD_FEATURES)
     counts = [32]
-    offsets = np.asarray([0])
+    offsets = np.asarray([0], dtype=np.int64)
     feats = np.zeros(sum(counts), dtype=np.int64)
     args = (
-        torch.from_numpy(feats),
-        torch.from_numpy(feats),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.zeros(len(counts), dtype=torch.long),
-        torch.ones(len(counts), dtype=torch.float32),
+        feats,
+        feats,
+        offsets,
+        offsets,
+        np.zeros(len(counts), dtype=np.int64),
+        np.ones(len(counts), dtype=np.float32),
     )
 
-    np.testing.assert_allclose(
-        expanded(*args).detach().numpy(),
-        legacy(*args).detach().numpy(),
-    )
+    np.testing.assert_allclose(expanded(*args), legacy(*args))
     export_model(expanded, exported)
     loaded = nn2.load_net(exported)
     assert loaded.output_head_features == nn2.N_HEAD_FEATURES
@@ -259,23 +240,20 @@ def test_pytorch_model_applies_material_head_features(tmp_path: Path) -> None:
 
     model = load_model_from_nn(source)
     counts = [32]
-    offsets = np.asarray([0])
+    offsets = np.asarray([0], dtype=np.int64)
     feats = np.zeros(sum(counts), dtype=np.int64)
     pred = model(
-        torch.from_numpy(feats),
-        torch.from_numpy(feats),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.zeros(len(counts), dtype=torch.long),
-        torch.tensor([1.5], dtype=torch.float32),
-        piece_count=torch.tensor(counts, dtype=torch.long),
+        feats,
+        feats,
+        offsets,
+        offsets,
+        np.zeros(len(counts), dtype=np.int64),
+        np.asarray([1.5], dtype=np.float32),
+        piece_count=np.asarray(counts, dtype=np.int64),
     )
 
     # raw = (32 * 0.5 + 64 * 1.0) / 32, then existing phase scaling.
-    np.testing.assert_allclose(
-        pred.detach().numpy(),
-        np.asarray([3.75], dtype=np.float32),
-    )
+    np.testing.assert_allclose(pred, np.asarray([3.75], dtype=np.float32))
 
 
 def test_pytorch_model_selects_material_output_bucket(tmp_path: Path) -> None:
@@ -286,21 +264,19 @@ def test_pytorch_model_selects_material_output_bucket(tmp_path: Path) -> None:
 
     model = load_model_from_nn(source)
     counts = [2, 8, 16, 32]
-    offsets = np.cumsum([0] + counts[:-1])
+    offsets = np.cumsum([0] + counts[:-1]).astype(np.int64)
     feats = np.zeros(sum(counts), dtype=np.int64)
     pred = model(
-        torch.from_numpy(feats),
-        torch.from_numpy(feats),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.zeros(len(counts), dtype=torch.long),
-        torch.ones(len(counts), dtype=torch.float32),
+        feats,
+        feats,
+        offsets,
+        offsets,
+        np.zeros(len(counts), dtype=np.int64),
+        np.ones(len(counts), dtype=np.float32),
     )
 
     np.testing.assert_allclose(
-        pred.detach().numpy(),
-        np.asarray([0.0, 0.0, 1.0, 3.0], dtype=np.float32),
-    )
+        pred, np.asarray([0.0, 0.0, 1.0, 3.0], dtype=np.float32))
 
 
 def test_pytorch_model_selects_complete_material_head(tmp_path: Path) -> None:
@@ -315,21 +291,18 @@ def test_pytorch_model_selects_complete_material_head(tmp_path: Path) -> None:
 
     model = load_model_from_nn(source)
     counts = [2, 6, 10, 14, 18, 22, 26, 30]
-    offsets = np.cumsum([0] + counts[:-1])
+    offsets = np.cumsum([0] + counts[:-1]).astype(np.int64)
     feats = np.zeros(sum(counts), dtype=np.int64)
     pred = model(
-        torch.from_numpy(feats),
-        torch.from_numpy(feats),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.tensor(offsets, dtype=torch.long),
-        torch.zeros(len(counts), dtype=torch.long),
-        torch.ones(len(counts), dtype=torch.float32),
+        feats,
+        feats,
+        offsets,
+        offsets,
+        np.zeros(len(counts), dtype=np.int64),
+        np.ones(len(counts), dtype=np.float32),
     )
 
-    np.testing.assert_allclose(
-        pred.detach().numpy(),
-        np.arange(1, 9, dtype=np.float32),
-    )
+    np.testing.assert_allclose(pred, np.arange(1, 9, dtype=np.float32))
     export_model(model, exported)
     loaded = nn2.load_net(exported)
     assert loaded.full_heads is True

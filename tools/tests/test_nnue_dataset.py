@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import torch
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
@@ -48,9 +47,9 @@ class NNueDatasetTests(unittest.TestCase):
         w, b, w_offsets, b_offsets, *_rest = collate_packed(batch)
 
         self.assertIs(w_offsets, b_offsets)
-        torch.testing.assert_close(w_offsets, torch.tensor([0, 2]))
-        torch.testing.assert_close(w, torch.tensor([1, 2, 3]))
-        torch.testing.assert_close(b, torch.tensor([5, 6, 7]))
+        np.testing.assert_array_equal(w_offsets, np.asarray([0, 2]))
+        np.testing.assert_array_equal(w, np.asarray([1, 2, 3]))
+        np.testing.assert_array_equal(b, np.asarray([5, 6, 7]))
 
 
     def test_loads_bullet_records(self) -> None:

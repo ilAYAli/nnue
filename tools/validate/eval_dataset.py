@@ -6,15 +6,16 @@ import math
 import sys
 from pathlib import Path
 
-import torch
-from torch.utils.data import DataLoader
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "train"))
 
-from lib.nnue_dataset import load_score_dataset
-from lib.nnue_model import load_model_from_nn
-from train_impl import MPE_EXPONENT, MPE_SCALE
+from lib.nnue_dataset import SequentialLoader, load_score_dataset
+from lib.nnue_forward import load_model_from_nn
+
+
+MPE_SCALE = 2.5 / 400.0
+MPE_EXPONENT = 2.5
 
 
 BUCKETS = (
@@ -49,16 +50,20 @@ def empty_stats() -> dict[str, float]:
     }
 
 
-def update_stats(stats: dict[str, float], pred: torch.Tensor,
-                 target: torch.Tensor) -> None:
+def _sigmoid(x: np.ndarray) -> np.ndarray:
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def update_stats(stats: dict[str, float], pred: np.ndarray,
+                 target: np.ndarray) -> None:
     err = pred - target
     sign_mask = target != 0
     stats["n"] += len(target)
-    stats["mae"] += float(err.abs().sum())
+    stats["mae"] += float(np.abs(err).sum())
     stats["mse"] += float((err * err).sum())
     stats["mpe"] += float(
-        ((torch.sigmoid(pred * MPE_SCALE)
-          - torch.sigmoid(target * MPE_SCALE)).abs() ** MPE_EXPONENT).sum())
+        (np.abs(_sigmoid(pred * MPE_SCALE)
+                - _sigmoid(target * MPE_SCALE)) ** MPE_EXPONENT).sum())
     stats["sign"] += int(
         ((pred[sign_mask] > 0) == (target[sign_mask] > 0)).sum())
     stats["sign_n"] += int(sign_mask.sum())
@@ -101,7 +106,6 @@ def source_names(data_path: str) -> dict[int, str]:
     return {int(source_id): str(name) for name, source_id in raw.items()}
 
 
-@torch.no_grad()
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--net", required=True)
@@ -109,7 +113,8 @@ def main() -> None:
     ap.add_argument("--rows", type=int, default=50000)
     ap.add_argument("--skip", type=int, default=0)
     ap.add_argument("--batch-size", type=int, default=4096)
-    ap.add_argument("--device", default="cpu")
+    ap.add_argument("--device", default="cpu",
+                     help="unused (numpy inference is always CPU)")
     ap.add_argument("--target-clamp", type=float, default=0.0)
     ap.add_argument("--buckets", action="store_true",
                     help="Print metrics grouped by absolute target score.")
@@ -119,8 +124,7 @@ def main() -> None:
                     help="Print metrics grouped by source id/name.")
     args = ap.parse_args()
 
-    model = load_model_from_nn(args.net, device=args.device)
-    model.eval()
+    model = load_model_from_nn(args.net)
     ds, collate_fn = load_score_dataset(
         args.data,
         limit=args.rows,
@@ -129,8 +133,7 @@ def main() -> None:
         feature_channels=model.feature_channels,
         full_threats=model.full_threats,
         slider_xray_threats=model.slider_xray_threats)
-    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False,
-                        collate_fn=collate_fn)
+    loader = SequentialLoader(ds, batch_size=args.batch_size, collate_fn=collate_fn)
 
     overall = empty_stats()
     by_source: dict[int, dict[str, float]] = {}
@@ -142,17 +145,8 @@ def main() -> None:
     ]
     material_stats = [empty_stats() for _ in range(model.output_buckets)]
     for w, b, w_off, b_off, counts, stm, y, _wdl, phase_scale, source_ids in loader:
-        w = w.to(args.device)
-        b = b.to(args.device)
-        w_off = w_off.to(args.device)
-        b_off = b_off.to(args.device)
-        counts = counts.to(args.device)
-        stm = stm.to(args.device)
-        y = y.to(args.device)
-        phase_scale = phase_scale.to(args.device)
-        source_ids = source_ids.to(args.device)
         if args.target_clamp > 0:
-            y = torch.clamp(y, -args.target_clamp, args.target_clamp)
+            y = np.clip(y, -args.target_clamp, args.target_clamp)
         pred = model(w, b, w_off, b_off, stm, phase_scale, piece_count=counts)
         err = pred - y
         sign_mask = y != 0
@@ -160,26 +154,22 @@ def main() -> None:
 
         if args.material_buckets:
             divisor = (32 + model.output_buckets - 1) // model.output_buckets
-            material_bucket = torch.clamp(
-                torch.div(counts - 2, divisor, rounding_mode="floor"),
-                min=0,
-                max=model.output_buckets - 1,
-            )
+            material_bucket = np.clip(
+                (counts - 2) // divisor, 0, model.output_buckets - 1)
             for bucket in range(model.output_buckets):
                 mask = material_bucket == bucket
                 if mask.any():
                     update_stats(material_stats[bucket], pred[mask], y[mask])
 
         if args.sources:
-            for source_id_tensor in torch.unique(source_ids):
-                source_id = int(source_id_tensor.item())
-                mask = source_ids == source_id_tensor
-                stats = by_source.setdefault(source_id, empty_stats())
+            for source_id in np.unique(source_ids):
+                mask = source_ids == source_id
+                stats = by_source.setdefault(int(source_id), empty_stats())
                 update_stats(stats, pred[mask], y[mask])
 
         if args.buckets:
-            abs_y = y.abs()
-            abs_err = err.abs()
+            abs_y = np.abs(y)
+            abs_err = np.abs(err)
             for idx, (lo, hi) in enumerate(BUCKETS):
                 mask = (abs_y >= lo) if math.isinf(hi) else (
                     (abs_y >= lo) & (abs_y < hi))

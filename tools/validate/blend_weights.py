@@ -11,9 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import torch
-
-from lib.nnue_model import load_model_from_nn, export_model
+from lib.nnue_forward import load_model_from_nn, export_model
 
 
 def main() -> None:
@@ -30,14 +28,13 @@ def main() -> None:
     trained = load_model_from_nn(args.trained)
     a = args.alpha
 
-    with torch.no_grad():
-        trained.l1_weight.copy_(a * trained.l1_weight + (1 - a) * ref.l1_weight)
-        trained.l1_bias.copy_(a * trained.l1_bias + (1 - a) * ref.l1_bias)
-        trained.l2.weight.copy_(a * trained.l2.weight + (1 - a) * ref.l2.weight)
-        trained.l2.bias.copy_(a * trained.l2.bias + (1 - a) * ref.l2.bias)
-        trained.output.weight.copy_(a * trained.output.weight + (1 - a) * ref.output.weight)
-        trained.output.bias.copy_(a * trained.output.bias + (1 - a) * ref.output.bias)
-        # embed.weight / input_bias stay fully at the trained values (untouched).
+    trained.l1_weight = a * trained.l1_weight + (1 - a) * ref.l1_weight
+    trained.l1_bias = a * trained.l1_bias + (1 - a) * ref.l1_bias
+    trained.l2_weight = a * trained.l2_weight + (1 - a) * ref.l2_weight
+    trained.l2_bias = a * trained.l2_bias + (1 - a) * ref.l2_bias
+    trained.output_weight = a * trained.output_weight + (1 - a) * ref.output_weight
+    trained.output_bias = a * trained.output_bias + (1 - a) * ref.output_bias
+    # input_weights / input_bias stay fully at the trained values (untouched).
 
     export_model(trained, args.out)
     print(f"wrote {args.out} (alpha={a})")

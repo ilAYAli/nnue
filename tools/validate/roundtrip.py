@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lib.nnue_model import export_model, load_model_from_nn
+from lib import enyo_nnue as nn2
 
 
 def main() -> None:
@@ -16,12 +16,12 @@ def main() -> None:
     args = ap.parse_args()
 
     src = Path(args.net)
-    model = load_model_from_nn(src)
+    net = nn2.load_net(src)
     with tempfile.NamedTemporaryFile(suffix=".nn", delete=False) as tmp:
         out = Path(tmp.name)
 
     try:
-        export_model(model, out)
+        nn2.write_net(net, out)
         a = src.read_bytes()
         b = out.read_bytes()
         if a != b:
