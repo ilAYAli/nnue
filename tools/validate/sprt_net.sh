@@ -103,19 +103,19 @@ run_sprt() {
 
 save_result() {
     mkdir -p "$ROOT/benchmarks"
-    local status_file candidate
+    local status_file candidate_net
     status_file=$(mktemp)
     trap 'rm -f "$status_file"' RETURN
     forge status "$RUN" --json >"$status_file"
 
-    candidate=$(basename "$(readlink -f "$CANDIDATE_NET")" .nn)
+    candidate_net=$(basename "$CANDIDATE_NET")
 
-    python3 - "$DB" "$ENGINE_NAME" "$REFERENCE_NAME" "$GAMES" "$candidate" "$status_file" <<'PY'
+    python3 - "$DB" "$ENGINE_NAME" "$REFERENCE_NAME" "$GAMES" "$candidate_net" "$status_file" <<'PY'
 import json
 import sqlite3
 import sys
 
-db_path, engine_name, reference_name, requested_games, candidate, status_file = sys.argv[1:7]
+db_path, engine_name, reference_name, requested_games, candidate_net, status_file = sys.argv[1:7]
 with open(status_file) as f:
     status = json.load(f)
 
@@ -145,13 +145,13 @@ conn = sqlite3.connect(db_path)
 conn.execute(
     """
     INSERT INTO benchmark
-        (date, candidate, engine, reference_net, requested_games, games,
+        (date, candidate_net, engine, reference_net, requested_games, games,
          elo, ci, llr, llr_bound, los, draw, source_ledger, raw_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
     (
         status["completed_at"][:10],
-        candidate,
+        candidate_net,
         engine_name,
         reference_name,
         requested_games,
@@ -167,7 +167,7 @@ conn.execute(
     ),
 )
 conn.commit()
-print(f"recorded: candidate={candidate} reference_net={reference_name} elo={metrics['elo']}")
+print(f"recorded: candidate_net={candidate_net} reference_net={reference_name} elo={metrics['elo']}")
 PY
 }
 
