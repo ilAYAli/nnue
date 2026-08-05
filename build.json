@@ -1,11 +1,11 @@
 {
   "run": "enyo-scc-1.0.0-rc1",
   "reference": "enyo-1.32.0-rc10",
-  "hypothesis": "Random-init scratch run on a combined 3.23B-position corpus (Lc0 static-labeled + Stockfish search-labeled nodes5000pv2), matching top-engine training scale, vs champion enyo-1.32.0-rc10 - incremental fine-tuning off rc10 has saturated.",
+  "hypothesis": "Random-init scratch run on a combined 3.23B-position corpus (Lc0 static-labeled + Stockfish search-labeled nodes5000pv2), properly interleaved via bullet-utils interleave (not flat-concatenated - the sequential direct loader has no shuffle buffer), matching top-engine training scale, vs champion enyo-1.32.0-rc10 - incremental fine-tuning off rc10 has saturated.",
   "superbatches": 221977,
   "trainable": "all",
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-combined.bullet"
+    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-interleaved.bullet"
   }
 }

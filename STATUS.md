@@ -346,23 +346,16 @@ completed output.
 Full Lc0 test91 conversion completed (30,174-shard distributed Forge label job,
 1.906B raw records -> 1,232,772,104 selected positions, quiet-only/min_ply=16).
 Combined with nodes5000pv2-recalibrated-2b.bullet (2,000,000,000 positions) into
-a 3,232,772,104-position corpus and scratch-trained (no continue_from, 9 epochs,
-wdl=0.05 - the enyo-scratch-long-1.0.0-rc1 regimen) as a new, separate lineage
+a 3,232,772,104-position corpus, interleaved via bullet-utils interleave (a
+genuine random cross-source merge - the `direct` loader has no shuffle buffer
+of its own, just a 256MB read-ahead one, so the corpus itself must already be
+shuffled), and scratch-trained (no continue_from, 9 epochs, wdl=0.05 - the
+enyo-scratch-long-1.0.0-rc1 regimen) as a new, separate lineage
 (enyo-scc-1.0.0-rc1), SPRT'd directly against champion enyo-1.32.0-rc10.
 
-Result: elo=-110.8  llr=-33.60/690.78 (-5%)  draw=45.1%  (4000/4000 games) -
-rejected. Worse even than enyo-ancestor.1.0.0-rc1's -208.6 vs SF (2026-07-30,
-above), which used the same two data sources (lc0-static + nodes5000pv2-
-recalibrated) for a comparable scratch attempt.
-
-Root cause identified: the combined corpus was built by flat `cat`-concatenating
-the two source files with no shuffling, and the `direct` loader
-(bullet_lib::value::loader::direct::DirectSequentialDataLoader, confirmed from
-the vendored crate source) reads file(s) in strict sequential order with only a
-256MB read-ahead buffer, not a shuffle buffer. Every one of the 9 epochs
-therefore cycled through one long unbroken run of pure lc0 positions (~38% of
-an epoch) followed by one long unbroken run of pure nodes5000pv2 positions
-(~62%), identically each pass - the two corpora were never blended within a
-batch. This is a data-preparation bug, not evidence against the Lc0 data
-itself; a properly shuffled/interleaved combined corpus has not yet been
-tested. See IMPROVEMENT_PLAN.md and commit 9a084b40 for full detail.
+Result: elo=-93.2  llr=-32.60/690.78 (-5%)  draw=45.5%  (4000/4000 games) -
+rejected, as expected for a single-generation scratch lineage against a
+champion that has been through dozens of fine-tune iterations (compare
+enyo-1.0.0-rc1's own -181.2 vs SF starting point, above). Not evidence against
+the Lc0 data itself - the champion comparison isn't the relevant signal for
+judging a founding net's data quality, only for the promotion decision.

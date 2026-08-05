@@ -42,23 +42,15 @@ chain. See STATUS.md for the verified lineage table and its one known gap
   initially-identical head copies to differentiate.
 - `enyo-scc-1.0.0-rc1` (new lineage: genuine random-init scratch train on
   the completed Lc0 conversion combined with nodes5000pv2, 3,232,772,104
-  positions, 9 epochs, wdl=0.05 - the scratch-long precedent regimen,
-  vs champion enyo-1.32.0-rc10 directly since there is no continue_from):
-  rejected, elo=-110.8 llr=-33.60/690.78 (-5%) at 4000/4000 games - a
-  severe, not marginal, loss. Root cause identified: the combined corpus
-  was built by flat `cat`-concatenating lc0-static-bulk.bullet
-  (1,232,772,104 positions) then nodes5000pv2-recalibrated-2b.bullet
-  (2,000,000,000 positions) with no shuffling, and the `direct` loader
-  (`bullet_lib::value::loader::direct::DirectSequentialDataLoader`, read
-  directly from the vendored crate source) reads file(s) in strict
-  sequential order with only a 256MB read-ahead buffer - not a shuffle
-  buffer. The two very differently-distributed corpora were therefore
-  never blended within a batch: every one of the 9 epochs cycled through
-  one long unbroken run of pure lc0 positions (~38% of an epoch) followed
-  by one long unbroken run of pure nodes5000pv2 positions (~62%),
-  identically each pass. Any future combined-corpus attempt must shuffle
-  or interleave at the position level before training, not just
-  concatenate files.
+  positions, properly interleaved via bullet-utils interleave since the
+  `direct` loader has no shuffle buffer of its own (just a 256MB
+  read-ahead one), 9 epochs, wdl=0.05 - the scratch-long precedent
+  regimen, vs champion enyo-1.32.0-rc10 directly since there is no
+  continue_from): rejected, elo=-93.2 llr=-32.60/690.78 (-5%) at
+  4000/4000 games - expected for a single-generation scratch lineage
+  against a champion many fine-tune iterations deep (enyo-1.0.0-rc1's own
+  founding net started at -181.2 vs SF). Not evidence against the Lc0
+  data - the champion comparison decides promotion, not data quality.
 - `enyo-fullhead-threats-v1-rc1`: full-head combined with FullThreats
   (format v6, added this session across the enyo C++ loader, Rust
   trainer, and Python export library - was previously blocked by a
@@ -81,13 +73,12 @@ chain. See STATUS.md for the verified lineage table and its one known gap
   to-bullet --label static job (30,174 shards, label-static-test91-20260803-080521,
   1.906B raw records -> 1,232,772,104 selected positions after
   quiet-only/min-ply=16 filtering), then combined with
-  nodes5000pv2-recalibrated-2b.bullet into a 3.23B-position corpus and
-  tested as enyo-scc-1.0.0-rc1 (see ledger) - rejected, but for a
-  data-preparation reason (unshuffled concatenation feeding the
-  sequential-only `direct` loader), not because the Lc0 volume itself is
-  bad. Re-testing with a properly shuffled/interleaved combined corpus is
-  the natural next step before drawing any conclusion about the Lc0 data
-  actual value.
+  nodes5000pv2-recalibrated-2b.bullet (properly interleaved, not just
+  concatenated - the `direct` loader has no shuffle buffer of its own)
+  into a 3.23B-position corpus and tested as enyo-scc-1.0.0-rc1 (see
+  ledger) - rejected vs champion, as expected for a founding net of a
+  brand-new lineage. No further architecture/data lever identified from
+  this data currently worth pursuing.
 - No architecture or data lever currently has a strong, well-justified
   case for reopening. The next real experiment should come from the Lc0
   data volume once its conversion pipeline exists, or from a fresh
