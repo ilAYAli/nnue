@@ -15,18 +15,6 @@ ROOT = Path(__file__).resolve().parents[2]
 DB = ROOT / "benchmarks" / "sprt.db"
 
 
-def resolve_net_path(value: str) -> Path:
-    if value.startswith(("/", "./", "../")):
-        return Path(value).expanduser()
-    return Path.home() / "assets" / "nets" / value
-
-
-def resolve_engine_path(value: str) -> Path:
-    if value.startswith(("/", "./", "../")):
-        return Path(value).expanduser()
-    return Path.home() / "assets" / "engines" / value
-
-
 def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
     try:
         result = subprocess.run(
@@ -143,15 +131,19 @@ def save_result(*, run: str, engine_name: str, reference_name: str, requested_ga
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--candidate", default=os.environ.get("CANDIDATE_NET", "candidate.net"))
-    parser.add_argument("--reference", default=os.environ.get("REFERENCE_NET", "nn-0ee0657fb25e.nnue"))
-    parser.add_argument("--engine", default=os.environ.get("ENGINE", "reference"))
+    parser.add_argument(
+        "--candidate", default=os.environ.get("CANDIDATE_NET", "~/assets/nets/candidate.net")
+    )
+    parser.add_argument(
+        "--reference", default=os.environ.get("REFERENCE_NET", "~/assets/nets/nn-0ee0657fb25e.nnue")
+    )
+    parser.add_argument("--engine", default=os.environ.get("ENGINE", "~/assets/engines/reference"))
     args = parser.parse_args()
     games = int(os.environ.get("GAMES", "1500"))
 
-    candidate_net = resolve_net_path(args.candidate)
-    reference_net = resolve_net_path(args.reference)
-    engine = resolve_engine_path(args.engine)
+    candidate_net = Path(args.candidate).expanduser()
+    reference_net = Path(args.reference).expanduser()
+    engine = Path(args.engine).expanduser()
 
     if not (engine.is_file() and os.access(engine, os.X_OK)):
         sys.exit(f"Error: ENGINE is not executable: {engine}")

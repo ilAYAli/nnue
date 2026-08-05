@@ -62,8 +62,8 @@ The primary absolute benchmark is the Stockfish net
 Use the net SPRT helper for fixed net comparisons:
 
 ```sh
-tools/validate/sprt_net.py --candidate candidate.net
-tools/validate/sprt_net.py --candidate enyo-1.20.0-rc12.nn --reference nn-0ee0657fb25e.nnue
+tools/validate/sprt_net.py --candidate ~/assets/nets/candidate.net
+tools/validate/sprt_net.py --candidate ~/assets/nets/enyo-1.20.0-rc12.nn --reference ~/assets/nets/nn-0ee0657fb25e.nnue
 ```
 
 ## Data
