@@ -359,3 +359,10 @@ champion that has been through dozens of fine-tune iterations (compare
 enyo-1.0.0-rc1's own -181.2 vs SF starting point, above). Not evidence against
 the Lc0 data itself - the champion comparison isn't the relevant signal for
 judging a founding net's data quality, only for the promotion decision.
+
+enyo-scc-1.0.0-rc1 vs nn-0ee0657fb25e.nnue (absolute, documentation only):
+elo=-136.2  llr=-11.76/690.78 (-2%)  draw=45.2%  (1500/1500 games, 2026-08-05).
+Meaningfully better than enyo-ancestor.1.0.0-rc1's -208.6 (same two data
+sources, unshuffled concatenation) and close to enyo-1.0.0-rc1's own -181.2
+founding-net starting point - a reasonable place for a first-generation
+lineage to land.
