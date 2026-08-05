@@ -1,11 +1,12 @@
 {
-  "run": "enyo-scc-1.0.0-rc1",
+  "run": "enyo-scc-1.1.0-rc1",
   "reference": "enyo-1.32.0-rc10",
-  "hypothesis": "Random-init scratch run on a combined 3.23B-position corpus (Lc0 static-labeled + Stockfish search-labeled nodes5000pv2), properly interleaved via bullet-utils interleave (not flat-concatenated - the sequential direct loader has no shuffle buffer), matching top-engine training scale, vs champion enyo-1.32.0-rc10 - incremental fine-tuning off rc10 has saturated.",
-  "superbatches": 221977,
+  "continue_from": "enyo-scc-1.0.0-rc1",
+  "hypothesis": "Dose-continuation round on enyo-scc-1.0.0-rc1 (rejected, elo=-93.2), mirroring how enyo-scratch-long got 5 rounds of real gains this way - corpus enriched with existing, validated self-play data (gen1/gen3/gen5 sf-oracle, non-TB, right policy net), no new generation.",
+  "superbatches": 231321,
   "trainable": "all",
   "wdl": 0.05,
   "data": {
-    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-interleaved.bullet"
+    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-selfplay-1.1.bullet"
   }
 }
