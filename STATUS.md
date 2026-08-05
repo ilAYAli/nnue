@@ -239,3 +239,29 @@ this back up, but there's a second, deeper issue in the input-materialization pa
 Forge-side debugging or the user's input before attempting gen2's real relabeling job again. Do not
 retry the full job blind - both attempts so far cost real fleet time (~4h then ~15min) for zero
 completed output.
+
+*** enyo-scc-1.0.0-rc1 (2026-08-05): new lineage, rejected ***
+
+Full Lc0 test91 conversion completed (30,174-shard distributed Forge label job,
+1.906B raw records -> 1,232,772,104 selected positions, quiet-only/min_ply=16).
+Combined with nodes5000pv2-recalibrated-2b.bullet (2,000,000,000 positions) into
+a 3,232,772,104-position corpus and scratch-trained (no continue_from, 9 epochs,
+wdl=0.05 - the enyo-scratch-long-1.0.0-rc1 regimen) as a new, separate lineage
+(enyo-scc-1.0.0-rc1), SPRT'd directly against champion enyo-1.32.0-rc10.
+
+Result: elo=-110.8  llr=-33.60/690.78 (-5%)  draw=45.1%  (4000/4000 games) -
+rejected. Worse even than enyo-ancestor.1.0.0-rc1's -208.6 vs SF (2026-07-30,
+above), which used the same two data sources (lc0-static + nodes5000pv2-
+recalibrated) for a comparable scratch attempt.
+
+Root cause identified: the combined corpus was built by flat `cat`-concatenating
+the two source files with no shuffling, and the `direct` loader
+(bullet_lib::value::loader::direct::DirectSequentialDataLoader, confirmed from
+the vendored crate source) reads file(s) in strict sequential order with only a
+256MB read-ahead buffer, not a shuffle buffer. Every one of the 9 epochs
+therefore cycled through one long unbroken run of pure lc0 positions (~38% of
+an epoch) followed by one long unbroken run of pure nodes5000pv2 positions
+(~62%), identically each pass - the two corpora were never blended within a
+batch. This is a data-preparation bug, not evidence against the Lc0 data
+itself; a properly shuffled/interleaved combined corpus has not yet been
+tested. See IMPROVEMENT_PLAN.md and commit 9a084b40 for full detail.
