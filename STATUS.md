@@ -366,3 +366,18 @@ Meaningfully better than enyo-ancestor.1.0.0-rc1's -208.6 (same two data
 sources, unshuffled concatenation) and close to enyo-1.0.0-rc1's own -181.2
 founding-net starting point - a reasonable place for a first-generation
 lineage to land.
+
+*** enyo-scc-1.1.0-rc1 (2026-08-05): dose-continuation round 1, rejected ***
+
+continue_from enyo-scc-1.0.0-rc1 (rejected, elo=-93.2), same regimen/corpus
+enriched with a one-time blend of existing, already-validated self-play data
+(gen1/gen3/gen5 sf-oracle, non-TB, right policy net - 136,088,579 positions,
+~4% growth), 231321 superbatches (scaled with the corpus growth), wdl=0.05 -
+mirroring how enyo-scratch-long got 5 rounds of real gains via dose
+continuation alone.
+
+Result: elo=-66.9  llr=-26.24/690.78 (-4%)  draw=46.1%  (4000/4000 games) -
+still rejected vs champion enyo-1.32.0-rc10 (expected), but +26.3 Elo over
+rc1.0 on the same reference - a real per-round gain, in the range of
+enyo-scratch-long's own early rounds (+93.2, +45.9, +25.8...). Validates
+dose-continuation as the ongoing lever for this lineage.

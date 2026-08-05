@@ -51,6 +51,13 @@ chain. See STATUS.md for the verified lineage table and its one known gap
   against a champion many fine-tune iterations deep (enyo-1.0.0-rc1's own
   founding net started at -181.2 vs SF). Not evidence against the Lc0
   data - the champion comparison decides promotion, not data quality.
+- `enyo-scc-1.1.0-rc1` (dose-continuation round 1: continue_from rc1.0,
+  same regimen/corpus + one-time existing self-play blend, 231321
+  superbatches): rejected, elo=-66.9 llr=-26.24/690.78 (-4%) at 4000/4000
+  games - +26.3 Elo over rc1.0 on the same reference, validating
+  dose-continuation as the ongoing lever (matches enyo-scratch-long's
+  early-round gains). Next: rc1.2.0, same corpus, more dose, no new
+  self-play.
 - `enyo-fullhead-threats-v1-rc1`: full-head combined with FullThreats
   (format v6, added this session across the enyo C++ loader, Rust
   trainer, and Python export library - was previously blocked by a
@@ -79,12 +86,14 @@ chain. See STATUS.md for the verified lineage table and its one known gap
   ledger) - rejected vs champion, as expected for a founding net of a
   brand-new lineage. No further architecture/data lever identified from
   this data currently worth pursuing.
-- No architecture or data lever currently has a strong, well-justified
-  case for reopening. The next real experiment should come from the Lc0
-  data volume once its conversion pipeline exists, or from a fresh
-  hypothesis grounded in comparison against the reference engines in
-  `~/source/` (Stockfish, Obsidian, Alexandria, PlentyChess, Reckless,
-  Stormphrax, berserk, pawnocchio, rice, viridithas, ShashChess).
+- Dose-continuation (continue_from + more superbatches on the same
+  corpus, no new data) is the active ongoing lever for enyo-scc, proven
+  by rc1.1's real per-round gain. Repeat for 1.2.0, 1.3.0, ... until
+  gains saturate, same as enyo-scratch-long's 5-round decay (+93.2,
+  +45.9, +25.8, +16.0, +7.4, +0.5). The self-play blend added in rc1.1
+  was a one-time addition (generation is too slow to repeat every
+  round) - it stays in the corpus for all future rounds, it is not
+  something to redo.
 
 ## Rules
 
