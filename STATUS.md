@@ -1,107 +1,226 @@
 All development is done on pwa-llm ~/code/chess/nnue
 read AGENTS.md there and the associated SKILL.md's
 
-The best net is currently ~ -154 elo from SF and ~ -122 from Berserk:
+## Current champion
 
-enyo-1.30.0-rc3.nn vs berserk-9b84c340af7e.nn (1500 games):
-elo=-122.2  llr=-2.29/2.20 (-104%)  los=0.0%  ci=31.9  draw=35.4%
+enyo-1.32.0-rc10 (continue_from enyo-1.31.0-rc57), commit 650a4fcc (2026-07-29).
+Absolute vs the fixed external target nn-0ee0657fb25e.nnue:
+elo=-139.8  ci=19.2  (4000 games, 2026-07-30, engine enyo_11ca4d7)
+This is the number to beat in absolute terms; promotion itself is decided parent-relative.
 
-enyo-1.30.0-rc3.nn vs nn-0ee0657fb25e.nnue (1500 games):
-elo=-154.4  llr=-22.66/690.78 (-3%)  los=0.0%  ci=15.4  draw=32.9%
+Also recorded, own separate Elo scale, not directly comparable to the nn-0ee0657fb25e.nnue
+numbers below: enyo-1.30.0-rc3 vs berserk-9b84c340af7e.nn: elo=-122.2 (1500 games, ci=31.9).
 
+All Elo figures below are vs nn-0ee0657fb25e.nnue unless stated otherwise. The "vs
+default.net" progression that used to live here is dropped from this document -
+default.net is a much weaker, non-comparable reference and added confusion rather than
+signal. See benchmarks/default-net.jsonl directly if that history is ever needed.
 
-Update: the currently best net is always ~/assts/nets/reference.net (enyo-1.32.0-rc10.nn)
+## Traceable ancestry (continue_from-verified)
 
-The NNUE architecture is failry close to Berserk, but I have been able to close the gap further.
-I have tried different architectures, selfplay, stockfish binpacks, and additional features such
-as FullThreats.
+### Scratch origin -> enyo-1.0.0-rc1 (2026-06-18 to 2026-07-07)
 
-Look at the git log to investigate the different lineages.
+  commit    run                           continue_from                  parent-rel result
+  2947c36   enyo-scratch-long-1.0.0-rc1   (scratch, no continue_from)    -
+  5a6028e   "        "  (same commit)     "        "                     +93.2  (2.26/2.20, 103%) vs enyo-scratch-broad-1.5.0-rc1, 1500g
+  7c7a076   enyo-scratch-long-1.1.0-rc1   enyo-scratch-long-1.0.0-rc1    +45.9  (2.12/2.20, 96%)
+  a1c8368   enyo-scratch-long-1.2.0-rc1   enyo-scratch-long-1.1.0-rc1    +25.8  (1.17/2.20, 53%)
+  1c22805   enyo-scratch-long-1.3.0-rc1   enyo-scratch-long-1.2.0-rc1    +16.0  (0.71/2.20, 32%)
+  d6c42e4   enyo-scratch-long-1.4.0-rc1   enyo-scratch-long-1.3.0-rc1    +7.4   (0.35/2.20, 16%)
+  8cea17a   enyo-scratch-long-1.5.0-rc1   enyo-scratch-long-1.4.0-rc1    +0.5   (0.02/2.20, 1%)
+  9d829ac   enyo-1.0.0-rc1                enyo-scratch-long-1.5.0-rc1    +4.9   (0.18/2.20, 8%)
 
-I am contemplating re-doing an earlier experiment and have a competition between multiple architecutes and/or features, trained without using existing tensors.
+  None of this chain except its final step was ever benchmarked directly vs
+  nn-0ee0657fb25e.nnue:
+  enyo-1.0.0-rc1 vs SF: elo=-181.2  ci=29.3  (1000 games, 2026-07-07) - the true
+  starting point of the numbered lineage's absolute distance from Stockfish.
 
+### enyo-1.1.0 through enyo-1.32.0, excluding the traceable rc3/rc57/rc10 milestones below: no recoverable continue_from chain (2026-07-07 to 2026-07-15)
 
-*** This is the enyo-1 lineage ***
+  A high-churn architecture/hyperparameter search phase - well over a hundred rc
+  candidates across ~30 promotion numbers in 9 days, no parent links preserved. Every
+  directly-recorded absolute result vs nn-0ee0657fb25e.nnue in this stretch, in date
+  order (source: benchmarks/stockfish-net.jsonl; duplicate rows are repeat/re-runs of
+  the same candidate, kept as-is for a faithful record):
 
-commit: 9d829ac0
-Elo 4.9,LLR 0.18/2.20 (8%)
-"run:" enyo-1.0.0-rc1
-"continue_from": enyo-scratch-long-1.5.0-rc1
+  2026-07-07  enyo-1.1.0-rc1               elo= -173.2  games=1000  ci=24.5
+  2026-07-07  enyo-1.1.0-rc2               elo= -185.8  games=1000  ci=27.6
+  2026-07-07  enyo-1.2.0-rc1               elo= -184.4  games=1000  ci=30.2
+  2026-07-07  enyo-1.5.0-rc2               elo= -148.0  games=500   ci=28.5
+  2026-07-08  enyo-1.10.0-rc4              elo= -187.1  games=500   ci=28.9
+  2026-07-08  enyo-1.11.0-rc2              elo= -197.4  games=500   ci=29.8
+  2026-07-08  enyo-1.3.0-rc2               elo= -180.8  games=500   ci=27.9
+  2026-07-08  enyo-1.7.0-rc3               elo= -148.0  games=500   ci=27.6
+  2026-07-08  enyo-1.7.0-rc3               elo= -158.9  games=500   ci=28.4
+  2026-07-08  enyo-1.9.0-rc1               elo= -180.8  games=500   ci=28.4
+  2026-07-09  enyo-1.12.0-rc1              elo= -176.3  games=500   ci=28.8
+  2026-07-09  enyo-1.13.0-rc1              elo= -179.0  games=500   ci=28.7
+  2026-07-09  enyo-1.13.0-rc2              elo= -158.9  games=500   ci=28.5
+  2026-07-09  enyo-1.14.0-rc1              elo= -178.1  games=500   ci=28.1
+  2026-07-09  enyo-1.14.0-rc2              elo= -179.9  games=500   ci=28.0
+  2026-07-09  enyo-1.15.0-rc1              elo= -188.1  games=500   ci=28.6
+  2026-07-09  enyo-1.15.0-rc2              elo= -171.9  games=500   ci=26.2
+  2026-07-09  enyo-1.16.0-rc1              elo= -190.8  games=500   ci=27.8
+  2026-07-09  enyo-1.16.0-rc2              elo= -183.5  games=500   ci=28.7
+  2026-07-09  enyo-1.16.0-rc3              elo= -184.4  games=500   ci=28.4
+  2026-07-09  enyo-1.16.0-rc3              elo= -150.5  games=500   ci=27.8
+  2026-07-09  enyo-1.17.0-rc1              elo= -156.4  games=500   ci=27.9
+  2026-07-09  enyo-1.17.0-rc2              elo= -158.1  games=500   ci=26.1
+  2026-07-09  enyo-1.18.0-rc1              elo= -155.5  games=500   ci=28.8
+  2026-07-09  enyo-1.18.0-rc1              elo= -156.4  games=500   ci=28.9
+  2026-07-09  enyo-1.19.0-rc1              elo= -187.1  games=500   ci=30.3
+  2026-07-09  enyo-1.19.0-rc2              elo= -172.8  games=500   ci=28.3
+  2026-07-09  enyo-1.19.0-rc2              elo= -168.4  games=500   ci=30.5
+  2026-07-09  enyo-1.20.0-rc1              elo= -175.4  games=500   ci=27.9
+  2026-07-09  enyo-1.20.0-rc2              elo= -183.5  games=500   ci=31.9
+  2026-07-09  enyo-1.20.0-rc3              elo= -183.5  games=500   ci=29.0
+  2026-07-09  enyo-1.5.0-rc2               elo= -171.9  games=500   ci=28.5
+  2026-07-09  enyo-1.5.0-rc2               elo= -160.6  games=500   ci=26.4
+  2026-07-10  enyo-1.20.0-rc10             elo= -188.1  games=500   ci=30.6
+  2026-07-10  enyo-1.20.0-rc11             elo= -201.2  games=500   ci=31.4
+  2026-07-10  enyo-1.20.0-rc12             elo= -168.4  games=500   ci=28.1
+  2026-07-10  enyo-1.20.0-rc4              elo= -186.2  games=500   ci=30.1
+  2026-07-10  enyo-1.20.0-rc5              elo= -169.3  games=500   ci=27.4
+  2026-07-10  enyo-1.20.0-rc6              elo= -195.5  games=500   ci=30.3
+  2026-07-10  enyo-1.20.0-rc7              elo= -164.9  games=500   ci=27.1
+  2026-07-10  enyo-1.20.0-rc8              elo= -173.7  games=500   ci=29.0
+  2026-07-10  enyo-1.20.0-rc9              elo= -166.7  games=500   ci=28.8
+  2026-07-10  enyo-1.21.0-rc3              elo= -173.6  games=500   ci=29.7
+  2026-07-10  enyo-1.21.0-rc5              elo= -173.7  games=500   ci=29.4
+  2026-07-10  enyo-1.21.0-rc7              elo= -179.0  games=500   ci=29.4
+  2026-07-10  enyo-1.21.0-rc8              elo= -158.9  games=500   ci=28.3
+  2026-07-10  enyo-1.21.0-rc9              elo= -174.5  games=500   ci=28.2
+  2026-07-10  enyo-1.22.0-rc1              elo= -180.8  games=500   ci=28.5
+  2026-07-10  enyo-1.22.0-rc2              elo= -186.2  games=500   ci=30.2
+  2026-07-11  enyo-1.16.0-rc3              elo= -170.1  games=2000  ci=13.1
+  2026-07-11  enyo-1.20.0-rc12             elo= -161.9  games=2000  ci=13.1
+  2026-07-11  enyo-1.21.0-rc8              elo= -182.8  games=2000  ci=13.8
+  2026-07-11  enyo-1.22.0-rc10             elo= -178.1  games=500   ci=28.7
+  2026-07-11  enyo-1.22.0-rc3              elo= -182.6  games=500   ci=28.0
+  2026-07-11  enyo-1.22.0-rc4              elo= -178.1  games=500   ci=28.6
+  2026-07-11  enyo-1.22.0-rc5              elo= -164.1  games=500   ci=28.1
+  2026-07-11  enyo-1.22.0-rc6              elo= -173.7  games=500   ci=28.2
+  2026-07-11  enyo-1.22.0-rc7              elo= -171.0  games=500   ci=28.8
+  2026-07-11  enyo-1.22.0-rc8              elo= -168.4  games=500   ci=28.6
+  2026-07-11  enyo-1.22.0-rc9              elo= -171.0  games=500   ci=29.1
+  2026-07-11  enyo-1.23.0-rc2              elo= -171.0  games=500   ci=29.0
+  2026-07-11  enyo-1.24.0-rc1              elo= -183.5  games=500   ci=28.4
+  2026-07-11  enyo-1.25.0-rc2              elo= -164.9  games=500   ci=27.9
+  2026-07-11  enyo-1.25.0-rc3              elo= -171.9  games=500   ci=29.5
+  2026-07-11  enyo-1.26.0-rc1              elo= -170.1  games=500   ci=28.8
+  2026-07-12  enyo-1.27.0-rc1              elo= -201.2  games=500   ci=32.8
+  2026-07-12  enyo-1.28.0-rc1              elo= -179.0  games=500   ci=27.8
+  2026-07-12  enyo-1.28.0-rc10             elo= -170.1  games=500   ci=28.3
+  2026-07-12  enyo-1.28.0-rc11             elo= -154.7  games=500   ci=28.5
+  2026-07-12  enyo-1.28.0-rc12             elo= -173.7  games=500   ci=28.1
+  2026-07-12  enyo-1.28.0-rc13             elo= -168.4  games=500   ci=28.6
+  2026-07-12  enyo-1.28.0-rc14             elo= -189.0  games=500   ci=29.7
+  2026-07-12  enyo-1.28.0-rc15             elo= -189.0  games=500   ci=27.9
+  2026-07-12  enyo-1.28.0-rc16             elo= -158.1  games=500   ci=25.8
+  2026-07-12  enyo-1.28.0-rc19             elo= -168.4  games=500   ci=26.9
+  2026-07-12  enyo-1.28.0-rc2              elo= -178.1  games=500   ci=29.2
+  2026-07-12  enyo-1.28.0-rc20             elo= -172.8  games=500   ci=28.3
+  2026-07-12  enyo-1.28.0-rc3              elo= -158.9  games=500   ci=28.8
+  2026-07-12  enyo-1.28.0-rc4              elo= -162.3  games=500   ci=27.1
+  2026-07-12  enyo-1.28.0-rc5              elo= -171.0  games=500   ci=28.4
+  2026-07-12  enyo-1.28.0-rc6              elo= -158.9  games=500   ci=28.1
+  2026-07-12  enyo-1.28.0-rc7              elo= -175.4  games=500   ci=28.5
+  2026-07-12  enyo-1.28.0-rc8              elo= -188.1  games=500   ci=30.9
+  2026-07-12  enyo-1.28.0-rc9              elo= -179.0  games=500   ci=28.9
+  2026-07-12  enyo-1.29.0-rc1              elo= -161.5  games=500   ci=27.3
+  2026-07-12  enyo-1.29.0-rc2              elo= -189.9  games=500   ci=27.9
+  2026-07-13  enyo-1.28.0-rc21             elo= -173.6  games=500   ci=28.0
+  2026-07-13  enyo-1.28.0-rc22             elo= -152.2  games=500   ci=27.6
+  2026-07-13  enyo-1.28.0-rc23             elo= -196.4  games=500   ci=30.4
+  2026-07-13  enyo-1.28.0-rc24             elo= -181.7  games=500   ci=29.6
+  2026-07-13  enyo-1.28.0-rc25             elo= -179.9  games=500   ci=27.9
+  2026-07-13  enyo-1.28.0-rc26             elo= -177.2  games=500   ci=28.1
+  2026-07-13  enyo-1.28.0-rc27             elo= -166.7  games=500   ci=27.7
+  2026-07-13  enyo-1.28.0-rc28             elo= -183.5  games=500   ci=29.7
+  2026-07-13  enyo-1.28.0-rc29             elo= -171.0  games=500   ci=27.0
+  2026-07-13  enyo-1.28.0-rc30             elo= -181.7  games=500   ci=29.8
+  2026-07-13  enyo-1.28.0-rc31             elo= -178.1  games=500   ci=30.3
+  2026-07-13  enyo-1.28.0-rc32             elo= -168.4  games=500   ci=29.8
+  2026-07-13  enyo-1.28.0-rc33             elo= -178.1  games=500   ci=28.5
+  2026-07-13  enyo-1.28.0-rc37             elo= -188.1  games=500   ci=31.9
+  2026-07-13  enyo-1.28.0-rc38             elo= -173.7  games=500   ci=28.8
+  2026-07-13  enyo-1.28.0-rc39             elo= -192.7  games=500   ci=29.2
+  2026-07-13  enyo-1.28.0-rc40             elo= -169.3  games=500   ci=28.2
+  2026-07-13  enyo-1.28.0-rc41             elo= -175.4  games=500   ci=28.0
+  2026-07-13  enyo-1.28.0-rc42             elo= -162.4  games=500   ci=28.7
+  2026-07-13  enyo-1.28.0-rc43             elo= -192.7  games=500   ci=27.7
+  2026-07-13  enyo-1.28.0-rc44             elo= -178.1  games=500   ci=28.1
+  2026-07-13  enyo-1.28.0-rc45             elo= -184.4  games=500   ci=27.7
+  2026-07-14  enyo-1.31.0-rc20             elo= -185.3  games=500   ci=31.6
+  2026-07-14  enyo-1.31.0-rc22             elo= -177.2  games=500   ci=28.4
+  2026-07-14  enyo-1.31.0-rc24             elo= -148.8  games=500   ci=26.7
+  2026-07-14  enyo-1.31.0-rc26             elo= -168.4  games=500   ci=26.6
+  2026-07-14  enyo-1.31.0-rc28             elo= -194.6  games=500   ci=29.0
+  2026-07-14  enyo-1.31.0-rc30             elo= -197.4  games=500   ci=29.8
+  2026-07-14  enyo-1.31.0-rc32             elo= -169.3  games=500   ci=29.6
+  2026-07-14  enyo-1.31.0-rc36             elo= -179.0  games=500   ci=28.1
+  2026-07-14  enyo-1.31.0-rc38             elo= -164.9  games=500   ci=27.3
+  2026-07-14  enyo-1.31.0-rc39             elo= -180.8  games=500   ci=28.5
+  2026-07-14  enyo-1.31.0-rc40             elo= -187.2  games=500   ci=28.9
+  2026-07-14  enyo-1.31.0-rc41             elo= -182.6  games=500   ci=28.4
+  2026-07-14  enyo-1.31.0-rc42             elo= -155.5  games=500   ci=28.8
+  2026-07-14  enyo-1.32.0-rc2              elo= -185.3  games=500   ci=29.0
+  2026-07-14  enyo-1.32.0-rc4              elo= -200.2  games=500   ci=30.9
+  2026-07-14  enyo-1.32.0-rc5              elo= -194.6  games=500   ci=29.9
+  2026-07-14  enyo-1.32.0-rc6              elo= -202.1  games=500   ci=30.5
+  2026-07-15  enyo-1.32.0-rc11             elo= -210.9  games=500   ci=32.8
+  2026-07-15  enyo-1.32.0-rc12             elo= -159.8  games=500   ci=27.6
+  2026-07-15  enyo-1.32.0-rc13             elo= -157.2  games=500   ci=28.0
+  2026-07-15  enyo-1.32.0-rc14             elo= -158.1  games=500   ci=28.0
+  2026-07-15  enyo-1.32.0-rc15             elo= -188.1  games=500   ci=29.3
+  2026-07-15  enyo-1.32.0-rc16             elo= -188.1  games=500   ci=27.7
+  2026-07-15  enyo-1.32.0-rc17             elo= -158.1  games=500   ci=27.2
+  2026-07-15  enyo-1.32.0-rc7              elo= -196.4  games=500   ci=28.7
+  2026-07-15  enyo-1.32.0-rc8              elo= -199.3  games=500   ci=31.1
+  2026-07-15  enyo-1.32.0-rc9              elo= -208.9  games=500   ci=30.7
 
-commit: 8cea17a7
-Elo 0.5,LLR 0.02/2.20 (1%)
-"run": "enyo-scratch-long-1.5.0-rc1",
-"continue_from": "enyo-scratch-long-1.4.0-rc1"
+  Best result in this whole untraced stretch: enyo-1.17.0-rc1, elo=-156.4 (500 games,
+  2026-07-09) - but with no continue_from proof, "best" here just means "lowest measured
+  absolute gap," not a verified lineage peak.
 
-commit: d6c42e4c
-"run": "enyo-scratch-long-1.4.0-rc1"
-"continue_from": "enyo-scratch-long-1.3.0-rc1"
+  Also benchmarked in this window but off the enyo-1.x line entirely (rejected
+  architecture probes, all far worse than anything on the main line):
 
-commit: 1c22805e
-Elo 7.4,LLR 0.35/2.20 (16%)
-"enyo-scratch-long-1.3.0-rc1"
-"continue_from": "enyo-scratch-long-1.2.0-rc1"
+  2026-07-10  enyo-2.0.0-rc1               elo= -559.2  games=500   ci=253.3
+  2026-07-10  enyo-2.0.0-rc2               elo= -426.6  games=500   ci=76.1
+  2026-07-11  enyo-2.0.0-rc3               elo= -354.5  games=500   ci=51.7
+  2026-07-11  enyo-2.0.0-rc4               elo= -465.4  games=500   ci=142.3
+  2026-07-12  enyo-2.0.0-rc5               elo= -254.1  games=500   ci=32.7
+  2026-07-12  enyo-2.0.0-rc6               elo= -265.7  games=500   ci=34.0
+  2026-07-12  enyo-2.0.0-rc7               elo= -281.7  games=500   ci=39.1
+  2026-07-13  enyo-3.0.0-rc1               elo= -194.6  games=500   ci=28.2
+  2026-07-13  enyo-4.0.0-rc1               elo= -185.3  games=500   ci=28.9
+  2026-07-13  enyo-arch-control-1.0.0-rc1  elo= -259.9  games=500   ci=36.4
 
-commit: a1c8368a
-Elo 25.8,LLR 1.17/2.20 (53%)
-"run": "enyo-scratch-long-1.2.0-rc1"
-"continue_from": "enyo-scratch-long-1.1.0-rc1"
+### enyo-1.30.0-rc3 forward to current champion (verified 2026-08-02)
 
-commit: 7c7a0764
-"run": "enyo-scratch-long-1.1.0-rc1",
-"continue_from": "enyo-scratch-long-1.0.0-rc1"
+  enyo-1.30.0-rc3 itself is untraceable further back: no recoverable commit anywhere in
+  history (checked all commits' build.json content, not just subject-line grep) and its
+  net file no longer exists on disk. Versions 1.1.0-1.29.0 above were not traced since
+  there is no endpoint to connect them to this chain.
 
-commit: 5a6028ef
-Elo 93.2,LLR 2.26/2.20 (103%)
-"run": "enyo-scratch-long-1.0.0-rc1"
+  commit    run                           continue_from                parent-rel   vs SF
+  -         enyo-1.30.0-rc3               (untraceable)                -            -154.4  (1500g, 07-17)
+  -         enyo-1.30.0-rc3-unscaled      enyo-1.30.0-rc3 (manual fix) n/a          -
+  3c464a3   enyo-1.31.0-rc57              enyo-1.30.0-rc3-unscaled     +8.6         -146.7  (4000g, corrected)
+  650a4fc   enyo-1.32.0-rc10 (champion)   enyo-1.31.0-rc57             +3.3         -139.8  (4000g, corrected)
 
-  ┌──────────┬─────────────────────────────┬─────────────────────────────┬───────┬──────────────────┐
-  │  commit  │             run             │        continue_from        │  Elo  │       LLR        │
-  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
-  │ 9d829ac0 │ enyo-1.0.0-rc1              │ enyo-scratch-long-1.5.0-rc1 │ +4.9  │ 0.18/2.20 (8%)   │
-  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
-  │ 8cea17a7 │ enyo-scratch-long-1.5.0-rc1 │ enyo-scratch-long-1.4.0-rc1 │ +0.5  │ 0.02/2.20 (1%)   │
-  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
-  │ d6c42e4c │ enyo-scratch-long-1.4.0-rc1 │ enyo-scratch-long-1.3.0-rc1 │ +7.4  │ 0.35/2.20 (16%)  │
-  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
-  │ 1c22805e │ enyo-scratch-long-1.3.0-rc1 │ enyo-scratch-long-1.2.0-rc1 │ +16.0 │ 0.71/2.20 (32%)  │
-  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
-  │ a1c8368a │ enyo-scratch-long-1.2.0-rc1 │ enyo-scratch-long-1.1.0-rc1 │ +25.8 │ 1.17/2.20 (53%)  │
-  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
-  │ 7c7a0764 │ enyo-scratch-long-1.1.0-rc1 │ enyo-scratch-long-1.0.0-rc1 │ +45.9 │ 2.12/2.20 (96%)  │
-  ├──────────┼─────────────────────────────┼─────────────────────────────┼───────┼──────────────────┤
-  │ 5a6028ef │ enyo-scratch-long-1.0.0-rc1 │ (scratch, no continue_from) │ +93.2 │ 2.26/2.20 (103%) │
-  └──────────┴─────────────────────────────┴─────────────────────────────┴───────┴──────────────────┘
+  Both rc57 and rc10's vs-SF numbers were corrected on 2026-07-30 from earlier
+  smaller-sample/engine-mismatch readings (-145.5 @ 1008g and -183.5/-183.5 @ 500g
+  respectively) - see the "correction" note further down for why.
 
-Near-tip chain (enyo-1.30.0-rc3 forward to the current champion) - verified separately,
-2026-08-02. This does NOT connect to the table above: enyo-1.30.0-rc3 itself has no
-recoverable commit anywhere in history (checked all commits' build.json content, not just
-subject-line grep) and the net file no longer exists on disk. Versions 1.1.0-1.29.0 were not
-traced since there is no endpoint to connect them to.
+  Naming collision: the name enyo-1.32.0-rc10 was used twice. An earlier, unrelated
+  attempt was rejected on 2026-07-15 (commit 7e31912f, continue_from enyo-1.31.0-rc42,
+  elo=-69.6 parent-relative) - a different net that happened to reuse the same name.
+  Only commit 650a4fcc (2026-07-29, above) is the actual current champion file.
 
-  ┌──────────┬────────────────────────────────┬───────────────────────────────┬───────┬─────────────────────────┐
-  │  commit  │              run               │         continue_from         │  Elo  │           LLR           │
-  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │    ?     │ enyo-1.30.0-rc3                │ (untraceable - no commit,     │   -   │            -            │
-  │          │                                │  no net file on disk)         │       │                         │
-  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │    -     │ enyo-1.30.0-rc3-unscaled       │ enyo-1.30.0-rc3               │  n/a  │ not an independent run  │
-  │          │ (manual output-scale fix on    │                               │       │ (never SPRT-tested or   │
-  │          │  rc3's own weights)            │                               │       │  committed)             │
-  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │ 3c464a3b │ enyo-1.31.0-rc57               │ enyo-1.30.0-rc3-unscaled      │ +8.6  │ 0.37/2.20 (17%)         │
-  ├──────────┼────────────────────────────────┼───────────────────────────────┼───────┼─────────────────────────┤
-  │ 650a4fcc │ enyo-1.32.0-rc10               │ enyo-1.31.0-rc57              │ +3.3  │ los=81.4%, ci=7.3       │
-  │          │ (current champion)             │                               │       │                         │
-  └──────────┴────────────────────────────────┴───────────────────────────────┴───────┴─────────────────────────┘
+## Rejected side-branches off the current tip (2026-08-01/02 onward, this session):
 
-Naming collision: the name enyo-1.32.0-rc10 was used twice. An earlier, unrelated attempt was
-rejected on 2026-07-15 (commit 7e31912f, continue_from enyo-1.31.0-rc42, elo=-69.6) - a
-different net that happened to reuse the same name. Only commit 650a4fcc (2026-07-29, above)
-is the actual current champion file.
-
-Rejected side-branches off the current tip (2026-08-01/02, this session, not part of the
-accepted chain above):
   enyo-1.33.0-rc9  (continue_from rc10, data/selfplay/gen4/gen4-sf-oracle.bullet - self-play
                     generated with Stockfish's own net loaded into the search engine, i.e. the
                     wrong policy net for self-distillation): elo=-17.3  llr=-2.40/2.20 (-109%)
@@ -111,24 +230,6 @@ accepted chain above):
                     actual recipe): elo=-9.0  llr=-2.25/2.20 (-102%) (3014/6000 games) - rejected.
   Conclusion: even the corrected self-play recipe does not reproduce rc57's gain against the
   now-mature rc10 - the incremental self-play-fine-tune path off rc10 appears saturated.
-
-*** default.net reference ***
-
-default.net (used below) is ~/code/rice/src/hexadecane_512_v2.net on pwa-mbp (with 4 bytes appended, IIRC) -
-a DIFFERENT reference engine than nn-0ee0657fb25e.nnue used everywhere else in this file. Elo numbers
-against the two are not directly comparable.
-
-*** enyo-1 lineage elo progression (vs default.net, benchmarks/default-net.jsonl) ***
-
-enyo-scratch-broad-1.0.0-rc1   -236.0  (1000 games, 2026-07-03)
-enyo-scratch-long-1.0.0-rc1    -169.3  (500 games,  2026-07-05)
-enyo-scratch-long-1.1.0-rc1    -126.2  (500 games,  2026-07-05)
-enyo-scratch-long-1.3.0-rc1    -113.7  (500 games,  2026-07-06)
-(1.2.0, 1.4.0, 1.5.0 not present in benchmarks/default-net.jsonl)
-
-enyo-1.0.0-rc1 (continue_from enyo-scratch-long-1.5.0-rc1) was the first net of this chain ever
-benchmarked against Stockfish directly:
-elo=-181.2  llr=-17.52/690.78  los=0.0%  ci=29.3  (1000 games, 2026-07-07, benchmarks/stockfish-net.jsonl:1)
 
 *** 2026-07-30 reconstruction ***
 
