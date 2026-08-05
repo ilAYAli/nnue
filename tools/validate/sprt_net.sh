@@ -46,17 +46,11 @@ else
 fi
 ENGINE_NAME=$(basename "$(readlink -f "$ENGINE")")
 BOOK=~/assets/books/AntiDraw_V2.1/WOMP_Openings_V1/WOMP_V1_+150_+159/WOMP_V1_6mvs_big_+140_+169.epd
-RUN="sprt-$(basename "$CANDIDATE_NET")-vs-$(basename "$REFERENCE_NET")-$GAMES-$(date +%Y%m%d-%H%M%S)"
 ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
 REFERENCE_NAME=$(basename "$REFERENCE_NET")
-LEDGER=
-SPRT_ARGS=()
-
-case "$REFERENCE_NAME" in
-    *.nnue)      LEDGER=stockfish-net.jsonl ;;
-esac
-
-[[ -z $LEDGER ]] || SPRT_ARGS=(--elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300)
+DB="$ROOT/benchmarks/benchmarks.db"
+SPRT_ARGS=(--elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300)
+RUN=
 
 check_engine_loads_net() {
     local role="$1"
@@ -81,10 +75,14 @@ check_engine_loads_net() {
     fi
 }
 
+# Deploys via the async `forge run sprt` template (not the blocking `forge sprt`
+# helper) with HOOK_EVENTS set, so the globally-configured notify_command
+# (~/code/chess/forge/scripts/forge_event_ntfy.sh) fires real done/fail
+# notifications for this run - matching how every other Forge job in this
+# project reports progress, instead of silently blocking with no visibility.
 run_sprt() {
-    forge sprt \
-        --run "$RUN" \
-        --verify \
+    local deploy_output
+    deploy_output=$(HOOK_EVENTS=done,fail forge run sprt \
         --comment "candidate=$(basename "$CANDIDATE_NET") vs reference=$(basename "$REFERENCE_NET")" \
         --reference "$ENGINE" \
         --candidate "$ENGINE" \
@@ -92,39 +90,85 @@ run_sprt() {
         --candidate-net "$CANDIDATE_NET" \
         --restart on \
         --games "$GAMES" \
-        "${SPRT_ARGS[@]}"
+        "${SPRT_ARGS[@]}")
+    printf '%s\n' "$deploy_output"
+
+    RUN=$(grep -m1 '^run: id=' <<<"$deploy_output" | sed 's/^run: id=//')
+    [[ -n $RUN ]] || { echo "Error: could not parse run id from forge run sprt output" >&2; exit 1; }
+
+    # Deploy itself is async (returns as soon as workers are launched); block
+    # here so save_result() below only runs once the SPRT has actually finished.
+    HOOK_EVENTS=done,fail forge resume "$RUN" --wait --verify --timeout-seconds 0
 }
 
 save_result() {
-    [[ -n $LEDGER ]] || return
-
     mkdir -p "$ROOT/benchmarks"
-    forge status "$RUN" --json | jq -c \
-        --arg candidate "$(basename "$(readlink -f "$CANDIDATE_NET")" .nn)" \
-        --arg engine "$ENGINE_NAME" \
-        --arg reference "$REFERENCE_NAME" \
-        --argjson requested_games "$GAMES" '
-        (.progress_fields | map(split("=") | {(.[0]): .[1]}) | add) as $metrics
-        | ($metrics.games | split("/") | map(tonumber)) as $games
-        | if .completed_at == null or $games[0] != $requested_games then
-            error("incomplete Forge result")
-          else
-        ($metrics.llr | capture("(?<value>-?[0-9.]+)/(?<bound>[0-9.]+)")) as $llr
-        | {
-            date: .completed_at[0:10],
-            candidate: $candidate,
-            engine: $engine,
-            reference: $reference,
-            requested_games: $requested_games,
-            games: $games[0],
-            elo: ($metrics.elo | tonumber),
-            ci: ($metrics.ci | tonumber),
-            llr: ($llr.value | tonumber),
-            llr_bound: ($llr.bound | tonumber),
-            los: ($metrics.los // null | if . then rtrimstr("%") | tonumber else null end),
-            draw: ($metrics.draw // null | if . then rtrimstr("%") | tonumber else null end)
-        }
-          end' >>"$ROOT/benchmarks/$LEDGER"
+    local status_file candidate
+    status_file=$(mktemp)
+    trap 'rm -f "$status_file"' RETURN
+    forge status "$RUN" --json >"$status_file"
+
+    candidate=$(basename "$(readlink -f "$CANDIDATE_NET")" .nn)
+
+    python3 - "$DB" "$ENGINE_NAME" "$REFERENCE_NAME" "$GAMES" "$candidate" "$status_file" <<'PY'
+import json
+import sqlite3
+import sys
+
+db_path, engine_name, reference_name, requested_games, candidate, status_file = sys.argv[1:7]
+with open(status_file) as f:
+    status = json.load(f)
+
+if not status.get("completed_at"):
+    sys.exit("Error: incomplete Forge result")
+
+metrics = {}
+for field in status.get("display", {}).get("fields", []):
+    key, _, value = field.partition("=")
+    metrics[key] = value
+
+games = int(metrics["games"].split("/")[0])
+requested_games = int(requested_games)
+if games != requested_games:
+    sys.exit(f"Error: incomplete Forge result (games={games} requested={requested_games})")
+
+llr_value, _, llr_rest = metrics["llr"].partition("/")
+llr_bound = llr_rest.split(" ")[0] if llr_rest else None
+
+def pct(key):
+    value = metrics.get(key)
+    if not value:
+        return None
+    return float(value.rstrip("%"))
+
+conn = sqlite3.connect(db_path)
+conn.execute(
+    """
+    INSERT INTO benchmark
+        (date, candidate, engine, reference_net, requested_games, games,
+         elo, ci, llr, llr_bound, los, draw, source_ledger, raw_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    (
+        status["completed_at"][:10],
+        candidate,
+        engine_name,
+        reference_name,
+        requested_games,
+        games,
+        float(metrics["elo"]),
+        float(metrics["ci"]) if metrics.get("ci") else None,
+        float(llr_value) if llr_value else None,
+        float(llr_bound) if llr_bound else None,
+        pct("los"),
+        pct("draw"),
+        "sprt_net.sh",
+        json.dumps(status),
+    ),
+)
+conn.commit()
+print(f"recorded: candidate={candidate} reference_net={reference_name} elo={metrics['elo']}")
+PY
 }
 
 main() {
