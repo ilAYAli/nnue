@@ -40,6 +40,25 @@ chain. See STATUS.md for the verified lineage table and its one known gap
   weight-replication warm start. Rejected, elo=-5.2 at 5620/6000 games -
   real, but only 1 fine-tune epoch, likely not enough for the 8
   initially-identical head copies to differentiate.
+- `enyo-scc-1.0.0-rc1` (new lineage: genuine random-init scratch train on
+  the completed Lc0 conversion combined with nodes5000pv2, 3,232,772,104
+  positions, 9 epochs, wdl=0.05 - the scratch-long precedent regimen,
+  vs champion enyo-1.32.0-rc10 directly since there is no continue_from):
+  rejected, elo=-110.8 llr=-33.60/690.78 (-5%) at 4000/4000 games - a
+  severe, not marginal, loss. Root cause identified: the combined corpus
+  was built by flat `cat`-concatenating lc0-static-bulk.bullet
+  (1,232,772,104 positions) then nodes5000pv2-recalibrated-2b.bullet
+  (2,000,000,000 positions) with no shuffling, and the `direct` loader
+  (`bullet_lib::value::loader::direct::DirectSequentialDataLoader`, read
+  directly from the vendored crate source) reads file(s) in strict
+  sequential order with only a 256MB read-ahead buffer - not a shuffle
+  buffer. The two very differently-distributed corpora were therefore
+  never blended within a batch: every one of the 9 epochs cycled through
+  one long unbroken run of pure lc0 positions (~38% of an epoch) followed
+  by one long unbroken run of pure nodes5000pv2 positions (~62%),
+  identically each pass. Any future combined-corpus attempt must shuffle
+  or interleave at the position level before training, not just
+  concatenate files.
 - `enyo-fullhead-threats-v1-rc1`: full-head combined with FullThreats
   (format v6, added this session across the enyo C++ loader, Rust
   trainer, and Python export library - was previously blocked by a
@@ -58,17 +77,17 @@ chain. See STATUS.md for the verified lineage table and its one known gap
 
 ## Open questions / in flight
 
-- Lc0 bulk data: downloading ~371GB from storage.lczero.org/test91
-  (in progress, ~284GB+ as of last check) to replace the existing 11.96M-
-  position sample with several hundred million positions, matching how
-  Obsidian/Alexandria/Stockfish actually train (largely or entirely on
-  Lc0 data, not self-play). No conversion pipeline exists yet for this
-  volume - the existing Forge `to-bullet` template only handles
-  self-play PGNs, not raw Lc0 V6 chunks, and single-machine conversion
-  via `lc0_to_jsonl.py` at the ~470 pos/sec rate measured locally would
-  take weeks. Needs a distributed approach (new Forge template, or
-  another parallelization strategy) before the resulting corpus can be
-  used for a real scratch/fine-tune test.
+- Lc0 bulk data: fully downloaded and converted via a distributed Forge
+  to-bullet --label static job (30,174 shards, label-static-test91-20260803-080521,
+  1.906B raw records -> 1,232,772,104 selected positions after
+  quiet-only/min-ply=16 filtering), then combined with
+  nodes5000pv2-recalibrated-2b.bullet into a 3.23B-position corpus and
+  tested as enyo-scc-1.0.0-rc1 (see ledger) - rejected, but for a
+  data-preparation reason (unshuffled concatenation feeding the
+  sequential-only `direct` loader), not because the Lc0 volume itself is
+  bad. Re-testing with a properly shuffled/interleaved combined corpus is
+  the natural next step before drawing any conclusion about the Lc0 data
+  actual value.
 - No architecture or data lever currently has a strong, well-justified
   case for reopening. The next real experiment should come from the Lc0
   data volume once its conversion pipeline exists, or from a fresh
