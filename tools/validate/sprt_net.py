@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Run a distributed SPRT of one net against a reference net, on a fixed engine,
-and record the result in benchmarks/sprt.db."""
+"""Run a distributed SPRT of one net against a reference net, on a fixed engine.
+
+The result itself is recorded centrally by forge (~/code/chess/forge/logs/sprt.db,
+forge_lib.status.record_sprt_completion) for every SPRT run regardless of what
+launches it - this script just launches one and prints the final result."""
 
 import argparse
 import json
 import os
 import re
-import sqlite3
 import subprocess
 import sys
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[2]
-DB = ROOT / "benchmarks" / "sprt.db"
 
 
 def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
@@ -75,7 +74,7 @@ def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: i
     return run
 
 
-def save_result(*, run: str, engine_name: str, reference_name: str, requested_games: int, candidate_net: str) -> None:
+def print_result(*, run: str, requested_games: int) -> None:
     status = json.loads(subprocess.run(["forge", "status", run, "--json"], capture_output=True, text=True, check=True).stdout)
 
     if not status.get("completed_at"):
@@ -90,42 +89,6 @@ def save_result(*, run: str, engine_name: str, reference_name: str, requested_ga
     if games != requested_games:
         sys.exit(f"Error: incomplete Forge result (games={games} requested={requested_games})")
 
-    llr_value, _, llr_rest = metrics["llr"].partition("/")
-    llr_bound = llr_rest.split(" ")[0] if llr_rest else None
-
-    def pct(key: str) -> float | None:
-        value = metrics.get(key)
-        return float(value.rstrip("%")) if value else None
-
-    DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB)
-    conn.execute(
-        """
-        INSERT INTO sprt
-            (date, candidate_net, engine, reference_net, requested_games, games,
-             elo, ci, llr, llr_bound, los, draw, source_ledger, raw_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            status["completed_at"][:10],
-            candidate_net,
-            engine_name,
-            reference_name,
-            requested_games,
-            games,
-            float(metrics["elo"]),
-            float(metrics["ci"]) if metrics.get("ci") else None,
-            float(llr_value) if llr_value else None,
-            float(llr_bound) if llr_bound else None,
-            pct("los"),
-            pct("draw"),
-            "sprt_net.py",
-            json.dumps(status),
-        ),
-    )
-    conn.commit()
-    conn.close()
-    print(f"recorded: candidate_net={candidate_net} reference_net={reference_name} elo={metrics['elo']}")
     print(f"elo={metrics['elo']} llr={metrics['llr'].split('/')[0]}")
 
 
@@ -155,15 +118,8 @@ def main() -> None:
     check_engine_loads_net(engine, "CANDIDATE_NET", candidate_net)
     check_engine_loads_net(engine, "REFERENCE_NET", reference_net)
 
-    engine_name = engine.resolve().name
     run = run_sprt(engine=engine, candidate_net=candidate_net, reference_net=reference_net, games=games)
-    save_result(
-        run=run,
-        engine_name=engine_name,
-        reference_name=reference_net.name,
-        requested_games=games,
-        candidate_net=candidate_net.name,
-    )
+    print_result(run=run, requested_games=games)
 
 
 if __name__ == "__main__":
