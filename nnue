@@ -272,7 +272,7 @@ notify() {
       good_news:($event == "iteration_done" and $user_notify)
     }
     | if $sprt == null then . else .sprt = $sprt end')
-  NNUE_RUN_EVENT_JSON=$payload "$EVENT_HOOK" >/dev/null 2>&1 || true
+  NNUE_RUN_EVENT_JSON=$payload NNUE_HOOK_EVENTS="$HOOK_EVENTS" "$EVENT_HOOK" >/dev/null 2>&1 || true
 }
 
 notify_sprt() {
