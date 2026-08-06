@@ -1071,6 +1071,7 @@ fn train_enyo<
 
             let open_params = AdamWParams {
                 decay: weight_decay,
+                beta1: 0.95,
                 max_weight: 1.0e9,
                 min_weight: -1.0e9,
                 ..Default::default()
@@ -1081,6 +1082,7 @@ fn train_enyo<
                     "l0w",
                     AdamWParams {
                         decay: weight_decay,
+                        beta1: 0.95,
                         // Enyo stores accumulator weights as int16. Existing Enyo nets
                         // legitimately contain values outside the older +/-4095 guard;
                         // clamping there corrupts the first exported Bullet checkpoint.
@@ -1093,6 +1095,7 @@ fn train_enyo<
                     "l0b",
                     AdamWParams {
                         decay: weight_decay,
+                        beta1: 0.95,
                         max_weight: f32::from(i16::MAX),
                         min_weight: f32::from(i16::MIN),
                         ..Default::default()
@@ -1103,6 +1106,7 @@ fn train_enyo<
                         "l0f",
                         AdamWParams {
                             decay: weight_decay,
+                            beta1: 0.95,
                             max_weight: f32::from(i16::MAX),
                             min_weight: f32::from(i16::MIN),
                             ..Default::default()
@@ -1115,6 +1119,7 @@ fn train_enyo<
                     "l1w",
                     AdamWParams {
                         decay: weight_decay,
+                        beta1: 0.95,
                         max_weight: 127.0 / l1_export_scale,
                         min_weight: -128.0 / l1_export_scale,
                         ..Default::default()
@@ -1232,7 +1237,7 @@ fn train_enyo<
         run_trainer!(
             base_trainer!().build_custom(|builder, (stm_inputs, ntm_inputs), target| {
                 let (output, activation_penalty) = enyo_forward!(builder, stm_inputs, ntm_inputs);
-                let loss = output.sigmoid().squared_error(target) + activation_penalty;
+                let loss = output.sigmoid().power_error(target, 3.0) + activation_penalty;
                 (output, loss)
             })
         );
@@ -1243,7 +1248,7 @@ fn train_enyo<
                 |builder, (stm_inputs, ntm_inputs, output_buckets), target| {
                     let (output, activation_penalty) =
                         enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets);
-                    let loss = output.sigmoid().squared_error(target) + activation_penalty;
+                    let loss = output.sigmoid().power_error(target, 3.0) + activation_penalty;
                     (output, loss)
                 }
             ));
