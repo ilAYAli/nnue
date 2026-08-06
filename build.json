@@ -1,6 +1,6 @@
 {
   "run": "enyo-scc-1.2.0-rc2",
-  "reference": "enyo-1.32.0-rc10",
+  "reference": "enyo-scc-1.1.0-rc1",
   "continue_from": "enyo-scc-1.1.0-rc1",
   "hypothesis": "Cubic loss |e|^3 + AdamW beta1=0.95 at WDL=0.05. rc1 catastrophically failed (-223.9 vs SF) with WDL=0.3 - most likely cause is Lc0 MCTS game results conflicting with SF oracle eval labels at 30% game-result weight. This round reverts WDL to 0.05 (known-good) and keeps only the code-level changes (cubic loss, beta1) to test them in isolation. final_lr 5e-6->2.5e-5 also kept (fixes 200:1 LR decay ratio). WDL is NOT the variable being tested here.",
   "superbatches": 231321,
