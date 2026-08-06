@@ -56,8 +56,19 @@ chain. See STATUS.md for the verified lineage table and its one known gap
   superbatches): rejected, elo=-66.9 llr=-26.24/690.78 (-4%) at 4000/4000
   games - +26.3 Elo over rc1.0 on the same reference, validating
   dose-continuation as the ongoing lever (matches enyo-scratch-long's
-  early-round gains). Next: rc1.2.0, same corpus, more dose, no new
-  self-play.
+  early-round gains).
+- `enyo-scc-1.1.0-rc2` (shuffle retry of rc1.1, same parent rc1.0, same
+  regimen): residual gate rejection, never reached SPRT. endgame
+  slope_gain=-0.004 and eval:800+ slope_gain=-0.001, both just below
+  MIN_SLOPE=0.05 threshold. MAE improved (endgame 313.8→227.8) but
+  calibration vs champion did not. Margin of failure is within noise; shuffle
+  hypothesis inconclusive.
+- `enyo-scc-1.2.0-rc1` (continue_from rc1.1, WDL 0.05→0.3 + cubic loss
+  |e|^3 + AdamW beta1=0.95 + final_lr 5e-6→2.5e-5): rejected,
+  vs-SF: elo=-223.9 ci=13.9 (1500 games) - catastrophic, 87 Elo worse than
+  the founding net. Most likely cause: WDL=0.3 conflicts with Lc0 MCTS game
+  results vs SF oracle eval labels in 38% of corpus. Cubic loss and beta1
+  are not the culprit (cannot account for this magnitude of regression).
 - `enyo-fullhead-threats-v1-rc1`: full-head combined with FullThreats
   (format v6, added this session across the enyo C++ loader, Rust
   trainer, and Python export library - was previously blocked by a

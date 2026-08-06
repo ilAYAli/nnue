@@ -381,3 +381,43 @@ still rejected vs champion enyo-1.32.0-rc10 (expected), but +26.3 Elo over
 rc1.0 on the same reference - a real per-round gain, in the range of
 enyo-scratch-long's own early rounds (+93.2, +45.9, +25.8...). Validates
 dose-continuation as the ongoing lever for this lineage.
+
+*** enyo-scc-1.1.0-rc2 (2026-08-06): shuffle retry, residual gate rejection ***
+
+Retry of rc1.1 from the same parent (enyo-scc-1.0.0-rc1) after an additional
+bullet-utils shuffle pass on the combined corpus, to test whether residual
+same-source clustering from the interleave step (invisible to the sequential
+direct loader) explained the -238.7 vs-SF measurement on rc1.1.
+
+Result: residual gate rejection - never reached SPRT. The gate measures
+slope_gain (candidate improvement over champion in eval-vs-reference slope,
+per phase and eval bucket). rc2 failed two checks: endgame slope_gain=-0.004
+and eval:800+ slope_gain=-0.001, both below MIN_SLOPE=0.05. MAE improved
+substantially in both groups (endgame: 313.8→227.8) but slope did not, meaning
+the net is more accurate in absolute terms but less well-calibrated vs the
+champion. The margin of failure is tiny and likely within residual-audit noise
+(50k samples, comparable to the CI on the slope estimate). Shuffle hypothesis
+is inconclusive - rc2 is not demonstrably better or worse than rc1.1.
+
+*** enyo-scc-1.2.0-rc1 (2026-08-06): training objective experiment, rejected ***
+
+continue_from enyo-scc-1.1.0-rc1 with three simultaneous changes: WDL 0.05→0.3
+(primary hypothesis - game-result weight never tested above 0.05 in this
+lineage), cubic loss |e|^3 replacing squared loss (spike_trainer rebuild,
++14.8 Elo at fixed nodes per July 2024 research), AdamW beta1 0.9→0.95 (+4
+Elo per same research), final_lr 5e-6→2.5e-5 (fix 200:1 LR decay ratio).
+
+vs nn-0ee0657fb25e.nnue: elo=-223.9  llr=-13.60/690.78 (-2%)  ci=13.9
+draw=48.0%  (1500/1500 games, 2026-08-06) - catastrophic. 87 Elo worse than the
+founding net (-136.2) and ~110 Elo below rc1.1's estimated absolute.
+
+Most likely cause: WDL=0.3 with the mixed corpus. The Lc0 T91 positions (38%
+of corpus) have game results from MCTS outcomes but eval labels from SF oracle
+static eval. At WDL=0.05 these are nearly decoupled. At WDL=0.3, the MCTS
+game outcomes become a dominant training signal and conflict with SF oracle
+evals for positions where Lc0 tactically outplayed SF from a neutral static
+eval. The net is pulled in two directions simultaneously.
+
+Next: enyo-scc-1.2.0-rc2 - revert WDL to 0.05, keep cubic loss and beta1=0.95
+as a baseline improvement bundle. This isolates the code changes from the WDL
+hypothesis.
