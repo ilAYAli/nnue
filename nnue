@@ -1040,7 +1040,7 @@ $command
 
 Result:
 $details" \
-    -- "${commit_paths[@]}" || return
+    -- "${commit_paths[@]}" || { local rc=$?; (( rc == 1 )) && git diff --cached --quiet && return 0; return $rc; }
 
   if [[ "$result" == PASS ]]; then
     ln -sfn "$accepted.nn" "$PROMOTED_NET_LINK" || return
