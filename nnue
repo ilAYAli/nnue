@@ -81,7 +81,8 @@ STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
 STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-500}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
 STOCKFISH_NET_MIN_DELTA=${STOCKFISH_NET_MIN_DELTA:-0}
-QSPRT=${QSPRT:-tools/validate/sprt_net.sh}
+SKIP_SF_GATE=${SKIP_SF_GATE:-0}
+QSPRT=${QSPRT:-tools/validate/sprt_net.py}
 PROMOTED_NET_LINK=${PROMOTED_NET_LINK:-$HOME/assets/nets/candidate.net}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 # H1 is deliberately wide. The LLR drift rate scales with
@@ -1224,7 +1225,7 @@ iterate() {
       train || fail "train failed for $run" train
       gates || fail "gates failed for $run" gates
     fi
-    if ! stockfish_net_gate "$run"; then
+    if (( SKIP_SF_GATE != 1 )) && ! stockfish_net_gate "$run"; then
       last_sprt_elo=$stockfish_delta
       last_sprt_llr="Stockfish upper90=$stockfish_upper90"
       last_sprt_command="$QSPRT --candidate $run.nn"
