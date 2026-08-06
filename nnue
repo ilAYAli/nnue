@@ -1030,6 +1030,7 @@ commit_and_bump_build_json() {
   fi
   [[ -f "$STOCKFISH_NET_LEDGER" ]] && commit_paths+=("$STOCKFISH_NET_LEDGER")
 
+  local commit_rc=0
   git commit --only \
     -m "$subject" \
     -m "Hypothesis:
@@ -1040,7 +1041,14 @@ $command
 
 Result:
 $details" \
-    -- "${commit_paths[@]}" || { local rc=$?; (( rc == 1 )) && git diff --cached --quiet && return 0; return $rc; }
+    -- "${commit_paths[@]}" || commit_rc=$?
+  if (( commit_rc != 0 )); then
+    if (( commit_rc == 1 )) && git diff --cached --quiet; then
+      : # empty commit — nothing staged, proceed to bump
+    else
+      return $commit_rc
+    fi
+  fi
 
   if [[ "$result" == PASS ]]; then
     ln -sfn "$accepted.nn" "$PROMOTED_NET_LINK" || return
