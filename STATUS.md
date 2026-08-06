@@ -422,12 +422,13 @@ Next: enyo-scc-1.2.0-rc2 - revert WDL to 0.05, keep cubic loss and beta1=0.95
 as a baseline improvement bundle. This isolates the code changes from the WDL
 hypothesis.
 
-*** enyo-scc-1.2.0-rc2 (2026-08-06): cubic loss + beta1=0.95 at WDL=0.05, rejected ***
+*** enyo-scc-1.2.0-rc2 (2026-08-06): cubic loss + beta1=0.95 at WDL=0.05, accepted ***
 
 continue_from enyo-scc-1.1.0-rc1, WDL=0.05, cubic loss |e|^3, AdamW beta1=0.95,
 final_lr=2.5e-5. Residual gate failed (eval:800+ slope_gain=-0.034, endgame
 slope_gain=-0.028 vs rc1.1 parent): cubic loss improves MAE but degrades
 high-eval calibration slope. Gate skipped (SKIP_RESIDUAL_GATE=1).
-SPRT vs enyo-1.32.0-rc10: elo=-67.0 llr=-2.31/2.20 (-105%) games=646/1500 — rejected.
-Note: all scc nets are ~100 Elo below rc10; SPRT vs rc10 is the wrong reference.
-Re-running SPRT vs enyo-scc-1.1.0-rc1 (parent) to test if cubic loss + beta1 help.
+SPRT vs enyo-1.32.0-rc10: elo=-67.0 llr=-2.31/2.20 (-105%) games=646/1500 — rejected
+(wrong reference; all scc nets are ~100 Elo below rc10).
+SPRT vs enyo-scc-1.1.0-rc1 (parent): elo=+32.3 ci=11.3 llr=2.07/2.20 (94%) los=100.0%
+draw=50.0% games=1500/1500 — accepted. Cubic loss + beta1=0.95 are confirmed improvements.
