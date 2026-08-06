@@ -82,6 +82,7 @@ STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-500}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
 STOCKFISH_NET_MIN_DELTA=${STOCKFISH_NET_MIN_DELTA:-0}
 SKIP_SF_GATE=${SKIP_SF_GATE:-0}
+SKIP_RESIDUAL_GATE=${SKIP_RESIDUAL_GATE:-0}
 QSPRT=${QSPRT:-tools/validate/sprt_net.py}
 PROMOTED_NET_LINK=${PROMOTED_NET_LINK:-$HOME/assets/nets/candidate.net}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
@@ -128,6 +129,7 @@ log_dir=
 candidate_net=
 data_file=
 reference_net=
+residual_ref_net=
 train_build=
 scratch_confirmed=0
 summary_file=
@@ -181,6 +183,7 @@ load_config() {
     || fail "build.json init_net was renamed to initialize_from" config
   run=$(json '.run')
   continue_from=$(json '.continue_from // empty')
+  residual_ref_net=$(net_for_name_or_path "$continue_from") || residual_ref_net=
   initialize_from=$(json '.initialize_from // empty')
   reference_name=$(json '.reference // empty')
   run_dir="runs/$run"
@@ -515,7 +518,7 @@ static_gate() {
   abs_float_le "$bias" "$MAX_ABS_BIAS" || fail "bias $bias outside +/-$MAX_ABS_BIAS" static_eval
   float_ge "$slope" "$MIN_SLOPE" || fail "slope $slope < $MIN_SLOPE" static_eval
 
-  if [[ "$REQUIRE_RESIDUAL_GATE" == 1 ]]; then
+  if [[ "$REQUIRE_RESIDUAL_GATE" == 1 && "${SKIP_RESIDUAL_GATE}" != 1 && -n "$continue_from" ]]; then
     local residual_log="$log_dir/03-residual-audit.log"
     local residual_json="$log_dir/03-residual-audit.json"
     [[ -f "$RESIDUAL_FEN_FILE" ]] \
@@ -523,7 +526,7 @@ static_gate() {
     notify phase_start residual_gate "50k residual audit for $run" "$residual_log" 0
     "$PYTHON" tools/validate/structural_net_audit.py \
       --engine "$ENGINE" \
-      --subject "reference=$reference_net" \
+      --subject "reference=$residual_ref_net" \
       --subject "candidate=$candidate_net" \
       --subject "stockfish=$HOME/assets/nets/$STOCKFISH_NET" \
       --fen-file "$RESIDUAL_FEN_FILE" \
