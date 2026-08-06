@@ -948,7 +948,7 @@ fn train_enyo<
             let x1 = x1_pre.relu();
             let x2_pre = if let Some(l2s) = l2s {
                 let clipped = x1_pre.max(0.0).min(127.0);
-                let squared = clipped * clipped / 127.0;
+                let squared = clipped.abs_pow(2.0) / 127.0;
                 l2.forward(x1) + l2s.forward(squared)
             } else {
                 l2.forward(x1)
@@ -1048,7 +1048,7 @@ fn train_enyo<
                 l2.forward(x1).select($output_buckets)
             } else if let Some(l2s) = l2s {
                 let clipped = x1_pre.max(0.0).min(127.0);
-                let squared = clipped * clipped / 127.0;
+                let squared = clipped.abs_pow(2.0) / 127.0;
                 l2.forward(x1) + l2s.forward(squared)
             } else {
                 l2.forward(x1)
