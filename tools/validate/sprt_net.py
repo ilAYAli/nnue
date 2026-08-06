@@ -36,42 +36,40 @@ def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
 
 
 def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: int) -> str:
-    """Deploy via the async `forge run sprt` template (not the blocking `forge
-    sprt` helper) with HOOK_EVENTS set, so the globally-configured
-    notify_command (~/code/chess/forge/scripts/forge_event_ntfy.sh) fires real
-    done/fail notifications for this run - matching how every other Forge job
-    in this project reports progress, instead of silently blocking with no
-    visibility. Deploy itself is async (returns as soon as workers are
-    launched), so `forge resume --wait` blocks until the SPRT actually
-    finishes before this function returns.
-    """
+    """Launch one Forge SPRT and stream output until its verified completion."""
     env = os.environ | {"HOOK_EVENTS": "done,fail"}
-    deploy = subprocess.run(
-        [
-            "forge", "run", "sprt",
-            "--comment", f"candidate={candidate_net.name} vs reference={reference_net.name}",
-            "--reference", str(engine),
-            "--candidate", str(engine),
-            "--reference-net", str(reference_net),
-            "--candidate-net", str(candidate_net),
-            "--restart", "on",
-            "--games", str(games),
-            "--elo0", "0", "--elo1", "10", "--alpha", "1e-300", "--beta", "1e-300",
-        ],
-        env=env, capture_output=True, text=True, check=True,
+    command = [
+        "forge", "run", "sprt", "--wait", "--verify",
+        "--comment", f"candidate={candidate_net.name} vs reference={reference_net.name}",
+        "--reference", str(engine),
+        "--candidate", str(engine),
+        "--reference-net", str(reference_net),
+        "--candidate-net", str(candidate_net),
+        "--restart", "on",
+        "--games", str(games),
+        "--elo0", "0", "--elo1", "10", "--alpha", "1e-300", "--beta", "1e-300",
+    ]
+    deploy = subprocess.Popen(
+        command,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
     )
-    print(deploy.stdout, end="")
+    output = []
+    assert deploy.stdout is not None
+    for line in deploy.stdout:
+        output.append(line)
+        print(line, end="", flush=True)
+    returncode = deploy.wait()
+    stdout = "".join(output)
+    if returncode:
+        raise subprocess.CalledProcessError(returncode, command, output=stdout)
 
-    match = re.search(r"^run: id=(\S+)", deploy.stdout, re.MULTILINE)
+    match = re.search(r"^run: id=(\S+)", stdout, re.MULTILINE)
     if not match:
         sys.exit("Error: could not parse run id from forge run sprt output")
-    run = match.group(1)
-
-    subprocess.run(
-        ["forge", "resume", run, "--wait", "--verify", "--timeout-seconds", "0"],
-        env=env, check=True,
-    )
-    return run
+    return match.group(1)
 
 
 def print_result(*, run: str, requested_games: int) -> None:
