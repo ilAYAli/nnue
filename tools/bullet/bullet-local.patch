@@ -1,0 +1,181 @@
+From 37fe6a3e1212752db363ef2fd8a2d7d5a1311afa Mon Sep 17 00:00:00 2001
+From: Petter Wahlman <petter@wahlman.no>
+Date: Fri, 7 Aug 2026 13:03:08 +0200
+Subject: [PATCH] Fix FusePointwise dropping registered gradient outputs; add
+ NVRTC fallback
+
+FusePointwise (fuse_subgraphs in pointwise/transforms.rs): when op_i's
+output was consumed only once by op_j, it was treated as an inlineable
+intermediate and omitted from total_outputs, silently dropping any
+registered gradient NodeId that matched. Fix: also keep in total_outputs
+if ir.is_output(out).
+
+EliminateCopies: removed Case 2 which swapped registered backward output
+NodeIds, breaking bwd_map tracking in the trainer.
+
+EliminateCommonSubExpressions: when op_j has registered outputs and op_i
+does not, keep op_j instead of op_i to avoid inserting a CopyOp for a
+registered NodeId that the GPU codegen can't materialise as a standalone
+buffer.
+
+function.rs / generate.rs: CopyOp codegen support so surviving CopyOps
+over registered outputs compile and execute correctly.
+
+runtime.rs: if NVRTC rejects --gpu-architecture (CUDA 12.4 does not
+support sm_120), retry without the flag and let the driver JIT generic
+PTX to the native architecture.
+---
+ .../src/tensor/transform/eliminate.rs         | 41 ++++++++++++-------
+ crates/gpu/src/function.rs                    |  4 +-
+ crates/gpu/src/pointwise/generate.rs          |  9 +++-
+ crates/gpu/src/pointwise/transforms.rs        |  2 +-
+ crates/gpu/src/runtime.rs                     |  9 +++-
+ 5 files changed, 46 insertions(+), 19 deletions(-)
+
+diff --git a/crates/compiler/src/tensor/transform/eliminate.rs b/crates/compiler/src/tensor/transform/eliminate.rs
+index 0423986..c0fe708 100644
+--- a/crates/compiler/src/tensor/transform/eliminate.rs
++++ b/crates/compiler/src/tensor/transform/eliminate.rs
+@@ -34,13 +34,11 @@ impl IRTransform for EliminateCopies {
+                     ir.remove_op(op.id())?;
+                     continue;
+                 }
+-
+-                if !ir.is_output(input) && !ir.is_input(input)? {
+-                    // no topo check as performs y = copy(x) -> y = copy(y)
+-                    ir.ir_mut().replace_input_no_cycle_check(output, input)?;
+-                    ir.swap_outputs(input, output)?;
+-                    ir.remove_op(op.id())?;
+-                }
++                // When output IS a registered backward output, keep the CopyOp alive.
++                // Case 2 (swap_outputs to promote the input to registered) is intentionally
++                // omitted: it changes which NodeId holds the gradient registration, breaking
++                // the bwd_map NodeId tracking in builder.rs. The GPU backend's CopyOp
++                // codegen in generate.rs handles these surviving CopyOps correctly.
+             }
+         }
+ 
+@@ -64,17 +62,30 @@ fn eliminate_single_common_subexpr(ir: &mut TensorIR) -> Result<bool, IRTrace> {
+     for (i, op_i) in ops.iter().enumerate() {
+         for op_j in ops.iter().skip(i + 1) {
+             if op_i.inputs() == op_j.inputs() && op_i.data().0.equals(op_j.data()) {
+-                for (&out_i, &out_j) in op_i.outputs().iter().zip(op_j.outputs()) {
+-                    ir.replace_input(out_i, out_j)?;
+-
+-                    if ir.is_output(out_j) {
+-                        let new_out = ir.copy(out_i)?;
+-                        ir.swap_outputs(new_out, out_j)?;
++                let any_j_registered = op_j.outputs().iter().any(|&o| ir.is_output(o));
++                let any_i_registered = op_i.outputs().iter().any(|&o| ir.is_output(o));
++
++                if any_j_registered && !any_i_registered {
++                    // op_j has registered outputs; keep op_j, discard op_i.
++                    // This avoids inserting a CopyOp for op_j's registered output NodeIds,
++                    // which the GPU codegen cannot materialise as a standalone output pointer.
++                    for (&out_i, &out_j) in op_i.outputs().iter().zip(op_j.outputs()) {
++                        ir.replace_input(out_j, out_i)?;
++                    }
++                    ir.remove_op(op_i.id())?;
++                } else {
++                    // Default: keep op_i (first-seen), discard op_j.
++                    for (&out_i, &out_j) in op_i.outputs().iter().zip(op_j.outputs()) {
++                        ir.replace_input(out_i, out_j)?;
++
++                        if ir.is_output(out_j) {
++                            let new_out = ir.copy(out_i)?;
++                            ir.swap_outputs(new_out, out_j)?;
++                        }
+                     }
++                    ir.remove_op(op_j.id())?;
+                 }
+ 
+-                ir.remove_op(op_j.id())?;
+-
+                 return Ok(true);
+             }
+         }
+diff --git a/crates/gpu/src/function.rs b/crates/gpu/src/function.rs
+index c791c55..f12c5f0 100644
+--- a/crates/gpu/src/function.rs
++++ b/crates/gpu/src/function.rs
+@@ -246,7 +246,9 @@ impl<G: Gpu> Function<G> {
+         let mut var_size = None;
+ 
+         for (name, buf) in inputs {
+-            let (idx, is_mut, ty) = *self.maps.get(name).ok_or("Input not in function!".into())?;
++            let (idx, is_mut, ty) = *self.maps.get(name).ok_or_else(|| {
++                "Input not in function!".to_string().into()
++            })?;
+             let size = ty.size();
+ 
+             if buf.dtype() != ty.dtype() {
+diff --git a/crates/gpu/src/pointwise/generate.rs b/crates/gpu/src/pointwise/generate.rs
+index ee285f3..1d30a7a 100644
+--- a/crates/gpu/src/pointwise/generate.rs
++++ b/crates/gpu/src/pointwise/generate.rs
+@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
+ use bullet_compiler::tensor::{
+     DValue, IRTrace, Size,
+     operation::{
+-        BroadcastAcrossDimension, CABinary, CABinaryOp, PadAcrossDimension, Power, ReduceAcrossDimension,
++        BroadcastAcrossDimension, CABinary, CABinaryOp, CopyOp, PadAcrossDimension, Power, ReduceAcrossDimension,
+         ScalarConstant, Select, SelectPad, SliceAcrossDimension, SparseMatmul, SparseMatmulBwdMulti, SubGraph, Unary,
+         UnaryOp,
+     },
+@@ -97,6 +97,9 @@ pub fn generate(sub: &SubGraph, props: &DeviceProps) -> Result<Option<(Pointwise
+             } else {
+                 return Ok(None);
+             }
++        } else if let Some(copy) = data.downcast::<CopyOp>() {
++            let size = copy.0.size();
++            (size, size.factor())
+         } else {
+             return Ok(None);
+         };
+@@ -318,6 +321,10 @@ pub fn generate(sub: &SubGraph, props: &DeviceProps) -> Result<Option<(Pointwise
+ 
+             let output = pntwise.conditional_read(values, idx, cond, DValue::zero(select_pad.dtype), p2size)?;
+             mapping.insert(op.outputs()[0], output);
++        } else if data.downcast::<CopyOp>().is_some() {
++            let out = op.outputs()[0];
++            let Some(input) = get_val(op.inputs()[0], &mut pntwise, &mapping)? else { return Ok(None) };
++            mapping.insert(out, input);
+         } else if let Some(reduce) = data.downcast::<ReduceAcrossDimension>() {
+             let out = op.outputs()[0];
+             let Some(value) = get_val(op.inputs()[0], &mut pntwise, &mapping)? else { return Ok(None) };
+diff --git a/crates/gpu/src/pointwise/transforms.rs b/crates/gpu/src/pointwise/transforms.rs
+index d4c2b98..0b567f3 100644
+--- a/crates/gpu/src/pointwise/transforms.rs
++++ b/crates/gpu/src/pointwise/transforms.rs
+@@ -190,7 +190,7 @@ fn fuse_subgraphs(ir: &TensorIR, op_i: OpId, op_j: OpId) -> Result<(SubGraph, Ve
+     for (&out, &new_out) in op_i.outputs().iter().zip(outputs_i.iter()) {
+         map.insert(out, new_out);
+ 
+-        if !op_j_set.contains(&out) || ir.get_node(out)?.children() > 1 {
++        if !op_j_set.contains(&out) || ir.get_node(out)?.children() > 1 || ir.is_output(out) {
+             total_outputs.push(out);
+             new_sub.register_output(new_out);
+         }
+diff --git a/crates/gpu/src/runtime.rs b/crates/gpu/src/runtime.rs
+index f439898..c6f116f 100644
+--- a/crates/gpu/src/runtime.rs
++++ b/crates/gpu/src/runtime.rs
+@@ -296,7 +296,14 @@ impl<G: Gpu> Module<G> {
+         let opt_ptr_ptr = if options_ptrs.is_empty() { std::ptr::null() } else { options_ptrs.as_ptr() };
+ 
+         let src = CString::new(source_code.into()).map_err(|e| format!("{e:?}"))?;
+-        let code = unsafe { G::program_compile(&src, options_ptrs.len() as i32, opt_ptr_ptr)? };
++        let code = match unsafe { G::program_compile(&src, options_ptrs.len() as i32, opt_ptr_ptr) } {
++            Err(e) if !options.is_empty() && format!("{e:?}").contains("INVALID_OPTION") => {
++                // NVRTC doesn't support this arch (e.g. sm_120 on CUDA 12.4).
++                // Fall back to generic PTX; the CUDA driver JIT-compiles it to native arch.
++                unsafe { G::program_compile(&src, 0, std::ptr::null()) }?
++            }
++            other => other?,
++        };
+         let module = unsafe { G::module_create(code.as_ptr().cast())? };
+ 
+         Ok(Arc::new(Self { device, module }))
+-- 
+2.53.0
+
