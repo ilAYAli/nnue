@@ -269,6 +269,18 @@ publish() {
 wake_agent() {
     [ "$AI_STDIN_ENABLE" = "1" ] || return 0
 
+    # Preferred: notifai.sh uses tmux paste-buffer + send-keys C-m so the
+    # message is injected and Enter is sent — no manual keypress needed.
+    if [ "$NOTIFAI_ENABLE" = "1" ] && command -v "$NOTIFAI_COMMAND" >/dev/null 2>&1; then
+        if "$NOTIFAI_COMMAND" "$rendered"; then
+            printf '%s event=%s → AI_stdin (notifai)\n' \
+                "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+            return 0
+        fi
+        printf '%s event=%s notifai failed, falling back to direct\n' \
+            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+    fi
+
     if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "4"; then
         printf '%s event=%s → AI_stdin direct\n' \
             "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
