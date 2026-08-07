@@ -915,9 +915,16 @@ fn train_enyo<
                 $builder.new_affine("l2", l2_size, 32)
             });
             let l2s = if MIXED_ACTIVATION {
-                Some(maybe_frozen($builder, !train_squared, || {
-                    zero_affine($builder, "l2s", l2_size, 32)
-                }))
+                // Freeze l2sb so its gradient CopyOp is not registered as a backward
+                // output — prevents a CopyOp(f32[32]) from surviving EliminateCopies.
+                // The squared branch shares l2b as its additive offset; l2sb stays zero.
+                let weights = maybe_frozen($builder, !train_squared, || {
+                    $builder.new_weights("l2sw", Shape::new(32, l2_size), InitSettings::Zeroed)
+                });
+                let bias = $builder.no_grad(|| {
+                    $builder.new_weights("l2sb", Shape::new(32, 1), InitSettings::Zeroed)
+                });
+                Some(Affine { weights, bias })
             } else {
                 None
             };
@@ -941,8 +948,14 @@ fn train_enyo<
                 .faux_quantise(1.0, false);
             let ntm_hidden = (l0.forward($ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
                 .faux_quantise(1.0, false);
-            let activation_penalty = (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
-                * (activation_l1 / (2.0 * hidden as f32));
+            let activation_penalty = if activation_l1 > 0.0 {
+                Some(
+                    (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
+                        * (activation_l1 / (2.0 * hidden as f32)),
+                )
+            } else {
+                None
+            };
             let x0 = stm_hidden.concat(ntm_hidden);
             let x1_pre = l1.forward(x0);
             let x1 = x1_pre.relu();
@@ -1009,9 +1022,13 @@ fn train_enyo<
                 $builder.new_affine("l2", l2_size, head_count * 32)
             });
             let l2s = if MIXED_ACTIVATION {
-                Some(maybe_frozen($builder, !train_squared, || {
-                    zero_affine($builder, "l2s", l2_size, 32)
-                }))
+                let weights = maybe_frozen($builder, !train_squared, || {
+                    $builder.new_weights("l2sw", Shape::new(32, l2_size), InitSettings::Zeroed)
+                });
+                let bias = $builder.no_grad(|| {
+                    $builder.new_weights("l2sb", Shape::new(32, 1), InitSettings::Zeroed)
+                });
+                Some(Affine { weights, bias })
             } else {
                 None
             };
@@ -1035,8 +1052,14 @@ fn train_enyo<
                 .faux_quantise(1.0, false);
             let ntm_hidden = (l0.forward($ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
                 .faux_quantise(1.0, false);
-            let activation_penalty = (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
-                * (activation_l1 / (2.0 * hidden as f32));
+            let activation_penalty = if activation_l1 > 0.0 {
+                Some(
+                    (stm_hidden.reduce_sum_rows() + ntm_hidden.reduce_sum_rows())
+                        * (activation_l1 / (2.0 * hidden as f32)),
+                )
+            } else {
+                None
+            };
             let x0 = stm_hidden.concat(ntm_hidden);
             let x1_pre = if FULL_HEADS {
                 l1.forward(x0).select($output_buckets)
@@ -1237,7 +1260,11 @@ fn train_enyo<
         run_trainer!(
             base_trainer!().build_custom(|builder, (stm_inputs, ntm_inputs), target| {
                 let (output, activation_penalty) = enyo_forward!(builder, stm_inputs, ntm_inputs);
-                let loss = output.sigmoid().power_error(target, 3.0) + activation_penalty;
+                let base_loss = output.sigmoid().power_error(target, 3.0);
+                let loss = match activation_penalty {
+                    Some(ap) => base_loss + ap,
+                    None => base_loss,
+                };
                 (output, loss)
             })
         );
@@ -1248,7 +1275,11 @@ fn train_enyo<
                 |builder, (stm_inputs, ntm_inputs, output_buckets), target| {
                     let (output, activation_penalty) =
                         enyo_forward!(builder, stm_inputs, ntm_inputs, output_buckets);
-                    let loss = output.sigmoid().power_error(target, 3.0) + activation_penalty;
+                    let base_loss = output.sigmoid().power_error(target, 3.0);
+                    let loss = match activation_penalty {
+                        Some(ap) => base_loss + ap,
+                        None => base_loss,
+                    };
                     (output, loss)
                 }
             ));
