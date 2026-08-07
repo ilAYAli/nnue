@@ -87,7 +87,9 @@ def print_result(*, run: str, requested_games: int) -> None:
     if games != requested_games:
         sys.exit(f"Error: incomplete Forge result (games={games} requested={requested_games})")
 
-    print(f"elo={metrics['elo']} llr={metrics['llr'].split('/')[0]}")
+    ci = metrics.get("ci", "")
+    ci_part = f" ci={ci}" if ci else ""
+    print(f"elo={metrics['elo']} llr={metrics['llr'].split('/')[0]}{ci_part}")
 
 
 def main() -> None:

@@ -78,7 +78,7 @@ CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
-STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-500}
+STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-3000}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
 STOCKFISH_NET_MIN_DELTA=${STOCKFISH_NET_MIN_DELTA:-0}
 SKIP_SF_GATE=${SKIP_SF_GATE:-0}
@@ -206,6 +206,9 @@ load_config() {
     reference_net=
   fi
   summary_file=${summary_file:-runs/logs/nnue-iterate-$(date +%Y%m%d_%H%M%S).txt}
+  if [[ $(json '.skip_stockfish_gate // false') == "true" ]]; then
+    SKIP_SF_GATE=1
+  fi
 }
 
 reference_label() {
@@ -272,7 +275,7 @@ notify() {
       good_news:($event == "iteration_done" and $user_notify)
     }
     | if $sprt == null then . else .sprt = $sprt end')
-  NNUE_RUN_EVENT_JSON=$payload NNUE_HOOK_EVENTS="${HOOK_EVENTS:-}" "$EVENT_HOOK" >/dev/null 2>&1 || true
+  NNUE_RUN_EVENT_JSON=$payload NNUE_HOOK_EVENTS="${HOOK_EVENTS:-$NNUE_AI_STDIN_EVENTS}" "$EVENT_HOOK" >/dev/null 2>&1 || true
 }
 
 notify_sprt() {
@@ -1025,6 +1028,7 @@ commit_and_bump_build_json() {
   fi
   hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
   if [[ -n "$pending_stockfish_results" ]]; then
+    mkdir -p "$(dirname "$STOCKFISH_NET_LEDGER")"
     printf '%s\n' "$pending_stockfish_results" >> "$STOCKFISH_NET_LEDGER"
     pending_stockfish_results=
   fi
@@ -1152,31 +1156,38 @@ latest_stockfish_result() {
 }
 
 run_stockfish_benchmark() {
-  local candidate=$1 candidate_path ledger_tmp
+  local candidate=$1 candidate_path qsprt_tmp result_line elo ci
   candidate_path="$HOME/assets/nets/$candidate.nn"
   [[ -f "$candidate_path" ]] \
     || fail "missing Stockfish benchmark candidate: $candidate_path" stockfish_net_sprt
   echo "Stockfish benchmark candidate=$candidate path=$candidate_path"
+
+  # Stream QSPRT output to terminal while capturing the result line.
+  # Temporarily disable pipefail so we can check PIPESTATUS[0] manually.
+  qsprt_tmp=$(mktemp)
+  set +o pipefail
   GAMES="$STOCKFISH_NET_GAMES" STOCKFISH_NET="$STOCKFISH_NET" "$QSPRT" \
-    --candidate "$candidate_path" \
+    --candidate "$candidate_path" | tee "$qsprt_tmp"
+  local qsprt_rc=${PIPESTATUS[0]}
+  set -o pipefail
+  result_line=$(tail -1 "$qsprt_tmp")
+  rm -f "$qsprt_tmp"
+  [[ $qsprt_rc -eq 0 ]] \
     || fail "Stockfish net benchmark failed for $candidate" stockfish_net_sprt
 
-  stockfish_result=$(tail -n 1 "$STOCKFISH_NET_LEDGER")
-  jq -e \
+  elo=$(grep -o 'elo=[^ ]*' <<< "$result_line" | cut -d= -f2)
+  ci=$(grep -o 'ci=[^ ]*' <<< "$result_line" | cut -d= -f2)
+  [[ -n "$elo" && -n "$ci" ]] \
+    || fail "invalid Stockfish benchmark result for $candidate" stockfish_net_sprt
+
+  stockfish_result=$(jq -cn \
     --arg candidate "$candidate" \
     --arg reference "${STOCKFISH_NET##*/}" \
     --argjson games "$STOCKFISH_NET_GAMES" \
-    '.candidate == $candidate
-     and .reference == $reference
-     and .games == $games
-     and (.elo | type) == "number"
-     and (.ci | type) == "number"' \
-    <<< "$stockfish_result" >/dev/null \
-    || fail "invalid Stockfish benchmark result for $candidate" stockfish_net_sprt
+    --argjson elo "$elo" \
+    --argjson ci "$ci" \
+    '{candidate:$candidate, reference:$reference, games:$games, elo:$elo, ci:$ci}')
 
-  ledger_tmp=$(mktemp)
-  sed '$d' "$STOCKFISH_NET_LEDGER" > "$ledger_tmp"
-  mv "$ledger_tmp" "$STOCKFISH_NET_LEDGER"
   if [[ -n "$pending_stockfish_results" ]]; then
     pending_stockfish_results+=$'\n'
   fi
@@ -1225,11 +1236,10 @@ stockfish_net_gate() {
   last_stockfish_line="Stockfish gate: $candidate ${candidate_elo} vs $champion ${champion_elo}; delta=${stockfish_delta}, upper90=${stockfish_upper90}"
   echo "$last_stockfish_line"
   # Veto on the one-sided 90% upper bound, not the point estimate. Both sides
-  # are measured at STOCKFISH_NET_GAMES (default 500), where ci is about 30, so
-  # the delta carries roughly +/-42. Testing the raw delta against 0 rejects a
-  # genuinely equal candidate half the time and a true +5 Elo candidate about
-  # 45% of the time - a coin flip standing in front of the SPRT that could
-  # actually measure it. This benchmark resolves gross drift, not small
+  # are measured at STOCKFISH_NET_GAMES (default 3000), where ci is about 9, so
+  # the delta carries roughly +/-13. Testing the raw delta against 0 rejects a
+  # genuinely equal candidate half the time. This benchmark resolves gross drift,
+  # not small
   # differences, so the gate should only fire when even the optimistic bound
   # says the candidate is worse.
   float_lt "$stockfish_upper90" "$STOCKFISH_NET_MIN_DELTA" && return 1
@@ -1319,7 +1329,7 @@ Usage:
 
 Useful overrides:
   ITERATIONS=5 ./nnue iterate
-  STOCKFISH_NET_EVERY=3 STOCKFISH_NET_GAMES=500 ./nnue iterate
+  STOCKFISH_NET_EVERY=3 STOCKFISH_NET_GAMES=3000 ./nnue iterate
   ./nnue iterate --full-sprt-first  # first iteration skips train/gates/smoke
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
   SKIP_SMOKE=1 GAMES=800 ./nnue iterate

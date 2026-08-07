@@ -269,7 +269,7 @@ publish() {
 wake_agent() {
     [ "$AI_STDIN_ENABLE" = "1" ] || return 0
 
-    if publish "$AI_STDIN_URL" "$rendered" "Enyo NNUE $event_name" "4"; then
+    if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "4"; then
         printf '%s event=%s → AI_stdin direct\n' \
             "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         return 0
@@ -318,7 +318,7 @@ if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$HOOK_EVENTS"; 
     if ! wake_agent; then
         priority=4
         [ "$event_name" = "fail" ] && priority=5
-        if publish "$AI_STDIN_URL" "$rendered" "Enyo NNUE $event_name" "$priority"; then
+        if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "$priority"; then
             printf '%s event=%s → AI_stdin\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         else
             rc=$?
