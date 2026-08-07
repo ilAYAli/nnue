@@ -1,8 +1,9 @@
 {
-  "run": "enyo-scc-2.0.0-rc1",
+  "run": "enyo-scc-2.0.0-rc2",
   "reference": "enyo-scc-1.2.0-rc2",
   "initialize_from": "enyo-scc-1.2.0-rc2",
   "hypothesis": "SCReLU (mixed activation, enyo-native-v4) warm-start from rc2. Adds squared branch at L2: activation = relu(Wx+b) + relu(Wx_sq+b_sq) where x_sq = clamp(x,127)^2/127. Squared branch initializes to zero — net starts identical to CReLU and the optimizer gradually activates the branch. Tests SCReLU as isolated variable at current best config (WDL=0.05, cubic loss |e|^3, AdamW beta1=0.95, final_lr=2.5e-5). Reference engines (Stormphrax, Obsidian) report 10-25 Elo from this change.",
+  "skip_stockfish_gate": true,
   "superbatches": 231321,
   "trainable": "all",
   "wdl": 0.05,
