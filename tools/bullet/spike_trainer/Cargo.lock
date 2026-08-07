@@ -32,12 +32,10 @@ dependencies = [
 [[package]]
 name = "bullet-compiler"
 version = "0.1.0"
-source = "git+https://github.com/jw1912/bullet#d372d487aedfeb8bdc256b9f694dbcd41016bf82"
 
 [[package]]
 name = "bullet-gpu"
 version = "0.1.0"
-source = "git+https://github.com/jw1912/bullet#d372d487aedfeb8bdc256b9f694dbcd41016bf82"
 dependencies = [
  "bullet-compiler",
 ]
@@ -45,7 +43,6 @@ dependencies = [
 [[package]]
 name = "bullet-trainer"
 version = "0.1.0"
-source = "git+https://github.com/jw1912/bullet#d372d487aedfeb8bdc256b9f694dbcd41016bf82"
 dependencies = [
  "bullet-compiler",
  "bullet-gpu",
@@ -56,7 +53,6 @@ dependencies = [
 [[package]]
 name = "bullet_lib"
 version = "1.0.0"
-source = "git+https://github.com/jw1912/bullet#d372d487aedfeb8bdc256b9f694dbcd41016bf82"
 dependencies = [
  "bullet-compiler",
  "bullet-gpu",
@@ -308,9 +304,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.150"
+version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
+checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
 dependencies = [
  "itoa",
  "memchr",
@@ -499,6 +495,6 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.21"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"

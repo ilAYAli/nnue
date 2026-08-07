@@ -915,13 +915,10 @@ fn train_enyo<
                 $builder.new_affine("l2", l2_size, 32)
             });
             let l2s = if MIXED_ACTIVATION {
-                // Freeze l2sb so its gradient CopyOp is not registered as a backward
-                // output — prevents a CopyOp(f32[32]) from surviving EliminateCopies.
-                // The squared branch shares l2b as its additive offset; l2sb stays zero.
                 let weights = maybe_frozen($builder, !train_squared, || {
                     $builder.new_weights("l2sw", Shape::new(32, l2_size), InitSettings::Zeroed)
                 });
-                let bias = $builder.no_grad(|| {
+                let bias = maybe_frozen($builder, !train_squared, || {
                     $builder.new_weights("l2sb", Shape::new(32, 1), InitSettings::Zeroed)
                 });
                 Some(Affine { weights, bias })
@@ -1025,7 +1022,7 @@ fn train_enyo<
                 let weights = maybe_frozen($builder, !train_squared, || {
                     $builder.new_weights("l2sw", Shape::new(32, l2_size), InitSettings::Zeroed)
                 });
-                let bias = $builder.no_grad(|| {
+                let bias = maybe_frozen($builder, !train_squared, || {
                     $builder.new_weights("l2sb", Shape::new(32, 1), InitSettings::Zeroed)
                 });
                 Some(Affine { weights, bias })
