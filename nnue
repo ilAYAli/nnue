@@ -1147,9 +1147,11 @@ latest_stockfish_result() {
   jq -sc \
     --arg candidate "$candidate" \
     --arg reference "${STOCKFISH_NET##*/}" \
+    --argjson games "$STOCKFISH_NET_GAMES" \
     '[.[] | select(
         .candidate == $candidate
         and .reference == $reference
+        and .games == $games
         and (.valid != false)
       )] | last // empty' \
     "$STOCKFISH_NET_LEDGER"
