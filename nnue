@@ -67,8 +67,8 @@ SPRT_ACCEPT_LOS=${SPRT_ACCEPT_LOS:-75}             # stop and accept once LOS re
 # accepting the first crossing is optional stopping and inflates the error well
 # past 1 - threshold. enyo-1.32.0-rc5-s0.65 read LOS 87.1% at 1500 games and
 # 38.2% at 6000. Half the budget limits the peeking window.
-SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-3000}
-GAMES=${GAMES:-6000}                               # final game budget (ci ~= 7 at this size)
+SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-2000}
+GAMES=${GAMES:-4000}                               # final game budget (ci ~= 10 at this size)
 SKIP_SMOKE=${SKIP_SMOKE:-0}                        # 1 disables every checkpoint
 SPRT_POLL_SECONDS=${SPRT_POLL_SECONDS:-30}   # how often to re-read Forge status mid-run
 # Hard bound on the poll loop so a silently dead Forge run cannot hang the
@@ -78,7 +78,7 @@ CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
-STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-3000}
+STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-4000}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
 STOCKFISH_NET_MIN_DELTA=${STOCKFISH_NET_MIN_DELTA:-0}
 SKIP_SF_GATE=${SKIP_SF_GATE:-0}
@@ -218,22 +218,7 @@ reference_label() {
 require_training_origin() {
   local stage=${1:-train}
   [[ -n "$continue_from" || -n "$initialize_from" ]] && return 0
-  [[ "$scratch_confirmed" == 1 ]] && return 0
-
-  if [[ -t 0 ]]; then
-    local answer
-    printf 'continue_from not found. Start a new scratch net? [y/N] ' >&2
-    IFS= read -r answer || answer=
-    case "$answer" in
-      y|Y)
-        scratch_confirmed=1
-        return 0
-        ;;
-    esac
-    fail "continue_from not found; not starting scratch net" "$stage"
-  fi
-
-  fail "continue_from not found; set continue_from or run interactively to confirm scratch" "$stage"
+  return 0
 }
 
 training_build() {

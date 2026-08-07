@@ -2168,6 +2168,8 @@ fn resume_config_sha256(config: &Config) -> Result<String, String> {
     let mut build = config.build.clone();
     if let Some(build) = build.as_object_mut() {
         build.remove("superbatches");
+        build.remove("hypothesis");
+        build.remove("reference");
     }
     let resolved = serde_json::json!({
         "architecture": &config.arch,
@@ -2388,6 +2390,12 @@ fn resume_training(config: &Config, force: bool) -> bool {
     let candidate = expand_path(&net_path(config));
     if !model.is_file() && !candidate.is_file() {
         return false;
+    }
+
+    if std::env::var("REUSE").as_deref() == Ok("1") && candidate.is_file() {
+        ensure_training_data(config);
+        println!("training_artifacts=reused (REUSE=1)");
+        return true;
     }
     if latest_current_checkpoint(config)
         .is_some_and(|(superbatch, _)| superbatch < training_superbatches(config))
