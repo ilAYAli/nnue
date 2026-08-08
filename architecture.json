@@ -13,6 +13,5 @@
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
-  "dense_activation": "relu-screlu-residual",
-  "export_format": "enyo-native-v4"
+  "export_format": "enyo-native-v2"
 }
