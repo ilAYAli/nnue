@@ -209,6 +209,9 @@ load_config() {
   if [[ $(json '.skip_stockfish_gate // false') == "true" ]]; then
     SKIP_SF_GATE=1
   fi
+  if [[ $(json '.skip_residual_gate // false') == "true" ]]; then
+    SKIP_RESIDUAL_GATE=1
+  fi
 }
 
 reference_label() {
@@ -1136,7 +1139,7 @@ latest_stockfish_result() {
     '[.[] | select(
         .candidate == $candidate
         and .reference == $reference
-        and .games == $games
+        and .games >= $games
         and (.valid != false)
       )] | last // empty' \
     "$STOCKFISH_NET_LEDGER"
