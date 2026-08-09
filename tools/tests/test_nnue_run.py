@@ -11,12 +11,13 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[2]
+DISPATCH_MARKER = "\nmain() {\n"
 
 
 class NnueRunTests(unittest.TestCase):
     def run_sourced(self, body: str) -> subprocess.CompletedProcess[str]:
         text = (REPO / "nnue").read_text(encoding="utf-8")
-        prefix = text.split(chr(10) + 'case "$cmd" in' + chr(10), 1)[0]
+        prefix = text.split(DISPATCH_MARKER, 1)[0]
         return subprocess.run(
             ["bash", "-s"],
             input=f"{prefix}\n{body}\n",
@@ -27,6 +28,11 @@ class NnueRunTests(unittest.TestCase):
 
     def test_shell_syntax_is_valid(self) -> None:
         subprocess.run(["bash", "-n", str(REPO / "nnue")], check=True)
+
+    def test_dispatch_is_parsed_before_long_running_command(self) -> None:
+        source = (REPO / "nnue").read_text(encoding="utf-8")
+        self.assertEqual(1, source.count(DISPATCH_MARKER))
+        self.assertTrue(source.rstrip().endswith('main "$@"'))
 
     def test_help_documents_thin_interface(self) -> None:
         proc = subprocess.run(
@@ -152,7 +158,7 @@ class NnueRunTests(unittest.TestCase):
             )
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 load_config
 printf 'label=%s\n' "$(reference_label)"
@@ -196,7 +202,7 @@ printf 'net=%s\n' "$reference_net"
             )
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 load_config
 printf 'data=%s\n' "$data_file"
@@ -258,7 +264,7 @@ printf 'data=%s\n' "$data_file"
             )
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 load_config
 printf 'label=%s\n' "$(reference_label)"
@@ -301,7 +307,7 @@ printf 'net=%s\n' "$reference_net"
             build.write_text('{"run":"native-2.0.0-rc14"}\n', encoding="utf-8")
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 load_config
 printf 'label=%s\n' "$(reference_label)"
@@ -342,7 +348,7 @@ printf 'net=%s\n' "$reference_net"
             )
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 load_config
 """
@@ -386,7 +392,7 @@ load_config
             )
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 load_config
 training_build >/dev/null
@@ -439,7 +445,7 @@ training_build >/dev/null
             )
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 load_config
 training_build >/dev/null
@@ -494,7 +500,7 @@ training_build >/dev/null
             helper.chmod(0o755)
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 TRAIN_HELPER="$TEST_HELPER"
@@ -556,7 +562,7 @@ train
             helper.chmod(0o755)
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 TRAIN_HELPER="$TEST_HELPER"
@@ -627,7 +633,7 @@ train
             helper.chmod(0o755)
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 TRAIN_HELPER="$TEST_HELPER"
@@ -1000,7 +1006,7 @@ stockfish_net_gate challenger
                 encoding="utf-8",
             )
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + '''
+            harness = source.split(DISPATCH_MARKER, 1)[0] + '''
 BUILD=build.json
 ARCH=architecture.json
 PROMOTED_NET_LINK=candidate.net
@@ -1105,7 +1111,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "For
                 encoding="utf-8",
             )
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
 PROMOTED_NET_LINK=candidate.net
@@ -1182,7 +1188,7 @@ bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "For
                 encoding="utf-8",
             )
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
 PROMOTED_NET_LINK=candidate.net
@@ -1287,7 +1293,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
                 encoding="utf-8",
             )
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
 AUTO_ADVANCE=1
@@ -1358,7 +1364,7 @@ fail_build_json "native-3.3.0-rc1" "-6.1" "-0.17/2.20 (-8%)" "forge command" "Fo
             )
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
 AUTO_ADVANCE=1
@@ -1426,7 +1432,7 @@ fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "
                 encoding="utf-8",
             )
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
 NNUE_NTFY=0
@@ -1495,7 +1501,7 @@ iterate
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 SMOKE_FAIL_ELO=-100.0
 check_smoke() {
   if smoke_sprt_failed "$1" "$2"; then
@@ -1545,7 +1551,7 @@ check_smoke 4.0 -0.22/2.20 positive_elo
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 last_sprt_early_accept=1
 last_sprt_los=81.0
 last_sprt_elo=5.2
@@ -1579,7 +1585,7 @@ if full_sprt_pass; then printf 'unexpected_pass\n'; else printf 'reject\n'; fi
             build.write_text('{"run":"candidate","continue_from":"reference"}\n', encoding="utf-8")
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
@@ -1621,7 +1627,7 @@ move_gate
             build.write_text('{"run":"candidate","continue_from":"reference"}\n', encoding="utf-8")
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
@@ -1667,7 +1673,7 @@ move_gate
             trace = tmp / "trace.txt"
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
@@ -1733,7 +1739,7 @@ sprt_gate
             trace = tmp / "trace.txt"
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
@@ -1787,7 +1793,7 @@ sprt_gate || printf 'rejected\n'
             trace = tmp / "trace.txt"
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
@@ -1840,7 +1846,7 @@ sprt_gate
             trace = tmp / "trace.txt"
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
@@ -1882,7 +1888,7 @@ sprt_gate
             tmp = Path(tmp_name)
             trace = tmp / "trace.txt"
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 run=candidate
 last_sprt_elo=7.5
 last_sprt_llr='2.21/2.20 (100%)'
@@ -1918,7 +1924,7 @@ sprt_command
             tmp = Path(tmp_name)
             trace = tmp / "trace.txt"
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 run=candidate
 last_sprt_elo=-25.0
 last_sprt_llr='-2.21/2.20 (-100%)'
@@ -1953,7 +1959,7 @@ sprt_command
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 printf '%s\n' "$NNUE_HOOK_EVENTS"
 """
             harness_path = tmp / "harness.sh"
@@ -2024,7 +2030,7 @@ printf '%s\n' "$NNUE_HOOK_EVENTS"
             done = tmp / "done"
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 SPRT_POLL_SECONDS=1
 SOLO=0
@@ -2123,7 +2129,7 @@ printf 'llr=%s\n' "$last_sprt_llr"
             forge_calls = tmp / "forge-calls.txt"
 
             source = (REPO / "nnue").read_text(encoding="utf-8")
-            harness = source.split('case "$cmd" in', 1)[0] + """
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
 NNUE_NTFY=0
 SPRT_POLL_SECONDS=1
 SOLO=0

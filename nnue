@@ -1383,13 +1383,20 @@ Safety:
 EOF
 }
 
-case "$cmd" in
-  iterate) iterate ;;
-  plan) plan ;;
-  train) train ;;
-  gates) gates ;;
-  sprt) sprt_command ;;
-  status) status ;;
-  help|-h|--help) help ;;
-  *) fail "unknown command: $cmd" ;;
-esac
+# Keep dispatch inside one parsed compound command. A long-running invocation
+# may outlive a repository update; Bash must not resume by reading a new tail
+# from the script path after Forge returns.
+main() {
+  case "$cmd" in
+    iterate) iterate ;;
+    plan) plan ;;
+    train) train ;;
+    gates) gates ;;
+    sprt) sprt_command ;;
+    status) status ;;
+    help|-h|--help) help ;;
+    *) fail "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"
