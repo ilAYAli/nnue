@@ -58,6 +58,10 @@ After four consecutive valid candidates from the same parent fail to gain Elo,
 stop tuning ordinary training parameters. Void runs and infrastructure failures
 do not count; an accepted candidate resets the count.
 
+At that boundary, `pwa-5090` may train the next feature via `initialize_from`
+while `pwa-llm` tests one final conventional candidate via `continue_from`.
+Both branch from the same accepted parent and must finish before parent selection.
+
 Test one feature at a time, in this order:
 
 1. Increase L2 width from 16 to 32.
