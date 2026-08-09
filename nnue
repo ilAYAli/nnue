@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Thin native NNUE loop:
-#   ./nnue iterate   train, gate, SPRT, bump build.json on success, stop on failure
+#   ./nnue iterate   train, gate, SPRT, commit result, stop for reconciliation
 #   ./nnue iterate --full-sprt-first  run full SPRT directly for iteration 1 only
 #   ./nnue plan      show resolved tools/bullet/train plan
 #   ./nnue train     data + train + export
@@ -77,6 +77,7 @@ SPRT_MAX_WAIT_SECONDS=${SPRT_MAX_WAIT_SECONDS:-86400}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
 ITERATIONS=${ITERATIONS:-999}
+AUTO_ADVANCE=${AUTO_ADVANCE:-0}                    # 1 restores legacy build bump + symlink promotion
 STOCKFISH_NET=${STOCKFISH_NET:-nn-0ee0657fb25e.nnue}
 STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-4000}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
@@ -1005,14 +1006,12 @@ commit_and_bump_build_json() {
   local result=$1 accepted=$2 elo=$3 llr=$4 command=$5 details=$6
   local next next_base subject hypothesis
   local -a commit_paths=("$BUILD" "$ARCH")
+  [[ "$AUTO_ADVANCE" == 0 || "$AUTO_ADVANCE" == 1 ]] \
+    || fail "AUTO_ADVANCE must be 0 or 1, got: $AUTO_ADVANCE" iterate
   if [[ "$result" == PASS ]]; then
     subject="${accepted}.nn: Elo ${elo},LLR ${llr}"
-    next_base=$accepted
-    next=$(next_promoted_run_name "$accepted")
   else
     subject="${accepted}.nn: rejected: Elo ${elo},LLR ${llr}"
-    next_base=${continue_from:-}
-    next=$(next_run_name "$accepted")
   fi
   hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
   if [[ -n "$pending_stockfish_results" ]]; then
@@ -1036,14 +1035,24 @@ $details" \
     -- "${commit_paths[@]}" || commit_rc=$?
   if (( commit_rc != 0 )); then
     if (( commit_rc == 1 )) && git diff --cached --quiet; then
-      : # empty commit — nothing staged, proceed to bump
+      : # empty commit — nothing staged
     else
       return $commit_rc
     fi
   fi
 
+  if [[ "$AUTO_ADVANCE" != 1 ]]; then
+    echo "committed $BUILD: run=$accepted; automatic advancement disabled"
+    return 0
+  fi
+
   if [[ "$result" == PASS ]]; then
+    next_base=$accepted
+    next=$(next_promoted_run_name "$accepted")
     ln -sfn "$accepted.nn" "$PROMOTED_NET_LINK" || return
+  else
+    next_base=${continue_from:-}
+    next=$(next_run_name "$accepted")
   fi
 
   local tmp
@@ -1098,7 +1107,11 @@ fail_build_json() {
 commit_failed_iteration() {
   fail_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-failed sprt}" \
     || fail "failed build.json commit failed for $run" iterate
-  record_iteration FAIL "rejected; build.json advanced"
+  if [[ "$AUTO_ADVANCE" == 1 ]]; then
+    record_iteration FAIL "rejected; build.json advanced"
+  else
+    record_iteration FAIL "rejected; awaiting reconciliation"
+  fi
   notify fail iterate "rejected $run: ${last_sprt_line:-sprt failed}" "$summary_file" 1
   print_summary || true
 }
@@ -1290,8 +1303,13 @@ iterate() {
     fi
     bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
       || fail "build.json commit failed for $run" iterate
-    record_iteration PASS "accepted; build.json advanced"
+    if [[ "$AUTO_ADVANCE" == 1 ]]; then
+      record_iteration PASS "accepted; build.json advanced"
+    else
+      record_iteration PASS "accepted; awaiting reconciliation"
+    fi
     notify iteration_done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
+    [[ "$AUTO_ADVANCE" == 1 ]] || break
   done
   print_summary
 }
@@ -1308,7 +1326,7 @@ status() {
 help() {
   cat <<'EOF'
 Usage:
-  ./nnue iterate   # main command: train, gate, SPRT, bump build.json on pass
+  ./nnue iterate   # train, gate, SPRT, commit result, stop for reconciliation
   ./nnue iterate --full-sprt-first
   ./nnue plan
   ./nnue train
@@ -1318,6 +1336,7 @@ Usage:
   ./nnue status
 
 Useful overrides:
+  AUTO_ADVANCE=1 ./nnue iterate  # legacy: promote symlink and prepare next build
   ITERATIONS=5 ./nnue iterate
   STOCKFISH_NET_EVERY=3 STOCKFISH_NET_GAMES=3000 ./nnue iterate
   ./nnue iterate --full-sprt-first  # first iteration skips train/gates/smoke
@@ -1337,6 +1356,7 @@ Staged SPRT checkpoints (one run of GAMES, polled and stopped early):
   MOVE_GATE_STRICT=1 ./nnue gates
 
 Safety:
+  automatic build advancement and symlink promotion are disabled by default
   continuation runs must set build.json continue_from
   missing continue_from asks before scratch training in an interactive terminal
   non-interactive missing continue_from fails before training

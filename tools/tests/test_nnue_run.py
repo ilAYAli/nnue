@@ -957,7 +957,7 @@ stockfish_net_gate challenger
             self.assertNotIn("reference", resolved)
             self.assertEqual("native-2.0.0-rc0", resolved["continue_from"])
 
-    def test_iteration_commit_keeps_accepted_build_and_leaves_next_diff(self) -> None:
+    def test_iteration_commit_does_not_advance_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             build = tmp / "build.json"
@@ -1011,10 +1011,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "For
 
             subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
 
-            self.assertEqual(
-                "uho-native-1.0.35.nn",
-                os.readlink(tmp / "candidate.net"),
-            )
+            self.assertFalse((tmp / "candidate.net").exists())
 
             subject = subprocess.run(
                 ["git", "show", "--no-patch", "--format=%s", "HEAD"],
@@ -1055,10 +1052,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "For
             self.assertEqual(500000000, committed_json["data"]["offset"])
 
             working_json = json.loads(build.read_text(encoding="utf-8"))
-            self.assertEqual("uho-native-1.0.36", working_json["run"])
-            self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
-            self.assertNotIn("reference", working_json)
-            self.assertEqual(600000000, working_json["data"]["offset"])
+            self.assertEqual(committed_json, working_json)
 
             diff = subprocess.run(
                 ["git", "--no-pager", "diff", "--no-color", "HEAD", "--", "build.json"],
@@ -1067,12 +1061,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "For
                 text=True,
                 stdout=subprocess.PIPE,
             ).stdout
-            self.assertIn('-  "run": "uho-native-1.0.35"', diff)
-            self.assertIn('+  "run": "uho-native-1.0.36"', diff)
-            self.assertIn('-  "continue_from": "uho-native-1.0.33"', diff)
-            self.assertIn('+  "continue_from": "uho-native-1.0.35"', diff)
-            self.assertIn('-    "offset": 500000000', diff)
-            self.assertIn('+    "offset": 600000000', diff)
+            self.assertEqual("", diff)
 
     def test_passed_release_candidate_prepares_next_minor_candidate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
@@ -1120,6 +1109,7 @@ bump_build_json "uho-native-1.0.35" "6.0" "0.49/2.20 (22%)" "forge command" "For
 BUILD=build.json
 ARCH=architecture.json
 PROMOTED_NET_LINK=candidate.net
+AUTO_ADVANCE=1
 bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "Forge result"
 """
             harness_path = tmp / "harness.sh"
@@ -1196,6 +1186,7 @@ bump_build_json "native-3.0.0-rc7" "12.3" "0.50/2.20 (23%)" "forge command" "For
 BUILD=build.json
 ARCH=architecture.json
 PROMOTED_NET_LINK=candidate.net
+AUTO_ADVANCE=1
 ln -s uho-native-1.0.35.nn "$PROMOTED_NET_LINK"
 continue_from=uho-native-1.0.35
 fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Forge result"
@@ -1299,6 +1290,7 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
+AUTO_ADVANCE=1
 continue_from=
 fail_build_json "native-3.3.0-rc1" "-6.1" "-0.17/2.20 (-8%)" "forge command" "Forge result"
 """
@@ -1369,6 +1361,7 @@ fail_build_json "native-3.3.0-rc1" "-6.1" "-0.17/2.20 (-8%)" "forge command" "Fo
             harness = source.split('case "$cmd" in', 1)[0] + """
 BUILD=build.json
 ARCH=architecture.json
+AUTO_ADVANCE=1
 continue_from=
 fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "Forge result"
 """
@@ -1392,7 +1385,7 @@ fail_build_json "native-2.0.0-rc1" "-25.2" "-0.32/2.20 (-15%)" "forge command" "
             self.assertNotIn("continue_from", working_json)
             self.assertEqual(100000000, working_json["data"]["offset"])
 
-    def test_rejected_smoke_advances_and_stops_iteration_loop(self) -> None:
+    def test_rejected_smoke_commits_without_advancing_and_stops_iteration_loop(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             build = tmp / "build.json"
@@ -1487,10 +1480,10 @@ iterate
                 "uho-native-1.0.36.nn: rejected: Elo -25.2,LLR -0.32/2.20 (-15%)",
             ], subjects)
             working_json = json.loads(build.read_text(encoding="utf-8"))
-            self.assertEqual("uho-native-1.0.37", working_json["run"])
+            self.assertEqual("uho-native-1.0.36", working_json["run"])
             self.assertEqual("uho-native-1.0.35", working_json["continue_from"])
-            self.assertNotIn("reference", working_json)
-            self.assertEqual(600000000, working_json["data"]["offset"])
+            self.assertEqual("uho-native-1.0.35", working_json["reference"])
+            self.assertEqual(500000000, working_json["data"]["offset"])
 
     def test_smoke_gate_rejects_only_catastrophic_elo(self) -> None:
         # enyo-1.33.0-rc9 false-fired at elo=-12.1/llr=-0.51 (506 games) under
