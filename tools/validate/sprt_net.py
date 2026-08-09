@@ -3,10 +3,9 @@
 
 The result itself is recorded centrally by forge (~/code/chess/forge/logs/sprt.db,
 forge_lib.status.record_sprt_completion) for every SPRT run regardless of what
-launches it - this script just launches one and prints the final result."""
+launches it. This script only launches the run; Forge owns completion."""
 
 import argparse
-import json
 import os
 import re
 import subprocess
@@ -36,11 +35,10 @@ def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
 
 
 def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: int) -> str:
-    """Launch one Forge SPRT and stream output until its verified completion."""
-    env = os.environ | {"HOOK_EVENTS": "done,fail"}
+    """Launch one Forge SPRT and stream deployment output."""
     command = [
-        "forge", "run", "sprt", "--wait", "--verify",
-        "--comment", f"candidate={candidate_net.name} vs reference={reference_net.name}",
+        "forge", "run", "sprt",
+        "--comment", f"{candidate_net.name} vs {reference_net.name}",
         "--reference", str(engine),
         "--candidate", str(engine),
         "--reference-net", str(reference_net),
@@ -51,7 +49,6 @@ def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: i
     ]
     deploy = subprocess.Popen(
         command,
-        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -70,26 +67,6 @@ def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: i
     if not match:
         sys.exit("Error: could not parse run id from forge run sprt output")
     return match.group(1)
-
-
-def print_result(*, run: str, requested_games: int) -> None:
-    status = json.loads(subprocess.run(["forge", "status", run, "--json"], capture_output=True, text=True, check=True).stdout)
-
-    if not status.get("completed_at"):
-        sys.exit("Error: incomplete Forge result")
-
-    metrics = {}
-    for field in status.get("display", {}).get("fields", []):
-        key, _, value = field.partition("=")
-        metrics[key] = value
-
-    games = int(metrics["games"].split("/")[0])
-    if games != requested_games:
-        sys.exit(f"Error: incomplete Forge result (games={games} requested={requested_games})")
-
-    ci = metrics.get("ci", "")
-    ci_part = f" ci={ci}" if ci else ""
-    print(f"elo={metrics['elo']} llr={metrics['llr'].split('/')[0]}{ci_part}")
 
 
 def main() -> None:
@@ -119,7 +96,7 @@ def main() -> None:
     check_engine_loads_net(engine, "REFERENCE_NET", reference_net)
 
     run = run_sprt(engine=engine, candidate_net=candidate_net, reference_net=reference_net, games=games)
-    print_result(run=run, requested_games=games)
+    print(f"started={run}")
 
 
 if __name__ == "__main__":
