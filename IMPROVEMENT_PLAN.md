@@ -43,6 +43,7 @@ locally, preserved with complete provenance, and integrated into canonical
 `main` only when `pwa-llm` reaches an event boundary. Promotion waits for every
 in-flight sibling from the same parent. A winning remote net becomes a parent
 only after its artifacts and hashes are verified on `pwa-llm`.
+All Forge coordination runs on `pwa-llm`; `pwa-5090` is training and worker-only.
 
 ## Priorities
 
@@ -66,16 +67,26 @@ Test one feature at a time, in this order:
 
 1. Increase L2 width from 16 to 32.
 2. Add an L2-to-output skip connection.
-3. Increase feature channels from 12 to 16.
-4. Increase input buckets from 16 to 32.
-5. Add FullThreats inputs.
-6. Add slider x-ray threat inputs.
+3. Add FullThreats inputs with verified trainer/runtime parity and
+   export-visible weights, against a matched unfactorised control.
+4. Add slider x-ray threat inputs under the same parity and export-visibility
+   requirements.
+5. Increase feature channels from 12 to 16.
+6. Increase input buckets from 16 to 32.
 7. Use independent dense heads per output bucket.
 
 Each item is a separate architecture number and uses `initialize_from` the
 current accepted parent when conversion is supported. Never combine features.
-FullThreats, x-ray threats, and independent heads remain lower priority because
-earlier tests were negative or provenance-ambiguous.
+The historical architecture race fixed `l2_size=16`, so it did not test item 1.
+Its `sf32` candidate changed both input buckets (`16` to `32`) and feature
+channels (`12` to `11`); replicated continuation was not significantly better
+than `h16`, so another input-bucket experiment is low priority.
+
+Earlier FullThreats and x-ray results are not conclusive feature tests. Their
+new rows learned sub-quantization float weights that were almost entirely erased
+on export; the FullThreats net retained only 16 nonzero values among 61,243,392
+threat weights. Do not spend games on another feature net unless its added rows
+receive updates and retain meaningful nonzero coverage after export.
 
 Detailed immutable ancestry and results belong in `LINEAGE.md`, not here.
 Procedural rules belong in `AGENTS.md` and the repository skills.
