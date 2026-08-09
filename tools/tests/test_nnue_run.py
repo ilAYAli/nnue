@@ -102,6 +102,22 @@ class NnueRunTests(unittest.TestCase):
         self.assertEqual("", proc.stderr)
         self.assertEqual(0, proc.returncode)
 
+    def test_scratch_root_skips_pairwise_only_gates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            candidate = Path(tmp_name) / "root.nn"
+            candidate.write_bytes(b"scratch root")
+            proc = self.run_sourced(
+                "NNUE_NTFY=0; run=enyo-5.0.0-rc1; log_dir=. ; "
+                f"candidate_net={shlex.quote(str(candidate))}; reference_net=; "
+                "load_config() { :; }; gate_passed() { return 1; }; "
+                "mark_gate_passed() { :; }; notify() { :; }; section() { :; }; "
+                "distinct_net_gate; move_gate"
+            )
+
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertIn("distinct_net (scratch root has no reference)", proc.stdout)
+        self.assertIn("move_gate (scratch root has no reference)", proc.stdout)
+
     def test_full_sprt_accepts_positive_at_cap(self) -> None:
         proc = self.run_sourced(
             "NNUE_NTFY=0; GAMES=3000; "
