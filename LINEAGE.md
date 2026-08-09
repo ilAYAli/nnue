@@ -22,4 +22,4 @@ Fixed external target: `nn-0ee0657fb25e.nnue`.
 
 | Run | Host | Parent | Variable | State | Net SHA-256 | Commit | Parent Elo / CI | SF Elo / CI | Games | Notes |
 |---|---|---|---|---|---|---|---|---|---:|---|
-| enyo-5.0.0-rc1 | pwa-llm | scratch | SCReLU v4 root; WDL 0.05; 221977 superbatches; preserved interleaved corpus | reserved | — | — | — | — | 0 | No `continue_from` or `initialize_from`; random initialization. |
+| enyo-5.0.0-rc1 | pwa-llm | scratch | SCReLU v4 root; WDL 0.05; 221977 superbatches; preserved interleaved corpus | training | — | — | — | — | 0 | No `continue_from` or `initialize_from`; random initialization. |
