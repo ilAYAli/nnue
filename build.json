@@ -1,12 +1,11 @@
 {
-  "run": "enyo-scc-2.0.0-rc3",
-  "reference": "enyo-scc-1.0.0-rc1",
-  "hypothesis": "SCReLU squared branch needs 2x superbatches to converge from scratch",
-  "skip_stockfish_gate": true,
-  "superbatches": 443954,
+  "run": "enyo-5.1.0-rc2",
+  "hypothesis": "switching the continuation corpus to the preserved self-play-1.2 shuffle improves the clean SCReLU root",
+  "superbatches": 221977,
   "trainable": "all",
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
-  }
+  },
+  "continue_from": "enyo-5.0.0-rc1"
 }
