@@ -52,5 +52,26 @@ only after its artifacts and hashes are verified on `pwa-llm`.
 4. Change architecture only after training variables are understood.
 5. Continue until the lineage statistically beats the fixed SF net.
 
+## Architecture fallback
+
+After four consecutive valid candidates from the same parent fail to gain Elo,
+stop tuning ordinary training parameters. Void runs and infrastructure failures
+do not count; an accepted candidate resets the count.
+
+Test one feature at a time, in this order:
+
+1. Increase L2 width from 16 to 32.
+2. Add an L2-to-output skip connection.
+3. Increase feature channels from 12 to 16.
+4. Increase input buckets from 16 to 32.
+5. Add FullThreats inputs.
+6. Add slider x-ray threat inputs.
+7. Use independent dense heads per output bucket.
+
+Each item is a separate architecture number and uses `initialize_from` the
+current accepted parent when conversion is supported. Never combine features.
+FullThreats, x-ray threats, and independent heads remain lower priority because
+earlier tests were negative or provenance-ambiguous.
+
 Detailed immutable ancestry and results belong in `LINEAGE.md`, not here.
 Procedural rules belong in `AGENTS.md` and the repository skills.
