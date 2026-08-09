@@ -1,9 +1,13 @@
 {
-  "run": "enyo-lc-1.0.0-rc1",
-  "hypothesis": "New lc0 self-play lineage from scratch. WDL=0.3 (default, scc used 0.05 throughout — never ablated). Cubic loss, AdamW beta1=0.95, final_lr=2.5e-5. Clean lineage start — no borrowed weights.",
-  "superbatches": 231321,
-  "final_lr": 0.000025,
+  "run": "enyo-scc-2.1.0-rc1",
+  "hypothesis": "a second SCReLU training dose improves the converted SCReLU parent",
+  "skip_residual_gate": true,
+  "skip_stockfish_gate": true,
+  "superbatches": 221977,
+  "trainable": "all",
+  "wdl": 0.05,
   "data": {
-    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
-  }
+    "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-interleaved.bullet"
+  },
+  "continue_from": "enyo-scc-2.0.0-rc2"
 }
