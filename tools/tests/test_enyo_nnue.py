@@ -13,6 +13,7 @@ def _zero_net(
     output_head_features: int = 0,
     full_threats: bool = False,
     full_heads: bool = False,
+    mixed_activation: bool = False,
 ) -> nn2.Net:
     head_count = output_buckets if full_heads else 1
     return nn2.Net(
@@ -46,6 +47,15 @@ def _zero_net(
         output_head_features=output_head_features,
         full_threats=full_threats,
         full_heads=full_heads,
+        mixed_activation=mixed_activation,
+        l2_squared_weights=(
+            np.zeros((nn2.N_L3, nn2.N_L2), dtype=np.float32)
+            if mixed_activation else None
+        ),
+        l2_squared_biases=(
+            np.zeros(nn2.N_L3, dtype=np.float32)
+            if mixed_activation else None
+        ),
     )
 
 
@@ -197,6 +207,38 @@ def test_numpy_model_load_and_export_preserve_full_threats(tmp_path: Path) -> No
     assert model.full_threats is True
     assert loaded.full_threats is True
     assert loaded.output_buckets == 8
+
+
+def test_numpy_model_applies_and_preserves_mixed_activation(
+        tmp_path: Path) -> None:
+    source = tmp_path / "mixed.nn"
+    exported = tmp_path / "mixed-exported.nn"
+    net = _zero_net(16, output_buckets=8, mixed_activation=True)
+    net.format_version = 4
+    net.l1_biases[0] = 127
+    net.l2_squared_weights[0, 0] = 2.0
+    net.output_weights[:, 0] = 32.0
+    nn2.write_net(net, source)
+
+    model = load_model_from_nn(source)
+    offsets = np.asarray([0], dtype=np.int64)
+    feats = np.asarray([0], dtype=np.int64)
+    pred = model(
+        feats, feats, offsets, offsets,
+        np.asarray([0], dtype=np.int64),
+        np.asarray([1.0], dtype=np.float32),
+        output_bucket=np.asarray([0], dtype=np.int64),
+    )
+
+    # SCReLU branch: (127**2 / 127) * 2, then output scale 32 / 32.
+    np.testing.assert_allclose(pred, np.asarray([254.0], dtype=np.float32))
+    export_model(model, exported)
+    loaded = nn2.load_net(exported)
+    assert loaded.mixed_activation is True
+    np.testing.assert_array_equal(
+        loaded.l2_squared_weights, net.l2_squared_weights)
+    np.testing.assert_array_equal(
+        loaded.l2_squared_biases, net.l2_squared_biases)
 
 
 def test_numpy_model_expands_legacy_net_to_zero_material_head(

@@ -22,7 +22,9 @@ class EnyoNNUE:
                  output_buckets: int, output_head_features: int,
                  trained_hidden: int, format_version: int,
                  full_threats: bool, slider_xray_threats: bool,
-                 full_heads: bool):
+                 full_heads: bool, mixed_activation: bool = False,
+                 l2_squared_weight: np.ndarray | None = None,
+                 l2_squared_bias: np.ndarray | None = None):
         self.input_weights = input_weights
         self.input_bias = input_bias
         self.l1_weight = l1_weight
@@ -40,6 +42,14 @@ class EnyoNNUE:
         self.full_threats = full_threats
         self.slider_xray_threats = slider_xray_threats
         self.full_heads = full_heads
+        self.mixed_activation = mixed_activation
+        self.l2_squared_weight = l2_squared_weight
+        self.l2_squared_bias = l2_squared_bias
+        if mixed_activation:
+            if full_heads:
+                raise ValueError("mixed activation does not support full heads")
+            if l2_squared_weight is None or l2_squared_bias is None:
+                raise ValueError("mixed activation requires the squared branch")
 
     def accumulator(self, feats: np.ndarray, offsets: np.ndarray) -> np.ndarray:
         rows = self.input_weights[feats]
@@ -118,8 +128,16 @@ class EnyoNNUE:
             x2 = np.maximum(
                 np.einsum("bij,bj->bi", l2_weight, x1) + l2_bias, 0.0)
         else:
-            x1 = np.maximum(x0 @ self.l1_weight.T + self.l1_bias, 0.0)
-            x2 = np.maximum(x1 @ self.l2_weight.T + self.l2_bias, 0.0)
+            x1_pre = x0 @ self.l1_weight.T + self.l1_bias
+            x1 = np.maximum(x1_pre, 0.0)
+            x2_pre = x1 @ self.l2_weight.T + self.l2_bias
+            if self.mixed_activation:
+                squared = np.clip(x1_pre, 0.0, 127.0) ** 2 / 127.0
+                x2_pre += (
+                    squared @ self.l2_squared_weight.T
+                    + self.l2_squared_bias
+                )
+            x2 = np.maximum(x2_pre, 0.0)
         if self.output_head_features:
             if head_features is None:
                 raise ValueError("head_features is required for output-head nets")
@@ -183,6 +201,15 @@ def load_model_from_nn(
         full_threats=net.full_threats,
         slider_xray_threats=net.slider_xray_threats,
         full_heads=net.full_heads,
+        mixed_activation=net.mixed_activation,
+        l2_squared_weight=(
+            None if net.l2_squared_weights is None
+            else net.l2_squared_weights.astype(np.float32)
+        ),
+        l2_squared_bias=(
+            None if net.l2_squared_biases is None
+            else net.l2_squared_biases.astype(np.float32)
+        ),
     )
 
 
@@ -226,5 +253,8 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         full_threats=model.full_threats,
         slider_xray_threats=model.slider_xray_threats,
         full_heads=model.full_heads,
+        mixed_activation=model.mixed_activation,
+        l2_squared_weights=model.l2_squared_weight,
+        l2_squared_biases=model.l2_squared_bias,
     )
     nn2.write_net(net, path)
