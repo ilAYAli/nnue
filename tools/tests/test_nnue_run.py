@@ -1464,7 +1464,6 @@ iterate
             self.assertEqual(
                 "train:uho-native-1.0.36\n"
                 "gates:uho-native-1.0.36\n"
-                "stockfish:uho-native-1.0.36\n"
                 "sprt:uho-native-1.0.36\n",
                 trace.read_text(encoding="utf-8"),
             )
@@ -1534,9 +1533,10 @@ check_smoke 4.0 -0.22/2.20 positive_elo
         self.assertIn("SPRT_ELO1=${SPRT_ELO1:-8.0}", text)
         self.assertNotIn("SPRT_REJECT_LOS", text)
         self.assertNotIn("SPRT_MIN_REJECT_GAMES", text)
-        self.assertIn("SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-3000}", text)
+        self.assertIn("SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-2000}", text)
+        self.assertIn("if (( SPRT_MIN_ACCEPT_GAMES > GAMES )); then", text)
         self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
-        self.assertIn("GAMES=${GAMES:-6000}", text)
+        self.assertIn("GAMES=${GAMES:-4000}", text)
         # the superseded elo>ci rule must be gone, not merely unused
         self.assertNotIn("SPRT_SIGNAL_MARGIN", text)
         self.assertNotIn("signal_sprt_failed", text)
