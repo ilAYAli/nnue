@@ -20,5 +20,5 @@ Fixed external target: `nn-0ee0657fb25e.nnue`.
 
 ## Experiments
 
-| Run | Host | Parent | Variable | State | Net SHA-256 | Commit | SF Elo / CI | Games | Notes |
-|---|---|---|---|---|---|---|---|---:|---|
+| Run | Host | Parent | Variable | State | Net SHA-256 | Commit | Parent Elo / CI | SF Elo / CI | Games | Notes |
+|---|---|---|---|---|---|---|---|---|---:|---|

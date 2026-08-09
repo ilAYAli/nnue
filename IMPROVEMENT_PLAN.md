@@ -28,11 +28,12 @@ After the root, every candidate:
 - uses `continue_from` the current proven parent;
 - changes exactly one meaningful variable;
 - receives a globally reserved run number;
-- is tested against the fixed SF net under identical conditions;
+- uses parent-relative SPRT for promotion;
 - is committed whether accepted or rejected.
 
-Positive candidates advance the promotion number. Rejected candidates advance
-the RC number. Only proven candidates become parents.
+The root and every passing candidate receive an identical-condition benchmark
+against the fixed SF net. Parent-relative SPRT selects parents; absolute SF Elo
+tracks progress toward the goal. Residual improvement is report-only.
 
 ## Parallel training
 
