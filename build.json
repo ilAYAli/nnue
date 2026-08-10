@@ -1,11 +1,11 @@
 {
-  "run": "enyo-5.1.0-rc2",
-  "hypothesis": "switching the continuation corpus to the preserved self-play-1.2 shuffle improves the clean SCReLU root",
+  "run": "enyo-5.2.0-rc1",
+  "hypothesis": "a second full training dose on the winning self-play-1.2 corpus improves the selected parent",
   "superbatches": 221977,
   "trainable": "all",
   "wdl": 0.05,
   "data": {
     "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
-  "continue_from": "enyo-5.0.0-rc1"
+  "continue_from": "enyo-5.1.0-rc2"
 }
