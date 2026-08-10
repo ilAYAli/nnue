@@ -6,8 +6,10 @@ forge_lib.status.record_sprt_completion) for every SPRT run regardless of what
 launches it. This script only launches the run; Forge owns completion."""
 
 import argparse
+import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -32,6 +34,40 @@ def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
         print(f"Error: engine cannot load {role}: engine={engine} net={net}", file=sys.stderr)
         print("\n".join(output.splitlines()[-40:]), file=sys.stderr)
         sys.exit(1)
+
+
+def existing_run_matches(
+    run: str, *, candidate_net: Path, reference_net: Path, games: int
+) -> bool:
+    status = subprocess.run(
+        ["forge", "status", run, "--json"],
+        capture_output=True,
+        text=True,
+    )
+    if status.returncode:
+        return False
+    try:
+        payload = json.loads(status.stdout)
+        command = payload["commands"][0]["command"]
+        tokens = shlex.split(command)
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError):
+        return False
+
+    def option(name: str) -> str | None:
+        try:
+            return tokens[tokens.index(name) + 1]
+        except (ValueError, IndexError):
+            return None
+
+    candidate = option("--candidate-net")
+    reference = option("--reference-net")
+    return (
+        candidate is not None
+        and reference is not None
+        and Path(candidate).name == candidate_net.name
+        and Path(reference).name == reference_net.name
+        and option("--games") == str(games)
+    )
 
 
 def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: int) -> str:
@@ -60,10 +96,22 @@ def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: i
         print(line, end="", flush=True)
     returncode = deploy.wait()
     stdout = "".join(output)
+    match = re.search(r"^run: id=(\S+)", stdout, re.MULTILINE)
     if returncode:
+        if (
+            match
+            and "run already exists" in stdout
+            and existing_run_matches(
+                match.group(1),
+                candidate_net=candidate_net,
+                reference_net=reference_net,
+                games=games,
+            )
+        ):
+            print(f"run: identical existing run accepted: {match.group(1)}")
+            return match.group(1)
         raise subprocess.CalledProcessError(returncode, command, output=stdout)
 
-    match = re.search(r"^run: id=(\S+)", stdout, re.MULTILINE)
     if not match:
         sys.exit("Error: could not parse run id from forge run sprt output")
     return match.group(1)
