@@ -28,3 +28,4 @@ Fixed external target: `nn-0ee0657fb25e.nnue`.
 | enyo-5.1.0-rc3 | pwa-llm | enyo-5.0.0-rc1 | raise WDL from 0.05 to 0.10 | accepted | e04a17b19a1201bab0b9c49c0c463a44566d75dc20b7971b6a05160110c1dcc9 | b6d228bf | +64.7 / 17.0 | -281.5 / 9.6 | 4000 | Passed but not selected; lost the direct tie-break to rc2. |
 | enyo-5.2.0-rc1 | pwa-llm | enyo-5.1.0-rc2 | second full dose on the winning self-play-1.2 corpus | accepted | 6f393ea228c588934eb0c64c602409b5a6908a6ef6bd75b501deb65091cf9a8b | pending | +38.2 / 12.6 | -254.2 / 9.0 | 4000 | Parent SPRT passed at 1106 games, LLR 2.31/2.20, LOS 100.0%; selection pending rc2. |
 | enyo-5.2.0-rc2 | pwa-5090 | enyo-5.1.0-rc2 | raise WDL from 0.05 to 0.10 | reserved | — | — | — | — | 0 | Same architecture, data, dose, and optimizer; `continue_from` rc2. |
+| enyo-5.2.0-rc3 | pwa-llm | enyo-5.1.0-rc2 | raise WDL from 0.05 to 0.075 | reserved | — | — | — | — | 0 | Same architecture, data, dose, and optimizer; `continue_from` rc2. |
