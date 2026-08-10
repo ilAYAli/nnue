@@ -1,9 +1,9 @@
 {
-  "run": "enyo-5.1.0-rc3",
-  "hypothesis": "raising WDL from 0.05 to 0.10 improves the second full-dose continuation from the clean SCReLU root",
+  "run": "enyo-5.1.0-rc1",
+  "hypothesis": "a second full training dose on the same preserved interleaved corpus improves the clean SCReLU root",
   "superbatches": 221977,
   "trainable": "all",
-  "wdl": 0.10,
+  "wdl": 0.05,
   "data": {
     "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-interleaved.bullet"
   },
