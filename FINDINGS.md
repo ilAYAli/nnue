@@ -51,7 +51,35 @@ perturbation — the net can learn correctly.
   difference < CI overlap (i.e. |Elo_llm - Elo_5090| < 25), default to WDL=0.05:
   lower WDL = less MCTS noise contamination = safer by the root-cause analysis above.
 
-**FullThreats note** (revised): the prior FullThreats tests at WDL=0.05 were not under-weighted;
+**FullThreats**
+
+FullThreats is also common among the strongest current architectures, but it is not universal.
+
+   Engine         NNUE threat inputs
+  ━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Stockfish      FullThreats plus pawn-pair features
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   ShashChess     FullThreats
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   PlentyChess    59,808 full threat features plus 4,560 pawn pairs
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   Stormphrax     Full piece-threat inputs plus pawn-pair features
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   pawnocchio     59,808 threat features plus 4,560 pawn pairs
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   viridithas     Full attacker/victim threat features plus pawn-pawn relational features
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   Reckless       Separate PSQT and threat accumulators; full threat-style inputs
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   Alexandria     No NNUE threat inputs
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   Obsidian       No NNUE threat inputs
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   berserk        No NNUE threat inputs
+  ─────────────  ─────────────────────────────────────────────────────────────────────────
+   rice           No NNUE threat inputs
+
+(revised): the prior FullThreats tests at WDL=0.05 were not under-weighted;
 they genuinely failed. WDL is not the explanation for those failures (they reached SPRT
 and lost at -119 Elo).
 
@@ -78,6 +106,33 @@ Never tested in Enyo.
 ---
 
 ## 3. SCReLU activation: equivalent to 50% larger network (architecture change)
+
+SCReLU or a squared-clipped relative is common, but there are materially different architectures.
+
+   Engine         Squared activation?    Actual pattern
+  ━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Alexandria                     Yes    Dual linear + squared-clipped dense activation
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   PlentyChess                    Yes    Pairwise FT, dual CReLU/squared branch, squared L2
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   ShashChess                     Yes    Stockfish-style SqrClippedReLU + ClippedReLU
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   Stormphrax                     Yes    Pairwise FT, dual CReLU/SCReLU, CReLU, L2 skip
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   Obsidian                       Yes    Pairwise FT and dual linear/squared dense outputs
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   Stockfish                      Yes    Paired SqrClippedReLU and ClippedReLU
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   pawnocchio                     Yes    Pairwise FT and dual CReLU/CSReLU
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   Reckless                        No    Pairwise FT followed by ordinary clipped ReLU
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   berserk                         No    CReLU input followed by ordinary ReLU layers
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   rice                            No    Simple ReLU NNUE
+  ─────────────  ─────────────────────  ────────────────────────────────────────────────────
+   viridithas                      No    Pairwise CReLU FT followed by Hard-Swish/SwiGLU
+
 
 **Priority: High. Requires accepted plain ReLU parent for initialize_from.**
 
