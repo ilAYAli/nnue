@@ -1401,6 +1401,12 @@ Safety:
 EOF
 }
 
+train_command() {
+  train
+  notify training_done train "training/export completed for $run" \
+    "$log_dir/01-train-export.log" 1
+}
+
 # Keep dispatch inside one parsed compound command. A long-running invocation
 # may outlive a repository update; Bash must not resume by reading a new tail
 # from the script path after Forge returns.
@@ -1408,7 +1414,7 @@ main() {
   case "$cmd" in
     iterate) iterate ;;
     plan) plan ;;
-    train) train ;;
+    train) train_command ;;
     gates) gates ;;
     sprt) sprt_command ;;
     status) status ;;

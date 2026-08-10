@@ -57,6 +57,12 @@ class NnueEventNtfyTests(unittest.TestCase):
                 encoding="utf-8",
             )
             hook_log = tmp / "hook.log"
+            fake_notifai = tmp / "notifai.sh"
+            fake_notifai.write_text(
+                "#!/bin/sh\nprintf 'notifai:AI_stdin:1.1\\n'\n",
+                encoding="utf-8",
+            )
+            fake_notifai.chmod(0o755)
             payload = {
                 "event": "done",
                 "run": str(run),
@@ -74,6 +80,7 @@ class NnueEventNtfyTests(unittest.TestCase):
                 "HOME": tmp_name,
                 "NNUE_NTFY_DRY_RUN": "1",
                 "NNUE_NTFY_LOG": str(hook_log),
+                "NNUE_NOTIFAI_COMMAND": str(fake_notifai),
             })
             env.update(env_extra)
             proc = subprocess.run(
@@ -159,7 +166,23 @@ class NnueEventNtfyTests(unittest.TestCase):
         self.assertNotIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
         self.assertIn("notifai:AI_stdin:1.1", proc.stdout)
         self.assertIn("event=iteration_done → nnue", log)
-        self.assertNotIn("event=iteration_done → AI_stdin", log)
+        self.assertNotIn("event=iteration_done → AI_stdin direct", log)
+
+    def test_training_done_can_wake_ai_stdin(self) -> None:
+        proc, log = self.run_hook(
+            {"NNUE_HOOK_EVENTS": "done,fail"},
+            payload_extra={
+                "event": "training_done",
+                "stage": "train",
+                "status": "training_done",
+                "message": "training/export completed for run",
+            },
+        )
+
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertIn("notifai:AI_stdin:1.1", proc.stdout)
+        self.assertIn("event=training_done → AI_stdout", log)
+        self.assertIn("event=training_done → AI_stdin (notifai)", log)
 
     def test_fail_event_reports_single_error_line(self) -> None:
         proc, log = self.run_hook(
@@ -202,7 +225,7 @@ class NnueEventNtfyTests(unittest.TestCase):
         self.assertIn("notifai:AI_stdin:1.1", proc.stdout)
         self.assertNotIn("https://ntfy.wahlman.no/AI_stdin", proc.stdout)
         self.assertIn("event=fail → ping", log)
-        self.assertNotIn("event=fail → AI_stdin", log)
+        self.assertNotIn("event=fail → AI_stdin direct", log)
 
 
 if __name__ == "__main__":

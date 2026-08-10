@@ -1995,6 +1995,20 @@ printf '%s\n' "$NNUE_HOOK_EVENTS"
 
             self.assertEqual("done,fail\n", proc.stdout)
 
+    def test_direct_train_emits_one_training_done_event(self) -> None:
+        proc = self.run_sourced(
+            "run=candidate; log_dir=runs/candidate/logs; "
+            "train() { :; }; "
+            "notify() { printf '%s|%s|%s\\n' \"$1\" \"$2\" \"$3\"; }; "
+            "train_command"
+        )
+
+        self.assertEqual(0, proc.returncode, proc.stderr)
+        self.assertEqual(
+            "training_done|train|training/export completed for candidate\n",
+            proc.stdout,
+        )
+
     def test_sprt_waits_matching_active_forge_run_for_build_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

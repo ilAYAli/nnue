@@ -306,6 +306,11 @@ event_selected() {
             *,done,*) return 0 ;;
         esac
     fi
+    if [ "$event" = "training_done" ]; then
+        case ",$list," in
+            *,done,*) return 0 ;;
+        esac
+    fi
     return 1
 }
 
