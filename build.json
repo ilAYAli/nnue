@@ -1,10 +1,10 @@
 {
-  "run": "enyo-5.4.0-rc1",
-  "hypothesis": "another full dose with the selected higher final learning rate continues the proven gain",
+  "run": "enyo-5.4.0-rc2",
+  "hypothesis": "doubling the selected final learning rate preserves more useful late-stage adaptation",
   "superbatches": 221977,
   "trainable": "all",
   "wdl": 0.05,
-  "final_lr": 0.000010,
+  "final_lr": 0.000020,
   "data": {
     "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
