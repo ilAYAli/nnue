@@ -1,9 +1,10 @@
 {
-  "run": "enyo-5.5.0-rc1",
-  "hypothesis": "another full dose on the selected SCReLU regimen continues the remaining convergence gain",
+  "run": "enyo-5.5.0-rc2",
+  "hypothesis": "a lower initial learning rate reduces destructive movement during mature continuation",
   "superbatches": 221977,
   "trainable": "all",
   "wdl": 0.05,
+  "lr": 0.0005,
   "final_lr": 0.000010,
   "data": {
     "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
