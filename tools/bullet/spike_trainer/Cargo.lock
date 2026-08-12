@@ -46,6 +46,7 @@ version = "0.1.0"
 dependencies = [
  "bullet-compiler",
  "bullet-gpu",
+ "libc",
  "rand",
  "rand_distr",
 ]
