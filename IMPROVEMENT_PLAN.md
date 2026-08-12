@@ -65,19 +65,33 @@ Both branch from the same accepted parent and must finish before parent selectio
 
 Test one feature at a time, in this order:
 
-1. Increase L2 width from 16 to 32.
-2. Add an L2-to-output skip connection.
-3. Add FullThreats inputs with verified trainer/runtime parity and
-   export-visible weights, against a matched unfactorised control.
-4. Add slider x-ray threat inputs under the same parity and export-visibility
-   requirements.
-5. Increase feature channels from 12 to 16.
-6. Increase input buckets from 16 to 32.
-7. Use independent dense heads per output bucket.
+1. Add an activated-L2-to-output skip connection. Skip connections are used by
+   Stockfish, Stormphrax, PlentyChess, and viridithas and add little inference
+   or parameter cost to Enyo's existing 16→32 dense stack.
+2. Add FullThreats inputs with verified trainer/runtime parity and
+   export-visible weights, against a matched unfactorised control. Threat
+   features are common in the strongest current architectures, but Enyo must
+   first prove that the added rows train and survive export.
+3. Add pawn-pair inputs under the same parity and export-visibility gates.
+   They are used by Stockfish, Stormphrax, PlentyChess, and viridithas and are
+   cheaper and more structured than another large bucketed feature expansion.
+4. Use independent dense heads per output bucket. This is common, but Enyo's
+   earlier full-head experiment failed, so retry only after the higher-priority
+   architecture changes have a stable training control.
+5. Add slider x-ray threat inputs after ordinary FullThreats has demonstrated
+   useful, export-visible learning. X-rays are an extension of the threat
+   family, not the first threat experiment.
+6. Increase L2 width from 16 to 32. Stockfish uses 32→32, but Alexandria,
+   Berserk, Obsidian, PlentyChess, and Reckless use 16→32; widening L2 is not
+   the prevailing small-engine architecture.
+7. Increase input buckets from 16 to 32. This is principally a Stockfish
+   design choice and has a much larger parameter cost than the features above.
+8. Increase feature channels from 12 to 16 only with a specific semantic
+   channel design. A bare channel-count increase has no strong survey support.
 
 Each item is a separate architecture number and uses `initialize_from` the
 current accepted parent when conversion is supported. Never combine features.
-The historical architecture race fixed `l2_size=16`, so it did not test item 1.
+The historical architecture race fixed `l2_size=16`, so it did not test item 6.
 Its `sf32` candidate changed both input buckets (`16` to `32`) and feature
 channels (`12` to `11`); replicated continuation was not significantly better
 than `h16`, so another input-bucket experiment is low priority.
