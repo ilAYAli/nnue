@@ -24,7 +24,8 @@ class EnyoNNUE:
                  full_threats: bool, slider_xray_threats: bool,
                  full_heads: bool, mixed_activation: bool = False,
                  l2_squared_weight: np.ndarray | None = None,
-                 l2_squared_bias: np.ndarray | None = None):
+                 l2_squared_bias: np.ndarray | None = None,
+                 l2_output_skip_weight: np.ndarray | None = None):
         self.input_weights = input_weights
         self.input_bias = input_bias
         self.l1_weight = l1_weight
@@ -45,11 +46,15 @@ class EnyoNNUE:
         self.mixed_activation = mixed_activation
         self.l2_squared_weight = l2_squared_weight
         self.l2_squared_bias = l2_squared_bias
+        self.l2_output_skip_weight = l2_output_skip_weight
         if mixed_activation:
             if full_heads:
                 raise ValueError("mixed activation does not support full heads")
             if l2_squared_weight is None or l2_squared_bias is None:
                 raise ValueError("mixed activation requires the squared branch")
+        if l2_output_skip_weight is not None and l2_output_skip_weight.shape != (
+                output_buckets, nn2.N_L2):
+            raise ValueError("L2-output skip requires [output_buckets,16] weights")
 
     def accumulator(self, feats: np.ndarray, offsets: np.ndarray) -> np.ndarray:
         rows = self.input_weights[feats]
@@ -142,7 +147,10 @@ class EnyoNNUE:
             if head_features is None:
                 raise ValueError("head_features is required for output-head nets")
             x2 = np.concatenate([x2, head_features], axis=-1)
-        raw = (x2 @ self.output_weight.T + self.output_bias) / nn2.EVAL_DIVISOR
+        raw = x2 @ self.output_weight.T + self.output_bias
+        if self.l2_output_skip_weight is not None:
+            raw += x1 @ self.l2_output_skip_weight.T
+        raw /= nn2.EVAL_DIVISOR
         if self.output_buckets == 1:
             return raw[:, 0]
         return np.take_along_axis(raw, output_bucket[:, None], axis=1)[:, 0]
@@ -210,6 +218,10 @@ def load_model_from_nn(
             None if net.l2_squared_biases is None
             else net.l2_squared_biases.astype(np.float32)
         ),
+        l2_output_skip_weight=(
+            None if net.l2_output_skip_weights is None
+            else net.l2_output_skip_weights.astype(np.float32)
+        ),
     )
 
 
@@ -256,5 +268,7 @@ def export_model(model: EnyoNNUE, path: str | Path) -> None:
         mixed_activation=model.mixed_activation,
         l2_squared_weights=model.l2_squared_weight,
         l2_squared_biases=model.l2_squared_bias,
+        l2_output_skip= model.l2_output_skip_weight is not None,
+        l2_output_skip_weights=model.l2_output_skip_weight,
     )
     nn2.write_net(net, path)

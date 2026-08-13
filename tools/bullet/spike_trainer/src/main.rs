@@ -99,6 +99,7 @@ fn write_seeded_enyo_weights(
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
+    l2_output_skip: bool,
     l0_stdev: f32,
     l1_stdev: f32,
 ) -> io::Result<()> {
@@ -143,6 +144,9 @@ fn write_seeded_enyo_weights(
         Some((2.0 / 32.0_f32).sqrt()),
     )?;
     write_tensor(&mut output, seed, "l3b", output_buckets, None)?;
+    if l2_output_skip {
+        write_tensor(&mut output, seed, "l2skipw", output_buckets * l2_size, None)?;
+    }
     if psqt_residual {
         write_tensor(
             &mut output,
@@ -616,6 +620,7 @@ fn train_enyo<
     const SLIDER_XRAY_THREATS: bool,
     const FULL_HEADS: bool,
     const MIXED_ACTIVATION: bool,
+    const L2_OUTPUT_SKIP: bool,
 >(
     dataset: String,
     output: String,
@@ -667,6 +672,9 @@ fn train_enyo<
     if MIXED_ACTIVATION && (FULL_HEADS || threat_features) {
         panic!("mixed activation must be tested independently");
     }
+    if L2_OUTPUT_SKIP && (!MIXED_ACTIVATION || FULL_HEADS || threat_features || OUTPUT_BUCKETS != 8) {
+        panic!("L2-output skip requires the shared-head mixed-activation 8-bucket architecture");
+    }
     if psqt_residual && (MIXED_ACTIVATION || FULL_HEADS || threat_features || OUTPUT_BUCKETS != 8) {
         panic!("PSQT residual requires the shared-head 8-bucket base architecture");
     }
@@ -697,6 +705,7 @@ fn train_enyo<
     println!("enyo_slider_xray_threats={SLIDER_XRAY_THREATS}");
     println!("enyo_full_heads={FULL_HEADS}");
     println!("enyo_mixed_activation={MIXED_ACTIVATION}");
+    println!("enyo_l2_output_skip={L2_OUTPUT_SKIP}");
     println!("enyo_psqt_residual={psqt_residual}");
     println!("enyo_l0_stdev={l0_stdev} enyo_l1_stdev={l1_stdev}");
     println!("enyo_l1_export_scale={l1_export_scale}");
@@ -782,7 +791,35 @@ fn train_enyo<
 
     macro_rules! base_trainer {
         () => {
-            if MIXED_ACTIVATION {
+            if MIXED_ACTIVATION && L2_OUTPUT_SKIP {
+                ValueTrainerBuilder::default()
+                    .dual_perspective()
+                    .optimiser(AdamW)
+                    .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS>)
+                    .save_format(&[
+                        l0w_format!(),
+                        SavedFormat::id("l0b").round().quantise::<i16>(1),
+                        SavedFormat::id("l1w").transpose().round().quantise::<i8>(l1_export_scale as i16),
+                        SavedFormat::id("l1b").round().quantise::<i32>(l1_export_scale as i32),
+                        SavedFormat::id("l2w").transpose().transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w / l1_export_scale).collect()
+                        }),
+                        SavedFormat::id("l2b"),
+                        SavedFormat::id("l2sw").transpose().transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w / l1_export_scale).collect()
+                        }),
+                        SavedFormat::id("l2sb"),
+                        SavedFormat::id("l3w").transpose().transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                        }),
+                        SavedFormat::id("l3b").transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                        }),
+                        SavedFormat::id("l2skipw").transpose().transform(move |_store, weights| {
+                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                        }),
+                    ])
+            } else if MIXED_ACTIVATION {
                 ValueTrainerBuilder::default()
                     .dual_perspective()
                     .optimiser(AdamW)
@@ -928,6 +965,13 @@ fn train_enyo<
             let l3 = maybe_frozen($builder, !train_l3, || {
                 $builder.new_affine("l3", 32, OUTPUT_BUCKETS)
             });
+            let l2skip = if L2_OUTPUT_SKIP {
+                Some(maybe_frozen($builder, !train_l3, || {
+                    $builder.new_weights("l2skipw", Shape::new(OUTPUT_BUCKETS, l2_size), InitSettings::Zeroed)
+                }))
+            } else {
+                None
+            };
             let psqt = if psqt_residual {
                 Some(maybe_frozen($builder, !train_psqt, || {
                     zero_affine(
@@ -964,7 +1008,11 @@ fn train_enyo<
                 l2.forward(x1)
             };
             let x2 = x2_pre.relu();
-            let output = l3.forward(x2);
+            let output = if let Some(l2skip) = l2skip {
+                l3.forward(x2) + l2skip.matmul(x1)
+            } else {
+                l3.forward(x2)
+            };
             let output = if let Some(psqt) = psqt {
                 output + psqt.forward($stm_inputs) - psqt.forward($ntm_inputs)
             } else {
@@ -1032,6 +1080,13 @@ fn train_enyo<
             let l3 = maybe_frozen($builder, !train_l3, || {
                 $builder.new_affine("l3", 32, OUTPUT_BUCKETS)
             });
+            let l2skip = if L2_OUTPUT_SKIP {
+                Some(maybe_frozen($builder, !train_l3, || {
+                    $builder.new_weights("l2skipw", Shape::new(OUTPUT_BUCKETS, l2_size), InitSettings::Zeroed)
+                }))
+            } else {
+                None
+            };
             let psqt = if psqt_residual {
                 Some(maybe_frozen($builder, !train_psqt, || {
                     zero_affine(
@@ -1074,7 +1129,11 @@ fn train_enyo<
                 l2.forward(x1)
             };
             let x2 = x2_pre.relu();
-            let output = l3.forward(x2).select($output_buckets);
+            let output = if let Some(l2skip) = l2skip {
+                (l3.forward(x2) + l2skip.matmul(x1)).select($output_buckets)
+            } else {
+                l3.forward(x2).select($output_buckets)
+            };
             let output = if let Some(psqt) = psqt {
                 output + (psqt.forward($stm_inputs) - psqt.forward($ntm_inputs))
                     .select($output_buckets)
@@ -1183,6 +1242,7 @@ fn train_enyo<
                     FULL_HEADS,
                     MIXED_ACTIVATION,
                     psqt_residual,
+                    L2_OUTPUT_SKIP,
                     l0_stdev,
                     l1_stdev,
                 )
@@ -1314,6 +1374,8 @@ fn main() {
         env_parse("ENYO_BULLET_ENYO_MIXED_ACTIVATION", 0usize) != 0;
     let enyo_psqt_residual =
         env_parse("ENYO_BULLET_ENYO_PSQT_RESIDUAL", 0usize) != 0;
+    let enyo_l2_output_skip =
+        env_parse("ENYO_BULLET_ENYO_L2_OUTPUT_SKIP", 0usize) != 0;
     let eval_scale = env_parse("ENYO_BULLET_EVAL_SCALE", 400.0f32);
     let save_rate = env_parse("ENYO_BULLET_SAVE_RATE", 64usize);
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
@@ -1322,7 +1384,7 @@ fn main() {
 
     if mode == "enyo" {
         macro_rules! run_enyo {
-            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal, $slider_xray_threats:literal, $full_heads:literal, $mixed_activation:literal) => {
+            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal, $slider_xray_threats:literal, $full_heads:literal, $mixed_activation:literal, $l2_output_skip:literal) => {
                 train_enyo::<
                     $input_buckets,
                     $feature_channels,
@@ -1331,6 +1393,7 @@ fn main() {
                     $slider_xray_threats,
                     $full_heads,
                     $mixed_activation,
+                    $l2_output_skip,
                 >(
                     dataset,
                     output,
@@ -1362,25 +1425,26 @@ fn main() {
 
         macro_rules! run_enyo_layout {
             ($input_buckets:literal, $feature_channels:literal) => {
-                match (enyo_output_buckets, enyo_full_threats, enyo_slider_xray_threats, enyo_full_heads, enyo_mixed_activation, enyo_psqt_residual) {
-                    (1, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false, false, false),
-                    (2, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, false, false),
-                    (4, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, false, false),
-                    (8, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false),
-                    (8, false, false, false, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false),
-                    (8, false, false, false, true, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true),
-                    (1, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, true, false, false, false),
-                    (2, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, true, false, false, false),
-                    (4, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, true, false, false, false),
-                    (8, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, false),
-                    (1, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, true, false, false),
-                    (2, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, true, false, false),
-                    (4, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, true, false, false),
-                    (8, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, true, false, false),
-                    (2, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, true, false),
-                    (4, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, true, false),
-                    (8, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, true, false),
-                    (8, true, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, true, false),
+                match (enyo_output_buckets, enyo_full_threats, enyo_slider_xray_threats, enyo_full_heads, enyo_mixed_activation, enyo_psqt_residual, enyo_l2_output_skip) {
+                    (8, false, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true, true),
+                    (1, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false, false, false, false),
+                    (2, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, false, false, false),
+                    (4, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, false, false, false),
+                    (8, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, false),
+                    (8, false, false, false, false, true, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, false),
+                    (8, false, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true, false),
+                    (1, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, true, false, false, false, false),
+                    (2, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, true, false, false, false, false),
+                    (4, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, true, false, false, false, false),
+                    (8, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, false, false),
+                    (1, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, true, false, false, false),
+                    (2, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, true, false, false, false),
+                    (4, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, true, false, false, false),
+                    (8, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, true, false, false, false),
+                    (2, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, true, false, false),
+                    (4, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, true, false, false),
+                    (8, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, true, false, false),
+                    (8, true, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, true, false, false),
                     _ => {
                         panic!(
                             "unsupported Enyo output/full-threat/full-head combination: \

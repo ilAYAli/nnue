@@ -253,6 +253,7 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "slider_xray_threats": bool(args.slider_xray_threats),
         "full_heads": bool(args.full_heads),
         "mixed_activation": bool(args.mixed_activation),
+        "l2_output_skip": bool(args.l2_output_skip),
         "legacy_inputs": bool(args.legacy_inputs),
     }
     (path.parent / "meta.json").write_text(
@@ -299,6 +300,11 @@ def main() -> int:
         "--psqt-residual",
         action="store_true",
         help="Append a zero-initialized material-bucketed PSQT residual table.",
+    )
+    parser.add_argument(
+        "--l2-output-skip",
+        action="store_true",
+        help="Append zero-initialized activated L2-to-output skip weights.",
     )
     parser.add_argument(
         "--legacy-inputs",
@@ -375,6 +381,20 @@ def main() -> int:
             bullet_l3_weights(output_weights) / output_scale,
         )
         write_tensor(handle, "l3b", output_biases / output_scale)
+        if args.l2_output_skip:
+            source_skip = getattr(net, "l2_output_skip_weights", None)
+            l2_output_skip = (
+                np.asarray(source_skip, dtype=np.float32)
+                if source_skip is not None
+                else np.zeros((args.output_buckets, N_L2), dtype=np.float32)
+            )
+            if l2_output_skip.shape != (args.output_buckets, N_L2):
+                raise SystemExit("source L2-output skip has incompatible shape")
+            write_tensor(
+                handle,
+                "l2skipw",
+                bullet_l3_weights(l2_output_skip) / output_scale,
+            )
         if args.psqt_residual:
             write_tensor(
                 handle,

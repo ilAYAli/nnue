@@ -56,12 +56,14 @@ const ENYO_V4_HEADER_MAGIC: &[u8; 8] = b"ENYONN4\0";
 const ENYO_V5_HEADER_MAGIC: &[u8; 8] = b"ENYONN5\0";
 const ENYO_V6_HEADER_MAGIC: &[u8; 8] = b"ENYONN6\0";
 const ENYO_V7_HEADER_MAGIC: &[u8; 8] = b"ENYONN7\0";
+const ENYO_V8_HEADER_MAGIC: &[u8; 8] = b"ENYONN8\0";
 const ENYO_V2_FORMAT_VERSION: u32 = 2;
 const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_V4_FORMAT_VERSION: u32 = 4;
 const ENYO_V5_FORMAT_VERSION: u32 = 5;
 const ENYO_V6_FORMAT_VERSION: u32 = 6;
 const ENYO_V7_FORMAT_VERSION: u32 = 7;
+const ENYO_V8_FORMAT_VERSION: u32 = 8;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
 const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
@@ -70,6 +72,7 @@ const ENYO_NETWORK_FLAG_PSQT_RESIDUAL: u32 = 8;
 const ENYO_NETWORK_FLAG_PAIRWISE: u32 = 16;
 const ENYO_NETWORK_FLAG_SLIDER_XRAY_THREATS: u32 = 16;
 const ENYO_NETWORK_FLAG_RECKLESS_THREATS: u32 = 32;
+const ENYO_NETWORK_FLAG_L2_OUTPUT_SKIP: u32 = 64;
 const RECKLESS_THREAT_DIMENSIONS: usize = 66_864;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 60_720;
 const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
@@ -795,6 +798,9 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
     if arch_psqt_residual(config) {
         command.arg("--psqt-residual");
     }
+    if arch_l2_output_skip(config) {
+        command.arg("--l2-output-skip");
+    }
     let status = command.status().unwrap_or_else(|err| {
         eprintln!("error: cannot run initialize_from converter: {err}");
         process::exit(1);
@@ -951,6 +957,10 @@ fn arch_psqt_residual(config: &Config) -> bool {
     bool_at(&config.arch, "psqt_residual", false)
 }
 
+fn arch_l2_output_skip(config: &Config) -> bool {
+    bool_at(&config.arch, "l2_output_skip", false)
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -965,6 +975,7 @@ fn validate_layout(config: &Config) {
     let full_heads = arch_full_heads(config);
     let mixed_activation = arch_mixed_activation(config);
     let psqt_residual = arch_psqt_residual(config);
+    let l2_output_skip = arch_l2_output_skip(config);
     let mode = string_at(&config.arch, "mode").unwrap_or("enyo");
     if mode == "reckless" {
         if input_buckets != 10
@@ -978,6 +989,7 @@ fn validate_layout(config: &Config) {
             || threat_features
             || mixed_activation
             || psqt_residual
+            || l2_output_skip
             || export_format != "enyo-native-v7-reckless-threats"
         {
             eprintln!("error: current native Reckless requires 10x12-768-o8, factorised input, full heads, and enyo-native-v7-reckless-threats");
@@ -1025,7 +1037,7 @@ fn validate_layout(config: &Config) {
     if !matches!(
         export_format,
         "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3" | "enyo-native-v4" | "enyo-native-v5"
-            | "enyo-native-v6"
+            | "enyo-native-v6" | "enyo-native-v8"
     ) {
         eprintln!("error: unsupported export_format={export_format}");
         process::exit(2);
@@ -1055,7 +1067,13 @@ fn validate_layout(config: &Config) {
         process::exit(2);
     }
     if mixed_activation && export_format != "enyo-native-v4" {
-        eprintln!("error: relu-screlu-residual requires export_format=enyo-native-v4");
+        if !(l2_output_skip && export_format == "enyo-native-v8") {
+            eprintln!("error: relu-screlu-residual requires export_format=enyo-native-v4 or v8");
+            process::exit(2);
+        }
+    }
+    if l2_output_skip && export_format != "enyo-native-v8" {
+        eprintln!("error: L2-output skip requires export_format=enyo-native-v8");
         process::exit(2);
     }
     if export_format == "enyo-native-v4" && !mixed_activation {
@@ -1076,6 +1094,10 @@ fn validate_layout(config: &Config) {
     }
     if mixed_activation && (full_heads || threat_features || output_buckets != 8) {
         eprintln!("error: mixed activation requires the shared-head 8-bucket base architecture");
+        process::exit(2);
+    }
+    if l2_output_skip && (!mixed_activation || full_heads || threat_features || output_buckets != 8) {
+        eprintln!("error: L2-output skip requires the shared-head mixed-activation 8-bucket base architecture");
         process::exit(2);
     }
     if training_trainable(config) == "squared-branch" && !mixed_activation {
@@ -1661,6 +1683,10 @@ fn cmd_run(config: &Config) {
         usize::from(arch_psqt_residual(config)),
     );
     set_env(
+        "ENYO_BULLET_ENYO_L2_OUTPUT_SKIP",
+        usize::from(arch_l2_output_skip(config)),
+    );
+    set_env(
         "ENYO_BULLET_EVAL_SCALE",
         f64_at(&config.arch, "eval_scale", 400.0),
     );
@@ -1691,6 +1717,7 @@ fn enyo_network_size(
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
+    l2_output_skip: bool,
 ) -> usize {
     let features = input_buckets * feature_channels * 64
         + if full_threats {
@@ -1710,6 +1737,7 @@ fn enyo_network_size(
         + (if mixed_activation { l2 * l3 * 4 + l3 * 4 } else { 0 })
         + output_buckets * l3 * 4
         + output_buckets * 4
+        + (if l2_output_skip { output_buckets * l2 * 4 } else { 0 })
         + (if psqt_residual {
             features * output_buckets * 4 + output_buckets * 4
         } else {
@@ -1728,6 +1756,7 @@ fn trim_checkpoint(
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
+    l2_output_skip: bool,
 ) -> Vec<u8> {
     let expected = enyo_network_size(
         input_buckets,
@@ -1739,6 +1768,7 @@ fn trim_checkpoint(
         full_heads,
         mixed_activation,
         psqt_residual,
+        l2_output_skip,
     );
     if raw.len() < expected {
         eprintln!(
@@ -1789,6 +1819,7 @@ fn expand_input_buckets(
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
+    l2_output_skip: bool,
 ) -> Vec<u8> {
     let raw = trim_checkpoint(
         raw,
@@ -1801,6 +1832,7 @@ fn expand_input_buckets(
         full_heads,
         mixed_activation,
         psqt_residual,
+        l2_output_skip,
     );
     if input_buckets == runtime_input_buckets {
         return raw;
@@ -1845,6 +1877,7 @@ fn pad_hidden_width(
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
+    l2_output_skip: bool,
 ) -> Vec<u8> {
     if hidden == ENYO_RUNTIME_HIDDEN {
         return raw.to_vec();
@@ -1861,6 +1894,7 @@ fn pad_hidden_width(
         full_heads,
         mixed_activation,
         psqt_residual,
+        l2_output_skip,
     );
     let features = input_buckets * feature_channels * 64
         + if full_threats {
@@ -1922,6 +1956,7 @@ fn enyo_container(
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
+    l2_output_skip: bool,
     pairwise: bool,
     format_version: u32,
 ) -> Vec<u8> {
@@ -1930,7 +1965,9 @@ fn enyo_container(
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    let magic = if format_version == ENYO_V7_FORMAT_VERSION {
+    let magic = if format_version == ENYO_V8_FORMAT_VERSION {
+        ENYO_V8_HEADER_MAGIC
+    } else if format_version == ENYO_V7_FORMAT_VERSION {
         ENYO_V7_HEADER_MAGIC
     } else if format_version == ENYO_V6_FORMAT_VERSION {
         ENYO_V6_HEADER_MAGIC
@@ -1983,6 +2020,10 @@ fn enyo_container(
             0
         }) | (if format_version == ENYO_V7_FORMAT_VERSION {
             ENYO_NETWORK_FLAG_RECKLESS_THREATS
+        } else {
+            0
+        }) | (if l2_output_skip {
+            ENYO_NETWORK_FLAG_L2_OUTPUT_SKIP
         } else {
             0
         }),
@@ -2477,6 +2518,7 @@ fn write_model(config: &Config) {
             true,
             false,
             false,
+            false,
             true,
             ENYO_V7_FORMAT_VERSION,
         );
@@ -2506,6 +2548,7 @@ fn write_model(config: &Config) {
     let full_heads = arch_full_heads(config);
     let psqt_residual = arch_psqt_residual(config);
     let mixed_activation = arch_mixed_activation(config);
+    let l2_output_skip = arch_l2_output_skip(config);
     let model = expand_input_buckets(
         &raw,
         input_buckets,
@@ -2518,6 +2561,7 @@ fn write_model(config: &Config) {
         full_heads,
         mixed_activation,
         psqt_residual,
+        l2_output_skip,
     );
     let model = pad_hidden_width(
         &model,
@@ -2530,6 +2574,7 @@ fn write_model(config: &Config) {
         full_heads,
         mixed_activation,
         psqt_residual,
+        l2_output_skip,
     );
     let model = match string_at(&config.arch, "export_format") {
         Some("enyo-native-v2") => enyo_container(
@@ -2541,6 +2586,7 @@ fn write_model(config: &Config) {
             output_buckets,
             full_threats,
             slider_xray_threats,
+            false,
             false,
             false,
             false,
@@ -2560,6 +2606,7 @@ fn write_model(config: &Config) {
             false,
             false,
             false,
+            false,
             ENYO_V3_FORMAT_VERSION,
         ),
         Some("enyo-native-v4") => enyo_container(
@@ -2573,6 +2620,7 @@ fn write_model(config: &Config) {
             false,
             false,
             mixed_activation,
+            false,
             false,
             false,
             ENYO_V4_FORMAT_VERSION,
@@ -2590,6 +2638,7 @@ fn write_model(config: &Config) {
             false,
             psqt_residual,
             false,
+            false,
             ENYO_V5_FORMAT_VERSION,
         ),
         Some("enyo-native-v6") => enyo_container(
@@ -2605,7 +2654,24 @@ fn write_model(config: &Config) {
             false,
             false,
             false,
+            false,
             ENYO_V6_FORMAT_VERSION,
+        ),
+        Some("enyo-native-v8") => enyo_container(
+            &model,
+            runtime_input_buckets,
+            feature_channels,
+            hidden,
+            l2,
+            output_buckets,
+            false,
+            false,
+            false,
+            mixed_activation,
+            false,
+            l2_output_skip,
+            false,
+            ENYO_V8_FORMAT_VERSION,
         ),
         _ => model,
     };
@@ -3080,6 +3146,7 @@ mod tests {
             false,
             false,
             true,
+            false,
         );
         let features = input_buckets * feature_channels * 64;
         assert_eq!(
@@ -3100,6 +3167,7 @@ mod tests {
                 false,
                 false,
                 true,
+                false,
             )
             .len(),
             with_psqt,
@@ -3119,6 +3187,7 @@ mod tests {
             false,
             false,
             true,
+            false,
             false,
             false,
             false,
