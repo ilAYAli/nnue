@@ -1009,7 +1009,8 @@ fn train_enyo<
             };
             let x2 = x2_pre.relu();
             let output = if let Some(l2skip) = l2skip {
-                l3.forward(x2) + l2skip.matmul(x1)
+                let skip_input = x1.max(0.0).min(127.0) / 127.0;
+                l3.forward(x2) + l2skip.matmul(skip_input)
             } else {
                 l3.forward(x2)
             };
@@ -1130,7 +1131,8 @@ fn train_enyo<
             };
             let x2 = x2_pre.relu();
             let output = if let Some(l2skip) = l2skip {
-                (l3.forward(x2) + l2skip.matmul(x1)).select($output_buckets)
+                let skip_input = x1.max(0.0).min(127.0) / 127.0;
+                (l3.forward(x2) + l2skip.matmul(skip_input)).select($output_buckets)
             } else {
                 l3.forward(x2).select($output_buckets)
             };

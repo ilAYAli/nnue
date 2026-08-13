@@ -149,7 +149,8 @@ class EnyoNNUE:
             x2 = np.concatenate([x2, head_features], axis=-1)
         raw = x2 @ self.output_weight.T + self.output_bias
         if self.l2_output_skip_weight is not None:
-            raw += x1 @ self.l2_output_skip_weight.T
+            skip_input = np.clip(x1, 0.0, 127.0) / 127.0
+            raw += skip_input @ self.l2_output_skip_weight.T
         raw /= nn2.EVAL_DIVISOR
         if self.output_buckets == 1:
             return raw[:, 0]
