@@ -23,5 +23,6 @@ overlap. The direct comparison decides the deterministic parent choice.
 | Run | Host | Parent | Single variable |
 |---|---|---|---|
 | enyo-5.9.0-rc1–rc2 | — | — | void: invalid parent/configuration pairing |
-| enyo-5.9.0-rc3 | pwa-llm | enyo-5.8.0-rc1 | source: combined corpus → interleaved corpus |
-| enyo-5.9.0-rc4 | pwa-5090 | enyo-5.8.0-rc1 | source: combined corpus → recalibrated nodes5000 |
+| enyo-5.9.0-rc3–rc4 | — | — | void: unsupported corpus ablations |
+| enyo-5.9.0-rc5 | pwa-llm | enyo-5.8.0-rc1 | dose: one corpus pass (25,702 superbatches) |
+| enyo-5.9.0-rc6 | pwa-5090 | enyo-5.8.0-rc1 | dose: two corpus passes (51,404 superbatches) |
