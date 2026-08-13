@@ -16,9 +16,9 @@
 
 ## Current selection and reservations
 
-`enyo-5.9.0-rc6` is selected: it passed its parent SPRT by +7.6 ± 10.2 Elo,
-benchmarked at -183.9 ± 7.7 versus SF, and beat one-pass rc5 by +5.7 ± 5.6
-Elo over 5,000 games.
+`enyo-5.10.0-rc2` is selected: it passed its parent SPRT by +9.0 ± 10.7 Elo,
+benchmarked at -185.3 ± 8.0 versus SF, and was nominally ahead of its rc1
+sibling by +1.2 ± 5.7 Elo over 5,000 games.
 
 | Run | Host | Parent | Single variable |
 |---|---|---|---|
@@ -26,5 +26,5 @@ Elo over 5,000 games.
 | enyo-5.9.0-rc3–rc4 | — | — | void: unsupported corpus ablations |
 | enyo-5.9.0-rc5 | pwa-llm | enyo-5.8.0-rc1 | rejected: one corpus pass (25,702 superbatches) |
 | enyo-5.9.0-rc6 | pwa-5090 | enyo-5.8.0-rc1 | selected: two corpus passes (51,404 superbatches) |
-| enyo-5.10.0-rc1 | pwa-llm | enyo-5.9.0-rc6 | dose: three corpus passes (77,106 superbatches) |
-| enyo-5.10.0-rc2 | pwa-5090 | enyo-5.9.0-rc6 | dose: four corpus passes (102,808 superbatches) |
+| enyo-5.10.0-rc1 | pwa-llm | enyo-5.9.0-rc6 | unselected: three corpus passes (77,106 superbatches) |
+| enyo-5.10.0-rc2 | pwa-5090 | enyo-5.9.0-rc6 | selected: four corpus passes (102,808 superbatches) |
