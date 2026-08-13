@@ -22,5 +22,6 @@ overlap. The direct comparison decides the deterministic parent choice.
 
 | Run | Host | Parent | Single variable |
 |---|---|---|---|
-| enyo-5.9.0-rc1 | pwa-llm | enyo-5.8.0-rc1 | halve dose: 221977 → 110988 superbatches |
-| enyo-5.9.0-rc2 | pwa-5090 | enyo-5.8.0-rc1 | source: current combined corpus → Pylon |
+| enyo-5.9.0-rc1–rc2 | — | — | void: invalid parent/configuration pairing |
+| enyo-5.9.0-rc3 | pwa-llm | enyo-5.8.0-rc1 | source: combined corpus → interleaved corpus |
+| enyo-5.9.0-rc4 | pwa-5090 | enyo-5.8.0-rc1 | source: combined corpus → recalibrated nodes5000 |
