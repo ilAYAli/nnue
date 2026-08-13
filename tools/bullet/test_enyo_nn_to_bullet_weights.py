@@ -7,6 +7,7 @@ from enyo_nn_to_bullet_weights import (
     bullet_l3_weights,
     expand_dense_heads,
     expand_output_head,
+    mixed_activation_weights,
     source_bucket_for_target,
     source_output_bucket_for_target,
     source_channel_for_target,
@@ -32,6 +33,12 @@ class SharedDenseNet:
     l2_weights = np.arange(N_L3 * N_L2, dtype=np.float32).reshape(N_L3, N_L2)
     l2_biases = np.arange(N_L3, dtype=np.float32)
     full_heads = False
+
+
+class MixedActivationNet:
+    l2_squared_weights = np.arange(
+        N_L3 * N_L2, dtype=np.float32).reshape(N_L3, N_L2)
+    l2_squared_biases = np.arange(N_L3, dtype=np.float32) + 0.5
 
 
 def test_expanded_l3_weights_use_bullet_internal_orientation() -> None:
@@ -77,6 +84,16 @@ def test_full_dense_heads_repeat_shared_native_head() -> None:
         np.testing.assert_array_equal(l2b[head], SharedDenseNet.l2_biases)
 
 
+def test_mixed_activation_init_preserves_parent_branch() -> None:
+    weights, biases = mixed_activation_weights(MixedActivationNet())
+    np.testing.assert_array_equal(weights, MixedActivationNet.l2_squared_weights)
+    np.testing.assert_array_equal(biases, MixedActivationNet.l2_squared_biases)
+    np.testing.assert_array_equal(
+        weights.ravel(order="F"),
+        MixedActivationNet.l2_squared_weights.T.ravel(),
+    )
+
+
 def test_32_bucket_init_uses_legacy_parent_buckets() -> None:
     assert source_bucket_for_target(11, 16, 32) == 11
     assert source_bucket_for_target(12, 16, 32) == 8
@@ -111,6 +128,7 @@ def main() -> None:
     test_expanded_l3_weights_use_bullet_internal_orientation()
     test_expanded_multi_bucket_head_repeats_parent_ranges()
     test_full_dense_heads_repeat_shared_native_head()
+    test_mixed_activation_init_preserves_parent_branch()
     test_32_bucket_init_uses_legacy_parent_buckets()
     test_clean_bucket_expansion_repeats_parent_buckets()
     test_unsupported_bucket_mapping_fails()

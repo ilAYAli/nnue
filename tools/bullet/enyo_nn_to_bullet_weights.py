@@ -191,6 +191,24 @@ def bullet_l3_weights(output_weights: np.ndarray) -> np.ndarray:
     return np.asarray(output_weights, dtype=np.float32).T
 
 
+def mixed_activation_weights(net) -> tuple[np.ndarray, np.ndarray]:
+    """Preserve a SCReLU parent branch, or add a zero branch to a ReLU parent."""
+    source_weights = getattr(net, "l2_squared_weights", None)
+    source_biases = getattr(net, "l2_squared_biases", None)
+    if source_weights is None and source_biases is None:
+        return (
+            np.zeros((N_L3, N_L2), dtype=np.float32),
+            np.zeros(N_L3, dtype=np.float32),
+        )
+    if source_weights is None or source_biases is None:
+        raise SystemExit("source SCReLU branch is incomplete")
+    weights = np.asarray(source_weights, dtype=np.float32)
+    biases = np.asarray(source_biases, dtype=np.float32)
+    if weights.shape != (N_L3, N_L2) or biases.shape != (N_L3,):
+        raise SystemExit("source SCReLU branch has incompatible shape")
+    return weights, biases
+
+
 def expand_dense_heads(net, output_buckets: int, full_heads: bool):
     l1_weights = np.asarray(net.l1_weights, dtype=np.float32)
     l1_biases = np.asarray(net.l1_biases, dtype=np.float32)
@@ -373,8 +391,9 @@ def main() -> int:
         )
         write_tensor(handle, "l2b", l2_biases)
         if args.mixed_activation:
-            write_tensor(handle, "l2sw", np.zeros((N_L2, N_L3), dtype=np.float32))
-            write_tensor(handle, "l2sb", np.zeros(N_L3, dtype=np.float32))
+            l2_squared_weights, l2_squared_biases = mixed_activation_weights(net)
+            write_tensor(handle, "l2sw", l2_squared_weights.ravel(order="F"))
+            write_tensor(handle, "l2sb", l2_squared_biases)
         write_tensor(
             handle,
             "l3w",
