@@ -1,8 +1,8 @@
 # Enyo 5 Lineage
 
-This is the canonical ancestry, reservation, and result ledger for the clean
-`enyo-5` lineage. Do not reconstruct entries from memory. Record each reservation
-on `pwa-llm` before launch and complete it from preserved artifacts and results.
+This is the canonical selected ancestry for the clean `enyo-5` lineage.
+Experiment details, including rejected and void runs, remain in Git and preserved
+run artifacts. Do not reconstruct entries from memory.
 
 Fixed external target: `nn-0ee0657fb25e.nnue`.
 
@@ -18,26 +18,25 @@ Fixed external target: `nn-0ee0657fb25e.nnue`.
 - A `pwa-5090` winner becomes a parent only after its commit, net, provenance,
   and hashes are verified on `pwa-llm`.
 
-## Experiments
+## Selected ancestry
 
-| Run | Host | Parent | Variable | State | Net SHA-256 | Commit | Parent Elo / CI | SF Elo / CI | Games | Notes |
-|---|---|---|---|---|---|---|---|---|---:|---|
-| enyo-5.0.0-rc1 | pwa-llm | scratch | SCReLU v4 root; WDL 0.05; 221977 superbatches; preserved interleaved corpus | accepted | 1adb72ef065aa9ebe5cc3c431b0c6301a8b7b3605bec9bc1a90ef829cdd841ae | 8364ea6f | — | -315.2 / 10.6 | 4000 | Fixed-SF run `sprt-enyo_203ab1f-4000-20260809-175759`; no origin fields; random initialization. |
-| enyo-5.1.0-rc1 | pwa-llm | enyo-5.0.0-rc1 | second full dose on the same interleaved corpus | accepted | 045e4b6c6de7360008d668dba43cdf4e16ef7cf9ce1a2dc992a292bdaa1116f0 | 5404c5d0 | +59.1 / 16.7 | -287.9 / 9.7 | 4000 | Parent SPRT passed at 688 games, LLR 2.28/2.20, LOS 100.0%; fixed-SF run `sprt-enyo_203ab1f-4000-20260810-002529`; selection pending rc2. |
-| enyo-5.1.0-rc2 | pwa-5090 | enyo-5.0.0-rc1 | switch continuation corpus to self-play-1.2 shuffled | accepted | c4aa34c5998848e5784b730e97f3e7a0054a64f7f88eab7ef086a32e484707a5 | af9f1e23 | +64.2 / 15.9 | -263.1 / 9.3 | 4000 | Selected parent; beat rc3 by +13.2 / 6.8 at 3940 games, LLR 2.28/2.20, LOS 100.0%. |
-| enyo-5.1.0-rc3 | pwa-llm | enyo-5.0.0-rc1 | raise WDL from 0.05 to 0.10 | accepted | e04a17b19a1201bab0b9c49c0c463a44566d75dc20b7971b6a05160110c1dcc9 | b6d228bf | +64.7 / 17.0 | -281.5 / 9.6 | 4000 | Passed but not selected; lost the direct tie-break to rc2. |
-| enyo-5.2.0-rc1 | pwa-llm | enyo-5.1.0-rc2 | second full dose on the winning self-play-1.2 corpus | accepted | 6f393ea228c588934eb0c64c602409b5a6908a6ef6bd75b501deb65091cf9a8b | e6da210c | +38.2 / 12.6 | -254.2 / 9.0 | 4000 | Selected parent; beat rc2 by +6.8 / 5.8 over 5000 direct games. |
-| enyo-5.2.0-rc2 | pwa-5090 | enyo-5.1.0-rc2 | raise WDL from 0.05 to 0.10 | accepted | bbf2d21f7f3eb0407224432fe0853bdab26b8155358582ca2872c57b543ea824 | d4403d9d | +36.1 / 13.6 | -252.6 / 8.9 | 4000 | Passed but not selected; lost the direct tie-break to rc1. |
-| enyo-5.2.0-rc3 | pwa-llm | enyo-5.1.0-rc2 | raise WDL from 0.05 to 0.075 | accepted | 5349e54fc9267b386805c2a45ae4d6c092dffd8fb7ea57b4f1941a6ea4fb1a10 | 3e91620a | +30.7 / 11.0 | -259.3 / 9.2 | 4000 | Passed at the positive cap but not selected. |
-| enyo-5.3.0-rc1 | pwa-llm | enyo-5.2.0-rc1 | third full dose with the selected WDL 0.05 regimen | accepted | bc0102cefb7a44313d2b59451670595836a885607c64f5c6d4ef177009f3fbc4 | c54db7e4 | +26.2 / 12.5 | -238.0 / 8.8 | 4000 | Passed but not selected on the completed fixed-SF point estimate. |
-| enyo-5.3.0-rc2 | pwa-5090 | enyo-5.2.0-rc1 | raise final LR from 0.000005 to 0.000010 | accepted | 4ed3eca977c10cb2a32cfc086c45d686554d1e162158743088397dd3b5b2527e | 5b851c74 | +28.7 / 11.6 | -232.0 / 8.5 | 4000 | Selected on identical fixed-SF point estimate; direct confirmation is running. |
-| enyo-5.4.0-rc1 | pwa-llm | enyo-5.3.0-rc2 | fourth full dose with the selected final LR 0.000010 regimen | accepted | 26be08a3ce654d855ed206a7c1c1423889d6536a544da9d6f27349736701bff2 | 947cc252 | +8.8 / 10.7 | -220.2 / 8.1 | 4000 | Selected on identical fixed-SF point estimate; direct confirmation is running. |
-| enyo-5.4.0-rc2 | pwa-5090 | enyo-5.3.0-rc2 | raise final LR from 0.000010 to 0.000020 | accepted | 18180c97cdb5d7334e2ba2496171863736b86a2c52a23ea2b216e3a1a490af8a | 0d25473a | +9.7 / 10.5 | -224.8 / 8.4 | 4000 | Passed but not selected on the completed fixed-SF point estimate. |
-| enyo-5.5.0-rc1 | pwa-llm | enyo-5.4.0-rc1 | fifth full dose with the selected final LR 0.000010 regimen | accepted | d37d880d39290af3edaa6bb11aedfafea4c702661feba3921f2cf4640ac4d2de | e1ef500f | +11.1 / 10.6 | -216.1 / 8.4 | 4000 | Selected parent; rc2 lost the 5000-game direct tie-break by 3.1 / 5.7 Elo. |
-| enyo-5.5.0-rc2 | pwa-5090 | enyo-5.4.0-rc1 | lower initial LR from 0.0010 to 0.0005 | accepted | faabdb6bc56d24e8574f1483961a84ed1e72fdf6ff4239c4ad67b79ba3a69462 | 38ce1f3a | +8.1 / 10.4 | -220.1 / 8.1 | 4000 | Passed but not selected; lost directly to rc1 by 3.1 / 5.7 Elo over 5000 games. |
-| enyo-5.6.0-rc1 | pwa-llm | enyo-5.5.0-rc1 | sixth full dose with the selected regimen | accepted | e12a6c3c797b0de44e3024c3ee20583e4af5136f3cebb1d14d270823c3a27b57 | 92b36e31 | +11.6 / 10.8 | -204.9 / 8.2 | 4000 | Passed but not selected; lost the direct sibling match to rc2. |
-| enyo-5.6.0-rc2 | pwa-5090 | enyo-5.5.0-rc1 | raise initial LR from 0.0010 to 0.0020 | accepted | 576586fa8b9d2093913b02a46d0a47e1f4fb58c9368b2a177ca344048ea988b0 | c2a45f4e | +24.8 / 10.4 | -204.8 / 8.1 | 5000 | Selected parent; beat rc1 directly by +4.2 / 5.7 Elo, LOS 92.7%. |
-| enyo-5.7.0-rc1 | pwa-llm | enyo-5.6.0-rc2 | seventh full dose with the selected initial LR 0.0020 regimen | accepted | 255d04a3759ed354ff8d71a7e7c8b328bfad09801202e8911b99144d292a5d29 | de137020 | +12.3 / 9.9 | -196.8 / 8.1 | 4000 | Passed but not selected; lost the direct sibling match to rc2. |
-| enyo-5.7.0-rc2 | pwa-5090 | enyo-5.6.0-rc2 | raise initial LR from 0.0020 to 0.0030 | accepted | 9f51ab4026da551f5dc5a617034053714720b50152a8e849c464b75174fa7639 | ee199085 | +19.0 / 10.1 | -191.2 / 8.1 | 5000 | Selected parent; beat rc1 directly by +4.4 / 5.7 Elo, LOS 93.5%. |
-| enyo-5.8.0-rc1 | pwa-llm | enyo-5.7.0-rc2 | eighth full dose with the selected initial LR 0.0030 regimen | accepted | 828c40c79d982ddec80b15ebbf40fd665f64e50fb65dbf86e685fc3a0f043213 | 9848db88 | +13.0 / — | -192.6 / 8.1 | 4000 | Passed parent SPRT at the positive cap; direct sibling selection pending. |
-| enyo-5.8.0-rc2 | pwa-5090 | enyo-5.7.0-rc2 | raise initial LR from 0.0030 to 0.0040 | accepted | cd66ae7f81b2d48aa705c107680d4f63762e6c73be4abf56bbae61d3e2be8086 | 111e0e94 | +10.0 / 10.2 | -191.1 / 7.8 | 4000 | Passed parent SPRT with LOS 97.2%; fixed-SF point estimate leads rc1, but direct sibling selection is pending. |
+`Parent SPRT` is against the immediately preceding selected net. `SF` is the
+fixed 4,000-game benchmark, shown as Elo ± CI. Commit links the exact config.
+
+| Promotion | Selected run | Host | Change | Parent SPRT | SF | Commit |
+|---:|---|---|---|---|---|---|
+| 0 | enyo-5.0.0-rc1 | pwa-llm | scratch SCReLU root | — | -315.2 ± 10.6 | 11aa8bc4 |
+| 1 | enyo-5.1.0-rc2 | pwa-5090 | shuffled self-play-1.2 corpus | +64.2 ± 15.9 | -263.1 ± 9.3 | 715837c6 |
+| 2 | enyo-5.2.0-rc1 | pwa-llm | next full dose | +38.2 ± 12.6 | -254.2 ± 9.0 | d2da4c89 |
+| 3 | enyo-5.3.0-rc2 | pwa-5090 | final LR 0.000005 → 0.000010 | +28.7 ± 11.6 | -232.0 ± 8.5 | b6db90d0 |
+| 4 | enyo-5.4.0-rc1 | pwa-llm | next full dose | +8.8 ± 10.7 | -220.2 ± 8.1 | f09a933b |
+| 5 | enyo-5.5.0-rc1 | pwa-llm | next full dose | +11.1 ± 10.6 | -216.1 ± 8.4 | bf950072 |
+| 6 | enyo-5.6.0-rc2 | pwa-5090 | initial LR 0.0010 → 0.0020 | +24.8 ± 10.4 | -204.8 ± 8.1 | 074dc6b9 |
+| 7 | enyo-5.7.0-rc2 | pwa-5090 | initial LR 0.0020 → 0.0030 | +19.0 ± 10.1 | -191.2 ± 8.1 | 73b965c3 |
+
+## Pending selection
+
+| Candidate | Host | Change | Parent SPRT | SF | Commit |
+|---|---|---|---|---|---|
+| enyo-5.8.0-rc1 | pwa-llm | next full dose | +13.0 | -192.6 ± 8.1 | e0ab687d |
+| enyo-5.8.0-rc2 | pwa-5090 | initial LR 0.0030 → 0.0040 | +10.0 ± 10.2 | -191.1 ± 7.8 | c6056975 |
