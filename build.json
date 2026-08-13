@@ -1,13 +1,13 @@
 {
-  "run": "enyo-5.9.0-rc6",
-  "hypothesis": "two corpus passes test whether reduced exposure avoids mature-continuation saturation",
-  "superbatches": 51404,
+  "run": "enyo-5.10.0-rc1",
+  "hypothesis": "three corpus passes test whether the selected schedule continues improving mature continuation",
+  "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.05,
   "lr": 0.003,
   "final_lr": 0.000010,
   "data": {
-    "source_binpack": "/home/petter/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
+    "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
-  "continue_from": "enyo-5.8.0-rc1"
+  "continue_from": "enyo-5.9.0-rc6"
 }
