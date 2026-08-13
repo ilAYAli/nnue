@@ -1266,6 +1266,59 @@ fail_build_json "uho-native-1.0.36" "-25.2" "-0.32/2.20 (-15%)" "forge command" 
             self.assertNotIn("reference", working_json)
             self.assertEqual(600000000, working_json["data"]["offset"])
 
+    def test_rejected_commit_ignores_untracked_stockfish_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            (tmp / "build.json").write_text(
+                '{"run":"native-1.0.0-rc1","hypothesis":"baseline"}\n',
+                encoding="utf-8",
+            )
+            (tmp / "architecture.json").write_text('{}\n', encoding="utf-8")
+            (tmp / ".gitignore").write_text('*.jsonl\n', encoding="utf-8")
+            ledger = tmp / "benchmarks" / "stockfish-net.jsonl"
+            ledger.parent.mkdir()
+            ledger.write_text('{"candidate":"old"}\n', encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.name", "Petter Wahlman"], cwd=tmp, check=True)
+            subprocess.run(["git", "config", "user.email", "petter@wahlman.no"], cwd=tmp, check=True)
+            subprocess.run(
+                ["git", "add", "build.json", "architecture.json", ".gitignore"],
+                cwd=tmp,
+                check=True,
+            )
+            subprocess.run(["git", "commit", "-q", "-m", "base"], cwd=tmp, check=True)
+            (tmp / "build.json").write_text(
+                '{"run":"native-1.0.0-rc2","hypothesis":"candidate"}\n',
+                encoding="utf-8",
+            )
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
+BUILD=build.json
+ARCH=architecture.json
+AUTO_ADVANCE=0
+STOCKFISH_NET_LEDGER=benchmarks/stockfish-net.jsonl
+fail_build_json "native-1.0.0-rc2" "-1.0" "-0.1/2.2" "forge" "rejected"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            subprocess.run(["bash", str(harness_path)], cwd=tmp, check=True)
+            subject = subprocess.run(
+                ["git", "show", "--no-patch", "--format=%s", "HEAD"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout.strip()
+            self.assertEqual("native-1.0.0-rc2.nn: rejected: Elo -1.0,LLR -0.1/2.2", subject)
+            names = subprocess.run(
+                ["git", "show", "--format=", "--name-only", "HEAD"],
+                cwd=tmp,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+            ).stdout.splitlines()
+            self.assertNotIn("benchmarks/stockfish-net.jsonl", names)
+
     def test_failed_initialized_candidate_preserves_origin(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

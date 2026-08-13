@@ -1045,9 +1045,11 @@ commit_and_bump_build_json() {
   if [[ -n "$pending_stockfish_results" ]]; then
     mkdir -p "$(dirname "$STOCKFISH_NET_LEDGER")"
     printf '%s\n' "$pending_stockfish_results" >> "$STOCKFISH_NET_LEDGER"
+    git add -f "$STOCKFISH_NET_LEDGER" || return
     pending_stockfish_results=
   fi
-  [[ -f "$STOCKFISH_NET_LEDGER" ]] && commit_paths+=("$STOCKFISH_NET_LEDGER")
+  git ls-files --error-unmatch "$STOCKFISH_NET_LEDGER" >/dev/null 2>&1 \
+    && commit_paths+=("$STOCKFISH_NET_LEDGER")
 
   local commit_rc=0
   git commit --only \
