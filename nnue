@@ -808,8 +808,8 @@ wait_for_existing_forge_sprt() {
 
       last_sprt_los=$(jq -r '.progress_fields[]? | select(startswith("los=")) | sub("^los="; "") | sub("%$"; "")' <<< "$status_json" | tail -1)
 
+      verdict=
       if [[ "$SKIP_SMOKE" != 1 && -n "$played" && -n "$last_sprt_elo" ]]; then
-        verdict=
         # Checkpoint 1: a catastrophically bad net, rejected on effect size
         # because the LLR bound is far too slow to see it.
         if (( triage_done == 0 )) && [[ "$played" -ge "$SMOKE_GAMES" ]]; then
@@ -818,29 +818,23 @@ wait_for_existing_forge_sprt() {
             verdict="reject:triage at $played games, elo $last_sprt_elo"
           fi
         fi
-        # Rejection is Forge's job, not ours. With SPRT_ELO1 widened the LLR
-        # bound crosses early enough to end a bad run on its own, on a proper
-        # 90% bound rather than a LOS heuristic, so there is no client-side
-        # reject checkpoint here.
-        #
-        # Checkpoint 2: likely stronger, and past the optional-stopping floor.
-        # Acceptance stays here because Forge cannot express it: H1 is
-        # ">= SPRT_ELO1 Elo", which a mature net making +3 never reaches.
-        if [[ -z "$verdict" && -n "$last_sprt_los" ]] \
-           && [[ "$played" -ge "$SPRT_MIN_ACCEPT_GAMES" ]] \
-           && float_ge "$last_sprt_los" "$SPRT_ACCEPT_LOS"; then
-          verdict="accept:los $last_sprt_los% at or above $SPRT_ACCEPT_LOS% after $played games"
+      fi
+      # Rejection is Forge's job. Acceptance remains available when smoke
+      # triage is disabled: SKIP_SMOKE must not disable the promotion rule.
+      if [[ -z "$verdict" && -n "$played" && -n "$last_sprt_los" ]] \
+         && [[ "$played" -ge "$SPRT_MIN_ACCEPT_GAMES" ]] \
+         && float_ge "$last_sprt_los" "$SPRT_ACCEPT_LOS"; then
+        verdict="accept:los $last_sprt_los% at or above $SPRT_ACCEPT_LOS% after $played games"
+      fi
+      if [[ -n "$verdict" ]]; then
+        printf 'stopping Forge SPRT early, %s\n' "${verdict#*:}" | tee -a "$last_sprt_log"
+        "$FORGE" stop --force "$forge_run" </dev/null 2>&1 | tee -a "$last_sprt_log" || true
+        last_sprt_line="Forge $forge_run stopped early, ${verdict#*:} (elo $last_sprt_elo los $last_sprt_los%)"
+        if [[ "$verdict" == accept:* ]]; then
+          last_sprt_early_accept=1
+          return 0
         fi
-        if [[ -n "$verdict" ]]; then
-          printf 'stopping Forge SPRT early, %s\n' "${verdict#*:}" | tee -a "$last_sprt_log"
-          "$FORGE" stop --force "$forge_run" </dev/null 2>&1 | tee -a "$last_sprt_log" || true
-          last_sprt_line="Forge $forge_run stopped early, ${verdict#*:} (elo $last_sprt_elo los $last_sprt_los%)"
-          if [[ "$verdict" == accept:* ]]; then
-            last_sprt_early_accept=1
-            return 0
-          fi
-          return 3
-        fi
+        return 3
       fi
     fi
     sleep "$SPRT_POLL_SECONDS"
