@@ -1,10 +1,10 @@
 {
-  "run": "enyo-5.8.0-rc1",
-  "hypothesis": "another full dose with the selected initial learning rate continues useful convergence",
+  "run": "enyo-5.8.0-rc2",
+  "hypothesis": "raising the selected initial learning rate from 0.0030 to 0.0040 improves mature continuation",
   "superbatches": 221977,
   "trainable": "all",
   "wdl": 0.05,
-  "lr": 0.003,
+  "lr": 0.004,
   "final_lr": 0.000010,
   "data": {
     "source_binpack": "data/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
