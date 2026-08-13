@@ -13,3 +13,14 @@
 | 5 | enyo-5.5.0-rc1 | bf950072 | pwa-llm  | +11.1 ± 10.6 | -216.1 ± 8.4  | next full dose
 | 6 | enyo-5.6.0-rc2 | 074dc6b9 | pwa-5090 | +24.8 ± 10.4 | -204.8 ± 8.1  | initial LR 0.0010 → 0.0020
 | 7 | enyo-5.7.0-rc2 | 73b965c3 | pwa-5090 | +19.0 ± 10.1 | -191.2 ± 8.1  | initial LR 0.0020 → 0.0030
+
+## Current selection and reservations
+
+`enyo-5.8.0-rc1` is the incumbent: the 5,000-game direct match against rc2
+favoured rc1 by 2.2 ± 5.7 Elo (inconclusive), while their fixed-SF results
+overlap. The direct comparison decides the deterministic parent choice.
+
+| Run | Host | Parent | Single variable |
+|---|---|---|---|
+| enyo-5.9.0-rc1 | pwa-llm | enyo-5.8.0-rc1 | halve dose: 221977 → 110988 superbatches |
+| enyo-5.9.0-rc2 | pwa-5090 | enyo-5.8.0-rc1 | source: current combined corpus → Pylon |
