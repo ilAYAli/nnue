@@ -28,3 +28,4 @@ sibling by +1.2 ± 5.7 Elo over 5,000 games.
 | enyo-5.9.0-rc6 | pwa-5090 | enyo-5.8.0-rc1 | selected: two corpus passes (51,404 superbatches) |
 | enyo-5.10.0-rc1 | pwa-llm | enyo-5.9.0-rc6 | unselected: three corpus passes (77,106 superbatches) |
 | enyo-5.10.0-rc2 | pwa-5090 | enyo-5.9.0-rc6 | selected: four corpus passes (102,808 superbatches) |
+| enyo-6.0.0-rc1 | pwa-llm | enyo-5.10.0-rc2 | reserved: activated L2-to-output skip |
