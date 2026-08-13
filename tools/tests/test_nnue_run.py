@@ -160,6 +160,24 @@ class NnueRunTests(unittest.TestCase):
                 proc.stdout,
             )
 
+    def test_load_config_expands_home_relative_bullet_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            home.mkdir()
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","data":{"source_binpack":"~/assets/training/data.bullet"}}\n',
+                encoding="utf-8",
+            )
+            proc = self.run_sourced(
+                f"HOME={shlex.quote(str(home))}; BUILD={shlex.quote(str(build))}; "
+                "load_config; printf '%s\\n' \"$data_file\""
+            )
+
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(f"{home}/assets/training/data.bullet\n", proc.stdout)
+
     def test_load_config_defaults_reference_to_continue_from(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

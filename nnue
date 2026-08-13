@@ -193,7 +193,7 @@ load_config() {
   run_dir="runs/$run"
   log_dir="$run_dir/logs"
   candidate_net="$HOME/assets/nets/$run.nn"
-  data_file=$(jq -r --arg run "$run" '
+  data_file=$(abs_path "$(jq -r --arg run "$run" '
     .data.bullet_output
     // (if (((.data.source_binpack // "") | endswith(".bullet"))
             and ((.data.offset // 0) == 0)
@@ -201,7 +201,7 @@ load_config() {
         then .data.source_binpack
         else ("data/bullet/" + $run + ".bullet")
         end)
-  ' "$BUILD")
+  ' "$BUILD")")
   mkdir -p "$log_dir" runs/logs
   local ref_source="${REFERENCE_NET:-${reference_name:-$continue_from}}"
   if [[ -n "$ref_source" ]]; then
