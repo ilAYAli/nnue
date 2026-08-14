@@ -1184,11 +1184,12 @@ latest_stockfish_result() {
 }
 
 run_stockfish_benchmark() {
-  local candidate=$1 candidate_path qsprt_tmp result_line elo ci
+  local candidate=$1 candidate_path qsprt_tmp result_line elo ci hypothesis
   candidate_path="$HOME/assets/nets/$candidate.nn"
   [[ -f "$candidate_path" ]] \
     || fail "missing Stockfish benchmark candidate: $candidate_path" stockfish_net_sprt
   echo "Stockfish benchmark candidate=$candidate path=$candidate_path"
+  hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
 
   # Stream QSPRT output to terminal while capturing the result line.
   # Temporarily disable pipefail so we can check PIPESTATUS[0] manually.
@@ -1196,7 +1197,7 @@ run_stockfish_benchmark() {
   set +o pipefail
   GAMES="$STOCKFISH_NET_GAMES" STOCKFISH_NET="$STOCKFISH_NET" "$QSPRT" \
     --candidate "$candidate_path" \
-    --comment "$candidate.nn vs ${STOCKFISH_NET##*/}"$'\n'"$hypothesis" | tee "$qsprt_tmp"
+    --comment "$candidate.nn vs ${STOCKFISH_NET##*/}: $hypothesis" | tee "$qsprt_tmp"
   local qsprt_rc=${PIPESTATUS[0]}
   set -o pipefail
   result_line=$(tail -1 "$qsprt_tmp")
