@@ -24,7 +24,8 @@
 
 `Parent SPRT` is historical and is not comparable to the Enyo-5/6 results.
 Rows are the selected direct-weight path; omitted versions are rejected or
-non-ancestor sibling experiments. `[gap]` is not an inferred link.
+non-ancestor sibling experiments. Scale rows are deterministic export
+transforms, not training runs.
 
 |  # | Selected run                      | Commit   | Host | Parent SPRT   | SF | Change
 |----|-----------------------------------|----------|------|---------------|----|--------------------------------
@@ -51,6 +52,7 @@ non-ancestor sibling experiments. `[gap]` is not an inferred link.
 | 20 | enyo-1.16.0-rc3                   | 79cd05cb | —    | +4.9          | —  | T60T70wIsRightFarseer; 256 SB
 | 21 | enyo-1.20.0-rc12                  | 586a5c29 | —    | +2.1          | —  | Pylon; output-only; 512 SB
 | 22 | enyo-1.28.0-rc16                  | f37067d2 | —    | +10.2         | —  | Pylon; input-only; LR 0.00001; 256 SB
-| 23 | [gap: enyo-1.30.0-rc3-unscaled]   | —        | —    | unrecovered   | —  | its exact configuration and parent are absent
-| 24 | enyo-1.31.0-rc57                  | 3c464a3b | —    | +8.6          | —  | Stockfish-static relabel of 46.4M self-play positions; 354 SB
-| 25 | enyo-1.32.0-rc10                  | 650a4fcc | —    | +3.3          | —  | recalibrated nodes5000pv2 labels; 4,000 SB
+| 23 | enyo-1.30.0-rc3                   | —        | —    | +25.3 ± 13.9 | —  | 0.48 final-output-head scale of rc16
+| 24 | enyo-1.30.0-rc3-unscaled          | —        | —    | —             | —  | inverse scale; loss-coordinate parent
+| 25 | enyo-1.31.0-rc57                  | 3c464a3b | —    | +8.6          | —  | Stockfish-static relabel of 46.4M self-play positions; 354 SB
+| 26 | enyo-1.32.0-rc10                  | 650a4fcc | —    | +3.3          | —  | recalibrated nodes5000pv2 labels; 4,000 SB
