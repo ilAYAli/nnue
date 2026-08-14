@@ -1,13 +1,13 @@
 {
-  "run": "enyo-6.3.0-rc1",
-  "hypothesis": "a third full corpus pass tests whether the confirmed higher initial learning rate raises the optimal continuation dose",
-  "superbatches": 77106,
+  "run": "enyo-6.3.0-rc2",
+  "hypothesis": "a higher final learning rate tests whether useful late adaptation remains after the confirmed higher initial learning rate",
+  "superbatches": 51404,
   "trainable": "all",
   "wdl": 0.05,
   "lr": 0.004,
-  "final_lr": 0.000010,
+  "final_lr": 0.000020,
   "data": {
     "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
-  "continue_from": "enyo-6.2.0-rc4"
+  "continue_from": "enyo-6.1.0-rc2"
 }
