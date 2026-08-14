@@ -32,3 +32,5 @@ and benchmarked at -170.5 ± 7.7 versus SF using enyo_f2a0417.
 | enyo-6.1.0-rc2 | pwa-llm | enyo-6.0.0-rc1 | selected: two corpus-pass continuation (51,404 superbatches); +7.9 ± 10.1, SF -170.5 ± 7.7 |
 | enyo-6.2.0-rc1 | pwa-llm | enyo-6.1.0-rc2 | rejected: three corpus-pass continuation (77,106 superbatches) |
 | enyo-6.2.0-rc2 | pwa-5090 | enyo-6.1.0-rc2 | rejected: four corpus-pass continuation (102,808 superbatches) |
+| enyo-6.2.0-rc3 | pwa-llm | enyo-6.1.0-rc2 | reserved: initial LR 0.003 → 0.002 |
+| enyo-6.2.0-rc4 | pwa-5090 | enyo-6.1.0-rc2 | reserved: initial LR 0.003 → 0.004 |
