@@ -116,9 +116,10 @@ def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: i
         sys.exit("Error: could not parse run id from forge run sprt output")
     run = match.group(1)
 
-    wait = subprocess.run(["forge", "wait", run])
+    manifest = Path.home() / "code" / "chess" / "forge" / "runs" / run / "manifest.json"
+    wait = subprocess.run(["forge", "wait", "--manifest", str(manifest)])
     if wait.returncode:
-        raise subprocess.CalledProcessError(wait.returncode, ["forge", "wait", run])
+        raise subprocess.CalledProcessError(wait.returncode, ["forge", "wait", "--manifest", str(manifest)])
 
     status = subprocess.run(
         ["forge", "status", run, "--json"], capture_output=True, text=True, check=True

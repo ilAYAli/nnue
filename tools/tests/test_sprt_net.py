@@ -89,7 +89,8 @@ class RunSprtTests(unittest.TestCase):
 
         self.assertEqual("sprt-test", result)
         self.assertEqual(
-            [mock.call(["forge", "wait", "sprt-test"]),
+            [mock.call(["forge", "wait", "--manifest",
+                       str(Path.home() / "code" / "chess" / "forge" / "runs" / "sprt-test" / "manifest.json")]),
              mock.call(["forge", "status", "sprt-test", "--json"], capture_output=True, text=True, check=True)],
             run.call_args_list,
         )
