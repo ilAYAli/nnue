@@ -72,7 +72,7 @@ class RunSprtTests(unittest.TestCase):
             stderr="",
         )
         with (
-            mock.patch.object(sprt_net.subprocess, "Popen", return_value=launch),
+            mock.patch.object(sprt_net.subprocess, "Popen", return_value=launch) as popen,
             mock.patch.object(
                 sprt_net.subprocess,
                 "run",
@@ -89,12 +89,43 @@ class RunSprtTests(unittest.TestCase):
 
         self.assertEqual("sprt-test", result)
         self.assertEqual(
+            "candidate.nn vs reference.nn",
+            popen.call_args.args[0][4],
+        )
+        self.assertEqual(
             [mock.call(["forge", "wait", "--manifest",
                        str(Path.home() / "code" / "chess" / "forge" / "runs" / "sprt-test" / "manifest.json")]),
              mock.call(["forge", "status", "sprt-test", "--json"], capture_output=True, text=True, check=True)],
             run.call_args_list,
         )
         printed.assert_any_call("progress=games=4000/4000, elo=-165.1, ci=7.4")
+
+    def test_uses_explicit_comment(self) -> None:
+        launch = mock.Mock()
+        launch.stdout = iter(["run: id=sprt-test\n"])
+        launch.wait.return_value = 0
+        completed = subprocess.CompletedProcess(
+            args=["forge", "status"], returncode=0,
+            stdout=json.dumps({"progress": "progress=games=4000/4000"}), stderr="",
+        )
+        with (
+            mock.patch.object(sprt_net.subprocess, "Popen", return_value=launch) as popen,
+            mock.patch.object(
+                sprt_net.subprocess,
+                "run",
+                side_effect=[subprocess.CompletedProcess(args=["forge", "wait"], returncode=0), completed],
+            ),
+        ):
+            sprt_net.run_sprt(
+                engine=Path("/engine"), candidate_net=Path("/candidate.nn"),
+                reference_net=Path("/reference.nn"), games=4000,
+                comment="candidate.nn vs reference.nn\nhypothesis",
+            )
+
+        self.assertEqual(
+            "candidate.nn vs reference.nn\nhypothesis",
+            popen.call_args.args[0][4],
+        )
 
 
 if __name__ == "__main__":

@@ -70,11 +70,13 @@ def existing_run_matches(
     )
 
 
-def run_sprt(*, engine: Path, candidate_net: Path, reference_net: Path, games: int) -> str:
+def run_sprt(
+    *, engine: Path, candidate_net: Path, reference_net: Path, games: int, comment: str | None = None
+) -> str:
     """Launch one Forge SPRT and stream deployment output."""
     command = [
         "forge", "run", "sprt",
-        "--comment", f"{candidate_net.name} vs {reference_net.name}",
+        "--comment", comment or f"{candidate_net.name} vs {reference_net.name}",
         "--reference", str(engine),
         "--candidate", str(engine),
         "--reference-net", str(reference_net),
@@ -141,6 +143,7 @@ def main() -> None:
         "--reference", default=os.environ.get("REFERENCE_NET", "~/assets/nets/nn-0ee0657fb25e.nnue")
     )
     parser.add_argument("--engine", default=os.environ.get("ENGINE", "~/assets/engines/reference"))
+    parser.add_argument("--comment")
     args = parser.parse_args()
     games = int(os.environ.get("GAMES", "1500"))
 
@@ -158,7 +161,13 @@ def main() -> None:
     check_engine_loads_net(engine, "CANDIDATE_NET", candidate_net)
     check_engine_loads_net(engine, "REFERENCE_NET", reference_net)
 
-    run = run_sprt(engine=engine, candidate_net=candidate_net, reference_net=reference_net, games=games)
+    run = run_sprt(
+        engine=engine,
+        candidate_net=candidate_net,
+        reference_net=reference_net,
+        games=games,
+        comment=args.comment,
+    )
     print(f"started={run}")
 
 

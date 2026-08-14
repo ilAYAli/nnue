@@ -887,7 +887,7 @@ run_sprt_once() {
       --alpha "$SPRT_ALPHA"
       --beta "$SPRT_BETA"
     )
-    forge_cmd+=(--comment "$run vs $(reference_label)")
+    forge_cmd+=(--comment "$run vs $(reference_label)"$'\n'"$hypothesis")
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
       fail "could not launch Forge SPRT for $run ($forge_run)" sprt
@@ -1194,7 +1194,8 @@ run_stockfish_benchmark() {
   qsprt_tmp=$(mktemp)
   set +o pipefail
   GAMES="$STOCKFISH_NET_GAMES" STOCKFISH_NET="$STOCKFISH_NET" "$QSPRT" \
-    --candidate "$candidate_path" | tee "$qsprt_tmp"
+    --candidate "$candidate_path" \
+    --comment "$candidate.nn vs ${STOCKFISH_NET##*/}"$'\n'"$hypothesis" | tee "$qsprt_tmp"
   local qsprt_rc=${PIPESTATUS[0]}
   set -o pipefail
   result_line=$(tail -1 "$qsprt_tmp")
