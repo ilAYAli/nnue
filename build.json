@@ -1,7 +1,7 @@
 {
-  "run": "enyo-6.2.0-rc1",
-  "hypothesis": "three corpus passes test whether the selected dose continues improving skip continuation",
-  "superbatches": 77106,
+  "run": "enyo-6.2.0-rc2",
+  "hypothesis": "four corpus passes test whether a larger dose improves skip continuation",
+  "superbatches": 102808,
   "trainable": "all",
   "wdl": 0.05,
   "lr": 0.003,
