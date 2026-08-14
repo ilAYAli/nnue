@@ -1200,7 +1200,7 @@ run_stockfish_benchmark() {
     --comment "$candidate.nn vs ${STOCKFISH_NET##*/}: $hypothesis" | tee "$qsprt_tmp"
   local qsprt_rc=${PIPESTATUS[0]}
   set -o pipefail
-  result_line=$(tail -1 "$qsprt_tmp")
+  result_line=$(grep '^progress=' "$qsprt_tmp" | tail -1 || true)
   rm -f "$qsprt_tmp"
   [[ $qsprt_rc -eq 0 ]] \
     || fail "Stockfish net benchmark failed for $candidate" stockfish_net_sprt
