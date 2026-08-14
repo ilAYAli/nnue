@@ -843,7 +843,8 @@ wait_for_existing_forge_sprt() {
 }
 
 run_sprt_once() {
-  local label=$1 sprt_games=$2 stage=$3
+  local label=$1 sprt_games=$2 stage=$3 hypothesis
+  hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
   last_sprt_early_accept=0
   last_sprt_log="$log_dir/05-${label}-${sprt_games}.log"
   notify phase_start "$stage" "SPRT $label $run vs $(reference_label)" "$last_sprt_log" 0
@@ -887,7 +888,7 @@ run_sprt_once() {
       --alpha "$SPRT_ALPHA"
       --beta "$SPRT_BETA"
     )
-    forge_cmd+=(--comment "$run vs $(reference_label)"$'\n'"$hypothesis")
+    forge_cmd+=(--comment "$run vs $(reference_label): $hypothesis")
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
       fail "could not launch Forge SPRT for $run ($forge_run)" sprt
