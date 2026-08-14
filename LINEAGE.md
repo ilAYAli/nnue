@@ -16,8 +16,8 @@
 
 ## Current selection and reservations
 
-`enyo-6.1.0-rc2` is selected: it passed its parent SPRT by +7.9 ± 10.1 Elo
-and benchmarked at -170.5 ± 7.7 versus SF using enyo_f2a0417.
+`enyo-6.2.0-rc4` is selected: it passed its parent SPRT by +2.1 ± 10.6 Elo
+and benchmarked at -164.3 ± 7.5 versus SF using enyo_f2a0417.
 
 | Run | Host | Parent | Single variable |
 |---|---|---|---|
@@ -32,5 +32,5 @@ and benchmarked at -170.5 ± 7.7 versus SF using enyo_f2a0417.
 | enyo-6.1.0-rc2 | pwa-llm | enyo-6.0.0-rc1 | selected: two corpus-pass continuation (51,404 superbatches); +7.9 ± 10.1, SF -170.5 ± 7.7 |
 | enyo-6.2.0-rc1 | pwa-llm | enyo-6.1.0-rc2 | rejected: three corpus-pass continuation (77,106 superbatches) |
 | enyo-6.2.0-rc2 | pwa-5090 | enyo-6.1.0-rc2 | rejected: four corpus-pass continuation (102,808 superbatches) |
-| enyo-6.2.0-rc3 | pwa-llm | enyo-6.1.0-rc2 | reserved: initial LR 0.003 → 0.002 |
-| enyo-6.2.0-rc4 | pwa-5090 | enyo-6.1.0-rc2 | reserved: initial LR 0.003 → 0.004 |
+| enyo-6.2.0-rc3 | pwa-llm | enyo-6.1.0-rc2 | rejected: initial LR 0.003 → 0.002 |
+| enyo-6.2.0-rc4 | pwa-5090 | enyo-6.1.0-rc2 | selected: initial LR 0.003 → 0.004; +2.1 ± 10.6, SF -164.3 ± 7.5 |
