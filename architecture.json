@@ -1,5 +1,5 @@
 {
-  "name": "native-h16-12ch-1024-v4",
+  "name": "native-h16-12ch-1024-v8-l2-output-skip",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
@@ -14,5 +14,6 @@
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
   "dense_activation": "relu-screlu-residual",
-  "export_format": "enyo-native-v4"
+  "l2_output_skip": true,
+  "export_format": "enyo-native-v8"
 }
