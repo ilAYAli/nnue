@@ -60,5 +60,41 @@ class ExistingRunTests(unittest.TestCase):
         self.assertFalse(matches)
 
 
+class RunSprtTests(unittest.TestCase):
+    def test_waits_and_prints_completed_progress(self) -> None:
+        launch = mock.Mock()
+        launch.stdout = iter(["run: id=sprt-test\n"])
+        launch.wait.return_value = 0
+        completed = subprocess.CompletedProcess(
+            args=["forge", "status"],
+            returncode=0,
+            stdout=json.dumps({"progress": "progress=games=4000/4000, elo=-165.1, ci=7.4"}),
+            stderr="",
+        )
+        with (
+            mock.patch.object(sprt_net.subprocess, "Popen", return_value=launch),
+            mock.patch.object(
+                sprt_net.subprocess,
+                "run",
+                side_effect=[subprocess.CompletedProcess(args=["forge", "wait"], returncode=0), completed],
+            ) as run,
+            mock.patch("builtins.print") as printed,
+        ):
+            result = sprt_net.run_sprt(
+                engine=Path("/engine"),
+                candidate_net=Path("/candidate.nn"),
+                reference_net=Path("/reference.nn"),
+                games=4000,
+            )
+
+        self.assertEqual("sprt-test", result)
+        self.assertEqual(
+            [mock.call(["forge", "wait", "sprt-test"]),
+             mock.call(["forge", "status", "sprt-test", "--json"], capture_output=True, text=True, check=True)],
+            run.call_args_list,
+        )
+        printed.assert_any_call("progress=games=4000/4000, elo=-165.1, ci=7.4")
+
+
 if __name__ == "__main__":
     unittest.main()
