@@ -1,7 +1,7 @@
 {
-  "run": "enyo-6.1.0-rc2",
-  "hypothesis": "two corpus passes test the continuation dose for the accepted skip architecture",
-  "superbatches": 51404,
+  "run": "enyo-6.1.0-rc1",
+  "hypothesis": "one corpus pass tests the continuation dose for the accepted skip architecture",
+  "superbatches": 25702,
   "trainable": "all",
   "wdl": 0.05,
   "lr": 0.003,
