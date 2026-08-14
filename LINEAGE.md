@@ -20,6 +20,8 @@
 | 12 | enyo-6.1.0-rc2  | 2741cfd1 | pwa-llm  | +7.9 ± 10.1  | -170.5 ± 7.7  | two corpus passes
 | 13 | enyo-6.2.0-rc4  | 18dd99b0 | pwa-5090 | +2.1 ± 10.6  | -164.3 ± 7.5  | initial LR 0.0030 → 0.0040
 
+Reserved from `enyo-6.2.0-rc4`: `enyo-6.3.0-rc3` on pwa-llm (final LR 0.000005) and `enyo-6.3.0-rc4` on pwa-5090 (0.000020).
+
 # Enyo 1 Lineage (recovered)
 
 `Parent SPRT` is historical and is not comparable to the Enyo-5/6 results.
