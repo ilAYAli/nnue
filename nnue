@@ -1205,8 +1205,8 @@ run_stockfish_benchmark() {
   [[ $qsprt_rc -eq 0 ]] \
     || fail "Stockfish net benchmark failed for $candidate" stockfish_net_sprt
 
-  elo=$(grep -o 'elo=[^ ]*' <<< "$result_line" | cut -d= -f2)
-  ci=$(grep -o 'ci=[^ ]*' <<< "$result_line" | cut -d= -f2)
+  elo=$(grep -o 'elo=[^ ]*' <<< "$result_line" | cut -d= -f2 | tr -d ',')
+  ci=$(grep -o 'ci=[^ ]*' <<< "$result_line" | cut -d= -f2 | tr -d ',')
   [[ -n "$elo" && -n "$ci" ]] \
     || fail "invalid Stockfish benchmark result for $candidate" stockfish_net_sprt
 
