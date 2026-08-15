@@ -3,6 +3,10 @@
 `Parent SPRT` is against the immediately preceding selected net.
 `SF` is the fixed 4,000-game benchmark against `nn-0ee0657fb25e.nnue`
 
+Architecture 5: SCReLU dense activation (`relu-screlu-residual`).
+Architecture 6: Architecture 5 plus the activated L2→output skip.
+Current Enyo-5/6 champion: `enyo-6.3.0-rc3` (−148.6 ±7.5 vs fixed SF, `enyo_f2a0417`).
+
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
 |  0 | enyo-5.0.0-rc1  | 11aa8bc4 | pwa-llm  | —            | -315.2 ± 10.6 | scratch SCReLU root
