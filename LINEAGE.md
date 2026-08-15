@@ -20,8 +20,9 @@
 | 12 | enyo-6.1.0-rc2  | 2741cfd1 | pwa-llm  | +7.9 ± 10.1  | -170.5 ± 7.7  | two corpus passes
 | 13 | enyo-6.2.0-rc4  | 18dd99b0 | pwa-5090 | +2.1 ± 10.6  | -164.3 ± 7.5  | initial LR 0.0030 → 0.0040
 | 14 | enyo-6.3.0-rc3  | 1aa663b7 | pwa-llm  | +12.0 ± 10.4 | -148.6 ± 7.5  | final LR 0.000010 → 0.000005; tie-break +6.6 ± 5.5 vs rc4
+| 15 | enyo-6.4.0-rc1  | cd7728bc | pwa-llm  | +0.7 ± 10.2  | -156.1 ± 7.4  | three corpus passes; tie-break +4.4 ± 5.6 vs rc2
 
-Reserved from `enyo-6.3.0-rc3`: `enyo-6.4.0-rc1` on pwa-llm (three corpus passes) and `enyo-6.4.0-rc2` on pwa-5090 (WDL 0.075).
+Reserved from `enyo-6.4.0-rc1`: `enyo-6.5.0-rc1` on pwa-llm (WDL 0.025) and `enyo-6.5.0-rc2` on pwa-5090 (final LR 0.0000025).
 
 # Enyo 1 Lineage (recovered)
 
