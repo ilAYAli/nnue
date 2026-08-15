@@ -1,6 +1,6 @@
 {
-  "run": "enyo-7.0.0-rc1",
-  "hypothesis": "finer king-relative input buckets test whether additional feature partitioning lifts the skip architecture ceiling",
+  "run": "enyo-7.0.0-rc2",
+  "hypothesis": "explicit architecture initialization verifies the 32-bucket conversion from the selected parent",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.05,
@@ -9,5 +9,6 @@
   "data": {
     "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
-  "continue_from": "enyo-6.4.0-rc1"
+  "reference": "enyo-6.4.0-rc1",
+  "initialize_from": "enyo-6.4.0-rc1"
 }
