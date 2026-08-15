@@ -1,13 +1,13 @@
 {
-  "run": "enyo-6.4.0-rc2",
-  "hypothesis": "a modest WDL increase tests whether stronger game-outcome weighting improves the selected skip parent",
-  "superbatches": 51404,
+  "run": "enyo-6.5.0-rc1",
+  "hypothesis": "a lower WDL weight tests whether value targets improve the selected skip parent",
+  "superbatches": 77106,
   "trainable": "all",
-  "wdl": 0.075,
+  "wdl": 0.025,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
     "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
-  "continue_from": "enyo-6.3.0-rc3"
+  "continue_from": "enyo-6.4.0-rc1"
 }
