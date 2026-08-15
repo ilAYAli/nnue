@@ -1,9 +1,9 @@
 {
-  "run": "enyo-6.4.0-rc1",
-  "hypothesis": "a third corpus pass tests whether the selected final-LR schedule still improves the skip parent",
-  "superbatches": 77106,
+  "run": "enyo-6.4.0-rc2",
+  "hypothesis": "a modest WDL increase tests whether stronger game-outcome weighting improves the selected skip parent",
+  "superbatches": 51404,
   "trainable": "all",
-  "wdl": 0.05,
+  "wdl": 0.075,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
