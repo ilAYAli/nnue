@@ -1,7 +1,7 @@
 {
-  "run": "enyo-6.5.0-rc5",
-  "hypothesis": "a moderate training dose tests whether mature continuation avoids saturation",
-  "superbatches": 16384,
+  "run": "enyo-7.0.0-rc1",
+  "hypothesis": "finer king-relative input buckets test whether additional feature partitioning lifts the skip architecture ceiling",
+  "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.05,
   "lr": 0.004,
