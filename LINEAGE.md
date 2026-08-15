@@ -26,7 +26,7 @@ Current Enyo-5/6 champion: `enyo-6.3.0-rc3` (−148.6 ±7.5 vs fixed SF, `enyo_f
 | 14 | enyo-6.3.0-rc3  | 1aa663b7 | pwa-llm  | +12.0 ± 10.4 | -148.6 ± 7.5  | final LR 0.000010 → 0.000005; tie-break +6.6 ± 5.5 vs rc4
 | 15 | enyo-6.4.0-rc1  | cd7728bc | pwa-llm  | +0.7 ± 10.2  | -156.1 ± 7.4  | three corpus passes; tie-break +4.4 ± 5.6 vs rc2
 
-Reserved: `enyo-7.0.0-rc1` on pwa-5090 (32 input buckets from `enyo-6.4.0-rc1`).
+Reserved: `enyo-7.0.0-rc2` on pwa-llm (explicit architecture initialization from `enyo-6.4.0-rc1`).
 
 # Enyo 1 Lineage (recovered)
 
