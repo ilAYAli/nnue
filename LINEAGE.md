@@ -5,7 +5,8 @@
 
 Architecture 5: SCReLU dense activation (`relu-screlu-residual`).
 Architecture 6: Architecture 5 plus the activated L2→output skip.
-Current Enyo-5/6 champion: `enyo-6.3.0-rc3` (−148.6 ±7.5 vs fixed SF, `enyo_f2a0417`).
+Architecture 7: Architecture 6 plus 32 input buckets.
+Current selected parent: `enyo-7.0.0-rc2` (−158.9 ±7.4 vs fixed SF, `enyo_f2a0417`).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
@@ -25,8 +26,8 @@ Current Enyo-5/6 champion: `enyo-6.3.0-rc3` (−148.6 ±7.5 vs fixed SF, `enyo_f
 | 13 | enyo-6.2.0-rc4  | 18dd99b0 | pwa-5090 | +2.1 ± 10.6  | -164.3 ± 7.5  | initial LR 0.0030 → 0.0040
 | 14 | enyo-6.3.0-rc3  | 1aa663b7 | pwa-llm  | +12.0 ± 10.4 | -148.6 ± 7.5  | final LR 0.000010 → 0.000005; tie-break +6.6 ± 5.5 vs rc4
 | 15 | enyo-6.4.0-rc1  | cd7728bc | pwa-llm  | +0.7 ± 10.2  | -156.1 ± 7.4  | three corpus passes; tie-break +4.4 ± 5.6 vs rc2
+| 16 | enyo-7.0.0-rc2  | dde4b621 | pwa-llm  | +9.3          | -158.9 ± 7.4  | 32 input buckets; explicit initialization
 
-Reserved: `enyo-7.0.0-rc2` on pwa-llm (explicit architecture initialization from `enyo-6.4.0-rc1`).
 
 # Enyo 1 Lineage (recovered)
 
