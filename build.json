@@ -1,7 +1,7 @@
 {
-  "run": "enyo-6.5.0-rc4",
-  "hypothesis": "a shorter training dose tests whether mature continuation avoids saturation",
-  "superbatches": 4000,
+  "run": "enyo-6.5.0-rc5",
+  "hypothesis": "a moderate training dose tests whether mature continuation avoids saturation",
+  "superbatches": 16384,
   "trainable": "all",
   "wdl": 0.05,
   "lr": 0.004,
