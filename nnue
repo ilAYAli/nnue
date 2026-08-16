@@ -819,9 +819,9 @@ wait_for_existing_forge_sprt() {
           fi
         fi
       fi
-      # Rejection is Forge's job. Acceptance remains available when smoke
-      # triage is disabled: SKIP_SMOKE must not disable the promotion rule.
-      if [[ -z "$verdict" && -n "$played" && -n "$last_sprt_los" ]] \
+      # SKIP_SMOKE disables every client-side checkpoint, including optional
+      # early acceptance, so a fixed-game parent match reaches its full cap.
+      if [[ "$SKIP_SMOKE" != 1 && -z "$verdict" && -n "$played" && -n "$last_sprt_los" ]] \
          && [[ "$played" -ge "$SPRT_MIN_ACCEPT_GAMES" ]] \
          && float_ge "$last_sprt_los" "$SPRT_ACCEPT_LOS"; then
         verdict="accept:los $last_sprt_los% at or above $SPRT_ACCEPT_LOS% after $played games"

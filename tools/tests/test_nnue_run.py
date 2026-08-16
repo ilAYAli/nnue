@@ -1630,6 +1630,7 @@ check_smoke 4.0 -0.22/2.20 positive_elo
         self.assertIn("if (( SPRT_MIN_ACCEPT_GAMES > GAMES )); then", text)
         self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
         self.assertIn("GAMES=${GAMES:-4000}", text)
+        self.assertIn('[[ "$SKIP_SMOKE" != 1 && -z "$verdict"', text)
         # the superseded elo>ci rule must be gone, not merely unused
         self.assertNotIn("SPRT_SIGNAL_MARGIN", text)
         self.assertNotIn("signal_sprt_failed", text)
