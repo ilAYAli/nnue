@@ -1,6 +1,6 @@
 {
-  "run": "enyo-7.1.0-rc2",
-  "hypothesis": "the stronger fixed-SF parent tests an independent continuation trajectory",
+  "run": "enyo-7.2.0-rc2",
+  "hypothesis": "one additional corpus pass tests whether the accepted continuation regimen keeps improving",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.05,
@@ -9,5 +9,5 @@
   "data": {
     "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
-  "continue_from": "enyo-7.1.0-rc1"
+  "continue_from": "enyo-7.1.0-rc2"
 }
