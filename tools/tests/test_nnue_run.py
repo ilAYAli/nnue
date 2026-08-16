@@ -1620,37 +1620,27 @@ check_smoke 4.0 -0.22/2.20 positive_elo
 
     def test_sprt_checkpoint_defaults_encode_the_los_policy(self) -> None:
         text = (REPO / "nnue").read_text(encoding="utf-8")
-        self.assertIn("SPRT_ACCEPT_LOS=${SPRT_ACCEPT_LOS:-75}", text)
-        # Rejection belongs to Forge's llr bound, which only fires if H1 is far
-        # enough from H0; at elo1=3 a losing candidate cost a full run.
+        # Promotion is determined only by the final LLR threshold.
         self.assertIn("SPRT_ELO1=${SPRT_ELO1:-8.0}", text)
         self.assertNotIn("SPRT_REJECT_LOS", text)
+        self.assertNotIn("SPRT_ACCEPT_LOS", text)
         self.assertNotIn("SPRT_MIN_REJECT_GAMES", text)
-        self.assertIn("SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-2000}", text)
-        self.assertIn("if (( SPRT_MIN_ACCEPT_GAMES > GAMES )); then", text)
         self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
         self.assertIn("GAMES=${GAMES:-4000}", text)
-        self.assertIn('[[ "$SKIP_SMOKE" != 1 && -z "$verdict"', text)
         # the superseded elo>ci rule must be gone, not merely unused
         self.assertNotIn("SPRT_SIGNAL_MARGIN", text)
         self.assertNotIn("signal_sprt_failed", text)
 
-    def test_early_los_acceptance_passes_the_full_sprt_check(self) -> None:
+    def test_full_sprt_requires_h1(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             source = (REPO / "nnue").read_text(encoding="utf-8")
             harness = source.split(DISPATCH_MARKER, 1)[0] + """
-last_sprt_early_accept=1
-last_sprt_los=81.0
-last_sprt_elo=5.2
-last_sprt_llr='0.44/2.20 (20%)'
+last_sprt_elo=2.3
+last_sprt_llr='0.67/2.20 (30%)'
+if full_sprt_pass; then printf 'unexpected_positive_pass\n'; else printf 'positive_reject\n'; fi
+last_sprt_llr='2.20/2.20 (100%)'
 if full_sprt_pass; then printf 'pass:%s\n' "$full_sprt_label"; else printf 'fail\n'; fi
-# a run that never triggered an early accept still falls through to the
-# ordinary H1 / positive-at-cap logic
-last_sprt_early_accept=0
-last_sprt_elo=-1.1
-last_sprt_llr='-0.66/2.20 (-30%)'
-if full_sprt_pass; then printf 'unexpected_pass\n'; else printf 'reject\n'; fi
 """
             harness_path = tmp / "accept.sh"
             harness_path.write_text(harness, encoding="utf-8")
@@ -1658,8 +1648,8 @@ if full_sprt_pass; then printf 'unexpected_pass\n'; else printf 'reject\n'; fi
                 ["bash", str(harness_path)],
                 cwd=tmp, check=True, text=True, stdout=subprocess.PIPE,
             )
-            self.assertIn("pass:LOS 81.0% >= 75%", proc.stdout)
-            self.assertIn("reject", proc.stdout)
+            self.assertIn("positive_reject", proc.stdout)
+            self.assertIn("pass:H1 reached", proc.stdout)
 
     def test_move_gate_skips_missing_cases_when_not_strict(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:

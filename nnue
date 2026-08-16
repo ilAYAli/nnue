@@ -34,44 +34,11 @@ REFERENCE_NET=${REFERENCE_NET:-}
 CASES=${CASES:-runs/lichess-inacc-miss-blunder-20260612/native760_vs_native123_net_value_bad_move_gate.jsonl}
 
 ROWS=${ROWS:-50000}
-# SPRT stopping is split between Forge and this script, because they can each
-# express something the other cannot.
-#
-# Forge owns REJECTION, via its own llr bound. That only works if H1 is far
-# enough from H0 for a game to discriminate: at elo1=3, enyo-1.33.0-rc1 sat at
-# llr -0.37/2.20 after 2168 games at -5.0 Elo, extrapolating to ~12900 games to
-# reject - past the 6000 cap, so the bound could never fire and every losing
-# candidate cost a full run. SPRT_ELO1 is widened below to fix that.
-#
-# This script owns ACCEPTANCE, via LOS, because Forge cannot express it: with a
-# wide H1 the llr accept bound means ">= SPRT_ELO1 Elo", which a mature net
-# making +3 will never reach. enyo-1.32.0-rc10 was a genuine promotion at
-# llr 0.68/2.20.
-#
-# At 6000 games sigma is about 3.7 Elo, so the accept threshold sets both the
-# minimum detectable gain and the false-accept rate, which is 1 - threshold:
-#   LOS 95  needs +6.1  detects a true +3 only 20% of the time   5% wrong
-#   LOS 85  needs +3.8  detects a true +3     41% of the time   15% wrong
-#   LOS 75  needs +2.5  detects a true +3     55% of the time   25% wrong
-# 75 is chosen deliberately: for a mature net making +3 to +5 Elo steps, a
-# stricter gate finds nothing. One promotion in four will be wrong, which the
-# periodic absolute benchmark (STOCKFISH_NET_EVERY) exists to catch.
-#
-# If Forge ever grows declarative stop conditions (--stop-if "los >= 75 after
-# 3000"), the poll loop in wait_for_existing_forge_sprt should be deleted
-# outright and the wait reverted to blocking.
+# A parent promotion uses the fixed game cap and Forge's final LLR bound.
+# Optional smoke triage may stop only a catastrophically bad candidate.
 SMOKE_GAMES=${SMOKE_GAMES:-500}                    # checkpoint 1: stop if catastrophically bad
 SMOKE_FAIL_ELO=${SMOKE_FAIL_ELO:--100.0}
-SPRT_ACCEPT_LOS=${SPRT_ACCEPT_LOS:-75}             # stop and accept once LOS reaches this
-# Acceptance floor. LOS already normalises for sample size, but polling and
-# accepting the first crossing is optional stopping and inflates the error well
-# past 1 - threshold. enyo-1.32.0-rc5-s0.65 read LOS 87.1% at 1500 games and
-# 38.2% at 6000. Half the budget limits the peeking window.
 GAMES=${GAMES:-4000}                               # final game budget (ci ~= 10 at this size)
-SPRT_MIN_ACCEPT_GAMES=${SPRT_MIN_ACCEPT_GAMES:-2000}
-if (( SPRT_MIN_ACCEPT_GAMES > GAMES )); then
-  SPRT_MIN_ACCEPT_GAMES=$GAMES
-fi
 SKIP_SMOKE=${SKIP_SMOKE:-0}                        # 1 disables every checkpoint
 SPRT_POLL_SECONDS=${SPRT_POLL_SECONDS:-30}   # how often to re-read Forge status mid-run
 # Hard bound on the poll loop so a silently dead Forge run cannot hang the
@@ -90,15 +57,7 @@ SKIP_RESIDUAL_GATE=${SKIP_RESIDUAL_GATE:-0}
 QSPRT=${QSPRT:-tools/validate/sprt_net.py}
 PROMOTED_NET_LINK=${PROMOTED_NET_LINK:-$HOME/assets/nets/candidate.net}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
-# H1 is deliberately wide. The LLR drift rate scales with
-# (elo1 - elo0) * (true_elo - midpoint), so at elo1=3 the hypotheses are too
-# close for a game to discriminate: enyo-1.33.0-rc1 sat at llr -0.37/2.20 after
-# 2168 games at -5.0 Elo, which extrapolates to about 12900 games to reject -
-# more than double the 6000 cap, so Forge's own early stop could never fire.
-# At elo1=8 the same candidate rejects near 3000 games on a proper 90% bound,
-# which is why the client-side LOS reject checkpoint is gone. Accepting is a
-# separate matter: H1 now means ">= 10 Elo", which a mature net making +3 will
-# never reach, so acceptance is still decided by SPRT_ACCEPT_LOS below.
+# H1 is deliberately wide so Forge can reject clear losses promptly.
 SPRT_ELO1=${SPRT_ELO1:-8.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.10}
 SPRT_BETA=${SPRT_BETA:-0.10}
@@ -141,7 +100,6 @@ last_sprt_elo=
 last_sprt_llr=
 last_sprt_ci=
 last_sprt_los=
-last_sprt_early_accept=0
 last_sprt_line=
 last_sprt_command=
 last_sprt_log=
@@ -307,7 +265,6 @@ EOF
 float_ge() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a >= b) }'; }
 float_le() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a <= b) }'; }
 float_lt() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a < b) }'; }
-float_gt() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a > b) }'; }
 abs_float_le() { awk -v a="$1" -v b="$2" 'BEGIN { if (a < 0) a = -a; exit !(a <= b) }'; }
 
 sprt_h1_passed() {
@@ -316,13 +273,6 @@ sprt_h1_passed() {
   upper=$(sed -nE 's/^[[:space:]]*[+-]?[0-9]+([.][0-9]+)?\/([+-]?[0-9]+([.][0-9]+)?).*/\2/p' <<< "$1")
   [[ -n "$value" && -n "$upper" ]] || return 2
   float_ge "$value" "$upper"
-}
-
-sprt_llr_value() {
-  local value
-  value=$(sed -nE 's/^[[:space:]]*([+-]?[0-9]+([.][0-9]+)?)\/.*/\1/p' <<< "$1")
-  [[ -n "$value" ]] || return 2
-  printf '%s\n' "$value"
 }
 
 smoke_sprt_failed() {
@@ -335,19 +285,8 @@ smoke_sprt_failed() {
 
 full_sprt_label=
 full_sprt_pass() {
-  if [[ "$last_sprt_early_accept" == 1 ]]; then
-    full_sprt_label="LOS $last_sprt_los% >= $SPRT_ACCEPT_LOS%"
-    return 0
-  fi
   if sprt_h1_passed "$last_sprt_llr"; then
     full_sprt_label="H1 reached"
-    return 0
-  fi
-
-  local llr_value
-  llr_value=$(sprt_llr_value "$last_sprt_llr") || fail "could not parse SPRT LLR: $last_sprt_llr" sprt
-  if float_gt "$last_sprt_elo" 0 && float_gt "$llr_value" 0; then
-    full_sprt_label="positive at cap"
     return 0
   fi
   return 1
@@ -784,7 +723,7 @@ wait_for_existing_forge_sprt() {
 
   # Poll rather than block, so the staged checkpoints can stop a hopeless run
   # before it burns its full game budget. One run, cumulative statistics.
-  local triage_done=0 signal_done=0 played verdict
+  local triage_done=0 played verdict
   local waited=0
   while :; do
     if [[ "$SPRT_MAX_WAIT_SECONDS" -gt 0 && "$waited" -ge "$SPRT_MAX_WAIT_SECONDS" ]]; then
@@ -819,21 +758,10 @@ wait_for_existing_forge_sprt() {
           fi
         fi
       fi
-      # SKIP_SMOKE disables every client-side checkpoint, including optional
-      # early acceptance, so a fixed-game parent match reaches its full cap.
-      if [[ "$SKIP_SMOKE" != 1 && -z "$verdict" && -n "$played" && -n "$last_sprt_los" ]] \
-         && [[ "$played" -ge "$SPRT_MIN_ACCEPT_GAMES" ]] \
-         && float_ge "$last_sprt_los" "$SPRT_ACCEPT_LOS"; then
-        verdict="accept:los $last_sprt_los% at or above $SPRT_ACCEPT_LOS% after $played games"
-      fi
       if [[ -n "$verdict" ]]; then
         printf 'stopping Forge SPRT early, %s\n' "${verdict#*:}" | tee -a "$last_sprt_log"
         "$FORGE" stop --force "$forge_run" </dev/null 2>&1 | tee -a "$last_sprt_log" || true
         last_sprt_line="Forge $forge_run stopped early, ${verdict#*:} (elo $last_sprt_elo los $last_sprt_los%)"
-        if [[ "$verdict" == accept:* ]]; then
-          last_sprt_early_accept=1
-          return 0
-        fi
         return 3
       fi
     fi
@@ -845,7 +773,6 @@ wait_for_existing_forge_sprt() {
 run_sprt_once() {
   local label=$1 sprt_games=$2 stage=$3 hypothesis
   hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
-  last_sprt_early_accept=0
   last_sprt_log="$log_dir/05-${label}-${sprt_games}.log"
   notify phase_start "$stage" "SPRT $label $run vs $(reference_label)" "$last_sprt_log" 0
   section "$label"
@@ -943,8 +870,8 @@ sprt_gate() {
     printf '  └─────────────────────────────────────\n'
   else
     printf '  ┌─────────────────────────────────────\n'
-    printf '  │ \033[1;33m→ RUN\033[0m  %s games, Forge rejects on llr (elo1=%s), accept los>=%s%% after %s\n' \
-      "$GAMES" "$SPRT_ELO1" "$SPRT_ACCEPT_LOS" "$SPRT_MIN_ACCEPT_GAMES"
+    printf '  │ \033[1;33m→ RUN\033[0m  %s games, Forge decides on llr (elo1=%s)\n' \
+      "$GAMES" "$SPRT_ELO1"
     printf '  └─────────────────────────────────────\n'
   fi
 
@@ -1381,14 +1308,11 @@ Useful overrides:
   SMOKE_GAMES=400 SMOKE_FAIL_ELO=-100 ./nnue sprt
   GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue sprt
 
-Staged SPRT checkpoints (one run of GAMES, polled and stopped early):
-  SMOKE_GAMES=500              reject if catastrophic (elo <= SMOKE_FAIL_ELO)
-  SPRT_ELO1=8                  H1; Forge stops a losing run on its own llr bound
-  SPRT_ACCEPT_LOS=75           accept once LOS reaches the configured floor
-  SPRT_MIN_ACCEPT_GAMES=2000   clamped to GAMES when the game cap is lower
-  GAMES=4000                   hard cap; policy launch overrides this to 1500
-  SPRT_ACCEPT_LOS=90 ./nnue iterate  # stricter, but detects a true +3 only 32% of the time
-  SKIP_SMOKE=1 ./nnue iterate        # disable every checkpoint, always play GAMES
+SPRT checkpoints:
+  SMOKE_GAMES=500              reject only a catastrophic net (elo <= SMOKE_FAIL_ELO)
+  SPRT_ELO1=8                  H1 threshold
+  GAMES=4000                   hard cap; policy launch overrides this to 5000
+  SKIP_SMOKE=1 ./nnue iterate  # disable smoke; always play GAMES
   FORCE=1 ./nnue train
   MOVE_GATE_STRICT=1 ./nnue gates
 
