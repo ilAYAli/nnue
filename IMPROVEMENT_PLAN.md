@@ -36,6 +36,11 @@ against the fixed SF net. A 5,000-game parent-relative SPRT selects parents;
 shorter matches are screening only. Absolute SF Elo tracks progress toward the
 goal. Residual improvement is report-only.
 
+Promotion is simple: a decisive 5,000-game direct win selects the candidate.
+If direct play is inconclusive, select the stronger fixed-SF result under
+identical conditions; retain the incumbent if neither is better. H1 is never an
+additional promotion requirement.
+
 ## Parallel training
 
 `pwa-llm` owns canonical history and promotion decisions. `pwa-5090` trains
@@ -48,10 +53,11 @@ All Forge coordination runs on `pwa-llm`; `pwa-5090` is training and worker-only
 
 ## Priorities
 
-1. Establish the SCReLU scratch root.
-2. Improve training dose and data while holding architecture fixed.
+1. Reconcile every active sibling using the promotion rule above.
+2. Test the verified recalibrated nodes5000pv2 corpus as a data-only continuation.
 3. Test objective and optimizer parameters individually.
-4. Change architecture only after training variables are understood.
+4. Run a separate clean Berserk-topology control: 16 buckets, 12 channels,
+   1024, 16→32→1, CReLU and ordinary ReLU; never use Berserk weights.
 5. Continue until the lineage statistically beats the fixed SF net.
 
 ## Architecture fallback
