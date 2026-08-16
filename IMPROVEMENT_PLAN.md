@@ -28,12 +28,13 @@ After the root, every candidate:
 - uses `continue_from` the current proven parent;
 - changes exactly one meaningful variable;
 - receives a globally reserved run number;
-- uses parent-relative SPRT for promotion;
+- requires a 5,000-game parent-relative SPRT for promotion;
 - is committed whether accepted or rejected.
 
 The root and every passing candidate receive an identical-condition benchmark
-against the fixed SF net. Parent-relative SPRT selects parents; absolute SF Elo
-tracks progress toward the goal. Residual improvement is report-only.
+against the fixed SF net. A 5,000-game parent-relative SPRT selects parents;
+shorter matches are screening only. Absolute SF Elo tracks progress toward the
+goal. Residual improvement is report-only.
 
 ## Parallel training
 
