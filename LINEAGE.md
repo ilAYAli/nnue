@@ -31,7 +31,7 @@ Current selected parent: `enyo-7.1.0-rc2` (+5.7 ±5.4 vs `enyo-7.1.0-rc1`; −15
 | 18 | enyo-7.2.0-rc1  | 296f72bd | pwa-llm  | +4.2          | -157.0 ± 7.6  | second full continuation
 | 19 | enyo-7.1.0-rc2  | 22a4a975 | pwa-5090 | +5.7 ± 5.4    | -150.3 ± 7.4  | independent continuation trajectory
 
-Reserved: none.
+Reserved: `enyo-7.2.0-rc2` on pwa-llm (one additional corpus pass) and `enyo-7.2.0-rc3` on pwa-5090 (LR 0.0040 → 0.0045), both from `enyo-7.1.0-rc2`.
 
 # Enyo 1 Lineage (recovered)
 
