@@ -6,7 +6,7 @@
 Architecture 5: SCReLU dense activation (`relu-screlu-residual`).
 Architecture 6: Architecture 5 plus the activated L2→output skip.
 Architecture 7: Architecture 6 plus 32 input buckets.
-Current selected parent: `enyo-7.1.0-rc1` (−147.2 ±7.3 vs fixed SF, `enyo_f2a0417`; 7.2 tie-break −0.4 ±6.3).
+Current selected parent: `enyo-7.1.0-rc2` (+5.7 ±5.4 vs `enyo-7.1.0-rc1`; −150.3 ±7.4 vs fixed SF, `enyo_f2a0417`).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
@@ -29,8 +29,9 @@ Current selected parent: `enyo-7.1.0-rc1` (−147.2 ±7.3 vs fixed SF, `enyo_f2a
 | 16 | enyo-7.0.0-rc2  | dde4b621 | pwa-llm  | +9.3          | -158.9 ± 7.4  | 32 input buckets; explicit initialization
 | 17 | enyo-7.1.0-rc1  | fc024567 | pwa-llm  | +2.3 ± 9.9   | -147.2 ± 7.3  | full continuation
 | 18 | enyo-7.2.0-rc1  | 296f72bd | pwa-llm  | +4.2          | -157.0 ± 7.6  | second full continuation
+| 19 | enyo-7.1.0-rc2  | 22a4a975 | pwa-5090 | +5.7 ± 5.4    | -150.3 ± 7.4  | independent continuation trajectory
 
-Reserved: `enyo-7.1.0-rc2` on pwa-5090 (same regimen) and `enyo-7.1.0-rc3` on pwa-llm (WDL 0.10), both from `enyo-7.1.0-rc1`.
+Reserved: none.
 
 # Enyo 1 Lineage (recovered)
 
