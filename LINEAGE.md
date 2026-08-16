@@ -30,7 +30,7 @@ Current selected parent: `enyo-7.1.0-rc1` (−147.2 ±7.3 vs fixed SF, `enyo_f2a
 | 17 | enyo-7.1.0-rc1  | fc024567 | pwa-llm  | +2.3 ± 9.9   | -147.2 ± 7.3  | full continuation
 | 18 | enyo-7.2.0-rc1  | 296f72bd | pwa-llm  | +4.2          | -157.0 ± 7.6  | second full continuation
 
-Reserved: `enyo-7.1.0-rc2` on pwa-5090 (same regimen from `enyo-7.1.0-rc1`).
+Reserved: `enyo-7.1.0-rc2` on pwa-5090 (same regimen) and `enyo-7.1.0-rc3` on pwa-llm (WDL 0.10), both from `enyo-7.1.0-rc1`.
 
 # Enyo 1 Lineage (recovered)
 
