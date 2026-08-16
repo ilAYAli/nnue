@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.3.0-rc1",
-  "hypothesis": "a third full continuation tests whether the 32-bucket architecture keeps improving",
+  "run": "enyo-7.1.0-rc3",
+  "hypothesis": "stronger outcome weighting tests whether the 32-bucket architecture gains from game results",
   "superbatches": 77106,
   "trainable": "all",
-  "wdl": 0.05,
+  "wdl": 0.10,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
     "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
   },
-  "continue_from": "enyo-7.2.0-rc1"
+  "continue_from": "enyo-7.1.0-rc1"
 }
