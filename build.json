@@ -1,9 +1,9 @@
 {
-  "run": "enyo-7.1.0-rc3",
-  "hypothesis": "stronger outcome weighting tests whether the 32-bucket architecture gains from game results",
+  "run": "enyo-7.1.0-rc2",
+  "hypothesis": "the stronger fixed-SF parent tests an independent continuation trajectory",
   "superbatches": 77106,
   "trainable": "all",
-  "wdl": 0.10,
+  "wdl": 0.05,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
