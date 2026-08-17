@@ -5,7 +5,7 @@ set -euo pipefail
 # actions taken, and next steps. Raw commands and long logs should stay in the
 # tmux pane or run log.
 
-URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
+URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/llmsh}
 TITLE=${NNUE_AI_STDOUT_TITLE:-Enyo NNUE agent}
 PRIORITY=${NNUE_AI_STDOUT_PRIORITY:-4}
 DRY_RUN=${NNUE_AI_STDOUT_DRY_RUN:-0}
@@ -30,10 +30,10 @@ source "$HOME/.ntfy" 2>/dev/null || true
 
 if [ -n "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" ]; then
     curl -fsS -m 10 -u "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" \
-        -H "Title: $TITLE" -H "Priority: $PRIORITY" \
+        -H "Title: $TITLE" -H "Priority: $PRIORITY" -H "Tags: ai-out" \
         --data-binary "$body" "$URL" >/dev/null
 else
     curl -fsS -m 10 \
-        -H "Title: $TITLE" -H "Priority: $PRIORITY" \
+        -H "Title: $TITLE" -H "Priority: $PRIORITY" -H "Tags: ai-out" \
         --data-binary "$body" "$URL" >/dev/null
 fi

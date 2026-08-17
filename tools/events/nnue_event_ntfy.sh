@@ -10,14 +10,14 @@ set -euo pipefail
 #   AI_stdin        → opt-in via NNUE_HOOK_EVENTS
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
-AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/AI_stdin}
-AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/AI_stdout}
+AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/llmsh}
+AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/llmsh}
 PING_URL=${NNUE_PING_URL:-https://ntfy.wahlman.no/ping}
 HOOK_EVENTS=${NNUE_HOOK_EVENTS:-}
 AI_STDIN_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 NOTIFAI_ENABLE=${NNUE_NOTIFAI_ENABLE:-1}
 NOTIFAI_COMMAND=${NNUE_NOTIFAI_COMMAND:-notifai.sh}
-NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-AI_stdin:1.1}
+NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-llm:1.1}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -249,6 +249,9 @@ publish() {
     local data="$2"
     local title="$3"
     local priority="$4"
+    local tags="${5:-}"
+    local -a tag_args=()
+    [ -n "$tags" ] && tag_args=(-H "Tags: $tags")
 
     if [ "$DRY_RUN" = "1" ]; then
         printf '%s → %s\n' "$url" "$data"
@@ -257,11 +260,11 @@ publish() {
 
     if [ -n "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" ]; then
         curl -fsS -m 10 -u "${NTFY_AUTH:-${LICHESS_NTFY_AUTH:-}}" \
-            -H "Title: $title" -H "Priority: $priority" \
+            -H "Title: $title" -H "Priority: $priority" "${tag_args[@]}" \
             --data-binary "$data" "$url" >/dev/null
     else
         curl -fsS -m 10 \
-            -H "Title: $title" -H "Priority: $priority" \
+            -H "Title: $title" -H "Priority: $priority" "${tag_args[@]}" \
             --data-binary "$data" "$url" >/dev/null
     fi
 }
@@ -281,7 +284,7 @@ wake_agent() {
             "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
     fi
 
-    if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "4"; then
+    if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "4" "ai-in"; then
         printf '%s event=%s → AI_stdin direct\n' \
             "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         return 0
@@ -317,16 +320,15 @@ event_selected() {
 case "$event_name" in
     fail)
         publish "$PING_URL" "$rendered" "Enyo NNUE fail" "5"
-        publish "$AI_STDOUT_URL" "$rendered" "Enyo NNUE fail" "5"
+        publish "$NNUE_URL" "$rendered" "Enyo NNUE fail" "5"
         printf '%s event=fail → ping,AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
         ;;
     iteration_done)
         publish "$NNUE_URL" "$rendered" "Enyo NNUE iteration done" "4"
-        publish "$AI_STDOUT_URL" "$rendered" "Enyo NNUE iteration done" "4"
         printf '%s event=iteration_done → nnue,AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
         ;;
     *)
-        publish "$AI_STDOUT_URL" "$rendered" "Enyo NNUE $event_name" "3"
+        publish "$NNUE_URL" "$rendered" "Enyo NNUE $event_name" "3"
         printf '%s event=%s → AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         ;;
 esac
@@ -335,7 +337,7 @@ if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$HOOK_EVENTS"; 
     if ! wake_agent; then
         priority=4
         [ "$event_name" = "fail" ] && priority=5
-        if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "$priority"; then
+        if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "$priority" "ai-in"; then
             printf '%s event=%s → AI_stdin\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         else
             rc=$?
