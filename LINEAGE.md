@@ -33,6 +33,8 @@ Current selected parent: `enyo-7.3.0-rc3` (+6.8 ±6.1 vs `enyo-7.2.0-rc2`; −13
 | 20 | enyo-7.2.0-rc2  | e383cbf4 | pwa-llm  | +2.0 ± 5.6    | -145.2 ± 7.3  | one additional corpus pass; SF tie-break over rc3
 | 21 | enyo-7.3.0-rc3  | 0f7513e1 | pwa-llm  | +6.8 ± 6.1    | -138.9 ± 7.1  | recalibrated nodes5000pv2 labels
 
+Reserved: `enyo-7.4.0-rc1` on pwa-llm (WDL 0.05 → 0.025) and `enyo-7.4.0-rc2` on pwa-5090 (initial LR 0.0040 → 0.0035), both from `enyo-7.3.0-rc3`.
+
 # Enyo 1 Lineage (recovered)
 
 `Parent SPRT` is historical and is not comparable to the Enyo-5/6 results.
