@@ -779,6 +779,31 @@ stockfish_net_gate challenger
         self.assertEqual(0, proc.returncode)
         self.assertEqual(-150.0, json.loads(proc.stdout)["elo"])
 
+    def test_stockfish_tie_break_reuses_pending_candidate_result(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            ledger = Path(tmp_name) / "stockfish-net.jsonl"
+            ledger.write_text(
+                '{"candidate":"parent","reference":"nn-stockfish.nnue",'
+                '"games":4000,"elo":-138.9,"ci":7.1}\n',
+                encoding="utf-8",
+            )
+
+            proc = self.run_sourced(
+                f"""
+NNUE_NTFY=0
+STOCKFISH_NET_LEDGER={shlex.quote(str(ledger))}
+STOCKFISH_NET=nn-stockfish.nnue
+STOCKFISH_NET_GAMES=4000
+stockfish_result='{{"candidate":"challenger","reference":"nn-stockfish.nnue","games":4000,"elo":-138.0,"ci":7.3}}'
+run_stockfish_benchmark() {{ echo unexpected-benchmark >&2; return 99; }}
+stockfish_tie_break challenger parent
+"""
+            )
+
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+        self.assertIn("challenger -138.0 vs parent -138.9", proc.stdout)
+
     def test_stockfish_net_gate_allows_small_negative_delta_within_noise(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)

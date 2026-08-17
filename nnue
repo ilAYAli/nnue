@@ -1238,6 +1238,12 @@ stockfish_tie_break() {
   local candidate_elo parent_elo
 
   candidate_result=$(latest_stockfish_result "$candidate") || candidate_result=
+  # The candidate benchmark immediately preceding this tie-break is pending
+  # until the iteration commit. Reuse it rather than launching it again.
+  if [[ -z "$candidate_result" && -n "$stockfish_result" ]] \
+    && [[ $(jq -r '.candidate // empty' <<<"$stockfish_result") == "$candidate" ]]; then
+    candidate_result=$stockfish_result
+  fi
   if [[ -z "$candidate_result" ]]; then
     run_stockfish_benchmark "$candidate"
     candidate_result=$stockfish_result
