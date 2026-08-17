@@ -6,18 +6,13 @@ set -euo pipefail
 # Routing:
 #   fail            → ping
 #   iteration_done  → nnue (phone notification)
-#   everything else → AI_stdout
-#   AI_stdin        → opt-in via NNUE_HOOK_EVENTS
+#   selected done/fail events → llmsh (ai-in)
 
 NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
-AI_STDIN_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/llmsh}
-AI_STDOUT_URL=${NNUE_AI_STDOUT_URL:-https://ntfy.wahlman.no/llmsh}
+LLM_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/llmsh}
 PING_URL=${NNUE_PING_URL:-https://ntfy.wahlman.no/ping}
 HOOK_EVENTS=${NNUE_HOOK_EVENTS:-}
-AI_STDIN_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
-NOTIFAI_ENABLE=${NNUE_NOTIFAI_ENABLE:-1}
-NOTIFAI_COMMAND=${NNUE_NOTIFAI_COMMAND:-notifai.sh}
-NOTIFAI_TARGET=${NNUE_NOTIFAI_TARGET:-llm:1.1}
+LLM_WAKE_ENABLE=${NNUE_AI_STDIN_ENABLE:-1}
 DRY_RUN=${NNUE_NTFY_DRY_RUN:-0}
 LOG=${NNUE_NTFY_LOG:-$HOME/tmp/nnue_event_ntfy.log}
 
@@ -269,32 +264,6 @@ publish() {
     fi
 }
 
-wake_agent() {
-    [ "$AI_STDIN_ENABLE" = "1" ] || return 0
-
-    # Preferred: notifai.sh uses tmux paste-buffer + send-keys C-m so the
-    # message is injected and Enter is sent — no manual keypress needed.
-    if [ "$NOTIFAI_ENABLE" = "1" ] && command -v "$NOTIFAI_COMMAND" >/dev/null 2>&1; then
-        if "$NOTIFAI_COMMAND" "$rendered"; then
-            printf '%s event=%s → AI_stdin (notifai)\n' \
-                "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-            return 0
-        fi
-        printf '%s event=%s notifai failed, falling back to direct\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-    fi
-
-    if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "4" "ai-in"; then
-        printf '%s event=%s → AI_stdin direct\n' \
-            "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-        return 0
-    fi
-
-    printf '%s event=%s AI_stdin direct publish failed\n' \
-        "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-    return 1
-}
-
 event_selected() {
     local event="$1"
     local list
@@ -321,27 +290,25 @@ case "$event_name" in
     fail)
         publish "$PING_URL" "$rendered" "Enyo NNUE fail" "5"
         publish "$NNUE_URL" "$rendered" "Enyo NNUE fail" "5"
-        printf '%s event=fail → ping,AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
+        printf '%s event=fail → ping,nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
         ;;
     iteration_done)
         publish "$NNUE_URL" "$rendered" "Enyo NNUE iteration done" "4"
-        printf '%s event=iteration_done → nnue,AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
+        printf '%s event=iteration_done → nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
         ;;
     *)
         publish "$NNUE_URL" "$rendered" "Enyo NNUE $event_name" "3"
-        printf '%s event=%s → AI_stdout\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+        printf '%s event=%s → nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
         ;;
 esac
 
-if [ "$AI_STDIN_ENABLE" = "1" ] && event_selected "$event_name" "$HOOK_EVENTS"; then
-    if ! wake_agent; then
-        priority=4
-        [ "$event_name" = "fail" ] && priority=5
-        if publish "$AI_STDIN_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "$priority" "ai-in"; then
-            printf '%s event=%s → AI_stdin\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-        else
-            rc=$?
-            printf '%s event=%s AI_stdin failed rc=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" >>"$LOG"
-        fi
+if [ "$LLM_WAKE_ENABLE" = "1" ] && event_selected "$event_name" "$HOOK_EVENTS"; then
+    priority=4
+    [ "$event_name" = "fail" ] && priority=5
+    if publish "$LLM_URL" "$rendered"$'\n' "Enyo NNUE $event_name" "$priority" "ai-in"; then
+        printf '%s event=%s → llmsh ai-in\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
+    else
+        rc=$?
+        printf '%s event=%s llmsh ai-in failed rc=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" "$rc" >>"$LOG"
     fi
 fi
