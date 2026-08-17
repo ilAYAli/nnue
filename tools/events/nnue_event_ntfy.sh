@@ -5,10 +5,8 @@ set -euo pipefail
 #
 # Routing:
 #   fail            → ping
-#   iteration_done  → nnue (phone notification)
 #   selected done/fail events → llmsh (ai-in)
 
-NNUE_URL=${NNUE_NTFY_URL:-https://ntfy.wahlman.no/nnue}
 LLM_URL=${NNUE_AI_STDIN_URL:-https://ntfy.wahlman.no/llmsh}
 PING_URL=${NNUE_PING_URL:-https://ntfy.wahlman.no/ping}
 HOOK_EVENTS=${NNUE_HOOK_EVENTS:-}
@@ -286,21 +284,10 @@ event_selected() {
     return 1
 }
 
-case "$event_name" in
-    fail)
-        publish "$PING_URL" "$rendered" "Enyo NNUE fail" "5"
-        publish "$NNUE_URL" "$rendered" "Enyo NNUE fail" "5"
-        printf '%s event=fail → ping,nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
-        ;;
-    iteration_done)
-        publish "$NNUE_URL" "$rendered" "Enyo NNUE iteration done" "4"
-        printf '%s event=iteration_done → nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
-        ;;
-    *)
-        publish "$NNUE_URL" "$rendered" "Enyo NNUE $event_name" "3"
-        printf '%s event=%s → nnue\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$event_name" >>"$LOG"
-        ;;
-esac
+if [ "$event_name" = "fail" ]; then
+    publish "$PING_URL" "$rendered" "Enyo NNUE fail" "5"
+    printf '%s event=fail → ping\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >>"$LOG"
+fi
 
 if [ "$LLM_WAKE_ENABLE" = "1" ] && event_selected "$event_name" "$HOOK_EVENTS"; then
     priority=4
