@@ -29,6 +29,12 @@ class NnueRunTests(unittest.TestCase):
     def test_shell_syntax_is_valid(self) -> None:
         subprocess.run(["bash", "-n", str(REPO / "nnue")], check=True)
 
+    def test_sprt_h0_rejects_the_lower_bound(self) -> None:
+        proc = self.run_sourced('sprt_h0_rejected "-2.20/2.20 (100%)"')
+
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(0, proc.returncode)
+
     def test_dispatch_is_parsed_before_long_running_command(self) -> None:
         source = (REPO / "nnue").read_text(encoding="utf-8")
         self.assertEqual(1, source.count(DISPATCH_MARKER))
