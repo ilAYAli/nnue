@@ -1,7 +1,7 @@
 {
-  "run": "enyo-7.5.0-rc3",
-  "hypothesis": "a shorter continuation tests whether fewer repeated exposures preserve recalibrated labels",
-  "superbatches": 38553,
+  "run": "enyo-7.5.0-rc5",
+  "hypothesis": "a minimal continuation dose tests whether early lineage-scale adaptation preserves recalibrated labels",
+  "superbatches": 4000,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
