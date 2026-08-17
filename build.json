@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.4.0-rc2",
-  "hypothesis": "a slightly lower initial learning rate tests gentler adaptation from the recalibrated parent",
+  "run": "enyo-7.5.0-rc1",
+  "hypothesis": "a further outcome-weight reduction tests whether value targets extend the selected gain",
   "superbatches": 77106,
   "trainable": "all",
-  "wdl": 0.05,
-  "lr": 0.0035,
+  "wdl": 0.0125,
+  "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
     "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
   },
-  "continue_from": "enyo-7.3.0-rc3"
+  "continue_from": "enyo-7.4.0-rc1"
 }
