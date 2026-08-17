@@ -1,10 +1,10 @@
 {
-  "run": "enyo-7.2.0-rc2",
-  "hypothesis": "one additional corpus pass tests whether the accepted continuation regimen keeps improving",
+  "run": "enyo-7.2.0-rc3",
+  "hypothesis": "a modest higher initial learning rate tests stronger adaptation from the accepted parent",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.05,
-  "lr": 0.004,
+  "lr": 0.0045,
   "final_lr": 0.000005,
   "data": {
     "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
