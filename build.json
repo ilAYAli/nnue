@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.3.0-rc2",
-  "hypothesis": "stronger outcome weighting tests whether game results improve the selected continuation",
+  "run": "enyo-7.4.0-rc1",
+  "hypothesis": "lower outcome weighting tests whether value targets preserve the recalibrated-label gain",
   "superbatches": 77106,
   "trainable": "all",
-  "wdl": 0.075,
+  "wdl": 0.025,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
-    "source_binpack": "~/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
+    "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
   },
-  "continue_from": "enyo-7.2.0-rc2"
+  "continue_from": "enyo-7.3.0-rc3"
 }
