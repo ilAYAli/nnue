@@ -50,7 +50,7 @@ Format: `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
 
 ## Events and launch
 
-11) Never poll. NNUE `done`/`fail` events publish an `ai-in`-tagged message to ntfy topic `llmsh`; the sidecar delivers it to tmux session `llmsh`, target `llmsh:1.1`. One status check allowed.
+11) Never poll. NNUE `done`/`fail` events publish an `ai-in`-tagged message to the bidirectional `llmsh` nmsg subject; its sidecar delivers it to tmux `llmsh:1.1`. `ping` remains only for critical-error alerts. One status check allowed.
 12) On each event: fix the smallest defect and relaunch, pick one new hypothesis after rejection, or advance data after acceptance.
 - Launch exactly:
   ```sh
