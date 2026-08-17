@@ -28,7 +28,7 @@ After the root, every candidate:
 - uses `continue_from` the current proven parent;
 - changes exactly one meaningful variable;
 - receives a globally reserved run number;
-- requires a 5,000-game parent-relative SPRT for promotion;
+- caps parent-relative SPRT at 5,000 games;
 - is committed whether accepted or rejected.
 
 The root and every passing candidate receive an identical-condition benchmark
@@ -36,10 +36,10 @@ against the fixed SF net. A 5,000-game parent-relative SPRT selects parents;
 shorter matches are screening only. Absolute SF Elo tracks progress toward the
 goal. Residual improvement is report-only.
 
-Promotion is simple: a decisive 5,000-game direct win selects the candidate.
-If direct play is inconclusive, select the stronger fixed-SF result under
-identical conditions; retain the incumbent if neither is better. H1 is never an
-additional promotion requirement.
+Promotion is simple: H0 rejects and H1 selects early. If neither is reached by
+the 5,000-game cap, select the stronger fixed-SF result under identical
+conditions; retain the incumbent if neither is better. H1 is sufficient, never
+required.
 
 ## Parallel training
 

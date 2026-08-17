@@ -38,10 +38,10 @@ Format: `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
    other changes that are needed for the built/iteration to succeed (Bullet, ...)
 8) All other changes should be commited individually to avoid breaking rule 7)
 9) A scratch root records an absolute baseline against `nn-0ee0657fb25e.nnue`.
-   Descendants require a 5,000-game parent-relative match; shorter matches only
-   screen. A decisive direct win selects the candidate. If direct play is
-   inconclusive, compare fixed-SF Elo under identical conditions and select the
-   stronger net; retain the incumbent if neither is better. Every selected
+   Descendant parent-relative matches cap at 5,000 games; H0 rejects and H1
+   selects early. At the cap without either, compare fixed-SF Elo under identical
+   conditions and select the stronger net; retain the incumbent if neither is
+   better. Every selected
    candidate records the same fixed-SF benchmark. Commit each result with the
    files from 7) and its parent-relative Elo, or the root's SF Elo, in the subject.
 10) Export, distinct-net, engine-load, start-position, and catastrophic static
@@ -72,8 +72,8 @@ or failed run as its event. Never launch a duplicate.
   net, provenance, hashes, data identity, and result. Do not modify dirty pwa-llm;
   integrate remote commits there, in reserved order, at an event boundary. Never pull.
 - Wait for all siblings. Rejections remain recorded and cannot become parents.
-  A decisive 5,000-game winner advances; otherwise use identical fixed-SF results
-  as the tie-break. If none beats the incumbent, use the next RC.
+  H0 rejects and H1 advances early; use identical fixed-SF results only at the
+  5,000-game cap without either. If none beats the incumbent, use the next RC.
 - Before using a pwa-5090 winner, transfer its net and provenance to pwa-llm,
   verify hashes, integrate it, and verify `continue_from` resolves.
 - A resumable infrastructure failure keeps its RC only unchanged; a void run consumes

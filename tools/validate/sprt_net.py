@@ -71,7 +71,13 @@ def existing_run_matches(
 
 
 def run_sprt(
-    *, engine: Path, candidate_net: Path, reference_net: Path, games: int, comment: str | None = None
+    *,
+    engine: Path,
+    candidate_net: Path,
+    reference_net: Path,
+    games: int,
+    comment: str | None = None,
+    early_stop: bool = False,
 ) -> str:
     """Launch one Forge SPRT and stream deployment output."""
     command = [
@@ -83,7 +89,9 @@ def run_sprt(
         "--candidate-net", str(candidate_net),
         "--restart", "on",
         "--games", str(games),
-        "--elo0", "0", "--elo1", "10", "--alpha", "1e-300", "--beta", "1e-300",
+        "--elo0", "0", "--elo1", "10",
+        "--alpha", "0.1" if early_stop else "1e-300",
+        "--beta", "0.1" if early_stop else "1e-300",
     ]
     deploy = subprocess.Popen(
         command,
@@ -144,6 +152,11 @@ def main() -> None:
     )
     parser.add_argument("--engine", default=os.environ.get("ENGINE", "~/assets/engines/reference"))
     parser.add_argument("--comment")
+    parser.add_argument(
+        "--early-stop",
+        action="store_true",
+        help="allow H0/H1 stopping for a parent-relative match; fixed-SF benchmarks stay full-length",
+    )
     args = parser.parse_args()
     games = int(os.environ.get("GAMES", "1500"))
 
@@ -167,6 +180,7 @@ def main() -> None:
         reference_net=reference_net,
         games=games,
         comment=args.comment,
+        early_stop=args.early_stop,
     )
     print(f"started={run}")
 

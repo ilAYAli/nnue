@@ -127,6 +127,31 @@ class RunSprtTests(unittest.TestCase):
             popen.call_args.args[0][4],
         )
 
+    def test_uses_normal_sprt_bounds_for_parent_relative_early_stop(self) -> None:
+        launch = mock.Mock()
+        launch.stdout = iter(["run: id=sprt-test\n"])
+        launch.wait.return_value = 0
+        completed = subprocess.CompletedProcess(
+            args=["forge", "status"], returncode=0,
+            stdout=json.dumps({"progress": "progress=games=1442/5000"}), stderr="",
+        )
+        with (
+            mock.patch.object(sprt_net.subprocess, "Popen", return_value=launch) as popen,
+            mock.patch.object(
+                sprt_net.subprocess,
+                "run",
+                side_effect=[subprocess.CompletedProcess(args=["forge", "wait"], returncode=0), completed],
+            ),
+        ):
+            sprt_net.run_sprt(
+                engine=Path("/engine"), candidate_net=Path("/candidate.nn"),
+                reference_net=Path("/reference.nn"), games=5000, early_stop=True,
+            )
+
+        command = popen.call_args.args[0]
+        self.assertEqual("0.1", command[command.index("--alpha") + 1])
+        self.assertEqual("0.1", command[command.index("--beta") + 1])
+
 
 if __name__ == "__main__":
     unittest.main()
