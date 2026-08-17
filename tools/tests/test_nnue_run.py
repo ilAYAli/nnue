@@ -1997,6 +1997,37 @@ sprt_command
             self.assertIn("done|sprt|SPRT completed for candidate", event)
             self.assertIn("|7.5|2.21/2.20 (100%)", event)
 
+    def test_direct_sprt_inconclusive_emits_done_event(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            trace = tmp / "trace.txt"
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
+run=candidate
+last_sprt_elo=2.0
+last_sprt_llr='0.88/2.20 (40%)'
+last_sprt_line='games=5000/5000 elo=+2.0 ci=5.6 llr=0.88/2.20 los=76.0% draw=52.2%'
+last_sprt_log=run.log
+sprt_gate() { return 2; }
+notify_sprt() { printf '%s|%s|%s\n' "$1" "$2" "$3" >> "$TRACE"; }
+sprt_command
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env["TRACE"] = str(trace)
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)], cwd=tmp, env=env, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+            )
+
+            self.assertEqual(2, proc.returncode, proc.stderr)
+            self.assertEqual(
+                "done|sprt|SPRT inconclusive for candidate: games=5000/5000 elo=+2.0 ci=5.6 llr=0.88/2.20 los=76.0% draw=52.2%\n",
+                trace.read_text(encoding="utf-8"),
+            )
+
     def test_direct_sprt_rejection_emits_one_fail_event_with_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
