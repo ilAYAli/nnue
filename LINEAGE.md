@@ -34,7 +34,7 @@ Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −13
 | 21 | enyo-7.3.0-rc3  | 0f7513e1 | pwa-llm  | +6.8 ± 6.1    | -138.9 ± 7.1  | recalibrated nodes5000pv2 labels
 | 22 | enyo-7.4.0-rc1  | d7a94117 | pwa-llm  | +0.4 ± 5.7    | -138.0 ± 7.3  | WDL 0.05 → 0.025; SF tie-break
 
-Reserved: `enyo-7.5.0-rc4` on pwa-5090 (final LR 0.000005 → 0.000010) and `enyo-7.5.0-rc6` on pwa-llm (WDL 0.025 → 0.05), both from `enyo-7.4.0-rc1`.
+Reserved: `enyo-7.5.0-rc7` on pwa-llm (final LR 0.000005 → 0.000025) and `enyo-8.0.0-rc1` on pwa-5090 (FullThreats, export-visible initialization), both from `enyo-7.4.0-rc1`.
 
 # Enyo 1 Lineage (recovered)
 
