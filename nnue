@@ -162,7 +162,7 @@ load_config() {
         end)
   ' "$BUILD")")
   mkdir -p "$log_dir" runs/logs
-  local ref_source="${REFERENCE_NET:-${reference_name:-$continue_from}}"
+  local ref_source="${REFERENCE_NET:-${reference_name:-${continue_from:-$initialize_from}}}"
   if [[ -n "$ref_source" ]]; then
     reference_net=$(net_for_name_or_path "$ref_source")
   else
@@ -178,7 +178,7 @@ load_config() {
 }
 
 reference_label() {
-  printf '%s\n' "${REFERENCE_NET:-${reference_name:-$continue_from}}"
+  printf '%s\n' "${REFERENCE_NET:-${reference_name:-${continue_from:-$initialize_from}}}"
 }
 
 require_training_origin() {
@@ -1345,7 +1345,7 @@ iterate() {
     fi
     if (( SKIP_SF_GATE != 1 )); then
       run_stockfish_benchmark "$run"
-      if (( sprt_rc == 2 )) && ! stockfish_tie_break "$run" "$continue_from"; then
+      if (( sprt_rc == 2 )) && ! stockfish_tie_break "$run" "${continue_from:-$initialize_from}"; then
         last_sprt_line="${last_sprt_line:-parent SPRT inconclusive}; ${last_stockfish_line}"
         commit_failed_iteration
         break
