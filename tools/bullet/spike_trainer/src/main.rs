@@ -721,6 +721,7 @@ fn train_enyo<
         "all"
             | "input"
             | "xray-only"
+            | "threat-only"
             | "dense-head"
             | "float-head"
             | "output"
@@ -730,11 +731,18 @@ fn train_enyo<
     ) {
         panic!("unsupported trainable mode: {trainable}");
     }
-    let train_input =
-        trainable == "all" || trainable == "input" || trainable == "xray-only" || trainable == "frozen-output";
+    let train_input = trainable == "all"
+        || trainable == "input"
+        || trainable == "xray-only"
+        || trainable == "threat-only"
+        || trainable == "frozen-output";
     if trainable == "xray-only" && !SLIDER_XRAY_THREATS {
         panic!("xray-only requires slider x-ray threat features");
     }
+    if trainable == "threat-only" && !FULL_THREATS {
+        panic!("threat-only requires FullThreats features");
+    }
+    let extension_only = trainable == "xray-only" || trainable == "threat-only";
     let train_l1 = trainable == "all" || trainable == "dense-head" || trainable == "frozen-output";
     let train_l2 = trainable == "all"
         || trainable == "dense-head"
@@ -919,7 +927,7 @@ fn train_enyo<
                     l0_stdev,
                 )
             });
-            if trainable == "xray-only" {
+            if extension_only {
                 l0 = freeze_base_input_rows(
                     $builder,
                     l0,
@@ -929,7 +937,7 @@ fn train_enyo<
                 );
             }
             if input_factoriser {
-                let l0f = maybe_frozen($builder, !train_input, || {
+                let l0f = maybe_frozen($builder, !train_input || extension_only, || {
                     $builder.new_weights(
                         "l0f",
                         Shape::new(hidden, FEATURE_CHANNELS * 64),
@@ -1052,7 +1060,7 @@ fn train_enyo<
                     l0_stdev,
                 )
             });
-            if trainable == "xray-only" {
+            if extension_only {
                 l0 = freeze_base_input_rows(
                     $builder,
                     l0,
@@ -1062,7 +1070,7 @@ fn train_enyo<
                 );
             }
             if input_factoriser {
-                let l0f = maybe_frozen($builder, !train_input, || {
+                let l0f = maybe_frozen($builder, !train_input || extension_only, || {
                     $builder.new_weights(
                         "l0f",
                         Shape::new(hidden, FEATURE_CHANNELS * 64),

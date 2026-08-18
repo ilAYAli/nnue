@@ -866,6 +866,7 @@ fn supported_trainable(value: &str) -> bool {
         "all"
             | "input"
             | "xray-only"
+            | "threat-only"
             | "dense-head"
             | "float-head"
             | "output"
