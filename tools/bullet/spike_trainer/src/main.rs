@@ -936,18 +936,25 @@ fn train_enyo<
                         InitSettings::Zeroed,
                     )
                 });
-                let mut factoriser = l0f.repeat(INPUT_BUCKETS);
+                let mut factoriser = l0f.repeat(INPUT_BUCKETS).reshape(Shape::new(
+                    hidden * INPUT_BUCKETS * FEATURE_CHANNELS * 64,
+                    1,
+                ));
                 if threat_features {
                     let threat_padding = maybe_frozen($builder, true, || {
                         $builder.new_weights(
                             "l0tf",
-                            Shape::new(hidden, enyo_threats::DIMENSIONS),
+                            Shape::new(hidden * enyo_threats::DIMENSIONS, 1),
                             InitSettings::Zeroed,
                         )
                     });
                     factoriser = factoriser.concat(threat_padding);
                 }
-                l0.weights = l0.weights + factoriser;
+                l0.weights = l0.weights + factoriser.reshape(Shape::new(
+                    hidden,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
+                        + if threat_features { enyo_threats::DIMENSIONS } else { 0 },
+                ));
             }
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);
@@ -1062,18 +1069,25 @@ fn train_enyo<
                         InitSettings::Zeroed,
                     )
                 });
-                let mut factoriser = l0f.repeat(INPUT_BUCKETS);
+                let mut factoriser = l0f.repeat(INPUT_BUCKETS).reshape(Shape::new(
+                    hidden * INPUT_BUCKETS * FEATURE_CHANNELS * 64,
+                    1,
+                ));
                 if threat_features {
                     let threat_padding = maybe_frozen($builder, true, || {
                         $builder.new_weights(
                             "l0tf",
-                            Shape::new(hidden, enyo_threats::DIMENSIONS),
+                            Shape::new(hidden * enyo_threats::DIMENSIONS, 1),
                             InitSettings::Zeroed,
                         )
                     });
                     factoriser = factoriser.concat(threat_padding);
                 }
-                l0.weights = l0.weights + factoriser;
+                l0.weights = l0.weights + factoriser.reshape(Shape::new(
+                    hidden,
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
+                        + if threat_features { enyo_threats::DIMENSIONS } else { 0 },
+                ));
             }
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);
