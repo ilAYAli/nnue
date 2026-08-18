@@ -1,9 +1,9 @@
 {
-  "run": "enyo-7.5.0-rc5",
-  "hypothesis": "a minimal continuation dose tests whether early lineage-scale adaptation preserves recalibrated labels",
-  "superbatches": 4000,
+  "run": "enyo-7.5.0-rc6",
+  "hypothesis": "stronger outcome weighting tests whether recalibrated labels benefit from a historical WDL level",
+  "superbatches": 77106,
   "trainable": "all",
-  "wdl": 0.025,
+  "wdl": 0.05,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
