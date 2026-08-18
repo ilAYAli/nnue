@@ -936,7 +936,18 @@ fn train_enyo<
                         InitSettings::Zeroed,
                     )
                 });
-                l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
+                let mut factoriser = l0f.repeat(INPUT_BUCKETS);
+                if threat_features {
+                    let threat_padding = maybe_frozen($builder, true, || {
+                        $builder.new_weights(
+                            "l0tf",
+                            Shape::new(hidden, enyo_threats::DIMENSIONS),
+                            InitSettings::Zeroed,
+                        )
+                    });
+                    factoriser = factoriser.concat(threat_padding);
+                }
+                l0.weights = l0.weights + factoriser;
             }
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);

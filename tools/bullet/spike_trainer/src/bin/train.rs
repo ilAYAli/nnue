@@ -57,6 +57,7 @@ const ENYO_V5_HEADER_MAGIC: &[u8; 8] = b"ENYONN5\0";
 const ENYO_V6_HEADER_MAGIC: &[u8; 8] = b"ENYONN6\0";
 const ENYO_V7_HEADER_MAGIC: &[u8; 8] = b"ENYONN7\0";
 const ENYO_V8_HEADER_MAGIC: &[u8; 8] = b"ENYONN8\0";
+const ENYO_V9_HEADER_MAGIC: &[u8; 8] = b"ENYONN9\x00";
 const ENYO_V2_FORMAT_VERSION: u32 = 2;
 const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_V4_FORMAT_VERSION: u32 = 4;
@@ -64,6 +65,7 @@ const ENYO_V5_FORMAT_VERSION: u32 = 5;
 const ENYO_V6_FORMAT_VERSION: u32 = 6;
 const ENYO_V7_FORMAT_VERSION: u32 = 7;
 const ENYO_V8_FORMAT_VERSION: u32 = 8;
+const ENYO_V9_FORMAT_VERSION: u32 = 9;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
 const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
@@ -1037,7 +1039,7 @@ fn validate_layout(config: &Config) {
     if !matches!(
         export_format,
         "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3" | "enyo-native-v4" | "enyo-native-v5"
-            | "enyo-native-v6" | "enyo-native-v8"
+            | "enyo-native-v6" | "enyo-native-v8" | "enyo-native-v9"
     ) {
         eprintln!("error: unsupported export_format={export_format}");
         process::exit(2);
@@ -1046,7 +1048,7 @@ fn validate_layout(config: &Config) {
         eprintln!("error: non-1024 hidden widths require export_format=enyo-native-v2");
         process::exit(2);
     }
-    if threat_features && export_format != "enyo-native-v2" && export_format != "enyo-native-v6" {
+    if threat_features && export_format != "enyo-native-v2" && export_format != "enyo-native-v6" && export_format != "enyo-native-v9" {
         eprintln!("error: threat features require export_format=enyo-native-v2 (alone) or enyo-native-v6 (with full-head)");
         process::exit(2);
     }
@@ -1067,12 +1069,12 @@ fn validate_layout(config: &Config) {
         process::exit(2);
     }
     if mixed_activation && export_format != "enyo-native-v4" {
-        if !(l2_output_skip && export_format == "enyo-native-v8") {
+        if !(l2_output_skip && (export_format == "enyo-native-v8" || export_format == "enyo-native-v9")) {
             eprintln!("error: relu-screlu-residual requires export_format=enyo-native-v4 or v8");
             process::exit(2);
         }
     }
-    if l2_output_skip && export_format != "enyo-native-v8" {
+    if l2_output_skip && export_format != "enyo-native-v8" && export_format != "enyo-native-v9" {
         eprintln!("error: L2-output skip requires export_format=enyo-native-v8");
         process::exit(2);
     }
@@ -1092,11 +1094,11 @@ fn validate_layout(config: &Config) {
         eprintln!("error: PSQT residual requires the shared-head 8-bucket base architecture");
         process::exit(2);
     }
-    if mixed_activation && (full_heads || threat_features || output_buckets != 8) {
+    if mixed_activation && (full_heads || (threat_features && export_format != "enyo-native-v9") || output_buckets != 8) {
         eprintln!("error: mixed activation requires the shared-head 8-bucket base architecture");
         process::exit(2);
     }
-    if l2_output_skip && (!mixed_activation || full_heads || threat_features || output_buckets != 8) {
+    if l2_output_skip && (!mixed_activation || full_heads || (threat_features && export_format != "enyo-native-v9") || output_buckets != 8) {
         eprintln!("error: L2-output skip requires the shared-head mixed-activation 8-bucket base architecture");
         process::exit(2);
     }
@@ -1112,12 +1114,14 @@ fn validate_layout(config: &Config) {
         eprintln!("error: full-head output bucketing requires at least 2 output buckets");
         process::exit(2);
     }
-    if threat_features && bool_at(&config.arch, "input_factoriser", false) {
-        eprintln!("error: threat features do not support input_factoriser yet");
-        process::exit(2);
-    }
     if threat_features && input_buckets != runtime_input_buckets {
         eprintln!("error: threat features do not support runtime_input_buckets expansion yet");
+        process::exit(2);
+    }
+    if export_format == "enyo-native-v9"
+        && !(threat_features && !full_heads && mixed_activation && l2_output_skip && output_buckets == 8)
+    {
+        eprintln!("error: enyo-native-v9 requires threat inputs with the shared-head mixed-activation 8-bucket L2-skip layout");
         process::exit(2);
     }
     if training_lr_superbatches(config) < training_superbatches(config) {
@@ -1965,7 +1969,9 @@ fn enyo_container(
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    let magic = if format_version == ENYO_V8_FORMAT_VERSION {
+    let magic = if format_version == ENYO_V9_FORMAT_VERSION {
+        ENYO_V9_HEADER_MAGIC
+    } else if format_version == ENYO_V8_FORMAT_VERSION {
         ENYO_V8_HEADER_MAGIC
     } else if format_version == ENYO_V7_FORMAT_VERSION {
         ENYO_V7_HEADER_MAGIC
@@ -2672,6 +2678,11 @@ fn write_model(config: &Config) {
             l2_output_skip,
             false,
             ENYO_V8_FORMAT_VERSION,
+        ),
+        Some("enyo-native-v9") => enyo_container(
+            &model, runtime_input_buckets, feature_channels, hidden, l2, output_buckets,
+            full_threats, slider_xray_threats, false, mixed_activation, false,
+            l2_output_skip, false, ENYO_V9_FORMAT_VERSION,
         ),
         _ => model,
     };

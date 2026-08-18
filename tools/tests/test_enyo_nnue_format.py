@@ -258,5 +258,31 @@ class EnyoNNUEFormatTests(unittest.TestCase):
                 loaded.l2_output_skip_weights, net.l2_output_skip_weights)
 
 
+    def test_full_threats_l2_output_skip_v9_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "full-threats-l2-output-skip.nn"
+            net = zero_net(
+                input_buckets=32,
+                output_buckets=8,
+                format_version=9,
+                full_threats=True,
+            )
+            net.mixed_activation = True
+            net.l2_squared_weights = np.zeros((nn2.N_L3, nn2.N_L2), dtype=np.float32)
+            net.l2_squared_biases = np.zeros(nn2.N_L3, dtype=np.float32)
+            net.l2_output_skip = True
+            net.l2_output_skip_weights = np.arange(
+                8 * nn2.N_L2, dtype=np.float32).reshape(8, nn2.N_L2)
+            nn2.write_net(net, path)
+
+            loaded = nn2.load_net(path)
+            self.assertEqual(loaded.format_version, 9)
+            self.assertTrue(loaded.full_threats)
+            self.assertTrue(loaded.mixed_activation)
+            self.assertTrue(loaded.l2_output_skip)
+            np.testing.assert_array_equal(
+                loaded.l2_output_skip_weights, net.l2_output_skip_weights)
+
+
 if __name__ == "__main__":
     unittest.main()
