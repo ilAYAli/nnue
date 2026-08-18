@@ -669,10 +669,7 @@ fn train_enyo<
         panic!("FullThreats and slider x-ray threats are mutually exclusive");
     }
     let threat_features = FULL_THREATS || SLIDER_XRAY_THREATS;
-    if MIXED_ACTIVATION && (FULL_HEADS || threat_features) {
-        panic!("mixed activation must be tested independently");
-    }
-    if L2_OUTPUT_SKIP && (!MIXED_ACTIVATION || FULL_HEADS || threat_features || OUTPUT_BUCKETS != 8) {
+    if L2_OUTPUT_SKIP && (!MIXED_ACTIVATION || FULL_HEADS || OUTPUT_BUCKETS != 8) {
         panic!("L2-output skip requires the shared-head mixed-activation 8-bucket architecture");
     }
     if psqt_residual && (MIXED_ACTIVATION || FULL_HEADS || threat_features || OUTPUT_BUCKETS != 8) {
@@ -688,9 +685,6 @@ fn train_enyo<
     }
     if !activation_l1.is_finite() || activation_l1 < 0.0 {
         panic!("activation_l1 must be finite and non-negative");
-    }
-    if threat_features && input_factoriser {
-        panic!("threat-feature Enyo mode does not support input_factoriser yet");
     }
 
     println!("mode=enyo");
@@ -774,11 +768,15 @@ fn train_enyo<
             if input_factoriser {
                 SavedFormat::id("l0w")
                     .transform(|store, weights| {
-                        let factoriser = store.get("l0f").values.f32().repeat(INPUT_BUCKETS);
+                        let factoriser: Vec<_> = store
+                            .get("l0f")
+                            .values
+                            .f32()
+                            .repeat(INPUT_BUCKETS);
                         weights
                             .into_iter()
-                            .zip(factoriser)
-                            .map(|(a, b)| a + b)
+                            .enumerate()
+                            .map(|(index, value)| value + factoriser.get(index).copied().unwrap_or(0.0))
                             .collect()
                     })
                     .round()
@@ -1053,7 +1051,18 @@ fn train_enyo<
                         InitSettings::Zeroed,
                     )
                 });
-                l0.weights = l0.weights + l0f.repeat(INPUT_BUCKETS);
+                let mut factoriser = l0f.repeat(INPUT_BUCKETS);
+                if threat_features {
+                    let threat_padding = maybe_frozen($builder, true, || {
+                        $builder.new_weights(
+                            "l0tf",
+                            Shape::new(hidden, enyo_threats::DIMENSIONS),
+                            InitSettings::Zeroed,
+                        )
+                    });
+                    factoriser = factoriser.concat(threat_padding);
+                }
+                l0.weights = l0.weights + factoriser;
             }
             l0.weights = l0.weights.faux_quantise(1.0, true);
             l0.bias = l0.bias.faux_quantise(1.0, true);
@@ -1429,6 +1438,7 @@ fn main() {
             ($input_buckets:literal, $feature_channels:literal) => {
                 match (enyo_output_buckets, enyo_full_threats, enyo_slider_xray_threats, enyo_full_heads, enyo_mixed_activation, enyo_psqt_residual, enyo_l2_output_skip) {
                     (8, false, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true, true),
+                    (8, true, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, true, true),
                     (1, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false, false, false, false),
                     (2, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, false, false, false),
                     (4, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, false, false, false),
