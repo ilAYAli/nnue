@@ -150,9 +150,27 @@ def convert_input_weights(
     return target
 
 
-def add_full_threat_rows(input_weights: np.ndarray) -> np.ndarray:
-    threats = np.zeros((N_THREAT_FEATURES, input_weights.shape[1]), dtype=np.float32)
-    return np.concatenate((np.asarray(input_weights, dtype=np.float32), threats), axis=0)
+def add_full_threat_rows(
+        input_weights: np.ndarray,
+        *,
+        rows: int = N_THREAT_FEATURES,
+        seed: int = 0,
+        scale: float = 0.1) -> np.ndarray:
+    """Append deterministic, export-visible FullThreat rows.
+
+    A zero warm start leaves the new rows far below input quantization after a
+    continuation run.  Match each hidden column's parent scale at a conservative
+    fraction instead, so threats begin measurable without disturbing the parent.
+    """
+    parent = np.asarray(input_weights, dtype=np.float32)
+    column_std = parent.std(axis=0, dtype=np.float64).astype(np.float32)
+    rng = np.random.default_rng(seed)
+    threats = (
+        rng.standard_normal((rows, parent.shape[1])).astype(np.float32)
+        * column_std[np.newaxis, :]
+        * scale
+    )
+    return np.concatenate((parent, threats), axis=0)
 
 
 def source_output_bucket_for_target(target_bucket: int, source_buckets: int, target_buckets: int) -> int:

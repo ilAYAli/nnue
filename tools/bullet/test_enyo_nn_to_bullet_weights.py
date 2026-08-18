@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from enyo_nn_to_bullet_weights import (
+    add_full_threat_rows,
     bullet_l3_weights,
     expand_dense_heads,
     expand_output_head,
@@ -94,6 +95,26 @@ def test_mixed_activation_init_preserves_parent_branch() -> None:
     )
 
 
+def test_full_threat_init_is_deterministic_and_nonzero() -> None:
+    parent = np.asarray([
+        [-3.0, 2.0],
+        [-1.0, 4.0],
+        [1.0, 6.0],
+        [3.0, 8.0],
+    ], dtype=np.float32)
+    first = add_full_threat_rows(parent, rows=8)
+    second = add_full_threat_rows(parent, rows=8)
+
+    np.testing.assert_array_equal(first, second)
+    np.testing.assert_array_equal(first[:len(parent)], parent)
+    assert np.count_nonzero(first[len(parent):]) == 16
+    np.testing.assert_allclose(
+        first[len(parent):].std(axis=0),
+        parent.std(axis=0) * 0.1,
+        rtol=0.6,
+    )
+
+
 
 
 def test_32_bucket_init_uses_legacy_parent_buckets() -> None:
@@ -131,6 +152,7 @@ def main() -> None:
     test_expanded_multi_bucket_head_repeats_parent_ranges()
     test_full_dense_heads_repeat_shared_native_head()
     test_mixed_activation_init_preserves_parent_branch()
+    test_full_threat_init_is_deterministic_and_nonzero()
     test_32_bucket_init_uses_legacy_parent_buckets()
     test_clean_bucket_expansion_repeats_parent_buckets()
     test_unsupported_bucket_mapping_fails()
