@@ -1,8 +1,8 @@
 {
-  "run": "enyo-8.0.0-rc1",
-  "hypothesis": "FullThreats inputs test whether direct attack relations lift the stalled architecture",
+  "run": "enyo-8.0.0-rc2",
+  "hypothesis": "staged FullThreat adaptation tests whether new attack inputs attach without disturbing the selected evaluator",
   "superbatches": 15421,
-  "trainable": "all",
+  "trainable": "threat-only",
   "wdl": 0.025,
   "lr": 0.004,
   "final_lr": 0.000005,
