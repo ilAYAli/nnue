@@ -767,7 +767,7 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: unsupported output head feature count")
         allowed_flags = NETWORK_FLAG_FULL_THREATS | NETWORK_FLAG_SLIDER_XRAY_THREATS | (
             NETWORK_FLAG_FULL_HEADS if format_version in (3, 6) else 0) | (
-            NETWORK_FLAG_MIXED_ACTIVATION if format_version in (4, 8, 9) else 0) | (
+            NETWORK_FLAG_MIXED_ACTIVATION if format_version in (4, 8, 9, 10) else 0) | (
             NETWORK_FLAG_PSQT_RESIDUAL if format_version == 5 else 0) | (
             NETWORK_FLAG_L2_OUTPUT_SKIP if format_version in (8, 9, 10) else 0) | (
             NETWORK_FLAG_PAWN_PAIRS if format_version == 10 else 0)
