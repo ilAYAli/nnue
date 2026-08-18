@@ -1,8 +1,8 @@
 {
-  "run": "enyo-8.0.0-rc2",
-  "hypothesis": "staged FullThreat adaptation tests whether new attack inputs attach without disturbing the selected evaluator",
-  "superbatches": 15421,
-  "trainable": "threat-only",
+  "run": "enyo-9.0.0-rc1",
+  "hypothesis": "pawn-pair inputs test whether direct pawn-structure relations lift the selected evaluator",
+  "superbatches": 77106,
+  "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "final_lr": 0.000005,
