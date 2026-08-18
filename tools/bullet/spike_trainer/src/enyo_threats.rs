@@ -3,8 +3,10 @@ use std::sync::OnceLock;
 use bullet_lib::game::formats::bulletformat::ChessBoard;
 
 pub const DIMENSIONS: usize = 60_720;
+pub const PAWN_PAIR_DIMENSIONS: usize = 4_560;
 pub const RECKLESS_DIMENSIONS: usize = 66_864;
 pub const MAX_ACTIVE: usize = 128;
+pub const MAX_PAWN_PAIR_ACTIVE: usize = 64;
 
 const SQUARES: usize = 64;
 const PIECES: usize = 16;
@@ -100,6 +102,84 @@ impl BoardView {
         }
         board
     }
+}
+
+fn pawn_pair_mask(square: usize) -> u64 {
+    if !(8..56).contains(&square) {
+        return 0;
+    }
+    let file = square % 8;
+    let mut mask = 0_u64;
+    for pair_file in file.saturating_sub(1)..=(file + 1).min(7) {
+        for rank in 1..7 {
+            mask |= 1_u64 << (rank * 8 + pair_file);
+        }
+    }
+    mask & !(1_u64 << square)
+}
+
+fn pawn_pair_id(color: usize, square: usize, orientation: usize) -> usize {
+    let oriented = square ^ orientation;
+    assert!((8..56).contains(&oriented), "pawn-pair square outside ranks 2..7");
+    color * 48 + oriented - 8
+}
+
+fn pawn_pair_index(a: usize, b: usize) -> usize {
+    let lo = a.min(b);
+    let hi = a.max(b);
+    hi * (hi - 1) / 2 + lo
+}
+
+pub fn pawn_pair_active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
+    let board = BoardView::from_bullet(pos);
+    let mut result = [ActiveFeatures::new(), ActiveFeatures::new()];
+    for view in 0..2 {
+        let king = board.pieces[view][5].trailing_zeros() as usize;
+        let orientation = (if king % 8 < 4 { 0 } else { 7 }) ^ (56 * view);
+        let white = board.pieces[0][0];
+        let black = board.pieces[1][0];
+        let mut append = |a_color: usize, a_square: usize, b_color: usize, b_square: usize| {
+            let index = pawn_pair_index(
+                pawn_pair_id(a_color, a_square, orientation),
+                pawn_pair_id(b_color, b_square, orientation),
+            );
+            assert!(index < PAWN_PAIR_DIMENSIONS);
+            result[view].push(index);
+        };
+
+        let mut outer = white;
+        while outer != 0 {
+            let a = outer.trailing_zeros() as usize;
+            outer &= outer - 1;
+            let mut inner = outer & pawn_pair_mask(a);
+            while inner != 0 {
+                let b = inner.trailing_zeros() as usize;
+                inner &= inner - 1;
+                append(0, a, 0, b);
+            }
+            let mut inner = black & pawn_pair_mask(a);
+            while inner != 0 {
+                let b = inner.trailing_zeros() as usize;
+                inner &= inner - 1;
+                append(0, a, 1, b);
+            }
+        }
+        outer = black;
+        while outer != 0 {
+            let a = outer.trailing_zeros() as usize;
+            outer &= outer - 1;
+            let mut inner = outer & pawn_pair_mask(a);
+            while inner != 0 {
+                let b = inner.trailing_zeros() as usize;
+                inner &= inner - 1;
+                append(1, a, 1, b);
+            }
+        }
+        assert!(result[view].len() <= MAX_PAWN_PAIR_ACTIVE);
+        result[view].sort();
+    }
+    assert_eq!(result[0].len(), result[1].len());
+    result
 }
 
 fn tables(reckless: bool) -> &'static IndexTables {

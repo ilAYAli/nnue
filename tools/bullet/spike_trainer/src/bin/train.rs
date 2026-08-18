@@ -58,6 +58,7 @@ const ENYO_V6_HEADER_MAGIC: &[u8; 8] = b"ENYONN6\0";
 const ENYO_V7_HEADER_MAGIC: &[u8; 8] = b"ENYONN7\0";
 const ENYO_V8_HEADER_MAGIC: &[u8; 8] = b"ENYONN8\0";
 const ENYO_V9_HEADER_MAGIC: &[u8; 8] = b"ENYONN9\x00";
+const ENYO_V10_HEADER_MAGIC: &[u8; 8] = b"ENYON10\0";
 const ENYO_V2_FORMAT_VERSION: u32 = 2;
 const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_V4_FORMAT_VERSION: u32 = 4;
@@ -66,6 +67,7 @@ const ENYO_V6_FORMAT_VERSION: u32 = 6;
 const ENYO_V7_FORMAT_VERSION: u32 = 7;
 const ENYO_V8_FORMAT_VERSION: u32 = 8;
 const ENYO_V9_FORMAT_VERSION: u32 = 9;
+const ENYO_V10_FORMAT_VERSION: u32 = 10;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
 const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
@@ -74,9 +76,11 @@ const ENYO_NETWORK_FLAG_PSQT_RESIDUAL: u32 = 8;
 const ENYO_NETWORK_FLAG_PAIRWISE: u32 = 16;
 const ENYO_NETWORK_FLAG_SLIDER_XRAY_THREATS: u32 = 16;
 const ENYO_NETWORK_FLAG_RECKLESS_THREATS: u32 = 32;
+const ENYO_NETWORK_FLAG_PAWN_PAIRS: u32 = 32;
 const ENYO_NETWORK_FLAG_L2_OUTPUT_SKIP: u32 = 64;
 const RECKLESS_THREAT_DIMENSIONS: usize = 66_864;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 60_720;
+const ENYO_PAWN_PAIR_DIMENSIONS: usize = 4_560;
 const ENYO_LEGACY_BUCKET_FOR_32: [usize; 32] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 8, 9, 10, 11, 12, 12, 13, 13, 12, 12, 13, 13, 14, 14, 15,
     15, 14, 14, 15, 15,
@@ -791,6 +795,9 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
     if arch_slider_xray_threats(config) {
         command.arg("--slider-xray-threats");
     }
+    if arch_pawn_pairs(config) {
+        command.arg("--pawn-pairs");
+    }
     if arch_full_heads(config) {
         command.arg("--full-heads");
     }
@@ -934,6 +941,10 @@ fn arch_slider_xray_threats(config: &Config) -> bool {
     bool_at(&config.arch, "slider_xray_threats", false)
 }
 
+fn arch_pawn_pairs(config: &Config) -> bool {
+    bool_at(&config.arch, "pawn_pairs", false)
+}
+
 fn arch_full_heads(config: &Config) -> bool {
     match string_at(&config.arch, "output_bucket_scope").unwrap_or("final") {
         "final" => false,
@@ -974,7 +985,12 @@ fn validate_layout(config: &Config) {
     let export_format = string_at(&config.arch, "export_format").unwrap_or("enyo-native-v1");
     let full_threats = arch_full_threats(config);
     let slider_xray_threats = arch_slider_xray_threats(config);
+    let pawn_pairs = arch_pawn_pairs(config);
     let threat_features = full_threats || slider_xray_threats;
+    if pawn_pairs && threat_features {
+        eprintln!("error: pawn_pairs is a separate architecture from threat inputs");
+        process::exit(2);
+    }
     let full_heads = arch_full_heads(config);
     let mixed_activation = arch_mixed_activation(config);
     let psqt_residual = arch_psqt_residual(config);
@@ -1040,7 +1056,7 @@ fn validate_layout(config: &Config) {
     if !matches!(
         export_format,
         "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3" | "enyo-native-v4" | "enyo-native-v5"
-            | "enyo-native-v6" | "enyo-native-v8" | "enyo-native-v9"
+            | "enyo-native-v6" | "enyo-native-v8" | "enyo-native-v9" | "enyo-native-v10"
     ) {
         eprintln!("error: unsupported export_format={export_format}");
         process::exit(2);
@@ -1057,6 +1073,10 @@ fn validate_layout(config: &Config) {
         eprintln!("error: full_threats and slider_xray_threats are mutually exclusive");
         process::exit(2);
     }
+    if pawn_pairs && export_format != "enyo-native-v10" {
+        eprintln!("error: pawn_pairs requires export_format=enyo-native-v10");
+        process::exit(2);
+    }
     if full_heads && export_format != "enyo-native-v3" && export_format != "enyo-native-v6" {
         eprintln!("error: output_bucket_scope=full-head requires export_format=enyo-native-v3 (alone) or enyo-native-v6 (with threat features)");
         process::exit(2);
@@ -1070,12 +1090,12 @@ fn validate_layout(config: &Config) {
         process::exit(2);
     }
     if mixed_activation && export_format != "enyo-native-v4" {
-        if !(l2_output_skip && (export_format == "enyo-native-v8" || export_format == "enyo-native-v9")) {
+        if !(l2_output_skip && (export_format == "enyo-native-v8" || export_format == "enyo-native-v9" || export_format == "enyo-native-v10")) {
             eprintln!("error: relu-screlu-residual requires export_format=enyo-native-v4 or v8");
             process::exit(2);
         }
     }
-    if l2_output_skip && export_format != "enyo-native-v8" && export_format != "enyo-native-v9" {
+    if l2_output_skip && export_format != "enyo-native-v8" && export_format != "enyo-native-v9" && export_format != "enyo-native-v10" {
         eprintln!("error: L2-output skip requires export_format=enyo-native-v8");
         process::exit(2);
     }
@@ -1115,14 +1135,20 @@ fn validate_layout(config: &Config) {
         eprintln!("error: full-head output bucketing requires at least 2 output buckets");
         process::exit(2);
     }
-    if threat_features && input_buckets != runtime_input_buckets {
-        eprintln!("error: threat features do not support runtime_input_buckets expansion yet");
+    if (threat_features || pawn_pairs) && input_buckets != runtime_input_buckets {
+        eprintln!("error: extended inputs do not support runtime_input_buckets expansion yet");
         process::exit(2);
     }
     if export_format == "enyo-native-v9"
         && !(threat_features && !full_heads && mixed_activation && l2_output_skip && output_buckets == 8)
     {
         eprintln!("error: enyo-native-v9 requires threat inputs with the shared-head mixed-activation 8-bucket L2-skip layout");
+        process::exit(2);
+    }
+    if export_format == "enyo-native-v10"
+        && !(pawn_pairs && !full_heads && mixed_activation && l2_output_skip && output_buckets == 8)
+    {
+        eprintln!("error: enyo-native-v10 requires pawn pairs with the shared-head mixed-activation 8-bucket L2-skip layout");
         process::exit(2);
     }
     if training_lr_superbatches(config) < training_superbatches(config) {
@@ -1172,13 +1198,14 @@ fn cmd_plan(config: &Config) {
     println!();
     println!("resolved:");
     println!(
-        "  layout={} buckets, {} channels, hidden={}, output_buckets={}, full_threats={}, slider_xray_threats={}, full_heads={}",
+        "  layout={} buckets, {} channels, hidden={}, output_buckets={}, full_threats={}, slider_xray_threats={}, pawn_pairs={}, full_heads={}",
         usize_at(&config.arch, "input_buckets", 1),
         usize_at(&config.arch, "feature_channels", 12),
         usize_at(&config.arch, "hidden", 1024),
         usize_at(&config.arch, "output_buckets", 1),
         arch_full_threats(config),
         arch_slider_xray_threats(config),
+        arch_pawn_pairs(config),
         arch_full_heads(config),
     );
     println!(
@@ -1675,6 +1702,7 @@ fn cmd_run(config: &Config) {
         "ENYO_BULLET_ENYO_SLIDER_XRAY_THREATS",
         usize::from(arch_slider_xray_threats(config)),
     );
+    set_env("ENYO_BULLET_ENYO_PAWN_PAIRS", usize::from(arch_pawn_pairs(config)));
     set_env(
         "ENYO_BULLET_ENYO_FULL_HEADS",
         usize::from(arch_full_heads(config)),
@@ -1719,6 +1747,7 @@ fn enyo_network_size(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    pawn_pairs: bool,
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
@@ -1729,7 +1758,8 @@ fn enyo_network_size(
             ENYO_FULL_THREATS_DIMENSIONS
         } else {
             0
-        };
+        }
+        + if pawn_pairs { ENYO_PAWN_PAIR_DIMENSIONS } else { 0 };
     let l1 = 2 * hidden;
     let l3 = 32;
     let head_count = if full_heads { output_buckets } else { 1 };
@@ -1758,6 +1788,7 @@ fn trim_checkpoint(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    pawn_pairs: bool,
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
@@ -1770,6 +1801,7 @@ fn trim_checkpoint(
         hidden,
         l2,
         full_threats,
+        pawn_pairs,
         full_heads,
         mixed_activation,
         psqt_residual,
@@ -1821,6 +1853,7 @@ fn expand_input_buckets(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    pawn_pairs: bool,
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
@@ -1834,6 +1867,7 @@ fn expand_input_buckets(
         hidden,
         l2,
         full_threats,
+        pawn_pairs,
         full_heads,
         mixed_activation,
         psqt_residual,
@@ -1842,8 +1876,8 @@ fn expand_input_buckets(
     if input_buckets == runtime_input_buckets {
         return raw;
     }
-    if full_threats {
-        eprintln!("error: full_threats cannot expand input buckets during export");
+    if full_threats || pawn_pairs {
+        eprintln!("error: extended inputs cannot expand input buckets during export");
         process::exit(2);
     }
 
@@ -1879,6 +1913,7 @@ fn pad_hidden_width(
     hidden: usize,
     l2: usize,
     full_threats: bool,
+    pawn_pairs: bool,
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
@@ -1896,6 +1931,7 @@ fn pad_hidden_width(
         hidden,
         l2,
         full_threats,
+        pawn_pairs,
         full_heads,
         mixed_activation,
         psqt_residual,
@@ -1906,7 +1942,8 @@ fn pad_hidden_width(
             ENYO_FULL_THREATS_DIMENSIONS
         } else {
             0
-        };
+        }
+        + if pawn_pairs { ENYO_PAWN_PAIR_DIMENSIONS } else { 0 };
     let source_l0w = features * hidden * 2;
     let source_l0b = hidden * 2;
     let head_count = if full_heads { output_buckets } else { 1 };
@@ -1958,6 +1995,7 @@ fn enyo_container(
     output_buckets: usize,
     full_threats: bool,
     slider_xray_threats: bool,
+    pawn_pairs: bool,
     full_heads: bool,
     mixed_activation: bool,
     psqt_residual: bool,
@@ -1970,7 +2008,9 @@ fn enyo_container(
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    let magic = if format_version == ENYO_V9_FORMAT_VERSION {
+    let magic = if format_version == ENYO_V10_FORMAT_VERSION {
+        ENYO_V10_HEADER_MAGIC
+    } else if format_version == ENYO_V9_FORMAT_VERSION {
         ENYO_V9_HEADER_MAGIC
     } else if format_version == ENYO_V8_FORMAT_VERSION {
         ENYO_V8_HEADER_MAGIC
@@ -2007,6 +2047,10 @@ fn enyo_container(
             0
         }) | (if slider_xray_threats {
             ENYO_NETWORK_FLAG_SLIDER_XRAY_THREATS
+        } else {
+            0
+        }) | (if pawn_pairs {
+            ENYO_NETWORK_FLAG_PAWN_PAIRS
         } else {
             0
         }) | (if full_heads {
@@ -2522,6 +2566,7 @@ fn write_model(config: &Config) {
             output_buckets,
             false,
             false,
+            false,
             true,
             false,
             false,
@@ -2552,6 +2597,7 @@ fn write_model(config: &Config) {
     let full_threats = arch_full_threats(config);
     let slider_xray_threats = arch_slider_xray_threats(config);
     let threat_features = full_threats || slider_xray_threats;
+    let pawn_pairs = arch_pawn_pairs(config);
     let full_heads = arch_full_heads(config);
     let psqt_residual = arch_psqt_residual(config);
     let mixed_activation = arch_mixed_activation(config);
@@ -2565,6 +2611,7 @@ fn write_model(config: &Config) {
         hidden,
         l2,
         threat_features,
+        pawn_pairs,
         full_heads,
         mixed_activation,
         psqt_residual,
@@ -2578,6 +2625,7 @@ fn write_model(config: &Config) {
         hidden,
         l2,
         threat_features,
+        pawn_pairs,
         full_heads,
         mixed_activation,
         psqt_residual,
@@ -2598,6 +2646,7 @@ fn write_model(config: &Config) {
             false,
             false,
             false,
+            false,
             ENYO_V2_FORMAT_VERSION,
         ),
         Some("enyo-native-v3") => enyo_container(
@@ -2607,6 +2656,7 @@ fn write_model(config: &Config) {
             hidden,
             l2,
             output_buckets,
+            false,
             false,
             false,
             full_heads,
@@ -2623,6 +2673,7 @@ fn write_model(config: &Config) {
             hidden,
             l2,
             output_buckets,
+            false,
             false,
             false,
             false,
@@ -2643,6 +2694,7 @@ fn write_model(config: &Config) {
             false,
             false,
             false,
+            false,
             psqt_residual,
             false,
             false,
@@ -2657,6 +2709,7 @@ fn write_model(config: &Config) {
             output_buckets,
             full_threats,
             slider_xray_threats,
+            false,
             full_heads,
             false,
             false,
@@ -2674,6 +2727,7 @@ fn write_model(config: &Config) {
             false,
             false,
             false,
+            false,
             mixed_activation,
             false,
             l2_output_skip,
@@ -2682,8 +2736,13 @@ fn write_model(config: &Config) {
         ),
         Some("enyo-native-v9") => enyo_container(
             &model, runtime_input_buckets, feature_channels, hidden, l2, output_buckets,
-            full_threats, slider_xray_threats, false, mixed_activation, false,
+            full_threats, slider_xray_threats, false, false, mixed_activation, false,
             l2_output_skip, false, ENYO_V9_FORMAT_VERSION,
+        ),
+        Some("enyo-native-v10") => enyo_container(
+            &model, runtime_input_buckets, feature_channels, hidden, l2, output_buckets,
+            false, false, pawn_pairs, false, mixed_activation, false,
+            l2_output_skip, false, ENYO_V10_FORMAT_VERSION,
         ),
         _ => model,
     };

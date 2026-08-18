@@ -32,6 +32,7 @@ DEFAULT_N_OUTPUT_HEAD_FEATURES = 0
 N_HEAD_FEATURES = 2
 SUPPORTED_N_OUTPUT_HEAD_FEATURES = (0, N_HEAD_FEATURES)
 N_THREAT_FEATURES = 60_720
+N_PAWN_PAIR_FEATURES = 4_560
 N_KING_BUCKETS = DEFAULT_N_KING_BUCKETS
 N_PIECE_TYPES = 12
 N_SQUARES = 64
@@ -47,6 +48,7 @@ NETWORK_V5_HEADER_MAGIC = b"ENYONN5\0"
 NETWORK_V6_HEADER_MAGIC = b"ENYONN6\0"
 NETWORK_V8_HEADER_MAGIC = b"ENYONN8\0"
 NETWORK_V9_HEADER_MAGIC = b"ENYONN9\0"
+NETWORK_V10_HEADER_MAGIC = b"ENYON10\0"
 NETWORK_HEADER_MAGIC = NETWORK_V2_HEADER_MAGIC
 NETWORK_FORMAT_VERSION = 2
 NETWORK_FLAG_FULL_THREATS = 1
@@ -54,6 +56,7 @@ NETWORK_FLAG_FULL_HEADS = 2
 NETWORK_FLAG_MIXED_ACTIVATION = 4
 NETWORK_FLAG_PSQT_RESIDUAL = 8
 NETWORK_FLAG_SLIDER_XRAY_THREATS = 16
+NETWORK_FLAG_PAWN_PAIRS = 32
 NETWORK_FLAG_L2_OUTPUT_SKIP = 64
 NETWORK_HEADER = struct.Struct("<8s14I")
 NETWORK_HEADER_SIZE = NETWORK_HEADER.size
@@ -78,9 +81,11 @@ def input_feature_count(
     input_buckets: int = DEFAULT_N_KING_BUCKETS,
     feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
     full_threats: bool = False,
+    pawn_pairs: bool = False,
 ) -> int:
     return feature_count(input_buckets, feature_channels) + (
-        N_THREAT_FEATURES if full_threats else 0)
+        N_THREAT_FEATURES if full_threats else 0) + (
+        N_PAWN_PAIR_FEATURES if pawn_pairs else 0)
 
 
 def network_size(
@@ -93,8 +98,9 @@ def network_size(
     mixed_activation: bool = False,
     psqt_residual: bool = False,
     l2_output_skip: bool = False,
+    pawn_pairs: bool = False,
 ) -> int:
-    features = input_feature_count(input_buckets, feature_channels, full_threats)
+    features = input_feature_count(input_buckets, feature_channels, full_threats, pawn_pairs)
     if output_buckets not in SUPPORTED_N_OUTPUT_BUCKETS:
         raise ValueError(f"unsupported output bucket count {output_buckets}")
     if output_head_features not in SUPPORTED_N_OUTPUT_HEAD_FEATURES:
@@ -248,6 +254,7 @@ class Net:
     format_version: int = 1
     full_threats: bool = False
     slider_xray_threats: bool = False
+    pawn_pairs: bool = False
     full_heads: bool = False
     mixed_activation: bool = False
     psqt_residual: bool = False
@@ -648,7 +655,7 @@ def features_from_pieces(pieces: Sequence[tuple[int, int, int]],
                          input_buckets: int = DEFAULT_N_KING_BUCKETS,
                          feature_channels: int = DEFAULT_N_FEATURE_CHANNELS,
                          full_threats: bool = False,
-                         slider_xray_threats: bool = False) -> list[int]:
+    slider_xray_threats: bool = False) -> list[int]:
     king_sq = next(sq for pt, color, sq in pieces
                    if pt == KING and color == view)
     features = [
@@ -706,6 +713,7 @@ def load_net(path: str | Path) -> Net:
     format_version = 1
     full_threats = False
     slider_xray_threats = False
+    pawn_pairs = False
     full_heads = False
     mixed_activation = False
     psqt_residual = False
@@ -713,7 +721,8 @@ def load_net(path: str | Path) -> Net:
     payload = data
     if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC,
                         NETWORK_V4_HEADER_MAGIC, NETWORK_V5_HEADER_MAGIC,
-                        NETWORK_V6_HEADER_MAGIC, NETWORK_V8_HEADER_MAGIC, NETWORK_V9_HEADER_MAGIC)):
+                        NETWORK_V6_HEADER_MAGIC, NETWORK_V8_HEADER_MAGIC, NETWORK_V9_HEADER_MAGIC,
+                        NETWORK_V10_HEADER_MAGIC)):
         if len(data) < NETWORK_HEADER_SIZE:
             raise ValueError(f"{path}: truncated Enyo NNUE header")
         (
@@ -741,6 +750,7 @@ def load_net(path: str | Path) -> Net:
             (NETWORK_V6_HEADER_MAGIC, 6),
             (NETWORK_V8_HEADER_MAGIC, 8),
             (NETWORK_V9_HEADER_MAGIC, 9),
+            (NETWORK_V10_HEADER_MAGIC, 10),
         ):
             raise ValueError(f"{path}: unsupported Enyo NNUE header")
         if header_size != NETWORK_HEADER_SIZE:
@@ -759,12 +769,14 @@ def load_net(path: str | Path) -> Net:
             NETWORK_FLAG_FULL_HEADS if format_version in (3, 6) else 0) | (
             NETWORK_FLAG_MIXED_ACTIVATION if format_version in (4, 8, 9) else 0) | (
             NETWORK_FLAG_PSQT_RESIDUAL if format_version == 5 else 0) | (
-            NETWORK_FLAG_L2_OUTPUT_SKIP if format_version in (8, 9) else 0)
+            NETWORK_FLAG_L2_OUTPUT_SKIP if format_version in (8, 9, 10) else 0) | (
+            NETWORK_FLAG_PAWN_PAIRS if format_version == 10 else 0)
         if (flags & ~allowed_flags) or reserved0 or reserved1:
             raise ValueError(f"{path}: unsupported header flags or reserved fields")
         full_threats = bool(flags & NETWORK_FLAG_FULL_THREATS)
         slider_xray_threats = bool(flags & NETWORK_FLAG_SLIDER_XRAY_THREATS)
-        if full_threats and slider_xray_threats:
+        pawn_pairs = bool(flags & NETWORK_FLAG_PAWN_PAIRS)
+        if (full_threats and slider_xray_threats) or (pawn_pairs and (full_threats or slider_xray_threats)):
             raise ValueError(f"{path}: multiple threat feature modes")
         threat_features = full_threats or slider_xray_threats
         full_heads = bool(flags & NETWORK_FLAG_FULL_HEADS)
@@ -779,7 +791,7 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: unsupported full-head architecture")
         if format_version == 6 and not threat_features:
             raise ValueError(f"{path}: unsupported full-head architecture")
-        if mixed_activation != (format_version in (4, 8, 9)):
+        if mixed_activation != (format_version in (4, 8, 9, 10)):
             raise ValueError(f"{path}: v4/v8 and mixed-activation flag must be used together")
         if mixed_activation and (full_heads or (threat_features and format_version != 9) or output_buckets != 8):
             raise ValueError(f"{path}: unsupported mixed-activation architecture")
@@ -788,7 +800,7 @@ def load_net(path: str | Path) -> Net:
         if psqt_residual and (full_heads or threat_features or mixed_activation
                               or output_buckets != 8):
             raise ValueError(f"{path}: unsupported PSQT-residual architecture")
-        if l2_output_skip != (format_version in (8, 9)):
+        if l2_output_skip != (format_version in (8, 9, 10)):
             raise ValueError(f"{path}: v8 and L2-output-skip flag must be used together")
         if l2_output_skip and (not mixed_activation or full_heads or (threat_features and format_version != 9)
                                or output_buckets != 8 or output_head_features != 0):
@@ -799,11 +811,16 @@ def load_net(path: str | Path) -> Net:
             and output_head_features == 0
         ):
             raise ValueError(f"{path}: v9 requires threat inputs with shared-head mixed activation and L2-output skip")
+        if format_version == 10 and not (
+            pawn_pairs and not threat_features and not full_heads and mixed_activation
+            and l2_output_skip and output_buckets == 8 and output_head_features == 0
+        ):
+            raise ValueError(f"{path}: v10 requires pawn pairs with shared-head mixed activation and L2-output skip")
         payload = data[header_size:]
         expected_payload = network_size(
             input_buckets, output_buckets, output_head_features,
             feature_channels, threat_features, full_heads, mixed_activation, psqt_residual,
-            l2_output_skip)
+            l2_output_skip, pawn_pairs)
         if payload_size != expected_payload or len(payload) != expected_payload:
             raise ValueError(
                 f"{path}: payload size {len(payload)} does not match {expected_payload}")
@@ -814,7 +831,7 @@ def load_net(path: str | Path) -> Net:
         except ValueError as exc:
             raise ValueError(f"{path}: {exc}") from exc
     threat_features = full_threats or slider_xray_threats
-    n_features = input_feature_count(input_buckets, feature_channels, threat_features)
+    n_features = input_feature_count(input_buckets, feature_channels, threat_features, pawn_pairs)
     output_width = N_L3 + output_head_features
     head_count = output_buckets if full_heads else 1
 
@@ -870,6 +887,7 @@ def load_net(path: str | Path) -> Net:
         format_version=format_version,
         full_threats=full_threats,
         slider_xray_threats=slider_xray_threats,
+        pawn_pairs=pawn_pairs,
         full_heads=full_heads,
         mixed_activation=mixed_activation,
         psqt_residual=psqt_residual,
@@ -884,7 +902,7 @@ def load_net(path: str | Path) -> Net:
 def write_net(net: Net, path: str | Path) -> None:
     expected_features = input_feature_count(
         net.input_buckets, net.feature_channels,
-        net.full_threats or net.slider_xray_threats)
+        net.full_threats or net.slider_xray_threats, net.pawn_pairs)
     if net.trained_hidden not in SUPPORTED_TRAINED_HIDDEN:
         raise ValueError(f"unsupported trained hidden width {net.trained_hidden}")
     input_weights = np.asarray(net.input_weights, dtype=np.int16)
@@ -1002,18 +1020,18 @@ def write_net(net: Net, path: str | Path) -> None:
         if net.trained_hidden != N_HIDDEN:
             raise ValueError("non-1024 hidden widths require enyo-native-v2")
         data = payload
-    elif net.format_version in (2, 3, 4, 5, 6, 8, 9):
+    elif net.format_version in (2, 3, 4, 5, 6, 8, 9, 10):
         if net.full_heads != (net.format_version in (3, 6)):
             raise ValueError("enyo-native-v3/v6 and full_heads must be used together")
         if net.format_version == 3 and threat_features:
             raise ValueError("enyo-native-v3 does not support threat features - use v6")
         if net.format_version == 6 and not threat_features:
             raise ValueError("enyo-native-v6 requires threat features - use v3")
-        if (net.format_version in (4, 8, 9)) != net.mixed_activation:
+        if (net.format_version in (4, 8, 9, 10)) != net.mixed_activation:
             raise ValueError("enyo-native-v4/v8 and mixed activation must be used together")
         if (net.format_version == 5) != net.psqt_residual:
             raise ValueError("enyo-native-v5 and PSQT residual must be used together")
-        if (net.format_version in (8, 9)) != net.l2_output_skip:
+        if (net.format_version in (8, 9, 10)) != net.l2_output_skip:
             raise ValueError("enyo-native-v8 and L2-output skip must be used together")
         if net.l2_output_skip and (net.full_heads or (threat_features and net.format_version != 9)
                                    or net.output_buckets != 8
@@ -1025,8 +1043,15 @@ def write_net(net: Net, path: str | Path) -> None:
             and net.output_head_features == 0
         ):
             raise ValueError("enyo-native-v9 requires threat inputs with shared-head mixed activation and L2-output skip")
+        if net.format_version == 10 and not (
+            net.pawn_pairs and not threat_features and not net.full_heads
+            and net.mixed_activation and net.l2_output_skip and net.output_buckets == 8
+            and net.output_head_features == 0
+        ):
+            raise ValueError("enyo-native-v10 requires pawn pairs with shared-head mixed activation and L2-output skip")
         magic = (
-            NETWORK_V9_HEADER_MAGIC if net.format_version == 9
+            NETWORK_V10_HEADER_MAGIC if net.format_version == 10
+            else NETWORK_V9_HEADER_MAGIC if net.format_version == 9
             else NETWORK_V8_HEADER_MAGIC if net.l2_output_skip
             else NETWORK_V5_HEADER_MAGIC if net.psqt_residual
             else NETWORK_V4_HEADER_MAGIC if net.mixed_activation
@@ -1048,6 +1073,7 @@ def write_net(net: Net, path: str | Path) -> None:
             net.output_head_features,
             (NETWORK_FLAG_FULL_THREATS if net.full_threats else 0)
             | (NETWORK_FLAG_SLIDER_XRAY_THREATS if net.slider_xray_threats else 0)
+            | (NETWORK_FLAG_PAWN_PAIRS if net.pawn_pairs else 0)
             | (NETWORK_FLAG_FULL_HEADS if net.full_heads else 0)
             | (NETWORK_FLAG_MIXED_ACTIVATION if net.mixed_activation else 0)
             | (NETWORK_FLAG_PSQT_RESIDUAL if net.psqt_residual else 0)
@@ -1066,8 +1092,8 @@ def write_net(net: Net, path: str | Path) -> None:
     expected = network_size(
         net.input_buckets, net.output_buckets, net.output_head_features,
         net.feature_channels, net.full_threats or net.slider_xray_threats, net.full_heads,
-        net.mixed_activation, net.psqt_residual, net.l2_output_skip)
-    if net.format_version in (2, 3, 4, 5, 6, 8, 9):
+        net.mixed_activation, net.psqt_residual, net.l2_output_skip, net.pawn_pairs)
+    if net.format_version in (2, 3, 4, 5, 6, 8, 9, 10):
         expected += NETWORK_HEADER_SIZE
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")

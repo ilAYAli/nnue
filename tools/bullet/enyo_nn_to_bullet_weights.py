@@ -26,6 +26,8 @@ from lib.enyo_nnue import (
     load_net,
 )
 
+N_PAWN_PAIR_FEATURES = 4_560
+
 LEGACY_BUCKET_FOR_32 = (
     0, 1, 2, 3, 4, 5, 6, 7,
     8, 9, 10, 11, 8, 9, 10, 11,
@@ -287,6 +289,7 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "target_hidden": args.hidden,
         "full_threats": bool(args.full_threats),
         "slider_xray_threats": bool(args.slider_xray_threats),
+        "pawn_pairs": bool(args.pawn_pairs),
         "full_heads": bool(args.full_heads),
         "mixed_activation": bool(args.mixed_activation),
         "l2_output_skip": bool(args.l2_output_skip),
@@ -321,6 +324,11 @@ def main() -> int:
         "--slider-xray-threats",
         action="store_true",
         help="Append zero-initialized slider x-ray rows for warm-starting that architecture.",
+    )
+    parser.add_argument(
+        "--pawn-pairs",
+        action="store_true",
+        help="Append deterministic pawn-pair rows for a warm-started architecture.",
     )
     parser.add_argument(
         "--full-heads",
@@ -374,14 +382,19 @@ def main() -> int:
         target_buckets=args.input_buckets,
         target_channels=args.feature_channels,
     )[:, :args.hidden]
-    if args.full_threats and args.slider_xray_threats:
-        raise SystemExit("--full-threats and --slider-xray-threats are mutually exclusive")
+    if sum((args.full_threats, args.slider_xray_threats, args.pawn_pairs)) > 1:
+        raise SystemExit("extended input modes are mutually exclusive")
     source_threat_features = (
         bool(getattr(net, "full_threats", False))
         or bool(getattr(net, "slider_xray_threats", False))
     )
     if (args.full_threats or args.slider_xray_threats) and not source_threat_features:
         input_weights = add_full_threat_rows(input_weights)
+    if args.pawn_pairs:
+        if source_threat_features:
+            raise SystemExit("pawn-pair warm start requires a base-input parent")
+        input_weights = add_full_threat_rows(
+            input_weights, rows=N_PAWN_PAIR_FEATURES, seed=1)
     input_biases = np.asarray(net.input_biases, dtype=np.float32)[:args.hidden]
     l1_weights = np.concatenate((
         l1_weights[..., :args.hidden],

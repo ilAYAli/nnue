@@ -333,6 +333,7 @@ struct EnyoInputs<
     const FEATURE_CHANNELS: usize,
     const FULL_THREATS: bool,
     const SLIDER_XRAY_THREATS: bool,
+    const PAWN_PAIRS: bool,
 >;
 
 #[derive(Clone, Copy, Default)]
@@ -477,8 +478,9 @@ impl<
         const FEATURE_CHANNELS: usize,
         const FULL_THREATS: bool,
         const SLIDER_XRAY_THREATS: bool,
+        const PAWN_PAIRS: bool,
     > SparseInputType
-    for EnyoInputs<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS>
+    for EnyoInputs<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS, PAWN_PAIRS>
 {
     type RequiredDataType = ChessBoard;
 
@@ -489,14 +491,16 @@ impl<
             } else {
                 0
             }
+            + if PAWN_PAIRS { enyo_threats::PAWN_PAIR_DIMENSIONS } else { 0 }
     }
 
     fn max_active(&self) -> usize {
-        32 + if FULL_THREATS || SLIDER_XRAY_THREATS {
-            enyo_threats::MAX_ACTIVE
-        } else {
-            0
-        }
+            32 + if FULL_THREATS || SLIDER_XRAY_THREATS {
+                enyo_threats::MAX_ACTIVE
+            } else {
+                0
+            }
+            + if PAWN_PAIRS { enyo_threats::MAX_PAWN_PAIR_ACTIVE } else { 0 }
     }
 
     fn map_features<F: FnMut(usize, usize)>(&self, pos: &Self::RequiredDataType, mut f: F) {
@@ -523,6 +527,13 @@ impl<
             );
             for i in 0..threats[0].len() {
                 f(base + threats[0].get(i), base + threats[1].get(i));
+            }
+        }
+        if PAWN_PAIRS {
+            let base = INPUT_BUCKETS * FEATURE_CHANNELS * 64;
+            let pairs = enyo_threats::pawn_pair_active_features(pos);
+            for i in 0..pairs[0].len() {
+                f(base + pairs[0].get(i), base + pairs[1].get(i));
             }
         }
     }
@@ -618,6 +629,7 @@ fn train_enyo<
     const OUTPUT_BUCKETS: usize,
     const FULL_THREATS: bool,
     const SLIDER_XRAY_THREATS: bool,
+    const PAWN_PAIRS: bool,
     const FULL_HEADS: bool,
     const MIXED_ACTIVATION: bool,
     const L2_OUTPUT_SKIP: bool,
@@ -669,6 +681,16 @@ fn train_enyo<
         panic!("FullThreats and slider x-ray threats are mutually exclusive");
     }
     let threat_features = FULL_THREATS || SLIDER_XRAY_THREATS;
+    if threat_features && PAWN_PAIRS {
+        panic!("FullThreats and pawn-pair inputs are separate architectures");
+    }
+    let extension_features = if threat_features {
+        enyo_threats::DIMENSIONS
+    } else if PAWN_PAIRS {
+        enyo_threats::PAWN_PAIR_DIMENSIONS
+    } else {
+        0
+    };
     if L2_OUTPUT_SKIP && (!MIXED_ACTIVATION || FULL_HEADS || OUTPUT_BUCKETS != 8) {
         panic!("L2-output skip requires the shared-head mixed-activation 8-bucket architecture");
     }
@@ -801,7 +823,7 @@ fn train_enyo<
                 ValueTrainerBuilder::default()
                     .dual_perspective()
                     .optimiser(AdamW)
-                    .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS>)
+                    .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS, PAWN_PAIRS>)
                     .save_format(&[
                         l0w_format!(),
                         SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -829,7 +851,7 @@ fn train_enyo<
                 ValueTrainerBuilder::default()
                     .dual_perspective()
                     .optimiser(AdamW)
-                    .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS>)
+                    .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS, PAWN_PAIRS>)
                     .save_format(&[
                         l0w_format!(),
                         SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -854,7 +876,7 @@ fn train_enyo<
                 ValueTrainerBuilder::default()
                 .dual_perspective()
                 .optimiser(AdamW)
-                .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS>)
+                .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS, PAWN_PAIRS>)
                 .save_format(&[
                     l0w_format!(),
                     SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -881,7 +903,7 @@ fn train_enyo<
                 ValueTrainerBuilder::default()
                 .dual_perspective()
                 .optimiser(AdamW)
-                .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS>)
+                .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, FULL_THREATS, SLIDER_XRAY_THREATS, PAWN_PAIRS>)
                 .save_format(&[
                     l0w_format!(),
                     SavedFormat::id("l0b").round().quantise::<i16>(1),
@@ -917,12 +939,7 @@ fn train_enyo<
                 enyo_affine(
                     $builder,
                     "l0",
-                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
-                        + if threat_features {
-                            enyo_threats::DIMENSIONS
-                        } else {
-                            0
-                        },
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64 + extension_features,
                     hidden,
                     l0_stdev,
                 )
@@ -948,11 +965,11 @@ fn train_enyo<
                     hidden * INPUT_BUCKETS * FEATURE_CHANNELS * 64,
                     1,
                 ));
-                if threat_features {
+                if extension_features != 0 {
                     let threat_padding = maybe_frozen($builder, true, || {
                         $builder.new_weights(
                             "l0tf",
-                            Shape::new(hidden * enyo_threats::DIMENSIONS, 1),
+                            Shape::new(hidden * extension_features, 1),
                             InitSettings::Zeroed,
                         )
                     });
@@ -960,8 +977,7 @@ fn train_enyo<
                 }
                 l0.weights = l0.weights + factoriser.reshape(Shape::new(
                     hidden,
-                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
-                        + if threat_features { enyo_threats::DIMENSIONS } else { 0 },
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64 + extension_features,
                 ));
             }
             l0.weights = l0.weights.faux_quantise(1.0, true);
@@ -1050,12 +1066,7 @@ fn train_enyo<
                 enyo_affine(
                     $builder,
                     "l0",
-                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
-                        + if threat_features {
-                            enyo_threats::DIMENSIONS
-                        } else {
-                            0
-                        },
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64 + extension_features,
                     hidden,
                     l0_stdev,
                 )
@@ -1081,11 +1092,11 @@ fn train_enyo<
                     hidden * INPUT_BUCKETS * FEATURE_CHANNELS * 64,
                     1,
                 ));
-                if threat_features {
+                if extension_features != 0 {
                     let threat_padding = maybe_frozen($builder, true, || {
                         $builder.new_weights(
                             "l0tf",
-                            Shape::new(hidden * enyo_threats::DIMENSIONS, 1),
+                            Shape::new(hidden * extension_features, 1),
                             InitSettings::Zeroed,
                         )
                     });
@@ -1093,8 +1104,7 @@ fn train_enyo<
                 }
                 l0.weights = l0.weights + factoriser.reshape(Shape::new(
                     hidden,
-                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
-                        + if threat_features { enyo_threats::DIMENSIONS } else { 0 },
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64 + extension_features,
                 ));
             }
             l0.weights = l0.weights.faux_quantise(1.0, true);
@@ -1272,12 +1282,7 @@ fn train_enyo<
                 write_seeded_enyo_weights(
                     &seeded_path,
                     seed,
-                    INPUT_BUCKETS * FEATURE_CHANNELS * 64
-                        + if threat_features {
-                            enyo_threats::DIMENSIONS
-                        } else {
-                            0
-                        },
+                    INPUT_BUCKETS * FEATURE_CHANNELS * 64 + extension_features,
                     FEATURE_CHANNELS,
                     hidden,
                     l2_size,
@@ -1413,6 +1418,7 @@ fn main() {
     let enyo_full_threats = env_parse("ENYO_BULLET_ENYO_FULL_THREATS", 0usize) != 0;
     let enyo_slider_xray_threats =
         env_parse("ENYO_BULLET_ENYO_SLIDER_XRAY_THREATS", 0usize) != 0;
+    let enyo_pawn_pairs = env_parse("ENYO_BULLET_ENYO_PAWN_PAIRS", 0usize) != 0;
     let enyo_full_heads = env_parse("ENYO_BULLET_ENYO_FULL_HEADS", 0usize) != 0;
     let enyo_mixed_activation =
         env_parse("ENYO_BULLET_ENYO_MIXED_ACTIVATION", 0usize) != 0;
@@ -1428,13 +1434,14 @@ fn main() {
 
     if mode == "enyo" {
         macro_rules! run_enyo {
-            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal, $slider_xray_threats:literal, $full_heads:literal, $mixed_activation:literal, $l2_output_skip:literal) => {
+            ($input_buckets:literal, $feature_channels:literal, $output_buckets:literal, $full_threats:literal, $slider_xray_threats:literal, $pawn_pairs:literal, $full_heads:literal, $mixed_activation:literal, $l2_output_skip:literal) => {
                 train_enyo::<
                     $input_buckets,
                     $feature_channels,
                     $output_buckets,
                     $full_threats,
                     $slider_xray_threats,
+                    $pawn_pairs,
                     $full_heads,
                     $mixed_activation,
                     $l2_output_skip,
@@ -1469,31 +1476,32 @@ fn main() {
 
         macro_rules! run_enyo_layout {
             ($input_buckets:literal, $feature_channels:literal) => {
-                match (enyo_output_buckets, enyo_full_threats, enyo_slider_xray_threats, enyo_full_heads, enyo_mixed_activation, enyo_psqt_residual, enyo_l2_output_skip) {
-                    (8, false, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true, true),
-                    (8, true, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, true, true),
-                    (1, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false, false, false, false),
-                    (2, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, false, false, false),
-                    (4, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, false, false, false),
-                    (8, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, false),
-                    (8, false, false, false, false, true, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, false),
-                    (8, false, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true, false),
-                    (1, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, true, false, false, false, false),
-                    (2, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, true, false, false, false, false),
-                    (4, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, true, false, false, false, false),
-                    (8, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, false, false),
-                    (1, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, true, false, false, false),
-                    (2, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, true, false, false, false),
-                    (4, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, true, false, false, false),
-                    (8, false, true, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, true, false, false, false),
-                    (2, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, true, false, false),
-                    (4, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, true, false, false),
-                    (8, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, true, false, false),
-                    (8, true, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, true, false, false),
+                match (enyo_output_buckets, enyo_full_threats, enyo_slider_xray_threats, enyo_pawn_pairs, enyo_full_heads, enyo_mixed_activation, enyo_psqt_residual, enyo_l2_output_skip) {
+                    (8, false, false, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, true, true),
+                    (8, true, false, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, false, true, true),
+                    (8, false, false, true, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, true, false, true, true),
+                    (1, false, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false, false, false, false, false),
+                    (2, false, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, false, false, false, false),
+                    (4, false, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, false, false, false, false),
+                    (8, false, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, false, false),
+                    (8, false, false, false, false, false, true, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, false, false),
+                    (8, false, false, false, false, true, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, true, false),
+                    (1, true, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, true, false, false, false, false, false),
+                    (2, true, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, true, false, false, false, false, false),
+                    (4, true, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, true, false, false, false, false, false),
+                    (8, true, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, false, false, false),
+                    (1, false, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, true, false, false, false, false),
+                    (2, false, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, true, false, false, false, false),
+                    (4, false, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, true, false, false, false, false),
+                    (8, false, true, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, true, false, false, false, false),
+                    (2, false, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 2, false, false, false, true, false, false),
+                    (4, false, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 4, false, false, false, true, false, false),
+                    (8, false, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true, false, false),
+                    (8, true, false, false, true, false, false, false) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, true, false, false),
                     _ => {
                         panic!(
                             "unsupported Enyo output/full-threat/full-head combination: \
-                             {enyo_output_buckets}/{enyo_full_threats}/{enyo_slider_xray_threats}/{enyo_full_heads}/{enyo_mixed_activation}"
+                             {enyo_output_buckets}/{enyo_full_threats}/{enyo_slider_xray_threats}/{enyo_pawn_pairs}/{enyo_full_heads}/{enyo_mixed_activation}"
                         )
                     }
                 }
