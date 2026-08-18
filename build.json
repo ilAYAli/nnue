@@ -1,11 +1,11 @@
 {
-  "run": "enyo-7.5.0-rc6",
-  "hypothesis": "stronger outcome weighting tests whether recalibrated labels benefit from a historical WDL level",
+  "run": "enyo-7.5.0-rc4",
+  "hypothesis": "a higher final learning rate tests whether late adaptation improves the selected parent",
   "superbatches": 77106,
   "trainable": "all",
-  "wdl": 0.05,
+  "wdl": 0.025,
   "lr": 0.004,
-  "final_lr": 0.000005,
+  "final_lr": 0.00001,
   "data": {
     "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
   },
