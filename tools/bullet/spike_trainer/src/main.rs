@@ -691,8 +691,8 @@ fn train_enyo<
     } else {
         0
     };
-    if L2_OUTPUT_SKIP && (!MIXED_ACTIVATION || FULL_HEADS || OUTPUT_BUCKETS != 8) {
-        panic!("L2-output skip requires the shared-head mixed-activation 8-bucket architecture");
+    if L2_OUTPUT_SKIP && (!MIXED_ACTIVATION || OUTPUT_BUCKETS != 8) {
+        panic!("L2-output skip requires the mixed-activation 8-bucket architecture");
     }
     if psqt_residual && (MIXED_ACTIVATION || FULL_HEADS || threat_features || OUTPUT_BUCKETS != 8) {
         panic!("PSQT residual requires the shared-head 8-bucket base architecture");
@@ -1121,10 +1121,10 @@ fn train_enyo<
             });
             let l2s = if MIXED_ACTIVATION {
                 let weights = maybe_frozen($builder, !train_squared, || {
-                    $builder.new_weights("l2sw", Shape::new(32, l2_size), InitSettings::Zeroed)
+                    $builder.new_weights("l2sw", Shape::new(head_count * 32, l2_size), InitSettings::Zeroed)
                 });
                 let bias = maybe_frozen($builder, !train_squared, || {
-                    $builder.new_weights("l2sb", Shape::new(32, 1), InitSettings::Zeroed)
+                    $builder.new_weights("l2sb", Shape::new(head_count * 32, 1), InitSettings::Zeroed)
                 });
                 Some(Affine { weights, bias })
             } else {
@@ -1172,14 +1172,22 @@ fn train_enyo<
                 l1.forward(x0)
             };
             let x1 = x1_pre.relu();
-            let x2_pre = if FULL_HEADS {
+            let x2_linear = if FULL_HEADS {
                 l2.forward(x1).select($output_buckets)
-            } else if let Some(l2s) = l2s {
-                let clipped = x1_pre.max(0.0).min(127.0);
-                let squared = clipped.abs_pow(2.0) / 127.0;
-                l2.forward(x1) + l2s.forward(squared)
             } else {
                 l2.forward(x1)
+            };
+            let x2_pre = if let Some(l2s) = l2s {
+                let clipped = x1_pre.max(0.0).min(127.0);
+                let squared = clipped.abs_pow(2.0) / 127.0;
+                let x2_squared = if FULL_HEADS {
+                    l2s.forward(squared).select($output_buckets)
+                } else {
+                    l2s.forward(squared)
+                };
+                x2_linear + x2_squared
+            } else {
+                x2_linear
             };
             let x2 = x2_pre.relu();
             let output = if let Some(l2skip) = l2skip {
@@ -1478,6 +1486,7 @@ fn main() {
             ($input_buckets:literal, $feature_channels:literal) => {
                 match (enyo_output_buckets, enyo_full_threats, enyo_slider_xray_threats, enyo_pawn_pairs, enyo_full_heads, enyo_mixed_activation, enyo_psqt_residual, enyo_l2_output_skip) {
                     (8, false, false, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, false, true, true),
+                    (8, false, false, false, true, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, false, true, true, true),
                     (8, true, false, false, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, true, false, false, false, true, true),
                     (8, false, false, true, false, true, false, true) => run_enyo!($input_buckets, $feature_channels, 8, false, false, true, false, true, true),
                     (1, false, false, false, false, false, false, false) => run_enyo!($input_buckets, $feature_channels, 1, false, false, false, false, false, false),

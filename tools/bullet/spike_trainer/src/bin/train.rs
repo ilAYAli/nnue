@@ -59,6 +59,7 @@ const ENYO_V7_HEADER_MAGIC: &[u8; 8] = b"ENYONN7\0";
 const ENYO_V8_HEADER_MAGIC: &[u8; 8] = b"ENYONN8\0";
 const ENYO_V9_HEADER_MAGIC: &[u8; 8] = b"ENYONN9\x00";
 const ENYO_V10_HEADER_MAGIC: &[u8; 8] = b"ENYON10\0";
+const ENYO_V11_HEADER_MAGIC: &[u8; 8] = b"ENYON11\0";
 const ENYO_V2_FORMAT_VERSION: u32 = 2;
 const ENYO_V3_FORMAT_VERSION: u32 = 3;
 const ENYO_V4_FORMAT_VERSION: u32 = 4;
@@ -68,6 +69,7 @@ const ENYO_V7_FORMAT_VERSION: u32 = 7;
 const ENYO_V8_FORMAT_VERSION: u32 = 8;
 const ENYO_V9_FORMAT_VERSION: u32 = 9;
 const ENYO_V10_FORMAT_VERSION: u32 = 10;
+const ENYO_V11_FORMAT_VERSION: u32 = 11;
 const ENYO_NETWORK_HEADER_SIZE: usize = 64;
 const ENYO_NETWORK_FLAG_FULL_THREATS: u32 = 1;
 const ENYO_NETWORK_FLAG_FULL_HEADS: u32 = 2;
@@ -1057,6 +1059,7 @@ fn validate_layout(config: &Config) {
         export_format,
         "enyo-native-v1" | "enyo-native-v2" | "enyo-native-v3" | "enyo-native-v4" | "enyo-native-v5"
             | "enyo-native-v6" | "enyo-native-v8" | "enyo-native-v9" | "enyo-native-v10"
+            | "enyo-native-v11"
     ) {
         eprintln!("error: unsupported export_format={export_format}");
         process::exit(2);
@@ -1077,7 +1080,8 @@ fn validate_layout(config: &Config) {
         eprintln!("error: pawn_pairs requires export_format=enyo-native-v10");
         process::exit(2);
     }
-    if full_heads && export_format != "enyo-native-v3" && export_format != "enyo-native-v6" {
+    if full_heads && export_format != "enyo-native-v3" && export_format != "enyo-native-v6"
+        && export_format != "enyo-native-v11" {
         eprintln!("error: output_bucket_scope=full-head requires export_format=enyo-native-v3 (alone) or enyo-native-v6 (with threat features)");
         process::exit(2);
     }
@@ -1090,12 +1094,12 @@ fn validate_layout(config: &Config) {
         process::exit(2);
     }
     if mixed_activation && export_format != "enyo-native-v4" {
-        if !(l2_output_skip && (export_format == "enyo-native-v8" || export_format == "enyo-native-v9" || export_format == "enyo-native-v10")) {
+        if !(l2_output_skip && (export_format == "enyo-native-v8" || export_format == "enyo-native-v9" || export_format == "enyo-native-v10" || export_format == "enyo-native-v11")) {
             eprintln!("error: relu-screlu-residual requires export_format=enyo-native-v4 or v8");
             process::exit(2);
         }
     }
-    if l2_output_skip && export_format != "enyo-native-v8" && export_format != "enyo-native-v9" && export_format != "enyo-native-v10" {
+    if l2_output_skip && export_format != "enyo-native-v8" && export_format != "enyo-native-v9" && export_format != "enyo-native-v10" && export_format != "enyo-native-v11" {
         eprintln!("error: L2-output skip requires export_format=enyo-native-v8");
         process::exit(2);
     }
@@ -1115,11 +1119,11 @@ fn validate_layout(config: &Config) {
         eprintln!("error: PSQT residual requires the shared-head 8-bucket base architecture");
         process::exit(2);
     }
-    if mixed_activation && (full_heads || (threat_features && export_format != "enyo-native-v9") || output_buckets != 8) {
+    if mixed_activation && ((full_heads && export_format != "enyo-native-v11") || (threat_features && export_format != "enyo-native-v9") || output_buckets != 8) {
         eprintln!("error: mixed activation requires the shared-head 8-bucket base architecture");
         process::exit(2);
     }
-    if l2_output_skip && (!mixed_activation || full_heads || (threat_features && export_format != "enyo-native-v9") || output_buckets != 8) {
+    if l2_output_skip && (!mixed_activation || (full_heads && export_format != "enyo-native-v11") || (threat_features && export_format != "enyo-native-v9") || output_buckets != 8) {
         eprintln!("error: L2-output skip requires the shared-head mixed-activation 8-bucket base architecture");
         process::exit(2);
     }
@@ -1149,6 +1153,13 @@ fn validate_layout(config: &Config) {
         && !(pawn_pairs && !full_heads && mixed_activation && l2_output_skip && output_buckets == 8)
     {
         eprintln!("error: enyo-native-v10 requires pawn pairs with the shared-head mixed-activation 8-bucket L2-skip layout");
+        process::exit(2);
+    }
+    if export_format == "enyo-native-v11"
+        && !(full_heads && !threat_features && !pawn_pairs && mixed_activation
+            && l2_output_skip && output_buckets == 8)
+    {
+        eprintln!("error: enyo-native-v11 requires full heads with mixed activation and L2-output skip");
         process::exit(2);
     }
     if training_lr_superbatches(config) < training_superbatches(config) {
@@ -1769,7 +1780,7 @@ fn enyo_network_size(
         + head_count * l2 * 4
         + head_count * l2 * l3 * 4
         + head_count * l3 * 4
-        + (if mixed_activation { l2 * l3 * 4 + l3 * 4 } else { 0 })
+        + (if mixed_activation { head_count * (l2 * l3 * 4 + l3 * 4) } else { 0 })
         + output_buckets * l3 * 4
         + output_buckets * 4
         + (if l2_output_skip { output_buckets * l2 * 4 } else { 0 })
@@ -2008,7 +2019,9 @@ fn enyo_container(
         process::exit(1);
     });
     let mut output = vec![0_u8; ENYO_NETWORK_HEADER_SIZE + payload.len()];
-    let magic = if format_version == ENYO_V10_FORMAT_VERSION {
+    let magic = if format_version == ENYO_V11_FORMAT_VERSION {
+        ENYO_V11_HEADER_MAGIC
+    } else if format_version == ENYO_V10_FORMAT_VERSION {
         ENYO_V10_HEADER_MAGIC
     } else if format_version == ENYO_V9_FORMAT_VERSION {
         ENYO_V9_HEADER_MAGIC
@@ -2743,6 +2756,11 @@ fn write_model(config: &Config) {
             &model, runtime_input_buckets, feature_channels, hidden, l2, output_buckets,
             false, false, pawn_pairs, false, mixed_activation, false,
             l2_output_skip, false, ENYO_V10_FORMAT_VERSION,
+        ),
+        Some("enyo-native-v11") => enyo_container(
+            &model, runtime_input_buckets, feature_channels, hidden, l2, output_buckets,
+            false, false, false, full_heads, mixed_activation, false,
+            l2_output_skip, false, ENYO_V11_FORMAT_VERSION,
         ),
         _ => model,
     };

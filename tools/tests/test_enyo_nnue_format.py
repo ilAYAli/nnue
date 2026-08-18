@@ -99,6 +99,39 @@ class EnyoNNUEFormatTests(unittest.TestCase):
             np.testing.assert_array_equal(
                 loaded.l2_biases[:, 0], np.arange(8, dtype=np.float32) + 0.5)
 
+    def test_full_head_mixed_skip_v11_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "full-head-mixed-skip.nn"
+            net = zero_net(
+                input_buckets=32,
+                output_buckets=8,
+                format_version=11,
+                full_heads=True,
+            )
+            net.mixed_activation = True
+            net.l2_output_skip = True
+            net.l2_squared_weights = np.zeros(
+                (8, nn2.N_L3, nn2.N_L2), dtype=np.float32)
+            net.l2_squared_biases = np.zeros((8, nn2.N_L3), dtype=np.float32)
+            net.l2_squared_biases[:, 0] = np.arange(8, dtype=np.float32)
+            net.l2_output_skip_weights = np.zeros(
+                (8, nn2.N_L2), dtype=np.float32)
+            nn2.write_net(net, path)
+
+            self.assertEqual(
+                path.stat().st_size,
+                nn2.NETWORK_HEADER_SIZE
+                + nn2.network_size(32, 8, full_heads=True,
+                                   mixed_activation=True, l2_output_skip=True))
+            loaded = nn2.load_net(path)
+            self.assertEqual(loaded.format_version, 11)
+            self.assertTrue(loaded.full_heads)
+            self.assertTrue(loaded.mixed_activation)
+            self.assertTrue(loaded.l2_output_skip)
+            self.assertEqual(loaded.l2_squared_weights.shape, (8, nn2.N_L3, nn2.N_L2))
+            np.testing.assert_array_equal(
+                loaded.l2_squared_biases[:, 0], np.arange(8, dtype=np.float32))
+
     def test_single_head_roundtrip_keeps_legacy_size(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "single.nn"

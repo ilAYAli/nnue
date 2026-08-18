@@ -211,21 +211,41 @@ def bullet_l3_weights(output_weights: np.ndarray) -> np.ndarray:
     return np.asarray(output_weights, dtype=np.float32).T
 
 
-def mixed_activation_weights(net) -> tuple[np.ndarray, np.ndarray]:
+def mixed_activation_weights(
+    net,
+    output_buckets: int,
+    full_heads: bool,
+) -> tuple[np.ndarray, np.ndarray]:
     """Preserve a SCReLU parent branch, or add a zero branch to a ReLU parent."""
     source_weights = getattr(net, "l2_squared_weights", None)
     source_biases = getattr(net, "l2_squared_biases", None)
+    target_heads = output_buckets if full_heads else 1
     if source_weights is None and source_biases is None:
+        weights = np.zeros((N_L3, N_L2), dtype=np.float32)
+        biases = np.zeros(N_L3, dtype=np.float32)
+    else:
+        if source_weights is None or source_biases is None:
+            raise SystemExit("source SCReLU branch is incomplete")
+        weights = np.asarray(source_weights, dtype=np.float32)
+        biases = np.asarray(source_biases, dtype=np.float32)
+        if weights.shape == (N_L3, N_L2) and biases.shape == (N_L3,):
+            pass
+        elif weights.ndim == 3 and weights.shape[1:] == (N_L3, N_L2) \
+                and biases.shape == (weights.shape[0], N_L3):
+            if not full_heads:
+                raise SystemExit("cannot collapse full SCReLU heads into a shared branch")
+            indices = [
+                source_output_bucket_for_target(bucket, weights.shape[0], output_buckets)
+                for bucket in range(output_buckets)
+            ]
+            return weights[indices], biases[indices]
+        else:
+            raise SystemExit("source SCReLU branch has incompatible shape")
+    if full_heads:
         return (
-            np.zeros((N_L3, N_L2), dtype=np.float32),
-            np.zeros(N_L3, dtype=np.float32),
+            np.repeat(weights[np.newaxis, ...], target_heads, axis=0),
+            np.repeat(biases[np.newaxis, ...], target_heads, axis=0),
         )
-    if source_weights is None or source_biases is None:
-        raise SystemExit("source SCReLU branch is incomplete")
-    weights = np.asarray(source_weights, dtype=np.float32)
-    biases = np.asarray(source_biases, dtype=np.float32)
-    if weights.shape != (N_L3, N_L2) or biases.shape != (N_L3,):
-        raise SystemExit("source SCReLU branch has incompatible shape")
     return weights, biases
 
 
@@ -422,7 +442,11 @@ def main() -> int:
         )
         write_tensor(handle, "l2b", l2_biases)
         if args.mixed_activation:
-            l2_squared_weights, l2_squared_biases = mixed_activation_weights(net)
+            l2_squared_weights, l2_squared_biases = mixed_activation_weights(
+                net, args.output_buckets, args.full_heads)
+            l2_squared_weights = l2_squared_weights.reshape(
+                l2_output_rows, N_L2)
+            l2_squared_biases = l2_squared_biases.reshape(l2_output_rows)
             write_tensor(handle, "l2sw", l2_squared_weights.ravel(order="F"))
             write_tensor(handle, "l2sb", l2_squared_biases)
         write_tensor(
