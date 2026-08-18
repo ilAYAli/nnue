@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc7",
-  "hypothesis": "a higher final learning rate tests whether late adaptation retains useful recalibrated-label signal",
-  "superbatches": 77106,
+  "run": "enyo-8.0.0-rc1",
+  "hypothesis": "FullThreats inputs test whether direct attack relations lift the stalled architecture",
+  "superbatches": 15421,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
-  "final_lr": 0.000025,
+  "final_lr": 0.000005,
   "data": {
     "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
   },
-  "continue_from": "enyo-7.4.0-rc1"
+  "initialize_from": "enyo-7.4.0-rc1"
 }
