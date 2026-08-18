@@ -438,8 +438,8 @@ startpos_gate() {
   grep -q "input_buckets=$buckets" "$log" || fail "input_buckets mismatch, expected $buckets" startpos
   grep -q "feature_channels=$channels" "$log" || fail "feature_channels mismatch, expected $channels" startpos
 
-  cp=$(awk '/info depth 3 / { for (i = 1; i <= NF; i++) if ($i == "cp") print $(i + 1) }' "$log" | tail -1)
-  [[ -n "$cp" ]] || fail "startpos depth 3 had no cp score" startpos
+  cp=$(awk '$1 == "info" && $2 == "depth" && $3 >= 3 { for (i = 1; i <= NF; i++) if ($i == "cp") print $(i + 1) }' "$log" | tail -1)
+  [[ -n "$cp" ]] || fail "startpos had no cp score at depth 3 or greater" startpos
   abs_float_le "$cp" "$MAX_STARTPOS_CP" || fail "startpos cp $cp outside +/-$MAX_STARTPOS_CP" startpos
   printf '  ┌─────────────────────────────────────\n'
   printf '  │ \033[1;32m✓ PASS\033[0m  startpos\n'
