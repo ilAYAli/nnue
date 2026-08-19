@@ -37,8 +37,8 @@ Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −13
 Void: `enyo-10.0.0-rc1` (independent dense heads; no promotion).
 Void: `enyo-11.0.0-rc1` (reset-tail output scale; invalid startpos +2023 cp).
 Rejected: `enyo-11.0.0-rc2` (ordinary ReLU dense tail; -86.5 ±20.1, H0).
-Reserved: `enyo-12.0.0-rc1` on pwa-llm (16 input buckets) from `enyo-7.4.0-rc1`.
-Reserved: `enyo-13.0.0-rc1` on pwa-5090 (unfactorised inputs) from `enyo-7.4.0-rc1`.
+Rejected: `enyo-12.0.0-rc1` (16 input buckets; +0.4 ±5.5, SF tie-break −145.6 vs −138.0).
+Rejected: `enyo-13.0.0-rc1` (unfactorised inputs; -11.1 ±8.0, H0).
 
 # Enyo 1 Lineage (recovered)
 
