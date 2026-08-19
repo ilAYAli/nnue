@@ -5,6 +5,7 @@ import numpy as np
 
 from enyo_nn_to_bullet_weights import (
     add_full_threat_rows,
+    bullet_initial_l3_weights,
     bullet_l3_weights,
     expand_dense_heads,
     expand_output_head,
@@ -55,6 +56,20 @@ def test_expanded_l3_weights_use_bullet_internal_orientation() -> None:
     np.testing.assert_array_equal(
         bullet_weights[:, 0],
         np.arange(N_L3, dtype=np.float32),
+    )
+
+
+def test_initial_l3_weights_use_bullet_target_scale() -> None:
+    output_weights = np.asarray([[1.0, 2.0]], dtype=np.float32)
+    actual = bullet_initial_l3_weights(
+        output_weights,
+        eval_scale=400.0,
+        eval_divisor=32.0,
+    )
+
+    np.testing.assert_allclose(
+        actual,
+        np.asarray([[1.0 / 12800.0], [2.0 / 12800.0]], dtype=np.float32),
     )
 
 
@@ -174,6 +189,7 @@ def test_halfka_v2_init_merges_king_channels_by_square_legality() -> None:
 
 def main() -> None:
     test_expanded_l3_weights_use_bullet_internal_orientation()
+    test_initial_l3_weights_use_bullet_target_scale()
     test_expanded_multi_bucket_head_repeats_parent_ranges()
     test_full_dense_heads_repeat_shared_native_head()
     test_mixed_activation_init_preserves_parent_branch()

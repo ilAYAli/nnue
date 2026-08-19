@@ -211,6 +211,16 @@ def bullet_l3_weights(output_weights: np.ndarray) -> np.ndarray:
     return np.asarray(output_weights, dtype=np.float32).T
 
 
+def bullet_initial_l3_weights(
+    output_weights: np.ndarray,
+    *,
+    eval_scale: float,
+    eval_divisor: float,
+) -> np.ndarray:
+    """Convert exported output weights to Bullet's internal target scale."""
+    return bullet_l3_weights(output_weights) / (eval_scale * eval_divisor)
+
+
 def fresh_dense_tail(
     *,
     hidden: int,
@@ -526,9 +536,16 @@ def main() -> int:
             l2_squared_biases = l2_squared_biases.reshape(l2_output_rows)
             write_tensor(handle, "l2sw", l2_squared_weights.ravel(order="F"))
             write_tensor(handle, "l2sb", l2_squared_biases)
-        l3_scale = 1.0 if args.reset_dense_tail else output_scale
-        write_tensor(handle, "l3w", bullet_l3_weights(output_weights) / l3_scale)
-        write_tensor(handle, "l3b", output_biases / l3_scale)
+        write_tensor(
+            handle,
+            "l3w",
+            bullet_initial_l3_weights(
+                output_weights,
+                eval_scale=args.eval_scale,
+                eval_divisor=args.eval_divisor,
+            ),
+        )
+        write_tensor(handle, "l3b", output_biases / output_scale)
         if args.l2_output_skip:
             source_skip = getattr(net, "l2_output_skip_weights", None)
             l2_output_skip = (
