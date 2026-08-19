@@ -151,8 +151,8 @@ class EnyoNNUE:
             if self.mixed_activation:
                 squared = np.clip(x1_pre, 0.0, 127.0) ** 2 / 127.0
                 x2_pre += (
-                    squared @ self.l2_squared_weight.T
-                    + self.l2_squared_bias
+                    squared @ self.l2_squared_weight[0].T
+                    + self.l2_squared_bias[0]
                 )
             x2 = np.maximum(x2_pre, 0.0)
         if self.output_head_features:
