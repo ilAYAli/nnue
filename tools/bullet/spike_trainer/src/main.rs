@@ -25,7 +25,7 @@ use bullet_lib::{
     value::{
         loader::{
             sfbinpack::{MoveType, PieceType, TrainingDataEntry},
-            DirectSequentialDataLoader, SfBinpackLoader,
+            DataLoader, DirectSequentialDataLoader, SfBinpackLoader,
         },
         ValueTrainerBuilder,
     },
@@ -251,6 +251,57 @@ fn make_sfbinpack_filter() -> impl Fn(&TrainingDataEntry) -> bool + Clone {
             return false;
         }
         true
+    }
+}
+
+const RUNTIME_EVAL_CLAMP: i16 = 2045;
+
+fn phase_normalize_score(score: i16, board: &ChessBoard) -> i16 {
+    let mut phase = 0_u32;
+    let mut occupied = board.occ();
+    let mut index = 0_usize;
+    while occupied != 0 {
+        let code = (board.pcs[index / 2] >> (4 * (index & 1))) & 0x0f;
+        match code & 0x07 {
+            1 | 2 => phase += 3,
+            3 => phase += 5,
+            4 => phase += 10,
+            _ => {}
+        }
+        occupied &= occupied - 1;
+        index += 1;
+    }
+    let scale = (128.0 + phase as f32) / 128.0;
+    (f32::from(score.clamp(-RUNTIME_EVAL_CLAMP, RUNTIME_EVAL_CLAMP)) / scale).round() as i16
+}
+
+#[derive(Clone)]
+struct PhaseNormalizedSfBinpackLoader<T: Fn(&TrainingDataEntry) -> bool> {
+    inner: SfBinpackLoader<T>,
+}
+
+impl<T> DataLoader<ChessBoard> for PhaseNormalizedSfBinpackLoader<T>
+where
+    T: Fn(&TrainingDataEntry) -> bool + Clone + Send + Sync + 'static,
+{
+    fn data_file_paths(&self) -> &[String] {
+        self.inner.data_file_paths()
+    }
+
+    fn count_positions(&self) -> Option<u64> {
+        self.inner.count_positions()
+    }
+
+    fn map_chunks<F: FnMut(&[ChessBoard]) -> bool>(&self, start_position: usize, mut f: F) {
+        self.inner.map_chunks(start_position, |chunk| {
+            let mut normalized = Vec::with_capacity(chunk.len());
+            normalized.extend(chunk.iter().map(|board| {
+                let mut board = *board;
+                board.score = phase_normalize_score(board.score, &board);
+                board
+            }));
+            f(&normalized)
+        });
     }
 }
 
@@ -1357,12 +1408,14 @@ fn train_enyo<
                 }
                 "sfbinpack" => {
                     let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
-                    let dataloader = SfBinpackLoader::new_concat_multiple(
-                        &path_refs,
-                        buffer_mb,
-                        threads,
-                        make_sfbinpack_filter(),
-                    );
+                    let dataloader = PhaseNormalizedSfBinpackLoader {
+                        inner: SfBinpackLoader::new_concat_multiple(
+                            &path_refs,
+                            buffer_mb,
+                            threads,
+                            make_sfbinpack_filter(),
+                        ),
+                    };
                     trainer.run(&schedule, &settings, &dataloader);
                 }
                 _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
@@ -1699,12 +1752,14 @@ fn main() {
         }
         "sfbinpack" => {
             let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
-            let dataloader = SfBinpackLoader::new_concat_multiple(
-                &path_refs,
-                buffer_mb,
-                threads,
-                make_sfbinpack_filter(),
-            );
+            let dataloader = PhaseNormalizedSfBinpackLoader {
+                inner: SfBinpackLoader::new_concat_multiple(
+                    &path_refs,
+                    buffer_mb,
+                    threads,
+                    make_sfbinpack_filter(),
+                ),
+            };
             trainer.run(&schedule, &settings, &dataloader);
         }
         _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),

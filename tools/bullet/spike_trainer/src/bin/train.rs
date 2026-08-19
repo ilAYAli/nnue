@@ -845,6 +845,18 @@ fn training_loader(config: &Config) -> String {
     training_string(config, "loader", "direct")
 }
 
+fn uses_sfbinpack_loader(config: &Config) -> bool {
+    training_loader(config) == "sfbinpack"
+}
+
+fn training_dataset_path(config: &Config, data: &DataConfig) -> PathBuf {
+    if uses_sfbinpack_loader(config) {
+        expand_path(&data.source_binpack)
+    } else {
+        expand_path(&data.bullet_output)
+    }
+}
+
 fn training_lr(config: &Config) -> f64 {
     training_f64(config, "lr", 1e-3)
 }
@@ -1624,11 +1636,11 @@ fn set_env(key: &str, value: impl ToString) {
 fn cmd_run(config: &Config) {
     validate_layout(config);
     let data = data_config(config);
-    let bullet_output = expand_path(&data.bullet_output);
-    if !bullet_output.exists() {
+    let dataset = training_dataset_path(config, &data);
+    if !dataset.exists() {
         eprintln!(
-            "error: missing Bullet data: {}; run tools/bullet/train data --build build.json",
-            bullet_output.display()
+            "error: missing training data: {}",
+            dataset.display()
         );
         process::exit(1);
     }
@@ -1654,7 +1666,7 @@ fn cmd_run(config: &Config) {
         }
     }
 
-    set_env("ENYO_BULLET_DATA", bullet_output.display());
+    set_env("ENYO_BULLET_DATA", dataset.display());
     set_env("ENYO_BULLET_LOADER", training_loader(config));
     set_env("ENYO_BULLET_OUT", output.display());
     set_env("ENYO_BULLET_NET_ID", net_id(config));
@@ -2498,6 +2510,9 @@ fn copy_file_atomic(source: &Path, destination: &Path) -> Result<(), String> {
 }
 
 fn ensure_training_data(config: &Config) {
+    if uses_sfbinpack_loader(config) {
+        return;
+    }
     let output = expand_path(&data_config(config).bullet_output);
     if !output.is_file() {
         eprintln!("rebuilding missing Bullet data: {}", output.display());
@@ -2564,7 +2579,10 @@ fn cmd_all(config: &Config, force: bool) {
     if resume_training(config, force) {
         return;
     }
-    if extending {
+    if uses_sfbinpack_loader(config) {
+        // SfBinpackLoader streams and normalizes the source in the trainer;
+        // materializing a duplicate Bullet file is unnecessary and can exceed disk.
+    } else if extending {
         ensure_training_data(config);
     } else {
         cmd_data(config);
@@ -2996,6 +3014,20 @@ mod tests {
 
         let data = data_config(&config);
         assert_eq!(data.bullet_output, "data/shared.bullet");
+    }
+
+    #[test]
+    fn sfbinpack_loader_streams_source_without_bullet_materialization() {
+        let config = config(json!({
+            "run": "candidate",
+            "loader": "sfbinpack",
+            "data": {"source_binpack": "data/pylon.binpack"}
+        }));
+
+        let data = data_config(&config);
+        assert!(uses_sfbinpack_loader(&config));
+        assert_eq!(training_dataset_path(&config, &data), PathBuf::from("data/pylon.binpack"));
+        assert_eq!(data.bullet_output, "data/bullet/candidate.bullet");
     }
 
     #[test]
