@@ -1,6 +1,6 @@
 {
-  "run": "enyo-13.0.0-rc1",
-  "hypothesis": "removing input factorisation tests whether direct feature weights retain useful signal in the selected evaluator",
+  "run": "enyo-14.0.0-rc1",
+  "hypothesis": "a 512-wide accumulator tests whether compact features generalize better than the stalled evaluator",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.025,
