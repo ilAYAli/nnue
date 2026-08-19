@@ -35,7 +35,8 @@ Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −13
 | 22 | enyo-7.4.0-rc1  | d7a94117 | pwa-llm  | +0.4 ± 5.7    | -138.0 ± 7.3  | WDL 0.05 → 0.025; SF tie-break
 
 Void: `enyo-10.0.0-rc1` (independent dense heads; no promotion).
-Reserved: `enyo-11.0.0-rc1` on pwa-llm (ordinary ReLU dense-tail control) from `enyo-7.4.0-rc1`.
+Void: `enyo-11.0.0-rc1` (reset-tail output scale; invalid startpos +2023 cp).
+Reserved: `enyo-11.0.0-rc2` on pwa-llm (ordinary ReLU dense-tail control) from `enyo-7.4.0-rc1`.
 
 # Enyo 1 Lineage (recovered)
 
