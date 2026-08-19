@@ -39,7 +39,8 @@ Void: `enyo-11.0.0-rc1` (reset-tail output scale; invalid startpos +2023 cp).
 Rejected: `enyo-11.0.0-rc2` (ordinary ReLU dense tail; -86.5 ±20.1, H0).
 Rejected: `enyo-12.0.0-rc1` (16 input buckets; +0.4 ±5.5, SF tie-break −145.6 vs −138.0).
 Rejected: `enyo-13.0.0-rc1` (unfactorised inputs; -11.1 ±8.0, H0).
-Reserved: `enyo-14.0.0-rc1` on pwa-llm (512-wide accumulator) from `enyo-7.4.0-rc1`.
+Rejected: `enyo-14.0.0-rc1` (512-wide accumulator; -50.9 ±18.7, H0).
+Reserved: `enyo-7.4.0-rc4` on pwa-llm (Pylon data-only) from `enyo-7.4.0-rc1`.
 
 # Enyo 1 Lineage (recovered)
 
