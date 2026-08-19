@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.4.0-rc3",
-  "hypothesis": "the isolated lc0/test91 corpus tests whether newer labels improve the selected evaluator",
+  "run": "enyo-11.0.0-rc2",
+  "hypothesis": "an ordinary ReLU dense tail tests whether simpler late evaluation improves the preserved input evaluator",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
-    "source_binpack": "~/assets/training/bullet/lc0/test91/lc0-static-bulk.bullet"
+    "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
   },
-  "continue_from": "enyo-7.4.0-rc1"
+  "initialize_from": "enyo-7.4.0-rc1"
 }

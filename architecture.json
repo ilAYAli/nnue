@@ -1,20 +1,22 @@
 {
-  "name": "native-i32-12ch-1024-v8-l2-output-skip",
+  "name": "native-i32-12ch-1024-v2-relu-tail-control",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
   "l2_size": 16,
   "feature_channels": 12,
   "input_buckets": 32,
-  "output_buckets": 8,
-  "input_factoriser": true,
+  "output_buckets": 1,
+  "output_bucket_scope": "final",
+  "input_factoriser": false,
   "full_threats": false,
   "slider_xray_threats": false,
   "eval_scale": 400.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
-  "dense_activation": "relu-screlu-residual",
-  "l2_output_skip": true,
-  "export_format": "enyo-native-v8"
+  "dense_activation": "relu",
+  "l2_output_skip": false,
+  "tail_initialization": "reset",
+  "export_format": "enyo-native-v2"
 }
