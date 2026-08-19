@@ -12,6 +12,7 @@ from enyo_nn_to_bullet_weights import (
     fresh_dense_tail,
     mixed_activation_weights,
     source_bucket_for_target,
+    source_buckets_for_target,
     source_output_bucket_for_target,
     source_channel_for_target,
 )
@@ -170,6 +171,13 @@ def test_clean_bucket_expansion_repeats_parent_buckets() -> None:
     ]
 
 
+def test_16_bucket_projection_averages_legacy_32_bucket_regions() -> None:
+    assert source_buckets_for_target(0, 32, 16) == (0,)
+    assert source_buckets_for_target(8, 32, 16) == (8, 12)
+    assert source_buckets_for_target(12, 32, 16) == (16, 17, 20, 21)
+    assert source_buckets_for_target(15, 32, 16) == (26, 27, 30, 31)
+
+
 def test_unsupported_bucket_mapping_fails() -> None:
     try:
         source_bucket_for_target(0, 8, 12)
@@ -197,6 +205,7 @@ def main() -> None:
     test_fresh_dense_tail_is_deterministic_and_has_native_v2_shapes()
     test_32_bucket_init_uses_legacy_parent_buckets()
     test_clean_bucket_expansion_repeats_parent_buckets()
+    test_16_bucket_projection_averages_legacy_32_bucket_regions()
     test_unsupported_bucket_mapping_fails()
     test_halfka_v2_init_merges_king_channels_by_square_legality()
 

@@ -92,6 +92,24 @@ def source_bucket_for_target(target_bucket: int, source_buckets: int, target_buc
         f"cannot map input buckets {source_buckets} -> {target_buckets}")
 
 
+def source_buckets_for_target(
+    target_bucket: int, source_buckets: int, target_buckets: int,
+) -> tuple[int, ...]:
+    """Return parent input buckets contributing to one target bucket.
+
+    Expansions duplicate their source bucket.  The only supported contraction
+    is the inverse of Enyo's established 16-to-32 legacy mapping: average all
+    of the 32-bucket regions belonging to the target's 16-bucket region.
+    """
+    if source_buckets == 32 and target_buckets == 16:
+        return tuple(
+            source_bucket
+            for source_bucket, mapped_bucket in enumerate(LEGACY_BUCKET_FOR_32)
+            if mapped_bucket == target_bucket
+        )
+    return (source_bucket_for_target(target_bucket, source_buckets, target_buckets),)
+
+
 def source_channel_for_target(
     target_channel: int,
     target_square: int,
@@ -130,7 +148,7 @@ def convert_input_weights(
         (target_buckets * target_channels * 64, N_HIDDEN),
         dtype=np.float32)
     for target_bucket in range(target_buckets):
-        source_bucket = source_bucket_for_target(
+        source_buckets_for_target_ = source_buckets_for_target(
             target_bucket, source_buckets, target_buckets)
         for target_channel in range(target_channels):
             for target_square in range(64):
@@ -140,15 +158,17 @@ def convert_input_weights(
                     target_bucket,
                     source_channels,
                     target_channels)
-                source_feature = (
+                source_features = [
                     source_bucket * source_channels * 64
                     + source_channel * 64
-                    + target_square)
+                    + target_square
+                    for source_bucket in source_buckets_for_target_
+                ]
                 target_feature = (
                     target_bucket * target_channels * 64
                     + target_channel * 64
                     + target_square)
-                target[target_feature] = input_weights[source_feature]
+                target[target_feature] = input_weights[source_features].mean(axis=0)
     return target
 
 
