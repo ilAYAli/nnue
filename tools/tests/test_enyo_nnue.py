@@ -49,11 +49,18 @@ def _zero_net(
         full_heads=full_heads,
         mixed_activation=mixed_activation,
         l2_squared_weights=(
-            np.zeros((nn2.N_L3, nn2.N_L2), dtype=np.float32)
+            np.zeros(
+                (head_count, nn2.N_L3, nn2.N_L2)
+                if full_heads else (nn2.N_L3, nn2.N_L2),
+                dtype=np.float32,
+            )
             if mixed_activation else None
         ),
         l2_squared_biases=(
-            np.zeros(nn2.N_L3, dtype=np.float32)
+            np.zeros(
+                (head_count, nn2.N_L3) if full_heads else nn2.N_L3,
+                dtype=np.float32,
+            )
             if mixed_activation else None
         ),
     )
@@ -239,6 +246,32 @@ def test_numpy_model_applies_and_preserves_mixed_activation(
         loaded.l2_squared_weights, net.l2_squared_weights)
     np.testing.assert_array_equal(
         loaded.l2_squared_biases, net.l2_squared_biases)
+
+
+def test_numpy_model_applies_mixed_activation_to_full_heads(tmp_path: Path) -> None:
+    source = tmp_path / "full-head-mixed.nn"
+    net = _zero_net(16, output_buckets=8, full_heads=True,
+                    mixed_activation=True)
+    net.format_version = 11
+    net.l1_biases[:, 0] = 127
+    net.l2_squared_weights[:, 0, 0] = np.arange(1, 9, dtype=np.float32)
+    net.output_weights[:, 0] = 32.0
+    net.l2_output_skip = True
+    net.l2_output_skip_weights = np.zeros((8, nn2.N_L2), dtype=np.float32)
+    nn2.write_net(net, source)
+
+    model = load_model_from_nn(source)
+    counts = [2, 6, 10, 14, 18, 22, 26, 30]
+    offsets = np.cumsum([0] + counts[:-1]).astype(np.int64)
+    feats = np.zeros(sum(counts), dtype=np.int64)
+    pred = model(
+        feats, feats, offsets, offsets,
+        np.zeros(len(counts), dtype=np.int64),
+        np.ones(len(counts), dtype=np.float32),
+    )
+
+    np.testing.assert_allclose(
+        pred, 127.0 * np.arange(1, 9, dtype=np.float32))
 
 
 def test_numpy_model_expands_legacy_net_to_zero_material_head(

@@ -48,10 +48,13 @@ class EnyoNNUE:
         self.l2_squared_bias = l2_squared_bias
         self.l2_output_skip_weight = l2_output_skip_weight
         if mixed_activation:
-            if full_heads:
-                raise ValueError("mixed activation does not support full heads")
             if l2_squared_weight is None or l2_squared_bias is None:
                 raise ValueError("mixed activation requires the squared branch")
+            head_count = output_buckets if full_heads else 1
+            if l2_squared_weight.shape != (head_count, nn2.N_L3, nn2.N_L2):
+                raise ValueError("mixed activation has incompatible squared weights")
+            if l2_squared_bias.shape != (head_count, nn2.N_L3):
+                raise ValueError("mixed activation has incompatible squared biases")
         if l2_output_skip_weight is not None and l2_output_skip_weight.shape != (
                 output_buckets, nn2.N_L2):
             raise ValueError("L2-output skip requires [output_buckets,16] weights")
@@ -126,12 +129,21 @@ class EnyoNNUE:
         if self.full_heads:
             l1_weight = self.l1_weight[output_bucket]
             l1_bias = self.l1_bias[output_bucket]
-            x1 = np.maximum(
-                np.einsum("bij,bj->bi", l1_weight, x0) + l1_bias, 0.0)
+            x1_pre = np.einsum("bij,bj->bi", l1_weight, x0) + l1_bias
+            x1 = np.maximum(x1_pre, 0.0)
             l2_weight = self.l2_weight[output_bucket]
             l2_bias = self.l2_bias[output_bucket]
-            x2 = np.maximum(
-                np.einsum("bij,bj->bi", l2_weight, x1) + l2_bias, 0.0)
+            x2_pre = np.einsum("bij,bj->bi", l2_weight, x1) + l2_bias
+            if self.mixed_activation:
+                squared = np.clip(x1, 0.0, 127.0) ** 2 / 127.0
+                x2_pre += (
+                    np.einsum(
+                        "bij,bj->bi",
+                        self.l2_squared_weight[output_bucket], squared,
+                    )
+                    + self.l2_squared_bias[output_bucket]
+                )
+            x2 = np.maximum(x2_pre, 0.0)
         else:
             x1_pre = x0 @ self.l1_weight.T + self.l1_bias
             x1 = np.maximum(x1_pre, 0.0)
@@ -212,12 +224,15 @@ def load_model_from_nn(
         full_heads=net.full_heads,
         mixed_activation=net.mixed_activation,
         l2_squared_weight=(
-            None if net.l2_squared_weights is None
-            else net.l2_squared_weights.astype(np.float32)
+            None if net.l2_squared_weights is None else np.asarray(
+                net.l2_squared_weights, dtype=np.float32).reshape(
+                    (net.output_buckets if net.full_heads else 1),
+                    nn2.N_L3, nn2.N_L2)
         ),
         l2_squared_bias=(
-            None if net.l2_squared_biases is None
-            else net.l2_squared_biases.astype(np.float32)
+            None if net.l2_squared_biases is None else np.asarray(
+                net.l2_squared_biases, dtype=np.float32).reshape(
+                    (net.output_buckets if net.full_heads else 1), nn2.N_L3)
         ),
         l2_output_skip_weight=(
             None if net.l2_output_skip_weights is None
