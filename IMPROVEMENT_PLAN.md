@@ -53,55 +53,56 @@ All Forge coordination runs on `pwa-llm`; `pwa-5090` is training and worker-only
 
 ## Priorities
 
-1. Reconcile every active sibling using the promotion rule above.
-2. Test the verified recalibrated nodes5000pv2 corpus as a data-only continuation.
-3. Test objective and optimizer parameters individually.
-4. Run a separate clean Berserk-topology control: 16 buckets, 12 channels,
-   1024, 16→32→1, CReLU and ordinary ReLU; never use Berserk weights.
-5. Continue until the lineage statistically beats the fixed SF net.
+The selected parent is `enyo-7.4.0-rc1`. It already uses cubic loss, AdamW
+beta1=0.95, SCReLU, an activated L2 skip, and 32 input buckets. Do not retest
+those as new ideas.
+
+Its selected path has consumed roughly 386B examples, predominantly from the
+combined corpus and then the 2B recalibrated nodes5000pv2 corpus. Further
+changes to dose, WDL, LR, or final LR from this parent have not improved Elo.
+The 2B calibration is statistically indistinguishable from the successful
+600M Enyo-1.32 subset, so recalibration is not the remaining variable.
+
+1. Run one data-only continuation from `enyo-7.4.0-rc1` on the preserved,
+   traceable Stockfish Pylon binpack:
+   `~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack`.
+   Keep the selected parent architecture and every training setting unchanged;
+   change only `data.source_binpack`. Pylon was the broad-data bootstrap of
+   the recovered strong Enyo-1 path, so this isolates position distribution.
+2. If it wins, benchmark it against fixed SF and use it as the sole parent for
+   the next explicit data slice. If it loses, do not spend further runs on
+   WDL, LR, dose, final LR, FullThreats, pawn pairs, x-rays, or padded-width
+   conversions without new evidence.
+3. In parallel with no training, audit Pylon and nodes5000pv2 sampling and
+   targets. The goal is to identify a concrete data distinction before another
+   data run.
+4. Only then consider a true compact-topology project. Rice is a genuine
+   16-bucket, 512-wide, direct 1024→1 evaluator; `enyo-14` was not equivalent
+   because Enyo pads its trained 512 columns into a fixed 1024-wide runtime and
+   retained the Enyo-7 dense tail. A valid Rice-style control needs native
+   runtime/export support and parity tests before a training run. Never use
+   foreign weights.
 
 ## Architecture fallback
 
-After four consecutive valid candidates from the same parent fail to gain Elo,
-stop tuning ordinary training parameters. Void runs and infrastructure failures
-do not count; an accepted candidate resets the count.
+After four consecutive valid candidates from one parent fail, stop ordinary
+hyperparameter tuning. Void runs and infrastructure failures do not count; an
+accepted candidate resets the count.
 
 At that boundary, `pwa-5090` may train the next feature via `initialize_from`
 while `pwa-llm` tests one final conventional candidate via `continue_from`.
 Both branch from the same accepted parent and must finish before parent selection.
 
-Test one feature at a time, in this order:
+Architecture work must start with an implementation and parity audit, then one
+feature/topology at a time. The activated L2 skip and 32 input buckets are
+already in the selected architecture. FullThreats, pawn pairs, unfactorised
+inputs, independent heads, ordinary-ReLU tail, 16 buckets, and padded 512
+training have all lost. FullThreats remains closed unless its added rows show
+meaningful exported nonzero coverage.
 
-1. Add an activated-L2-to-output skip connection. Skip connections are used by
-   Stockfish, Stormphrax, PlentyChess, and viridithas and add little inference
-   or parameter cost to Enyo's existing 16→32 dense stack.
-2. Add FullThreats inputs with verified trainer/runtime parity and
-   export-visible weights, against a matched unfactorised control. Threat
-   features are common in the strongest current architectures, but Enyo must
-   first prove that the added rows train and survive export.
-3. Add pawn-pair inputs under the same parity and export-visibility gates.
-   They are used by Stockfish, Stormphrax, PlentyChess, and viridithas and are
-   cheaper and more structured than another large bucketed feature expansion.
-4. Use independent dense heads per output bucket. This is common, but Enyo's
-   earlier full-head experiment failed, so retry only after the higher-priority
-   architecture changes have a stable training control.
-5. Add slider x-ray threat inputs after ordinary FullThreats has demonstrated
-   useful, export-visible learning. X-rays are an extension of the threat
-   family, not the first threat experiment.
-6. Increase L2 width from 16 to 32. Stockfish uses 32→32, but Alexandria,
-   Berserk, Obsidian, PlentyChess, and Reckless use 16→32; widening L2 is not
-   the prevailing small-engine architecture.
-7. Increase input buckets from 16 to 32. This is principally a Stockfish
-   design choice and has a much larger parameter cost than the features above.
-8. Increase feature channels from 12 to 16 only with a specific semantic
-   channel design. A bare channel-count increase has no strong survey support.
-
-Each item is a separate architecture number and uses `initialize_from` the
-current accepted parent when conversion is supported. Never combine features.
-The historical architecture race fixed `l2_size=16`, so it did not test item 6.
-Its `sf32` candidate changed both input buckets (`16` to `32`) and feature
-channels (`12` to `11`); replicated continuation was not significantly better
-than `h16`, so another input-bucket experiment is low priority.
+Each architecture item receives a new architecture number and uses
+`initialize_from` only when the conversion is supported and preserves the
+intended topology. Never combine features merely to imitate another engine.
 
 Earlier FullThreats and x-ray results are not conclusive feature tests. Their
 new rows learned sub-quantization float weights that were almost entirely erased
