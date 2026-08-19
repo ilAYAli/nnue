@@ -1,6 +1,6 @@
 {
-  "run": "enyo-11.0.0-rc2",
-  "hypothesis": "an ordinary ReLU dense tail tests whether simpler late evaluation improves the preserved input evaluator",
+  "run": "enyo-12.0.0-rc1",
+  "hypothesis": "sixteen input buckets test whether a compact king partition improves the selected evaluator",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.025,
