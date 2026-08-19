@@ -211,6 +211,43 @@ def bullet_l3_weights(output_weights: np.ndarray) -> np.ndarray:
     return np.asarray(output_weights, dtype=np.float32).T
 
 
+def fresh_dense_tail(
+    *,
+    hidden: int,
+    output_buckets: int,
+    full_heads: bool,
+    l1_std: float,
+    seed: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Return a deterministic fresh ReLU dense tail in Bullet tensor layout.
+
+    This is deliberately limited to the ordinary Enyo tail: L1 2*hidden->16,
+    L2 16->32, and 32->output.  It is used when a parent has an incompatible
+    dense head (for example V11 full SCReLU heads), while retaining its exported
+    L0 feature table exactly.
+    """
+    if hidden not in (512, 768, 1024):
+        raise SystemExit(f"unsupported fresh tail hidden width: {hidden}")
+    if output_buckets not in (1, 2, 4, 8):
+        raise SystemExit(f"unsupported fresh tail output buckets: {output_buckets}")
+    if l1_std <= 0.0:
+        raise SystemExit("--l1-std must be positive")
+
+    heads = output_buckets if full_heads else 1
+    rng = np.random.default_rng(seed)
+    normal = lambda shape, std: (
+        rng.standard_normal(shape).astype(np.float32) * np.float32(std)
+    )
+    return (
+        normal((heads * N_L2, 2 * hidden), l1_std),
+        np.zeros(heads * N_L2, dtype=np.float32),
+        normal((heads * N_L3, N_L2), (2.0 / N_L2) ** 0.5),
+        np.zeros(heads * N_L3, dtype=np.float32),
+        normal((output_buckets, N_L3), (2.0 / N_L3) ** 0.5),
+        np.zeros(output_buckets, dtype=np.float32),
+    )
+
+
 def mixed_activation_weights(
     net,
     output_buckets: int,
@@ -314,6 +351,10 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "mixed_activation": bool(args.mixed_activation),
         "l2_output_skip": bool(args.l2_output_skip),
         "legacy_inputs": bool(args.legacy_inputs),
+        "dense_tail_initialization": (
+            "reset" if args.reset_dense_tail else "preserved"
+        ),
+        "tail_seed": args.tail_seed if args.reset_dense_tail else None,
     }
     (path.parent / "meta.json").write_text(
         json.dumps(meta, indent=2, sort_keys=True) + "\n",
@@ -335,6 +376,23 @@ def main() -> int:
                         help="Target feature channels; 0 keeps source layout.")
     parser.add_argument("--hidden", type=int, default=0, choices=[0, 512, 768, 1024],
                         help="Target hidden width; 0 keeps source trained width.")
+    parser.add_argument(
+        "--reset-dense-tail",
+        action="store_true",
+        help="Preserve exported L0 and deterministically reinitialize the ordinary ReLU dense tail.",
+    )
+    parser.add_argument(
+        "--tail-seed",
+        type=int,
+        default=1,
+        help="Deterministic seed used with --reset-dense-tail.",
+    )
+    parser.add_argument(
+        "--l1-std",
+        type=float,
+        default=1.0,
+        help="Fresh L1 standard deviation used with --reset-dense-tail.",
+    )
     parser.add_argument(
         "--full-threats",
         action="store_true",
@@ -392,9 +450,28 @@ def main() -> int:
     args.output.expanduser().parent.mkdir(parents=True, exist_ok=True)
 
     output_scale = args.eval_scale * args.eval_divisor
-    output_weights, output_biases = expand_output_head(net, args.output_buckets)
-    l1_weights, l1_biases, l2_weights, l2_biases = expand_dense_heads(
-        net, args.output_buckets, args.full_heads)
+    if args.reset_dense_tail:
+        if args.mixed_activation or args.l2_output_skip or args.psqt_residual:
+            raise SystemExit(
+                "--reset-dense-tail supports only the ordinary ReLU dense tail")
+        (
+            l1_weights,
+            l1_biases,
+            l2_weights,
+            l2_biases,
+            output_weights,
+            output_biases,
+        ) = fresh_dense_tail(
+            hidden=args.hidden,
+            output_buckets=args.output_buckets,
+            full_heads=args.full_heads,
+            l1_std=args.l1_std,
+            seed=args.tail_seed,
+        )
+    else:
+        output_weights, output_biases = expand_output_head(net, args.output_buckets)
+        l1_weights, l1_biases, l2_weights, l2_biases = expand_dense_heads(
+            net, args.output_buckets, args.full_heads)
     input_weights = convert_input_weights(
         net.input_weights,
         source_buckets=source_buckets,
@@ -449,12 +526,9 @@ def main() -> int:
             l2_squared_biases = l2_squared_biases.reshape(l2_output_rows)
             write_tensor(handle, "l2sw", l2_squared_weights.ravel(order="F"))
             write_tensor(handle, "l2sb", l2_squared_biases)
-        write_tensor(
-            handle,
-            "l3w",
-            bullet_l3_weights(output_weights) / output_scale,
-        )
-        write_tensor(handle, "l3b", output_biases / output_scale)
+        l3_scale = 1.0 if args.reset_dense_tail else output_scale
+        write_tensor(handle, "l3w", bullet_l3_weights(output_weights) / l3_scale)
+        write_tensor(handle, "l3b", output_biases / l3_scale)
         if args.l2_output_skip:
             source_skip = getattr(net, "l2_output_skip_weights", None)
             l2_output_skip = (

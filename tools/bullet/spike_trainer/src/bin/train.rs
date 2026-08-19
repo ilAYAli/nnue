@@ -759,7 +759,18 @@ fn initialize_from_path(value: &str) -> PathBuf {
     expand_path(value)
 }
 
-fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
+fn arch_resets_dense_tail(config: &Config) -> bool {
+    match string_at(&config.arch, "tail_initialization").unwrap_or("preserve") {
+        "preserve" => false,
+        "reset" => true,
+        value => {
+            eprintln!("error: unsupported tail_initialization={value}");
+            process::exit(2);
+        }
+    }
+}
+
+fn convert_initialize_from(config: &Config, initialize_from: &str, reset_dense_tail: bool) -> PathBuf {
     let input = initialize_from_path(initialize_from);
     if !input.exists() {
         eprintln!("error: missing initialize_from: {}", input.display());
@@ -791,6 +802,14 @@ fn convert_initialize_from(config: &Config, initialize_from: &str) -> PathBuf {
         .arg(usize_at(&config.arch, "output_buckets", 1).to_string())
         .arg("--hidden")
         .arg(usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN).to_string());
+    if reset_dense_tail {
+        command
+            .arg("--reset-dense-tail")
+            .arg("--tail-seed")
+            .arg(training_u64(config, "init_seed", 1).to_string())
+            .arg("--l1-std")
+            .arg(f64_at(&config.arch, "l1_std", 1.0).to_string());
+    }
     if arch_full_threats(config) {
         command.arg("--full-threats");
     }
@@ -1643,7 +1662,7 @@ fn cmd_run(config: &Config) {
         set_env("ENYO_BULLET_RESUME_CHECKPOINT", path.display());
         set_env("ENYO_BULLET_START_SUPERBATCH", superbatch + 1);
     } else if let Some(net) = initialize_from(config) {
-        let init_weights = convert_initialize_from(config, &net);
+        let init_weights = convert_initialize_from(config, &net, arch_resets_dense_tail(config));
         set_env("ENYO_BULLET_INIT_WEIGHTS", init_weights.display());
     } else if let Some(previous_run) = continue_from(config) {
         set_env(
@@ -2217,7 +2236,7 @@ fn latest_weight_checkpoint(config: &Config, run: &str) -> PathBuf {
         let net = expand_path(&net);
         if net.exists() {
             let net = net.to_string_lossy().into_owned();
-            return convert_initialize_from(config, &net);
+            return convert_initialize_from(config, &net, false);
         }
     }
 

@@ -8,6 +8,7 @@ from enyo_nn_to_bullet_weights import (
     bullet_l3_weights,
     expand_dense_heads,
     expand_output_head,
+    fresh_dense_tail,
     mixed_activation_weights,
     source_bucket_for_target,
     source_output_bucket_for_target,
@@ -86,7 +87,7 @@ def test_full_dense_heads_repeat_shared_native_head() -> None:
 
 
 def test_mixed_activation_init_preserves_parent_branch() -> None:
-    weights, biases = mixed_activation_weights(MixedActivationNet())
+    weights, biases = mixed_activation_weights(MixedActivationNet(), 1, False)
     np.testing.assert_array_equal(weights, MixedActivationNet.l2_squared_weights)
     np.testing.assert_array_equal(biases, MixedActivationNet.l2_squared_biases)
     np.testing.assert_array_equal(
@@ -113,6 +114,30 @@ def test_full_threat_init_is_deterministic_and_nonzero() -> None:
         parent.std(axis=0) * 0.1,
         rtol=0.6,
     )
+
+
+def test_fresh_dense_tail_is_deterministic_and_has_native_v2_shapes() -> None:
+    first = fresh_dense_tail(
+        hidden=1024, output_buckets=1, full_heads=False, l1_std=1.0, seed=17)
+    same = fresh_dense_tail(
+        hidden=1024, output_buckets=1, full_heads=False, l1_std=1.0, seed=17)
+    other = fresh_dense_tail(
+        hidden=1024, output_buckets=1, full_heads=False, l1_std=1.0, seed=18)
+
+    l1w, l1b, l2w, l2b, l3w, l3b = first
+    assert l1w.shape == (N_L2, N_L1)
+    assert l1b.shape == (N_L2,)
+    assert l2w.shape == (N_L3, N_L2)
+    assert l2b.shape == (N_L3,)
+    assert l3w.shape == (1, N_L3)
+    assert l3b.shape == (1,)
+    assert np.count_nonzero(l1w) == l1w.size
+    assert np.count_nonzero(l2w) == l2w.size
+    assert np.count_nonzero(l3w) == l3w.size
+    assert not np.any(l1b) and not np.any(l2b) and not np.any(l3b)
+    for actual, expected in zip(first, same):
+        np.testing.assert_array_equal(actual, expected)
+    assert not np.array_equal(first[0], other[0])
 
 
 
@@ -153,6 +178,7 @@ def main() -> None:
     test_full_dense_heads_repeat_shared_native_head()
     test_mixed_activation_init_preserves_parent_branch()
     test_full_threat_init_is_deterministic_and_nonzero()
+    test_fresh_dense_tail_is_deterministic_and_has_native_v2_shapes()
     test_32_bucket_init_uses_legacy_parent_buckets()
     test_clean_bucket_expansion_repeats_parent_buckets()
     test_unsupported_bucket_mapping_fails()
