@@ -6,7 +6,13 @@
 Architecture 5: SCReLU dense activation (`relu-screlu-residual`).
 Architecture 6: Architecture 5 plus the activated L2→output skip.
 Architecture 7: Architecture 6 plus 32 input buckets.
+Architecture 16: Architecture 7 plus FullThreats (initialize_from warm start via
+the fixed `add_full_threat_rows`; smoke diagnostic confirmed 89.3% nonzero
+threat-row coverage post-quantization and passed distinct_net/startpos/static_eval).
 Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −138.0 ±7.3 vs fixed SF, `enyo_f2a0417`).
+
+Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
+Reserved: `enyo-16.0.0-rc1` on pwa-llm (FullThreats) from `enyo-7.4.0-rc1`.
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
@@ -40,7 +46,10 @@ Rejected: `enyo-11.0.0-rc2` (ordinary ReLU dense tail; -86.5 ±20.1, H0).
 Rejected: `enyo-12.0.0-rc1` (16 input buckets; +0.4 ±5.5, SF tie-break −145.6 vs −138.0).
 Rejected: `enyo-13.0.0-rc1` (unfactorised inputs; -11.1 ±8.0, H0).
 Rejected: `enyo-14.0.0-rc1` (512-wide accumulator; -50.9 ±18.7, H0).
-# Enyo 1 Lineage (recovered)
+
+
+
+# Enyo 1 Lineage
 
 `Parent SPRT` is historical and is not comparable to the Enyo-5/6 results.
 Rows are the selected direct-weight path; omitted versions are rejected or
