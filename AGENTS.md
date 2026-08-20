@@ -1,81 +1,89 @@
 # Agent Rules
 
-This repository uses skills defined in ~/.agents/skills/.
-Read the applicable skill before acting; when more than one applies, read all of them.
+Repository-wide standing conventions. These rules always apply. Specialized workflows belong in `SKILL.md`.
 
-If I ask a question, answer it without making changes. You may perform read-only inspection
-needed to answer accurately, but do not edit files, commit, start/stop jobs, or otherwise
-change state unless I explicitly ask.
+If I ask a question, answer it without making changes. Read-only inspection is allowed. Never edit files, commit, launch/stop jobs, or otherwise change state unless explicitly requested.
 
+## Repository
 
-## Shell
+- `defaults.json` — complete shared training configuration.
+- `build.json` — active run; only values that differ from `defaults.json`.
+- `architecture.json` — trainer/export/runtime contract.
+- `LINEAGE.md` — canonical run-name and parent registry.
 
-All long-running commands MUST be run in the `nnue_cmd` tmux session on pwa-llm with
-output must be visible to the user.
-You can also use the `nnue_cmd` tmux session on pwa-5090 to run training in parallel with pwa-llm
-to save time. This can e.g be to check viability of features, ...
+## Hosts & Forge
 
-`pwa-llm` is the sole Forge coordinator. Launch every Forge command there,
-including SPRT, benchmarks, synchronization, deployment, status, and stop
-operations. `pwa-5090` may train candidates and participate as a Forge worker,
-but must never coordinate a Forge run.
+1. `pwa-llm` is the only Forge coordinator.
+2. Long-running training may run on `pwa-llm` or `pwa-5090`.
+3. Use only the existing `nnue_cmd` tmux session.
+4. Never create, rename, or interrupt tmux windows.
+5. Never duplicate or interfere with active Forge jobs.
 
-## Run names
+## Configuration
 
-Format: `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`
+6. Never use foreign NNUE weights; Stockfish-generated data is allowed.
+7. `build.json` must not restate defaults or define undeclared parameters.
+8. Every run uses exactly one of `continue_from` or `initialize_from`; only a lineage root, including an explicitly approved new-architecture scratch root, may omit both.
+9. `initialize_from` is valid only when the conversion preserves the parent's information; additive changes that append new input rows are valid, while changes that reshape an existing dimension require a new scratch root.
+10. `architecture.json` changes only as a dedicated architecture experiment.
 
-1) `architecture_number`: increments when `architecture.json` changes; resets `promotion_number` to 0 and `iteration` to 1.
-2) `promotion_number`: increments when a candidate is accepted.
-3) `iteration`: increments for each new RC within a promotion.
-4) Every iteration requires a matching `build.json` change with the corresponding run name.
+## Run naming
+
+11. Format: `enyo-{architecture_number}.{promotion_number}.0-rc{iteration}`.
+  `architecture_number` increments on an `architecture.json` change, resetting `promotion_number` to 0 and `iteration` to 1.
+  `promotion_number` increments on acceptance, resetting `iteration` to 1.
+  `iteration` is the candidate number within a promotion.
+12. Put descriptions in `hypothesis`, never in the run name.
+13. Never invent a naming scheme; ask first if the reservation flow does not fit.
+14. Reserve every run name and host in `LINEAGE.md` before launch.
+15. Run names are never reused, even if void.
 
 ## Experiment contract
 
-5) One meaningful variable change per iteration. Never test multiple things at once.
-6) `build.json` must contain a concise `hypothesis` that explains why, not how.
-7) The only tracked diff during training should be `build.json`
-   Exceptions to this rule are `architecture.json` (for architecture experiments), or
-   other changes that are needed for the built/iteration to succeed (Bullet, ...)
-8) All other changes should be commited individually to avoid breaking rule 7)
-9) A scratch root records an absolute baseline against `nn-0ee0657fb25e.nnue`.
-   Descendant parent-relative matches cap at 5,000 games; H0 rejects and H1
-   selects early. At the cap without either, compare fixed-SF Elo under identical
-   conditions and select the stronger net; retain the incumbent if neither is
-   better. Every selected
-   candidate records the same fixed-SF benchmark. Commit each result with the
-   files from 7) and its parent-relative Elo, or the root's SF Elo, in the subject.
-10) Export, distinct-net, engine-load, start-position, and catastrophic static
-   checks are integrity gates. Residual improvement is report-only. Game results
-   decide promotion.
+16. Read `IMPROVEMENT_PLAN.md` before selecting an experiment.
+17. Change exactly one meaningful variable per iteration.
+18. After editing `build.json`/`architecture.json`, request separate,
+    explicit confirmation before operating Forge or performing Git
+    operations — do not chain the two in one uninterrupted action.
+19. `build.json` must contain a concise hypothesis explaining **why**.
+20. During training, no source file may be modified except `build.json`, unless the iteration is an architecture experiment or requires a build-critical fix (a change required for that iteration to build or run).
+21. Commit unrelated changes individually; never bundle them into the same commit as the active iteration's tracked diff.
+22. Training/testing should always be active; never stop unless user interaction is required.
+23. Scratch roots benchmark against `nn-0ee0657fb25e.nnue`; descendants use parent-relative SPRT with a 4,000-game cap. H0 rejects; H1 selects; if neither is reached by the cap, select by fixed-SF Elo under identical conditions.
+24. Integrity gates (export, distinct-net, engine-load, start-position, catastrophic static) must pass before promotion; residual improvement is report-only.
+25. Generated runs, caches, datasets, and validation output must never remain as source changes.
 
-## Events and launch
+## Events & launch
 
-11) Never poll. NNUE `done`/`fail` events publish an `ai-in`-tagged message to the bidirectional `llmsh` nmsg subject; its sidecar delivers it to tmux `llmsh:1.1`. `ping` remains only for critical-error alerts. One status check allowed.
-12) On each event: fix the smallest defect and relaunch, pick one new hypothesis after rejection, or advance data after acceptance.
-- Launch exactly:
-  ```sh
-  cd ~/code/chess/nnue
-  HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=5000 ./nnue iterate
-  ```
-13) When a promotion candidate has been selected, add it to LINEAGE.md
+26. NNUE completion is event-driven: `done`/`fail` arrives automatically via `llmsh`; never poll or arm background waiters.
+27. Never launch a duplicate while a run is in flight.
+28. Launch exactly:
 
-`ping` permits one status check on both hosts. Leave active work untouched; handle a completed
-or failed run as its event. Never launch a duplicate.
+cd ~/code/chess/nnue
+HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=4000 ./nnue iterate
 
-## Parallel-host promotion and handoff
+29. Keep `AUTO_ADVANCE` disabled unless explicitly requested for a single-host run.
+30. On rejection, pick one new hypothesis; on acceptance, advance the
+    data slice.
+31. After a promotion is selected, record it in `LINEAGE.md`.
 
-- `pwa-llm` owns canonical `main`, Forge, numbering, and promotion. Its scratch
-  root is sole; pwa-5090 siblings use the same accepted parent.
-- Reserve each sibling name and host in `LINEAGE.md`; names are never reused.
-  Keep `AUTO_ADVANCE` off and configure the next run only after reconciliation.
-- Commit a completed pwa-5090 configuration with its SPRT result and preserve its
-  net, provenance, hashes, data identity, and result. Do not modify dirty pwa-llm;
-  integrate remote commits there, in reserved order, at an event boundary. Never pull.
-- Wait for all siblings. Rejections remain recorded and cannot become parents.
-  H0 rejects and H1 advances early; use identical fixed-SF results only at the
-  5,000-game cap without either. If none beats the incumbent, use the next RC.
-- Before using a pwa-5090 winner, transfer its net and provenance to pwa-llm,
-  verify hashes, integrate it, and verify `continue_from` resolves.
-- A resumable infrastructure failure keeps its RC only unchanged; a void run consumes
-  it. After four valid failures from one parent, reserve the next architecture feature
-  on pwa-5090 beside one final conventional pwa-llm candidate.
+## Validation
+
+32. Report games, Elo, confidence interval, LLR, LOS, draw rate, failures, and test conditions.
+33. Compare candidates only under identical engines, books, time controls, and worker conditions.
+34. Reject invalid exports, duplicate nets, engine-load failures, and catastrophic static failures.
+35. Do not select a parent until every parallel candidate from the same parent has completed, failed, or been voided.
+36. Preserve reproducibility evidence; never delete the only recorded copy of a result.
+37. Do not modify source or perform Git operations.
+
+## Git
+
+38. Work directly on `main`; never create branches.
+39. Never pull on `pwa-llm`; integrate by fetch + cherry-pick.
+40. Avoid fixup commits; amend when practical.
+41. Never add AI or bot co-author trailers.
+42. Stage only requested files and verify commit identity.
+43. Include SPRT Elo in the commit subject whenever a result exists.
+44. Never modify other repositories.
+45. Before a `pwa-5090` winner becomes a parent, transfer the entire `runs/{run}/` directory, verify the checkpoint SHA-256, and confirm `continue_from` resolves to the optimizer checkpoint rather than the exported-net fallback.
+46. After canonical promotion, update `candidate.net` and the Forge reference net; never point either at an active, rejected, or foreign net.
