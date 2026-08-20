@@ -12,7 +12,8 @@ threat-row coverage post-quantization and passed distinct_net/startpos/static_ev
 Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −138.0 ±7.3 vs fixed SF, `enyo_f2a0417`).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
-Reserved: `enyo-16.0.0-rc1` on pwa-llm (FullThreats) from `enyo-7.4.0-rc1`.
+Rejected: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
+coverage and gates verified clean beforehand; -97.8 ±17.4, LLR -5.00/2.20, H0).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
