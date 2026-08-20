@@ -73,9 +73,9 @@ The 2B calibration is statistically indistinguishable from the successful
 3. Next is a true compact-topology project. Rice is a genuine
    16-bucket, 512-wide, direct 1024→1 evaluator; `enyo-14` was not equivalent
    because Enyo pads its trained 512 columns into a fixed 1024-wide runtime and
-   retained the Enyo-7 dense tail. A valid Rice-style control needs native
-   runtime/export support and parity tests before a training run. Never use
-   foreign weights.
+   retained the Enyo-7 dense tail. Enyo already has a native unpadded legacy
+   runtime and the trainer now has a matching direct export; complete parity
+   verification before a scratch control. Never use foreign weights.
 
 ## Architecture fallback
 

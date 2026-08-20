@@ -1029,6 +1029,34 @@ fn validate_layout(config: &Config) {
     let psqt_residual = arch_psqt_residual(config);
     let l2_output_skip = arch_l2_output_skip(config);
     let mode = string_at(&config.arch, "mode").unwrap_or("enyo");
+    if mode == "legacy-direct" {
+        if input_buckets != 16
+            || runtime_input_buckets != 16
+            || feature_channels != 12
+            || output_buckets != 1
+            || hidden != 512
+            || bool_at(&config.arch, "input_factoriser", false)
+            || threat_features
+            || pawn_pairs
+            || full_heads
+            || mixed_activation
+            || psqt_residual
+            || l2_output_skip
+            || export_format != "enyo-legacy-direct"
+        {
+            eprintln!("error: legacy-direct requires 16x12, native 512 hidden, one direct output, and no extensions");
+            process::exit(2);
+        }
+        if training_lr_superbatches(config) < training_superbatches(config) {
+            eprintln!("error: lr_superbatches cannot be smaller than superbatches");
+            process::exit(2);
+        }
+        if training_trainable(config) != "all" {
+            eprintln!("error: legacy-direct currently requires trainable=all");
+            process::exit(2);
+        }
+        return;
+    }
     if mode == "reckless" {
         if input_buckets != 10
             || runtime_input_buckets != 10
@@ -1822,6 +1850,30 @@ fn enyo_network_size(
         })
 }
 
+fn legacy_direct_network_size(input_buckets: usize, feature_channels: usize, hidden: usize) -> usize {
+    let inputs = input_buckets * feature_channels * 64;
+    inputs * hidden * 2 + hidden * 2 + 2 * hidden * 2 + 4
+}
+
+fn trim_legacy_direct_checkpoint(raw: &[u8], hidden: usize) -> Vec<u8> {
+    let expected = legacy_direct_network_size(16, 12, hidden);
+    if raw.len() < expected {
+        eprintln!("error: legacy-direct checkpoint is {} bytes, expected at least {expected}", raw.len());
+        process::exit(1);
+    }
+    if raw.len() == expected {
+        return raw.to_vec();
+    }
+    let trailer = &raw[expected..];
+    for (idx, byte) in trailer.iter().enumerate() {
+        if *byte != b"bullet"[idx % 6] {
+            eprintln!("error: legacy-direct checkpoint has unexpected {} byte trailer", trailer.len());
+            process::exit(1);
+        }
+    }
+    raw[..expected].to_vec()
+}
+
 fn trim_checkpoint(
     raw: &[u8],
     input_buckets: usize,
@@ -2602,6 +2654,23 @@ fn write_model(config: &Config) {
         eprintln!("error: cannot read {}: {err}", checkpoint.display());
         process::exit(1);
     });
+    if string_at(&config.arch, "mode") == Some("legacy-direct") {
+        let hidden = usize_at(&config.arch, "hidden", 512);
+        let model = trim_legacy_direct_checkpoint(&raw, hidden);
+        let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
+        if let Some(parent) = model_path.parent() {
+            fs::create_dir_all(parent).unwrap_or_else(|err| {
+                eprintln!("error: cannot create {}: {err}", parent.display());
+                process::exit(1);
+            });
+        }
+        fs::write(&model_path, model).unwrap_or_else(|err| {
+            eprintln!("error: cannot write {}: {err}", model_path.display());
+            process::exit(1);
+        });
+        println!("wrote {}", model_path.display());
+        return;
+    }
     if string_at(&config.arch, "mode") == Some("reckless") {
         let hidden = usize_at(&config.arch, "hidden", 768);
         let l2 = usize_at(&config.arch, "l2_size", 16);

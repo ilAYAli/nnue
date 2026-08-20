@@ -160,6 +160,22 @@ fn write_seeded_enyo_weights(
     Ok(())
 }
 
+fn write_seeded_legacy_direct_weights(
+    path: &Path,
+    seed: u64,
+    input_size: usize,
+    hidden: usize,
+    l0_stdev: f32,
+    l1_stdev: f32,
+) -> io::Result<()> {
+    let mut output = File::create(path)?;
+    write_tensor(&mut output, seed, "l0w", hidden * input_size, Some(l0_stdev))?;
+    write_tensor(&mut output, seed, "l0b", hidden, None)?;
+    write_tensor(&mut output, seed, "l1w", 2 * hidden, Some(l1_stdev))?;
+    write_tensor(&mut output, seed, "l1b", 1, None)?;
+    Ok(())
+}
+
 fn write_seeded_reckless_weights(
     path: &Path,
     seed: u64,
@@ -1453,6 +1469,243 @@ fn train_enyo<
     }
 }
 
+// The original Enyo/Rice topology is deliberately kept separate from the
+// native Enyo dense tail: two 512-wide clipped-ReLU accumulators feed one
+// direct output.  The exported layout is the established raw legacy format
+// consumed by NNUE::Net, so it must not be padded to the 1024-wide native
+// runtime layout.
+#[allow(clippy::too_many_arguments)]
+fn train_legacy_direct(
+    dataset: String,
+    output: String,
+    net_id: String,
+    hidden: usize,
+    batch_size: usize,
+    batches_per_superbatch: usize,
+    start_superbatch: usize,
+    end_superbatch: usize,
+    lr_superbatches: usize,
+    threads: usize,
+    wdl_proportion: f32,
+    initial_lr: f32,
+    final_lr: f32,
+    l0_stdev: f32,
+    l1_stdev: f32,
+    eval_scale: f32,
+    save_rate: usize,
+    trainable: String,
+    weight_decay: f32,
+) {
+    const INPUT_BUCKETS: usize = 16;
+    const FEATURE_CHANNELS: usize = 12;
+    const INPUTS: usize = INPUT_BUCKETS * FEATURE_CHANNELS * 64;
+    const OUTPUT_QUANTIZATION: f32 = 128.0;
+
+    if hidden != 512 {
+        panic!("legacy-direct mode requires hidden=512");
+    }
+    if start_superbatch == 0 || start_superbatch > end_superbatch {
+        panic!("invalid superbatch range {start_superbatch}..={end_superbatch}");
+    }
+    if lr_superbatches < end_superbatch {
+        panic!(
+            "LR schedule ends at superbatch {lr_superbatches}, before training ends at {end_superbatch}"
+        );
+    }
+    if trainable != "all" {
+        panic!("legacy-direct mode currently requires trainable=all");
+    }
+
+    println!("mode=legacy-direct");
+    println!("dataset={dataset}");
+    println!("output={output}");
+    println!("net_id={net_id}");
+    println!("hidden={hidden} direct_head=1024x1");
+
+    let mut trainer = ValueTrainerBuilder::default()
+        .dual_perspective()
+        .optimiser(AdamW)
+        .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, false, false, false>)
+        .save_format(&[
+            SavedFormat::id("l0w").round().quantise::<i16>(1),
+            SavedFormat::id("l0b").round().quantise::<i16>(1),
+            SavedFormat::id("l1w")
+                .transpose()
+                .transform(move |_store, weights| {
+                    weights
+                        .into_iter()
+                        .map(|w| w * eval_scale * OUTPUT_QUANTIZATION)
+                        .collect()
+                })
+                .round()
+                .quantise::<i16>(1),
+            SavedFormat::id("l1b")
+                .transform(move |_store, weights| {
+                    weights
+                        .into_iter()
+                        .map(|b| b * eval_scale * 32.0 * OUTPUT_QUANTIZATION)
+                        .collect()
+                })
+                .round()
+                .quantise::<i32>(1),
+        ])
+        .build_custom(|builder, (stm_inputs, ntm_inputs), target| {
+            let mut l0 = enyo_affine(builder, "l0", INPUTS, hidden, l0_stdev);
+            l0.weights = l0.weights.faux_quantise(1.0, true);
+            l0.bias = l0.bias.faux_quantise(1.0, true);
+
+            let mut l1 = enyo_affine(builder, "l1", 2 * hidden, 1, l1_stdev);
+            // Match the int16 direct head used by the legacy evaluator.
+            l1.weights = l1
+                .weights
+                .faux_quantise(eval_scale * OUTPUT_QUANTIZATION, true);
+            l1.bias = l1
+                .bias
+                .faux_quantise(eval_scale * 32.0 * OUTPUT_QUANTIZATION, true);
+
+            let stm_hidden = (l0.forward(stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+                .faux_quantise(1.0, false);
+            let ntm_hidden = (l0.forward(ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+                .faux_quantise(1.0, false);
+            let output = l1.forward(stm_hidden.concat(ntm_hidden));
+            let loss = output.sigmoid().power_error(target, 3.0);
+            (output, loss)
+        });
+
+    let open_params = AdamWParams {
+        decay: weight_decay,
+        beta1: 0.95,
+        max_weight: 1.0e9,
+        min_weight: -1.0e9,
+        ..Default::default()
+    };
+    trainer.optimiser.set_params(open_params);
+    trainer.optimiser.set_params_for_weight(
+        "l0w",
+        AdamWParams {
+            decay: weight_decay,
+            beta1: 0.95,
+            max_weight: f32::from(i16::MAX),
+            min_weight: f32::from(i16::MIN),
+            ..Default::default()
+        },
+    );
+    trainer.optimiser.set_params_for_weight(
+        "l0b",
+        AdamWParams {
+            decay: weight_decay,
+            beta1: 0.95,
+            max_weight: f32::from(i16::MAX),
+            min_weight: f32::from(i16::MIN),
+            ..Default::default()
+        },
+    );
+    trainer.optimiser.set_params_for_weight(
+        "l1w",
+        AdamWParams {
+            decay: weight_decay,
+            beta1: 0.95,
+            max_weight: f32::from(i16::MAX) / (eval_scale * OUTPUT_QUANTIZATION),
+            min_weight: f32::from(i16::MIN) / (eval_scale * OUTPUT_QUANTIZATION),
+            ..Default::default()
+        },
+    );
+
+    let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
+    let resume_checkpoint = env_string("ENYO_BULLET_RESUME_CHECKPOINT", "");
+    let init_seed = env::var("ENYO_BULLET_INIT_SEED")
+        .ok()
+        .map(|value| value.parse::<u64>().expect("invalid ENYO_BULLET_INIT_SEED"));
+    let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
+    if !resume_checkpoint.is_empty() {
+        if !init_weights.is_empty() {
+            panic!("checkpoint resume and initial weights are mutually exclusive");
+        }
+        trainer.load_from_checkpoint(&resume_checkpoint);
+        println!("loaded_checkpoint={resume_checkpoint}");
+    } else if !init_weights.is_empty() {
+        trainer
+            .optimiser
+            .load_weights_from_file(&init_weights)
+            .expect("failed to load initial Bullet weights");
+        println!("loaded_init_weights={init_weights}");
+        trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+        if export_init_only {
+            println!("export_init_only=1");
+            return;
+        }
+    } else if let Some(seed) = init_seed {
+        let seeded_path = Path::new(&output).join(format!("{net_id}-seeded-init.bin"));
+        write_seeded_legacy_direct_weights(
+            &seeded_path,
+            seed,
+            INPUTS,
+            hidden,
+            l0_stdev,
+            l1_stdev,
+        )
+        .expect("failed to write deterministic legacy-direct initial weights");
+        trainer
+            .optimiser
+            .load_weights_from_file(seeded_path.to_str().expect("UTF-8 init path"))
+            .expect("failed to load deterministic legacy-direct initial weights");
+        println!("loaded_init_seed={seed}");
+        trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+        if export_init_only {
+            println!("export_init_only=1");
+            return;
+        }
+    } else if export_init_only {
+        panic!("legacy-direct mode requires explicit deterministic initialization");
+    }
+
+    let schedule = TrainingSchedule {
+        net_id,
+        eval_scale,
+        steps: TrainingSteps {
+            batch_size,
+            batches_per_superbatch,
+            start_superbatch,
+            end_superbatch,
+        },
+        wdl_scheduler: wdl::ConstantWDL { value: wdl_proportion },
+        lr_scheduler: lr::CosineDecayLR {
+            initial_lr,
+            final_lr,
+            final_superbatch: lr_superbatches,
+        },
+        save_rate,
+    };
+    let settings = LocalSettings {
+        threads,
+        test_set: None,
+        output_directory: &output,
+        batch_queue_size: 16,
+    };
+    let loader = env_string("ENYO_BULLET_LOADER", "direct");
+    let paths = dataset_paths(&dataset);
+    let path_refs = paths.iter().map(String::as_str).collect::<Vec<_>>();
+    match loader.as_str() {
+        "direct" => {
+            let dataloader = DirectSequentialDataLoader::new(&path_refs);
+            trainer.run(&schedule, &settings, &dataloader);
+        }
+        "sfbinpack" => {
+            let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
+            let dataloader = PhaseNormalizedSfBinpackLoader {
+                inner: SfBinpackLoader::new_concat_multiple(
+                    &path_refs,
+                    buffer_mb,
+                    threads,
+                    make_sfbinpack_filter(),
+                ),
+            };
+            trainer.run(&schedule, &settings, &dataloader);
+        }
+        _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
+    }
+}
+
 fn main() {
     let mode = env_string("ENYO_BULLET_MODE", "reckless");
     let dataset = env_string("ENYO_BULLET_DATA", "data/baseline.bullet");
@@ -1492,6 +1745,45 @@ fn main() {
     let trainable = env_string("ENYO_BULLET_TRAINABLE", "all");
     let weight_decay = env_parse("ENYO_BULLET_WEIGHT_DECAY", 0.0f32);
     let activation_l1 = env_parse("ENYO_BULLET_ACTIVATION_L1", 0.0f32);
+
+    if mode == "legacy-direct" {
+        if enyo_input_buckets != 16
+            || enyo_feature_channels != 12
+            || enyo_output_buckets != 1
+            || enyo_input_factoriser
+            || enyo_full_threats
+            || enyo_slider_xray_threats
+            || enyo_pawn_pairs
+            || enyo_full_heads
+            || enyo_mixed_activation
+            || enyo_psqt_residual
+            || enyo_l2_output_skip
+        {
+            panic!("legacy-direct mode requires the unextended 16x12, 512-hidden, single-output layout");
+        }
+        train_legacy_direct(
+            dataset,
+            output,
+            net_id,
+            hidden,
+            batch_size,
+            batches_per_superbatch,
+            start_superbatch,
+            end_superbatch,
+            lr_superbatches,
+            threads,
+            wdl_proportion,
+            initial_lr,
+            final_lr,
+            enyo_l0_std,
+            enyo_l1_std,
+            eval_scale,
+            save_rate,
+            trainable,
+            weight_decay,
+        );
+        return;
+    }
 
     if mode == "enyo" {
         macro_rules! run_enyo {
