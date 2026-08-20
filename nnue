@@ -161,6 +161,10 @@ load_config() {
         else ("data/bullet/" + $run + ".bullet")
         end)
   ' "$BUILD")")
+  static_eval_data_file=$data_file
+  if [[ $(json '.loader // "direct"') == "sfbinpack" ]]; then
+    static_eval_data_file=${STATIC_EVAL_DATA:-$HOME/assets/training/bullet/lc0/lc0-static-minply24.bullet}
+  fi
   mkdir -p "$log_dir" runs/logs
   local ref_source="${REFERENCE_NET:-${reference_name:-${continue_from:-$initialize_from}}}"
   if [[ -n "$ref_source" ]]; then
@@ -465,9 +469,9 @@ static_gate() {
     printf '  │ \033[1;33m↩ SKIP\033[0m  static_metrics (already passed)\n'
   else
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" static_eval
-  [[ -f "$data_file" ]] || fail "missing data: $data_file" static_eval
+  [[ -f "$static_eval_data_file" ]] || fail "missing static eval data: $static_eval_data_file" static_eval
   local eval_args=(
-    --net "$candidate_net" --data "$data_file" --rows "$ROWS"
+    --net "$candidate_net" --data "$static_eval_data_file" --rows "$ROWS"
     --batch-size 4096 --device cpu --buckets
   )
   if [[ "$mode" == reckless ]]; then
