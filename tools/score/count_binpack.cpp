@@ -3,6 +3,7 @@
 #include <bit>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -753,7 +754,49 @@ struct Counts {
     uint64_t chains = 0;
     uint64_t chunks = 0;
     uint64_t bytes_read = 0;
+    int64_t normalized_score_sum = 0;
+    uint64_t normalized_abs_score_sum = 0;
+    long double normalized_score_sq_sum = 0.0;
+    std::array<uint64_t, 6> normalized_abs_score_buckets{};
 };
+
+auto phase_scale(const Position& position) -> double
+{
+    auto phase = uint32_t{0};
+    auto occupied = position.occupied();
+    while (occupied != 0) {
+        const auto type = position.piece_at(pop_lsb(occupied)).type();
+        if (type == PieceType::Knight || type == PieceType::Bishop)
+            phase += 3;
+        else if (type == PieceType::Rook)
+            phase += 5;
+        else if (type == PieceType::Queen)
+            phase += 10;
+    }
+    return (128.0 + static_cast<double>(phase)) / 128.0;
+}
+
+auto normalized_score(const Entry& entry) -> int16_t
+{
+    constexpr auto EvalClamp = int16_t{2045};
+    const auto clamped = std::clamp(entry.score, static_cast<int16_t>(-EvalClamp), EvalClamp);
+    return static_cast<int16_t>(std::round(static_cast<double>(clamped) / phase_scale(entry.pos)));
+}
+
+auto score_bucket(uint32_t absolute_score) -> size_t
+{
+    if (absolute_score < 50)
+        return 0;
+    if (absolute_score < 100)
+        return 1;
+    if (absolute_score < 300)
+        return 2;
+    if (absolute_score < 800)
+        return 3;
+    if (absolute_score < 1600)
+        return 4;
+    return 5;
+}
 
 auto parse_u64(std::string_view text, std::string_view name) -> uint64_t
 {
@@ -851,6 +894,12 @@ auto keep_entry(const Entry& entry, const Options& options, Counts& counts) -> b
     }
 
     ++counts.kept;
+    const auto normalized = normalized_score(entry);
+    const auto absolute = abs_i16(normalized);
+    counts.normalized_score_sum += normalized;
+    counts.normalized_abs_score_sum += absolute;
+    counts.normalized_score_sq_sum += static_cast<long double>(normalized) * normalized;
+    ++counts.normalized_abs_score_buckets[score_bucket(absolute)];
     return true;
 }
 
@@ -946,6 +995,18 @@ void print_counts(const Options& options, const Counts& counts, double seconds)
     fmt::print("skipped_score: {}\n", counts.skipped_score);
     fmt::print("skipped_non_quiet: {}\n", counts.skipped_non_quiet);
     fmt::print("skipped_in_check: {}\n", counts.skipped_in_check);
+    if (counts.kept != 0) {
+        const auto n = static_cast<long double>(counts.kept);
+        const auto mean = static_cast<long double>(counts.normalized_score_sum) / n;
+        const auto variance = std::max(0.0L, counts.normalized_score_sq_sum / n - mean * mean);
+        fmt::print("normalized_score_mean: {:.3f}\n", static_cast<double>(mean));
+        fmt::print("normalized_abs_score_mean: {:.3f}\n", static_cast<double>(static_cast<long double>(counts.normalized_abs_score_sum) / n));
+        fmt::print("normalized_score_stdev: {:.3f}\n", static_cast<double>(std::sqrt(variance)));
+        fmt::print("normalized_abs_score_buckets: {} {} {} {} {} {}\n",
+            counts.normalized_abs_score_buckets[0], counts.normalized_abs_score_buckets[1],
+            counts.normalized_abs_score_buckets[2], counts.normalized_abs_score_buckets[3],
+            counts.normalized_abs_score_buckets[4], counts.normalized_abs_score_buckets[5]);
+    }
     fmt::print("elapsed_seconds: {:.3f}\n", seconds);
     fmt::print("entries_per_second: {:.0f}\n", rate);
     if (options.max_seen != 0 && counts.seen >= options.max_seen)
