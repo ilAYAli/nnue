@@ -63,20 +63,14 @@ changes to dose, WDL, LR, or final LR from this parent have not improved Elo.
 The 2B calibration is statistically indistinguishable from the successful
 600M Enyo-1.32 subset, so recalibration is not the remaining variable.
 
-1. Run one data-only continuation from `enyo-7.4.0-rc1` on the preserved,
-   traceable Stockfish Pylon binpack:
-   `~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack`.
-   Keep the selected parent architecture and every training setting unchanged;
-   change only `data.source_binpack`. Pylon was the broad-data bootstrap of
-   the recovered strong Enyo-1 path, so this isolates position distribution.
-2. If it wins, benchmark it against fixed SF and use it as the sole parent for
-   the next explicit data slice. If it loses, do not spend further runs on
-   WDL, LR, dose, final LR, FullThreats, pawn pairs, x-rays, or padded-width
-   conversions without new evidence.
-3. In parallel with no training, audit Pylon and nodes5000pv2 sampling and
-   targets. The goal is to identify a concrete data distinction before another
-   data run.
-4. Only then consider a true compact-topology project. Rice is a genuine
+1. The Pylon data-only control was rejected at H0: `enyo-7.4.0-rc4` scored
+   −11.7 ±8.5 Elo after 2,308 games. Do not spend another run on Pylon or an
+   ordinary regimen change from this parent.
+2. The sampling audit explains a material distribution difference: per million
+   retained positions, phase-normalized Pylon targets average |cp| 208 versus
+   299 for recalibrated nodes5000pv2, with 80k versus 186k positions in the
+   300–800 cp band. The selected corpus remains the data parent.
+3. Next is a true compact-topology project. Rice is a genuine
    16-bucket, 512-wide, direct 1024→1 evaluator; `enyo-14` was not equivalent
    because Enyo pads its trained 512 columns into a fixed 1024-wide runtime and
    retained the Enyo-7 dense tail. A valid Rice-style control needs native
