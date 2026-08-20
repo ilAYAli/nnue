@@ -1563,9 +1563,11 @@ fn train_legacy_direct(
                 .bias
                 .faux_quantise(eval_scale * 32.0 * OUTPUT_QUANTIZATION, true);
 
-            let stm_hidden = (l0.forward(stm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+            // The legacy Enyo/Rice direct evaluator applies an unclipped ReLU
+            // to its int16 accumulator.  Its format has no CReLU saturation.
+            let stm_hidden = (l0.forward(stm_inputs).max(0.0) / 32.0)
                 .faux_quantise(1.0, false);
-            let ntm_hidden = (l0.forward(ntm_inputs).max(0.0).min(127.0 * 32.0) / 32.0)
+            let ntm_hidden = (l0.forward(ntm_inputs).max(0.0) / 32.0)
                 .faux_quantise(1.0, false);
             let output = l1.forward(stm_hidden.concat(ntm_hidden));
             let loss = output.sigmoid().power_error(target, 3.0);

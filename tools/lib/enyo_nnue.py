@@ -129,6 +129,17 @@ def network_size(
 
 NETWORK_SIZE = network_size()
 LEGACY_NETWORK_SIZE = NETWORK_SIZE
+LEGACY_DIRECT_HIDDEN = 512
+LEGACY_DIRECT_INPUT_BUCKETS = 16
+LEGACY_DIRECT_FEATURE_CHANNELS = 12
+LEGACY_DIRECT_FEATURES = (
+    LEGACY_DIRECT_INPUT_BUCKETS * LEGACY_DIRECT_FEATURE_CHANNELS * N_SQUARES)
+LEGACY_DIRECT_NETWORK_SIZE = (
+    LEGACY_DIRECT_FEATURES * LEGACY_DIRECT_HIDDEN * np.dtype(np.int16).itemsize
+    + LEGACY_DIRECT_HIDDEN * np.dtype(np.int16).itemsize
+    + 2 * LEGACY_DIRECT_HIDDEN * np.dtype(np.int16).itemsize
+    + np.dtype(np.int32).itemsize
+)
 
 KING_BUCKETS_16: tuple[int, ...] = (
     15, 15, 14, 14, 14, 14, 15, 15,
@@ -273,6 +284,49 @@ class Net:
     @property
     def output_width(self) -> int:
         return N_L3 + self.output_head_features
+
+
+@dataclass
+class LegacyDirectNet:
+    """The raw 16x12x512 direct-head layout used by legacy Enyo and Rice."""
+
+    input_weights: np.ndarray
+    input_biases: np.ndarray
+    output_weights: np.ndarray
+    output_bias: np.int32
+
+
+def is_legacy_direct_net(path: str | Path) -> bool:
+    return Path(path).stat().st_size == LEGACY_DIRECT_NETWORK_SIZE
+
+
+def load_legacy_direct_net(path: str | Path) -> LegacyDirectNet:
+    data = Path(path).read_bytes()
+    if len(data) != LEGACY_DIRECT_NETWORK_SIZE:
+        raise ValueError(
+            f"{path}: size {len(data)} is not a legacy direct network "
+            f"({LEGACY_DIRECT_NETWORK_SIZE})")
+    offset = 0
+
+    def take(dtype: np.dtype, count: int) -> np.ndarray:
+        nonlocal offset
+        size = np.dtype(dtype).itemsize * count
+        values = np.frombuffer(data, dtype=dtype, count=count, offset=offset)
+        offset += size
+        return values.copy()
+
+    input_weights = take(np.dtype("<i2"), LEGACY_DIRECT_FEATURES * LEGACY_DIRECT_HIDDEN)
+    input_biases = take(np.dtype("<i2"), LEGACY_DIRECT_HIDDEN)
+    output_weights = take(np.dtype("<i2"), 2 * LEGACY_DIRECT_HIDDEN)
+    output_bias = take(np.dtype("<i4"), 1)[0]
+    assert offset == len(data)
+    return LegacyDirectNet(
+        input_weights=input_weights.reshape(
+            LEGACY_DIRECT_FEATURES, LEGACY_DIRECT_HIDDEN),
+        input_biases=input_biases,
+        output_weights=output_weights,
+        output_bias=output_bias,
+    )
 
 
 def to_berserk_sq(enyo_sq: int) -> int:

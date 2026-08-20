@@ -189,10 +189,51 @@ class EnyoNNUE:
         return self.forward(*args, **kwargs)
 
 
+class LegacyDirectNNUE:
+    """Numpy parity model for Enyo's raw 16x12x512 direct evaluator."""
+
+    input_buckets = nn2.LEGACY_DIRECT_INPUT_BUCKETS
+    feature_channels = nn2.LEGACY_DIRECT_FEATURE_CHANNELS
+    output_buckets = 1
+    full_threats = False
+    slider_xray_threats = False
+
+    def __init__(self, net: nn2.LegacyDirectNet):
+        self.input_weights = net.input_weights.astype(np.int64)
+        self.input_bias = net.input_biases.astype(np.int64)
+        self.output_weights = net.output_weights.astype(np.int64)
+        self.output_bias = np.int64(net.output_bias)
+
+    def accumulator(self, feats: np.ndarray, offsets: np.ndarray) -> np.ndarray:
+        rows = self.input_weights[feats]
+        return np.add.reduceat(rows, offsets, axis=0) + self.input_bias
+
+    def forward(self, w_feats: np.ndarray, b_feats: np.ndarray,
+                w_offsets: np.ndarray, b_offsets: np.ndarray,
+                stm: np.ndarray, phase_scale: np.ndarray,
+                output_bucket: np.ndarray | None = None,
+                piece_count: np.ndarray | None = None) -> np.ndarray:
+        w_acc = self.accumulator(w_feats, w_offsets)
+        b_acc = self.accumulator(b_feats, b_offsets)
+        stm_mask = stm.astype(bool)[:, None]
+        us = np.where(stm_mask, b_acc, w_acc)
+        them = np.where(stm_mask, w_acc, b_acc)
+        activations = np.maximum(np.concatenate((us, them), axis=1), 0)
+        total = activations @ self.output_weights + self.output_bias
+        # C++ signed integer division truncates toward zero at each step.
+        cp = np.trunc(np.trunc(total.astype(np.float64) / 32.0) / 128.0)
+        return np.clip(cp * phase_scale, -2045.0, 2045.0)
+
+    def __call__(self, *args, **kwargs) -> np.ndarray:
+        return self.forward(*args, **kwargs)
+
+
 def load_model_from_nn(
     path: str | Path,
     output_head_features: int | None = None,
-) -> EnyoNNUE:
+) -> EnyoNNUE | LegacyDirectNNUE:
+    if nn2.is_legacy_direct_net(path):
+        return LegacyDirectNNUE(nn2.load_legacy_direct_net(path))
     net = nn2.load_net(path)
     if output_head_features is None:
         output_head_features = net.output_head_features
