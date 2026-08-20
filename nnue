@@ -432,7 +432,12 @@ startpos_gate() {
   printf 'uci\nsetoption name nnue_file value %s\nisready\nposition startpos\ngo depth 4\nquit\n' "$candidate_net" \
     | "$ENGINE" | tee "$log"
 
-  grep -Eq 'evaluator=(enyo|native)-nnue' "$log" || fail "engine did not load Enyo NNUE" startpos
+  if [[ $(jq -r '.mode // "enyo"' "$ARCH") == legacy-direct ]]; then
+    grep -Eq 'evaluator=(enyo|native)-nnue|evaluator=legacy-default source=file' "$log" \
+      || fail "engine did not load legacy direct NNUE" startpos
+  else
+    grep -Eq 'evaluator=(enyo|native)-nnue' "$log" || fail "engine did not load Enyo NNUE" startpos
+  fi
 
   local hidden buckets channels cp
   hidden=$(jq -r .hidden "$ARCH")
