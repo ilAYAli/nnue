@@ -8,7 +8,7 @@
   "input_buckets": 32,
   "output_buckets": 8,
   "input_factoriser": true,
-  "full_threats": false,
+  "full_threats": true,
   "slider_xray_threats": false,
   "eval_scale": 400.0,
   "l0_std": 8.0,
@@ -16,5 +16,5 @@
   "l1_export_scale": 1.0,
   "dense_activation": "relu-screlu-residual",
   "l2_output_skip": true,
-  "export_format": "enyo-native-v8"
+  "export_format": "enyo-native-v9"
 }
