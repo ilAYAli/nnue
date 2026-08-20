@@ -14,6 +14,9 @@ Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −13
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Rejected: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
 coverage and gates verified clean beforehand; -97.8 ±17.4, LLR -5.00/2.20, H0).
+Reserved: `enyo-16.0.0-rc2` on pwa-5090 (FullThreats scratch root, no
+continue_from/initialize_from, to isolate whether rc1's rejection was the
+feature or the initialize_from-onto-converged-net methodology).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
