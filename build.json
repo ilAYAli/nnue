@@ -1,13 +1,15 @@
 {
-  "run": "enyo-14.0.0-rc1",
-  "hypothesis": "a 512-wide accumulator tests whether compact features generalize better than the stalled evaluator",
+  "run": "enyo-7.4.0-rc4",
+  "hypothesis": "the Stockfish Pylon position distribution that bootstrapped Enyo-1 improves the selected evaluator",
+  "loader": "sfbinpack",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "final_lr": 0.000005,
+  "save_rate": 77106,
   "data": {
-    "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
+    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack"
   },
-  "initialize_from": "enyo-7.4.0-rc1"
+  "continue_from": "enyo-7.4.0-rc1"
 }
