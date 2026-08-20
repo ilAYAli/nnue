@@ -197,6 +197,7 @@ class LegacyDirectNNUE:
     output_buckets = 1
     full_threats = False
     slider_xray_threats = False
+    legacy_direct = True
 
     def __init__(self, net: nn2.LegacyDirectNet):
         self.input_weights = net.input_weights.astype(np.int64)
@@ -222,7 +223,7 @@ class LegacyDirectNNUE:
         total = activations @ self.output_weights + self.output_bias
         # C++ signed integer division truncates toward zero at each step.
         cp = np.trunc(np.trunc(total.astype(np.float64) / 32.0) / 128.0)
-        return np.clip(cp * phase_scale, -2045.0, 2045.0)
+        return np.clip(cp, -2045.0, 2045.0)
 
     def __call__(self, *args, **kwargs) -> np.ndarray:
         return self.forward(*args, **kwargs)

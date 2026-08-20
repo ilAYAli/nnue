@@ -141,6 +141,17 @@ LEGACY_DIRECT_NETWORK_SIZE = (
     + np.dtype(np.int32).itemsize
 )
 
+LEGACY_DIRECT_KING_BUCKETS: tuple[int, ...] = (
+    0, 1, 2, 3, 3, 2, 1, 0,
+    4, 5, 6, 7, 7, 6, 5, 4,
+    8, 9, 10, 11, 11, 10, 9, 8,
+    8, 9, 10, 11, 11, 10, 9, 8,
+    12, 12, 13, 13, 13, 13, 12, 12,
+    12, 12, 13, 13, 13, 13, 12, 12,
+    14, 14, 15, 15, 15, 15, 14, 14,
+    14, 14, 15, 15, 15, 15, 14, 14,
+)
+
 KING_BUCKETS_16: tuple[int, ...] = (
     15, 15, 14, 14, 14, 14, 15, 15,
     15, 15, 14, 14, 14, 14, 15, 15,
@@ -725,6 +736,21 @@ def features_from_pieces(pieces: Sequence[tuple[int, int, int]],
         features.extend(
             base + index for index in slider_xray_features_from_pieces(pieces, view))
     return features
+
+
+def legacy_direct_features_from_pieces(
+    pieces: Sequence[tuple[int, int, int]], view: int,
+) -> list[int]:
+    """Rows for Enyo's raw 16x12x512 direct evaluator."""
+    king_sq = next(sq for pt, color, sq in pieces if pt == KING and color == view)
+    bucket = LEGACY_DIRECT_KING_BUCKETS[king_sq ^ (56 * view)]
+    rows = []
+    for piece_type, color, sq in pieces:
+        oriented_sq = sq ^ (56 * view) ^ (7 * int(bool(king_sq & 4)))
+        # The legacy layout places friendly pieces after enemy pieces.
+        channel = (piece_type - 1) + 6 * int(color == view)
+        rows.append(bucket * 12 * 64 + channel * 64 + oriented_sq)
+    return rows
 
 
 def phase_scale_from_pieces(pieces: Sequence[tuple[int, int, int]]) -> float:

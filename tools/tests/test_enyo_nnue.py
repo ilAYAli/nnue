@@ -122,6 +122,25 @@ def test_full_threats_features_extend_base_features() -> None:
     assert max(full) < nn2.input_feature_count(16, 12, True)
 
 
+def test_legacy_direct_features_match_runtime_startpos_layout() -> None:
+    pieces, _stm = nn2.parse_fen(
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    pieces.sort(key=lambda item: item[2])
+
+    assert nn2.legacy_direct_features_from_pieces(pieces, nn2.WHITE) == [
+        2880, 2753, 2818, 3011, 2948, 2821, 2758, 2887,
+        2696, 2697, 2698, 2699, 2700, 2701, 2702, 2703,
+        2352, 2353, 2354, 2355, 2356, 2357, 2358, 2359,
+        2552, 2425, 2490, 2683, 2620, 2493, 2430, 2559,
+    ]
+    assert nn2.legacy_direct_features_from_pieces(pieces, nn2.BLACK) == [
+        2552, 2425, 2490, 2683, 2620, 2493, 2430, 2559,
+        2352, 2353, 2354, 2355, 2356, 2357, 2358, 2359,
+        2696, 2697, 2698, 2699, 2700, 2701, 2702, 2703,
+        2880, 2753, 2818, 3011, 2948, 2821, 2758, 2887,
+    ]
+
+
 def test_slider_xray_features_match_trainer_and_engine() -> None:
     pieces, _stm = nn2.parse_fen(
         "r3k2r/8/n7/p7/P7/8/8/R3K2R w KQkq - 0 1")

@@ -403,6 +403,11 @@ struct EnyoInputs<
     const PAWN_PAIRS: bool,
 >;
 
+/// Raw legacy 16x12x512 nets predate the configurable Enyo layout.  Their
+/// king buckets and friendly-piece channel order are different.
+#[derive(Clone, Copy, Default)]
+struct LegacyDirectInputs;
+
 #[derive(Clone, Copy, Default)]
 struct RecklessInputs;
 
@@ -475,6 +480,18 @@ const ENYO_KING_BUCKETS_16: [usize; 64] = [
 ];
 
 #[rustfmt::skip]
+const LEGACY_DIRECT_KING_BUCKETS: [usize; 64] = [
+    0,  1,  2,  3,  3,  2,  1,  0,
+    4,  5,  6,  7,  7,  6,  5,  4,
+    8,  9, 10, 11, 11, 10,  9,  8,
+    8,  9, 10, 11, 11, 10,  9,  8,
+   12, 12, 13, 13, 13, 13, 12, 12,
+   12, 12, 13, 13, 13, 13, 12, 12,
+   14, 14, 15, 15, 15, 15, 14, 14,
+   14, 14, 15, 15, 15, 15, 14, 14,
+];
+
+#[rustfmt::skip]
 const ENYO_KING_BUCKETS_10: [usize; 64] = [
      9,  9,  8,  8,  8,  8,  9,  9,
      9,  9,  8,  8,  8,  8,  9,  9,
@@ -538,6 +555,41 @@ fn enyo_feature<const INPUT_BUCKETS: usize, const FEATURE_CHANNELS: usize>(
 
 fn bullet_square_to_enyo_net(square: u8) -> u8 {
     square ^ 56
+}
+
+fn legacy_direct_feature(piece: u8, enyo_square: u8, king_square: u8, view: usize) -> usize {
+    let colour = usize::from(piece & 8 != 0);
+    let piece_type = usize::from(piece & 7);
+    let king = usize::from(king_square);
+    let bucket = LEGACY_DIRECT_KING_BUCKETS[king ^ (56 * view)];
+    let square = usize::from(enyo_square) ^ (56 * view) ^ (7 * usize::from(king & 4 != 0));
+    // Legacy stores friendly pieces in channels 6..11.
+    let channel = piece_type + 6 * usize::from(colour == view);
+    bucket * 12 * 64 + channel * 64 + square
+}
+
+impl SparseInputType for LegacyDirectInputs {
+    type RequiredDataType = ChessBoard;
+
+    fn num_inputs(&self) -> usize { 16 * 12 * 64 }
+    fn max_active(&self) -> usize { 32 }
+
+    fn map_features<F: FnMut(usize, usize)>(&self, pos: &ChessBoard, mut f: F) {
+        let stm_king = pos.our_ksq() ^ 56;
+        let ntm_king = pos.opp_ksq();
+        for (piece, square) in pos.into_iter() {
+            let sq = bullet_square_to_enyo_net(square);
+            f(
+                legacy_direct_feature(piece, sq, stm_king, 0),
+                legacy_direct_feature(piece, sq, ntm_king, 1),
+            );
+        }
+    }
+
+    fn shorthand(&self) -> String { "enyo-legacy-direct".to_string() }
+    fn description(&self) -> String {
+        "Legacy Enyo 16-bucket, 12-channel direct input layout".to_string()
+    }
 }
 
 impl<
@@ -1525,7 +1577,7 @@ fn train_legacy_direct(
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
-        .inputs(EnyoInputs::<INPUT_BUCKETS, FEATURE_CHANNELS, false, false, false>)
+        .inputs(LegacyDirectInputs)
         .save_format(&[
             SavedFormat::id("l0w").round().quantise::<i16>(1),
             SavedFormat::id("l0b").round().quantise::<i16>(1),

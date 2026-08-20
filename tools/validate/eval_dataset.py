@@ -132,7 +132,8 @@ def main() -> None:
         input_buckets=model.input_buckets,
         feature_channels=model.feature_channels,
         full_threats=model.full_threats,
-        slider_xray_threats=model.slider_xray_threats)
+        slider_xray_threats=model.slider_xray_threats,
+        legacy_direct=getattr(model, "legacy_direct", False))
     loader = SequentialLoader(ds, batch_size=args.batch_size, collate_fn=collate_fn)
 
     overall = empty_stats()
