@@ -1,8 +1,8 @@
 From 37fe6a3e1212752db363ef2fd8a2d7d5a1311afa Mon Sep 17 00:00:00 2001
 From: Petter Wahlman <petter@wahlman.no>
 Date: Fri, 7 Aug 2026 13:03:08 +0200
-Subject: [PATCH] Fix FusePointwise dropping registered gradient outputs; add
- NVRTC fallback
+Subject: [PATCH 1/7] Fix FusePointwise dropping registered gradient outputs;
+ add NVRTC fallback
 
 FusePointwise (fuse_subgraphs in pointwise/transforms.rs): when op_i's
 output was consumed only once by op_j, it was treated as an inlineable
@@ -176,6 +176,531 @@ index f439898..c6f116f 100644
          let module = unsafe { G::module_create(code.as_ptr().cast())? };
  
          Ok(Arc::new(Self { device, module }))
+-- 
+2.53.0
+
+
+From 271ae5ee4e2cc9fe40fd9ff0139b01ef90a1ea27 Mon Sep 17 00:00:00 2001
+From: Petter Wahlman <petter@wahlman.no>
+Date: Tue, 11 Aug 2026 10:37:32 +0200
+Subject: [PATCH 2/7] trainer: show expected completion time
+
+---
+ Cargo.lock                       |  1 +
+ crates/trainer/Cargo.toml        |  3 ++-
+ crates/trainer/src/run/logger.rs | 23 +++++++++++++++++++++--
+ 3 files changed, 24 insertions(+), 3 deletions(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index b6f4a5b..1d393a9 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -69,6 +69,7 @@ version = "0.1.0"
+ dependencies = [
+  "bullet-compiler",
+  "bullet-gpu",
++ "libc",
+  "rand",
+  "rand_distr",
+ ]
+diff --git a/crates/trainer/Cargo.toml b/crates/trainer/Cargo.toml
+index 82287cf..91ff39b 100644
+--- a/crates/trainer/Cargo.toml
++++ b/crates/trainer/Cargo.toml
+@@ -13,7 +13,8 @@ bullet-compiler = { workspace = true }
+ bullet-gpu = { workspace = true }
+ rand = "0.9"
+ rand_distr = "0.5.1"
++libc = "0.2"
+ 
+ [features]
+ cuda = ["bullet-gpu/cuda"]
+-rocm = ["bullet-gpu/rocm"]
+\ No newline at end of file
++rocm = ["bullet-gpu/rocm"]
+diff --git a/crates/trainer/src/run/logger.rs b/crates/trainer/src/run/logger.rs
+index 4ca3e65..23b4c26 100644
+--- a/crates/trainer/src/run/logger.rs
++++ b/crates/trainer/src/run/logger.rs
+@@ -1,8 +1,9 @@
+ use std::{
+     fmt::Display,
+     io::{Write, stdout},
++    mem::MaybeUninit,
+     sync::atomic::{AtomicBool, Ordering::SeqCst},
+-    time::Instant,
++    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+ };
+ 
+ use super::schedule::TrainingSteps;
+@@ -88,15 +89,33 @@ pub fn report_time_left(steps: TrainingSteps, superbatch: usize, total_time: f32
+     let time_left = total_time / pct - total_time;
+ 
+     let (hours, minutes, seconds) = seconds_to_hms(time_left as u32);
++    let completion = completion_time(time_left as u32);
+ 
+     println!(
+-        "Estimated time remaining in training: {}h {}m {}s",
++        "Estimated time remaining in training: {}h {}m {}s · {}",
+         ansi(hours, num_cs),
+         ansi(minutes, num_cs),
+         ansi(seconds, num_cs),
++        ansi(completion, num_cs),
+     );
+ }
+ 
++fn completion_time(seconds: u32) -> String {
++    let timestamp = SystemTime::now()
++        .checked_add(Duration::from_secs(u64::from(seconds)))
++        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
++        .map_or(0, |duration| duration.as_secs() as libc::time_t);
++    let mut local = MaybeUninit::<libc::tm>::uninit();
++    let local = unsafe {
++        if libc::localtime_r(&timestamp, local.as_mut_ptr()).is_null() {
++            return "--:--:--".to_owned();
++        }
++        local.assume_init()
++    };
++
++    format!("{:02}:{:02}:{:02}", local.tm_hour, local.tm_min, local.tm_sec)
++}
++
+ pub fn seconds_to_hms(mut seconds: u32) -> (u32, u32, u32) {
+     let mut minutes = seconds / 60;
+     let hours = minutes / 60;
+-- 
+2.53.0
+
+
+From 0a243063757654d4b9c51b57edccd694f958abd7 Mon Sep 17 00:00:00 2001
+From: Petter Wahlman <petter@wahlman.no>
+Date: Sun, 16 Aug 2026 11:50:12 +0200
+Subject: [PATCH 3/7] trainer: render live progress on one line
+
+---
+ crates/bullet_lib/src/value.rs   |  1 +
+ crates/trainer/src/run.rs        | 23 ++++-----
+ crates/trainer/src/run/logger.rs | 82 +++++++++++++++++++++-----------
+ 3 files changed, 65 insertions(+), 41 deletions(-)
+
+diff --git a/crates/bullet_lib/src/value.rs b/crates/bullet_lib/src/value.rs
+index 5c459f9..71dd013 100644
+--- a/crates/bullet_lib/src/value.rs
++++ b/crates/bullet_lib/src/value.rs
+@@ -182,6 +182,7 @@ where
+                     save::save_to_checkpoint(trainer, &path);
+                     save::write_losses(&format!("{path}/log.txt"), &error_record.borrow());
+ 
++                    logger::finish_live_status();
+                     println!("Saved [{}]", logger::ansi(name, 31));
+                 }
+             },
+diff --git a/crates/trainer/src/run.rs b/crates/trainer/src/run.rs
+index 7b1c78f..def6a57 100644
+--- a/crates/trainer/src/run.rs
++++ b/crates/trainer/src/run.rs
+@@ -70,7 +70,6 @@ pub fn train_custom<G: Gpu, O: OptimiserState<G>, S>(
+         })
+     });
+ 
+-    let mut prev_lr = lr(0, 1);
+     let mut superbatch = steps.start_superbatch;
+     let mut curr_batch = 0;
+     let mut superbatch_timer = Instant::now();
+@@ -121,16 +120,6 @@ pub fn train_custom<G: Gpu, O: OptimiserState<G>, S>(
+         let gfdrop = TValue::F32(vec![1.0 / this_batch_size as f32]);
+         let gfdrop = tgf.copy_from_host_async(&copy_stream, &gfdrop).map_err(TrainerError::Unexpected)?;
+ 
+-        if curr_batch == 0 {
+-            if lrate < prev_lr {
+-                println!("LR dropped to {}", logger::ansi(lrate, logger::num_cs()));
+-            } else if lrate > prev_lr {
+-                println!("LR increased to {}", logger::ansi(lrate, logger::num_cs()));
+-            }
+-        }
+-
+-        prev_lr = lrate;
+-
+         let compute_block1 = trainer
+             .optimiser
+             .model
+@@ -199,8 +188,15 @@ pub fn train_custom<G: Gpu, O: OptimiserState<G>, S>(
+             let total_time = timer.elapsed().as_secs_f32();
+             let sb_time = superbatch_timer.elapsed().as_secs_f32();
+ 
+-            logger::report_superbatch_finished(superbatch, error, sb_time, total_time, superbatch_positions);
+-            logger::report_time_left(steps, superbatch, total_time);
++            logger::report_superbatch_finished(
++                steps,
++                superbatch,
++                error,
++                sb_time,
++                total_time,
++                superbatch_positions,
++                lrate,
++            );
+ 
+             superbatch_callback(trainer, superbatch);
+ 
+@@ -211,6 +207,7 @@ pub fn train_custom<G: Gpu, O: OptimiserState<G>, S>(
+         }
+     }
+ 
++    logger::finish_live_status();
+     let total_time = timer.elapsed().as_secs();
+     let (hours, minutes, seconds) = logger::seconds_to_hms(total_time as u32);
+ 
+diff --git a/crates/trainer/src/run/logger.rs b/crates/trainer/src/run/logger.rs
+index 23b4c26..f03fd45 100644
+--- a/crates/trainer/src/run/logger.rs
++++ b/crates/trainer/src/run/logger.rs
+@@ -1,6 +1,6 @@
+ use std::{
+     fmt::Display,
+-    io::{Write, stdout},
++    io::{IsTerminal, Write, stdout},
+     mem::MaybeUninit,
+     sync::atomic::{AtomicBool, Ordering::SeqCst},
+     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+@@ -48,56 +48,71 @@ pub fn report_superbatch_progress(
+ 
+     let seconds = superbatch_time / pct - superbatch_time;
+ 
+-    print!(
+-        "superbatch {} [{}% ({}/{} batches, {} pos/sec)]\n\
+-        Estimated time to end of superbatch: {}s     \x1b[F",
++    write_status(&format!(
++        "superbatch {} | {}% | {}/{} batches | {}k pos/s | superbatch ETA {}s",
+         ansi(superbatch, num_cs),
+         ansi(format!("{:.1}", pct * 100.0), 35),
+         ansi(finished_batches, num_cs),
+         ansi(batches, num_cs),
+-        ansi(format!("{pos_per_sec:.0}"), num_cs),
++        ansi(format!("{:.0}", pos_per_sec / 1000.0), num_cs),
+         ansi(format!("{seconds:.1}"), num_cs),
+-    );
+-    let _ = stdout().flush();
++    ));
+ }
+ 
+ pub fn report_superbatch_finished(
++    steps: TrainingSteps,
+     superbatch: usize,
+     error: f32,
+     superbatch_time: f32,
+     total_time: f32,
+     positions: usize,
++    learning_rate: f32,
+ ) {
+     let num_cs = num_cs();
+     let pos_per_sec = positions as f32 / superbatch_time;
+-
+-    println!(
+-        "superbatch {} | time {}s | running loss {} | {} pos/sec | total time {}s",
+-        ansi(superbatch, num_cs),
+-        ansi(format!("{superbatch_time:.1}"), num_cs),
+-        ansi(format!("{error:.6}"), num_cs),
+-        ansi(format!("{pos_per_sec:.0}"), num_cs),
+-        ansi(format!("{total_time:.1}"), num_cs),
+-    );
+-}
+-
+-pub fn report_time_left(steps: TrainingSteps, superbatch: usize, total_time: f32) {
+-    let num_cs = num_cs();
+     let finished_superbatches = superbatch - steps.start_superbatch + 1;
+     let total_superbatches = steps.end_superbatch - steps.start_superbatch + 1;
+     let pct = finished_superbatches as f32 / total_superbatches as f32;
+     let time_left = total_time / pct - total_time;
+-
+-    let (hours, minutes, seconds) = seconds_to_hms(time_left as u32);
++    let elapsed = compact_hms(total_time as u32);
++    let eta = compact_hms(time_left as u32);
+     let completion = completion_time(time_left as u32);
+ 
+-    println!(
+-        "Estimated time remaining in training: {}h {}m {}s · {}",
+-        ansi(hours, num_cs),
+-        ansi(minutes, num_cs),
+-        ansi(seconds, num_cs),
++    write_status(&format!(
++        "superbatch {} | loss {} | {}k pos/s | LR {} | elapsed {} | ETA {} · {}",
++        ansi(superbatch, num_cs),
++        ansi(format!("{error:.6}"), num_cs),
++        ansi(format!("{:.0}", pos_per_sec / 1000.0), num_cs),
++        ansi(format!("{learning_rate:.8}"), num_cs),
++        ansi(elapsed, num_cs),
++        ansi(eta, num_cs),
+         ansi(completion, num_cs),
+-    );
++    ));
++}
++
++pub fn finish_live_status() {
++    if stdout().is_terminal() {
++        println!();
++    }
++}
++
++fn write_status(line: &str) {
++    let mut output = stdout().lock();
++    if output.is_terminal() {
++        let _ = write!(output, "\r{line}\x1b[K");
++    } else {
++        let _ = writeln!(output, "{line}");
++    }
++    let _ = output.flush();
++}
++
++fn compact_hms(seconds: u32) -> String {
++    let (hours, minutes, seconds) = seconds_to_hms(seconds);
++    if hours == 0 {
++        format!("{minutes}m{seconds}s")
++    } else {
++        format!("{hours}h{minutes}m{seconds}s")
++    }
+ }
+ 
+ fn completion_time(seconds: u32) -> String {
+@@ -124,3 +139,14 @@ pub fn seconds_to_hms(mut seconds: u32) -> (u32, u32, u32) {
+ 
+     (hours, minutes, seconds)
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::compact_hms;
++
++    #[test]
++    fn compact_duration_omits_zero_hours() {
++        assert_eq!(compact_hms(2_724), "45m24s");
++        assert_eq!(compact_hms(8_193), "2h16m33s");
++    }
++}
+-- 
+2.53.0
+
+
+From 6c3d3a9e39f70e75de454404dd2073bb1f93fd03 Mon Sep 17 00:00:00 2001
+From: Petter Wahlman <petter@wahlman.no>
+Date: Sun, 16 Aug 2026 22:38:10 +0200
+Subject: [PATCH 4/7] trainer: retain completed live status
+
+---
+ crates/trainer/src/run/logger.rs | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/crates/trainer/src/run/logger.rs b/crates/trainer/src/run/logger.rs
+index f03fd45..9d96538 100644
+--- a/crates/trainer/src/run/logger.rs
++++ b/crates/trainer/src/run/logger.rs
+@@ -41,6 +41,10 @@ pub fn report_superbatch_progress(
+     superbatch_timer: &Instant,
+     superbatch_positions: usize,
+ ) {
++    if finished_batches == 0 {
++        return;
++    }
++
+     let num_cs = num_cs();
+     let superbatch_time = superbatch_timer.elapsed().as_secs_f32();
+     let pct = finished_batches as f32 / batches as f32;
+-- 
+2.53.0
+
+
+From ba8d513ac0699384c3344c9f2a92f22858eca0c9 Mon Sep 17 00:00:00 2001
+From: Petter Wahlman <petter@wahlman.no>
+Date: Mon, 17 Aug 2026 08:32:46 +0200
+Subject: [PATCH 5/7] trainer: render live status through controlling tty
+
+---
+ crates/trainer/src/run/logger.rs | 32 +++++++++++++++++++++++++++++---
+ 1 file changed, 29 insertions(+), 3 deletions(-)
+
+diff --git a/crates/trainer/src/run/logger.rs b/crates/trainer/src/run/logger.rs
+index 9d96538..4031b96 100644
+--- a/crates/trainer/src/run/logger.rs
++++ b/crates/trainer/src/run/logger.rs
+@@ -1,14 +1,16 @@
+ use std::{
++    fs::{File, OpenOptions},
+     fmt::Display,
+     io::{IsTerminal, Write, stdout},
+     mem::MaybeUninit,
+-    sync::atomic::{AtomicBool, Ordering::SeqCst},
++    sync::{Mutex, OnceLock, atomic::{AtomicBool, Ordering::SeqCst}},
+     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+ };
+ 
+ use super::schedule::TrainingSteps;
+ 
+ static CBCS: AtomicBool = AtomicBool::new(false);
++static TTY: OnceLock<Option<Mutex<File>>> = OnceLock::new();
+ 
+ pub fn ansi<T: Display, U: Display>(x: T, y: U) -> String {
+     format!("\x1b[{y}m{x}\x1b[0m{}", esc())
+@@ -97,16 +99,40 @@ pub fn report_superbatch_finished(
+ pub fn finish_live_status() {
+     if stdout().is_terminal() {
+         println!();
++    } else {
++        write_tty("", true);
+     }
+ }
+ 
++fn write_tty(line: &str, newline: bool) -> bool {
++    let tty = TTY.get_or_init(|| OpenOptions::new().write(true).open("/dev/tty").ok().map(Mutex::new));
++    let Some(tty) = tty.as_ref() else {
++        return false;
++    };
++    let Ok(mut output) = tty.lock() else {
++        return false;
++    };
++    let result = if newline {
++        writeln!(output, "{line}")
++    } else {
++        write!(output, "\r{line}\x1b[K")
++    };
++    result.is_ok() && output.flush().is_ok()
++}
++
+ fn write_status(line: &str) {
+     let mut output = stdout().lock();
+     if output.is_terminal() {
+         let _ = write!(output, "\r{line}\x1b[K");
+-    } else {
+-        let _ = writeln!(output, "{line}");
++        let _ = output.flush();
++        return;
+     }
++    drop(output);
++    if write_tty(line, false) {
++        return;
++    }
++    let mut output = stdout().lock();
++    let _ = writeln!(output, "{line}");
+     let _ = output.flush();
+ }
+ 
+-- 
+2.53.0
+
+
+From bfa0062d30d892100c7afddbcef01246d69d940f Mon Sep 17 00:00:00 2001
+From: Petter Wahlman <petter@wahlman.no>
+Date: Wed, 19 Aug 2026 14:50:09 +0200
+Subject: [PATCH 6/7] trainer: clarify completion ETA
+
+---
+ crates/trainer/src/run/logger.rs | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/crates/trainer/src/run/logger.rs b/crates/trainer/src/run/logger.rs
+index 4031b96..637c7ef 100644
+--- a/crates/trainer/src/run/logger.rs
++++ b/crates/trainer/src/run/logger.rs
+@@ -85,14 +85,14 @@ pub fn report_superbatch_finished(
+     let completion = completion_time(time_left as u32);
+ 
+     write_status(&format!(
+-        "superbatch {} | loss {} | {}k pos/s | LR {} | elapsed {} | ETA {} · {}",
++        "superbatch {} | loss {} | {}k pos/s | LR {} | elapsed {} | ETA: {} · in {}",
+         ansi(superbatch, num_cs),
+         ansi(format!("{error:.6}"), num_cs),
+         ansi(format!("{:.0}", pos_per_sec / 1000.0), num_cs),
+         ansi(format!("{learning_rate:.8}"), num_cs),
+         ansi(elapsed, num_cs),
+-        ansi(eta, num_cs),
+         ansi(completion, num_cs),
++        ansi(eta, num_cs),
+     ));
+ }
+ 
+-- 
+2.53.0
+
+
+From 341362edcbb860d5e7701655bc8cb2f7f3d39bd1 Mon Sep 17 00:00:00 2001
+From: Petter Wahlman <petter@wahlman.no>
+Date: Fri, 21 Aug 2026 00:58:56 +0200
+Subject: [PATCH 7/7] value: add ValueTrainer::run_distributed for periodic
+ weight-averaging
+
+Refactors run() into run_with_hook() plus a new run_distributed() that
+takes a per-superbatch sync_hook(&mut Model<ExecutionContext>, usize) -> bool,
+called just before the existing checkpoint-save logic. A hook returning
+true (a sync happened this superbatch) triggers an optimiser state reset,
+since AdamW momentum/velocity are no longer valid for freshly-averaged
+weights. run()'s behaviour is unchanged: it now just calls run_with_hook
+with a no-op hook.
+
+Intended for local-SGD-style distributed training across machines on an
+ordinary LAN: each process trains independently and only exchanges full
+weights every few superbatches, rather than gradients every batch, so it
+tolerates Wi-Fi-grade latency/bandwidth. The actual networking/averaging
+lives in enyo-bullet-spike (tools/bullet/spike_trainer), not here; this
+patch only adds the extension point.
+---
+ crates/bullet_lib/src/value.rs | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/crates/bullet_lib/src/value.rs b/crates/bullet_lib/src/value.rs
+index 71dd013..4a947c5 100644
+--- a/crates/bullet_lib/src/value.rs
++++ b/crates/bullet_lib/src/value.rs
+@@ -9,7 +9,7 @@ pub use builder::{NoOutputBuckets, ValueTrainerBuilder};
+ use bullet_compiler::tensor::TValue;
+ use bullet_trainer::{
+     Trainer,
+-    model::save::SavedFormat,
++    model::{save::SavedFormat, Model},
+     optimiser::OptimiserState,
+     run::{self, dataloader::PreparedBatchHost, logger},
+ };
+@@ -126,6 +126,32 @@ where
+         schedule: &TrainingSchedule<impl LrScheduler, impl WdlScheduler>,
+         settings: &LocalSettings,
+         dataloader: &impl loader::DataLoader<Inp::RequiredDataType>,
++    ) {
++        self.run_with_hook(schedule, settings, dataloader, |_, _| false)
++    }
++
++    /// Identical to `run`, except `sync_hook` is invoked at the end of every
++    /// superbatch (before any checkpoint save) with the full weight model, and
++    /// should return `true` if it performed a cross-process weight average
++    /// this superbatch (in which case optimiser momentum/velocity is reset,
++    /// since it's no longer valid for the newly-averaged weights). A hook that
++    /// always returns `false` reproduces `run` exactly.
++    pub fn run_distributed(
++        &mut self,
++        schedule: &TrainingSchedule<impl LrScheduler, impl WdlScheduler>,
++        settings: &LocalSettings,
++        dataloader: &impl loader::DataLoader<Inp::RequiredDataType>,
++        sync_hook: impl FnMut(&mut Model<ExecutionContext>, usize) -> bool,
++    ) {
++        self.run_with_hook(schedule, settings, dataloader, sync_hook)
++    }
++
++    fn run_with_hook(
++        &mut self,
++        schedule: &TrainingSchedule<impl LrScheduler, impl WdlScheduler>,
++        settings: &LocalSettings,
++        dataloader: &impl loader::DataLoader<Inp::RequiredDataType>,
++        mut sync_hook: impl FnMut(&mut Model<ExecutionContext>, usize) -> bool,
+     ) {
+         logger::clear_colours();
+         println!("{}", logger::ansi("Training Preamble", "34;1"));
+@@ -175,6 +201,10 @@ where
+                 }
+             },
+             |trainer, superbatch| {
++                if sync_hook(&mut trainer.optimiser.model, superbatch) {
++                    trainer.optimiser.reset_state().unwrap();
++                }
++
+                 if superbatch % schedule.save_rate == 0 || superbatch == steps.end_superbatch {
+                     let name = format!("{}-{superbatch}", schedule.net_id);
+                     let path = format!("{}/{name}", settings.output_directory);
 -- 
 2.53.0
 
