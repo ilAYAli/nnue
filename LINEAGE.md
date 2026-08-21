@@ -9,7 +9,7 @@ Architecture 7: Architecture 6 plus 32 input buckets.
 Architecture 16: Architecture 7 plus FullThreats (initialize_from warm start via
 the fixed `add_full_threat_rows`; smoke diagnostic confirmed 89.3% nonzero
 threat-row coverage post-quantization and passed distinct_net/startpos/static_eval).
-Architecture 17: Architecture 7 plus Stockfish-exact FullThreats (v12 export
+Architecture 8: Architecture 7 plus Stockfish-exact FullThreats (v12 export
 contract and matching 59,808-row feature map).
 Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −138.0 ±7.3 vs fixed SF, `enyo_f2a0417`).
 
@@ -30,7 +30,7 @@ SHA-256 `865285d7e419544aa5722ce97afe8cf52f2b8a040d89101ec6b1fdc21c1fb9e3`,
 finite weights/loss; 1.44x conservative effective throughput at
 `sync_every=512`, no SPRT or promotion; evidence retained under
 `~/tmp/enyo-dist-smoke-rc3/` on both hosts).
-Reserved: `enyo-17.0.0-rc1` on pwa-llm (Forge coordinator; pwa-llm,
+Reserved: `enyo-8.0.0-rc1` on pwa-llm (Forge coordinator; pwa-llm,
 pwa-5090, and pwa-hak training ranks; Stockfish-exact FullThreats v12
 warm-started from `enyo-7.4.0-rc1`).
 
