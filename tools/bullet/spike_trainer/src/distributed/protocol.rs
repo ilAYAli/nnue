@@ -1,7 +1,10 @@
 use std::io::{self, ErrorKind, Read, Write};
 
 pub const VERSION: u16 = 1;
-pub const MAX_FRAME_BYTES: usize = 512 * 1024 * 1024;
+// A full synchronized optimiser/model payload for the large Enyo network is
+// larger than 512 MiB. The u32 length prefix caps frames below 4 GiB; 2 GiB
+// retains a bounded allocation while accommodating that payload.
+pub const MAX_FRAME_BYTES: usize = 2 * 1024 * 1024 * 1024;
 const MAX_ID_BYTES: usize = 256;
 
 #[derive(Debug, PartialEq, Eq)]
