@@ -17,6 +17,17 @@ coverage and gates verified clean beforehand; -97.8 ±17.4, LLR -5.00/2.20, H0).
 Reserved: `enyo-16.0.0-rc2` on pwa-5090 (FullThreats scratch root, no
 continue_from/initialize_from, to isolate whether rc1's rejection was the
 feature or the initialize_from-onto-converged-net methodology).
+Void: `enyo-16.0.0-rc3` (two-host local-SGD smoke on pwa-llm + pwa-hak:
+2,048 superbatches per host, 16/16 sync rounds including final sync, identical
+final quantised SHA-256 `23dd64332115a9c1512b3abdbb3164f15d1fa4086ba87cc43e3408e24bb5f8b3`,
+finite weights/loss; 0.86x effective throughput at sync_every=128, no SPRT or
+promotion; evidence retained under `~/tmp/enyo-dist-smoke-rc3/` on both hosts).
+Void: `enyo-16.0.0-rc4` (two-host local-SGD throughput probe on pwa-llm +
+pwa-hak: 512 superbatches per host, one final sync, identical final quantised
+SHA-256 `865285d7e419544aa5722ce97afe8cf52f2b8a040d89101ec6b1fdc21c1fb9e3`,
+finite weights/loss; 1.44x conservative effective throughput at
+`sync_every=512`, no SPRT or promotion; evidence retained under
+`~/tmp/enyo-dist-smoke-rc3/` on both hosts).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------

@@ -5,6 +5,7 @@ use std::{
     fs::File,
     io::{self, Write},
     path::Path,
+    time::Duration,
 };
 
 use bullet_lib::{
@@ -231,6 +232,86 @@ fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> T {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
+}
+
+fn required_env(name: &str) -> Result<String, String> {
+    match env::var(name) {
+        Ok(value) if !value.trim().is_empty() => Ok(value),
+        _ => Err(format!("missing {name}")),
+    }
+}
+
+fn positive_env(name: &str, default: usize) -> Result<usize, String> {
+    let value = match env::var(name) {
+        Ok(value) => value,
+        Err(_) => return Ok(default),
+    };
+    let value = value.parse::<usize>().map_err(|_| format!("{name} must be a positive integer"))?;
+    if value == 0 {
+        return Err(format!("{name} must be a positive integer"));
+    }
+    Ok(value)
+}
+
+fn distributed_config_from_env() -> Result<Option<enyo_bullet_spike::distributed::DistributedConfig>, String> {
+    use enyo_bullet_spike::distributed::{DistributedConfig, Role};
+
+    let role = match env::var("ENYO_BULLET_DISTRIBUTED_ROLE") {
+        Ok(role) => role,
+        Err(_) => return Ok(None),
+    };
+
+    let role = match role.as_str() {
+        "coordinator" => Role::Coordinator {
+            listen_addr: env_string("ENYO_BULLET_DISTRIBUTED_LISTEN_ADDR", "0.0.0.0:9219"),
+            num_peers: positive_env("ENYO_BULLET_DISTRIBUTED_NUM_PEERS", 0)?,
+        },
+        "worker" => Role::Worker {
+            coordinator_addr: required_env("ENYO_BULLET_DISTRIBUTED_COORDINATOR_ADDR")?,
+        },
+        other => return Err(format!("unsupported ENYO_BULLET_DISTRIBUTED_ROLE={other} (expected coordinator|worker)")),
+    };
+
+    let run_id = env::var("ENYO_BULLET_DISTRIBUTED_RUN_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| env_string("ENYO_BULLET_NET_ID", ""));
+    let node_id = env::var("ENYO_BULLET_DISTRIBUTED_NODE_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| env::var("HOSTNAME").ok().filter(|value| !value.trim().is_empty()))
+        .ok_or_else(|| "missing ENYO_BULLET_DISTRIBUTED_NODE_ID (and HOSTNAME is unavailable)".to_owned())?;
+    let sync_every_superbatches = positive_env("ENYO_BULLET_DISTRIBUTED_SYNC_EVERY", 1)?;
+    let timeout_secs = positive_env("ENYO_BULLET_DISTRIBUTED_TIMEOUT_SECS", 120)?;
+
+    Ok(Some(DistributedConfig {
+        role,
+        run_id,
+        node_id,
+        sync_every_superbatches,
+        round_timeout: Duration::from_secs(timeout_secs as u64),
+    }))
+}
+
+fn run_trainer<Opt, Inp, Out>(
+    trainer: &mut bullet_lib::value::ValueTrainer<Opt, Inp, Out>,
+    schedule: &TrainingSchedule<impl lr::LrScheduler, impl wdl::WdlScheduler>,
+    settings: &LocalSettings,
+    dataloader: &impl DataLoader<Inp::RequiredDataType>,
+) where
+    Opt: bullet_trainer::optimiser::OptimiserState<bullet_lib::nn::ExecutionContext>,
+    Inp: SparseInputType,
+    Inp::RequiredDataType: bullet_lib::value::loader::LoadableDataType,
+    Out: OutputBuckets<Inp::RequiredDataType>,
+{
+    match distributed_config_from_env().unwrap_or_else(|error| panic!("invalid distributed training configuration: {error}")) {
+        Some(config) => {
+            let hook = enyo_bullet_spike::distributed::make_sync_hook(config, schedule.steps.end_superbatch)
+                .unwrap_or_else(|err| panic!("failed to bind distributed listener: {err}"));
+            trainer.run_distributed(schedule, settings, dataloader, hook);
+        }
+        None => trainer.run(schedule, settings, dataloader),
+    }
 }
 
 fn dataset_paths(dataset: &str) -> Vec<String> {
@@ -1472,7 +1553,7 @@ fn train_enyo<
             match loader.as_str() {
                 "direct" => {
                     let dataloader = DirectSequentialDataLoader::new(&path_refs);
-                    trainer.run(&schedule, &settings, &dataloader);
+                    run_trainer(&mut trainer, &schedule, &settings, &dataloader);
                 }
                 "sfbinpack" => {
                     let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
@@ -1484,7 +1565,7 @@ fn train_enyo<
                             make_sfbinpack_filter(),
                         ),
                     };
-                    trainer.run(&schedule, &settings, &dataloader);
+                    run_trainer(&mut trainer, &schedule, &settings, &dataloader);
                 }
                 _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
             }
@@ -1742,7 +1823,7 @@ fn train_legacy_direct(
     match loader.as_str() {
         "direct" => {
             let dataloader = DirectSequentialDataLoader::new(&path_refs);
-            trainer.run(&schedule, &settings, &dataloader);
+            run_trainer(&mut trainer, &schedule, &settings, &dataloader);
         }
         "sfbinpack" => {
             let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
@@ -1754,7 +1835,7 @@ fn train_legacy_direct(
                     make_sfbinpack_filter(),
                 ),
             };
-            trainer.run(&schedule, &settings, &dataloader);
+            run_trainer(&mut trainer, &schedule, &settings, &dataloader);
         }
         _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
     }
@@ -2094,7 +2175,7 @@ fn main() {
     match loader.as_str() {
         "direct" => {
             let dataloader = DirectSequentialDataLoader::new(&path_refs);
-            trainer.run(&schedule, &settings, &dataloader);
+            run_trainer(&mut trainer, &schedule, &settings, &dataloader);
         }
         "sfbinpack" => {
             let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
@@ -2106,7 +2187,7 @@ fn main() {
                     make_sfbinpack_filter(),
                 ),
             };
-            trainer.run(&schedule, &settings, &dataloader);
+            run_trainer(&mut trainer, &schedule, &settings, &dataloader);
         }
         _ => panic!("unsupported ENYO_BULLET_LOADER={loader}"),
     }

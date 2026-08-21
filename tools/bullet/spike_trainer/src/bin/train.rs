@@ -852,6 +852,11 @@ fn uses_sfbinpack_loader(config: &Config) -> bool {
 }
 
 fn training_dataset_path(config: &Config, data: &DataConfig) -> PathBuf {
+    if let Ok(path) = env::var("ENYO_BULLET_DISTRIBUTED_DATA") {
+        if !path.trim().is_empty() {
+            return expand_path(&path);
+        }
+    }
     if uses_sfbinpack_loader(config) {
         expand_path(&data.source_binpack)
     } else {

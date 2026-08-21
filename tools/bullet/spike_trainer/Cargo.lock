@@ -109,6 +109,7 @@ dependencies = [
 name = "enyo-bullet-spike"
 version = "0.1.0"
 dependencies = [
+ "bullet-trainer",
  "bullet_lib",
  "rand",
  "rand_chacha",
