@@ -14,7 +14,7 @@ contract and matching 59,808-row feature map).
 Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −138.0 ±7.3 vs fixed SF, `enyo_f2a0417`).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
-Rejected: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
+Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
 coverage and gates verified clean beforehand; -97.8 ±17.4, LLR -5.00/2.20, H0).
 Reserved: `enyo-16.0.0-rc2` on pwa-5090 (FullThreats scratch root, no
 continue_from/initialize_from, to isolate whether rc1's rejection was the
@@ -30,13 +30,7 @@ SHA-256 `865285d7e419544aa5722ce97afe8cf52f2b8a040d89101ec6b1fdc21c1fb9e3`,
 finite weights/loss; 1.44x conservative effective throughput at
 `sync_every=512`, no SPRT or promotion; evidence retained under
 `~/tmp/enyo-dist-smoke-rc3/` on both hosts).
-Void: `enyo-17.0.0-rc1` (two-rank Forge launch was interrupted before any
-training began; no result or checkpoint).
-Void: `enyo-17.0.0-rc2` (three-rank Forge staging exited before any task was
-claimed; no training result or checkpoint).
-Void: `enyo-17.0.0-rc3` (single-host launch stopped at superbatch 114 to
-correct the execution mode; no export, validation, or promotion).
-Reserved: `enyo-17.0.0-rc4` on pwa-llm (Forge coordinator; pwa-llm,
+Reserved: `enyo-17.0.0-rc1` on pwa-llm (Forge coordinator; pwa-llm,
 pwa-5090, and pwa-hak training ranks; Stockfish-exact FullThreats v12
 warm-started from `enyo-7.4.0-rc1`).
 
