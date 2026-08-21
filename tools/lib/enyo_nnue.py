@@ -31,7 +31,7 @@ SUPPORTED_N_OUTPUT_BUCKETS = (1, 2, 4, 8)
 DEFAULT_N_OUTPUT_HEAD_FEATURES = 0
 N_HEAD_FEATURES = 2
 SUPPORTED_N_OUTPUT_HEAD_FEATURES = (0, N_HEAD_FEATURES)
-N_THREAT_FEATURES = 60_720
+N_THREAT_FEATURES = 59_808
 N_PAWN_PAIR_FEATURES = 4_560
 N_KING_BUCKETS = DEFAULT_N_KING_BUCKETS
 N_PIECE_TYPES = 12
@@ -50,6 +50,7 @@ NETWORK_V8_HEADER_MAGIC = b"ENYONN8\0"
 NETWORK_V9_HEADER_MAGIC = b"ENYONN9\0"
 NETWORK_V10_HEADER_MAGIC = b"ENYON10\0"
 NETWORK_V11_HEADER_MAGIC = b"ENYON11\0"
+NETWORK_V12_HEADER_MAGIC = b"ENYON12\0"
 NETWORK_HEADER_MAGIC = NETWORK_V2_HEADER_MAGIC
 NETWORK_FORMAT_VERSION = 2
 NETWORK_FLAG_FULL_THREATS = 1
@@ -378,9 +379,9 @@ def feature_index(piece_type: int, piece_color: int, enyo_sq: int,
     return king_buckets(input_buckets)[ok] * feature_channels * 64 + op * 64 + osq
 
 
-_VALID_THREAT_TARGETS = (0, 6, 10, 8, 8, 10, 0, 0, 0, 6, 10, 8, 8, 10, 0, 0)
+_VALID_THREAT_TARGETS = (0, 4, 10, 8, 8, 10, 0, 0, 0, 4, 10, 8, 8, 10, 0, 0)
 _THREAT_TARGET_MAP = (
-    (0, 1, -1, 2, -1, -1),
+    (-1, 0, -1, 1, -1, -1),
     (0, 1, 2, 3, 4, -1),
     (0, 1, 2, 3, -1, -1),
     (0, 1, 2, 3, -1, -1),
@@ -452,12 +453,12 @@ def _slider_attacks(piece_type: int, square: int, occupied: int) -> int:
     return attacks
 
 
-def _pawn_push_or_attacks(color: int, square: int) -> int:
+def _pawn_threat_attacks(color: int, square: int) -> int:
     attacks = 0
     file_idx = square % 8
     rank = square // 8
     rank_delta = 1 if color == WHITE else -1
-    for file_delta in (-1, 0, 1):
+    for file_delta in (-1, 1):
         to_file = file_idx + file_delta
         to_rank = rank + rank_delta
         if _on_board(to_file, to_rank):
@@ -468,7 +469,7 @@ def _pawn_push_or_attacks(color: int, square: int) -> int:
 def _pseudo_threat_attacks(piece: int, square: int) -> int:
     pt = _piece_type(piece)
     if pt == PAWN:
-        return _pawn_push_or_attacks(_piece_color(piece), square)
+        return _pawn_threat_attacks(_piece_color(piece), square)
     if pt in (KNIGHT, KING):
         return _leaper_attacks(pt, square)
     return _slider_attacks(pt, square, 0)
@@ -572,8 +573,8 @@ def threat_features_from_pieces(
         color_at[sq] = color
 
     both = lambda pt: pt_bb[WHITE][pt] | pt_bb[BLACK][pt]
-    pawn_targets = both(PAWN) | both(KNIGHT) | both(ROOK)
-    minor_slider_targets = pawn_targets | both(BISHOP)
+    pawn_targets = both(KNIGHT) | both(ROOK)
+    minor_slider_targets = both(PAWN) | pawn_targets | both(BISHOP)
     queen_targets = minor_slider_targets | both(QUEEN)
     king_square = [
         _trailing_square(pt_bb[WHITE][KING]) ^ 7,
@@ -605,11 +606,6 @@ def threat_features_from_pieces(
                     to_sq = target_rank * 8 + target_file
                     if pawn_targets & (1 << to_sq):
                         emit(pawn, from_sq, to_sq)
-            if _on_board(file_idx, target_rank):
-                to_sq = target_rank * 8 + file_idx
-                if piece_at[to_sq] == PAWN:
-                    emit(pawn, from_sq, to_sq)
-
         for pt in (KNIGHT, BISHOP, ROOK, QUEEN):
             attacker = pt + (color << 3)
             targets = queen_targets if pt in (KNIGHT, QUEEN) else minor_slider_targets
@@ -803,7 +799,7 @@ def load_net(path: str | Path) -> Net:
     if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC,
                         NETWORK_V4_HEADER_MAGIC, NETWORK_V5_HEADER_MAGIC,
                         NETWORK_V6_HEADER_MAGIC, NETWORK_V8_HEADER_MAGIC, NETWORK_V9_HEADER_MAGIC,
-                        NETWORK_V10_HEADER_MAGIC, NETWORK_V11_HEADER_MAGIC)):
+                        NETWORK_V10_HEADER_MAGIC, NETWORK_V11_HEADER_MAGIC, NETWORK_V12_HEADER_MAGIC)):
         if len(data) < NETWORK_HEADER_SIZE:
             raise ValueError(f"{path}: truncated Enyo NNUE header")
         (
@@ -833,6 +829,7 @@ def load_net(path: str | Path) -> Net:
             (NETWORK_V9_HEADER_MAGIC, 9),
             (NETWORK_V10_HEADER_MAGIC, 10),
             (NETWORK_V11_HEADER_MAGIC, 11),
+            (NETWORK_V12_HEADER_MAGIC, 12),
         ):
             raise ValueError(f"{path}: unsupported Enyo NNUE header")
         if header_size != NETWORK_HEADER_SIZE:
@@ -849,9 +846,9 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: unsupported output head feature count")
         allowed_flags = NETWORK_FLAG_FULL_THREATS | NETWORK_FLAG_SLIDER_XRAY_THREATS | (
             NETWORK_FLAG_FULL_HEADS if format_version in (3, 6, 11) else 0) | (
-            NETWORK_FLAG_MIXED_ACTIVATION if format_version in (4, 8, 9, 10, 11) else 0) | (
+            NETWORK_FLAG_MIXED_ACTIVATION if format_version in (4, 8, 9, 10, 11, 12) else 0) | (
             NETWORK_FLAG_PSQT_RESIDUAL if format_version == 5 else 0) | (
-            NETWORK_FLAG_L2_OUTPUT_SKIP if format_version in (8, 9, 10, 11) else 0) | (
+            NETWORK_FLAG_L2_OUTPUT_SKIP if format_version in (8, 9, 10, 11, 12) else 0) | (
             NETWORK_FLAG_PAWN_PAIRS if format_version == 10 else 0)
         if (flags & ~allowed_flags) or reserved0 or reserved1:
             raise ValueError(f"{path}: unsupported header flags or reserved fields")
@@ -873,28 +870,28 @@ def load_net(path: str | Path) -> Net:
             raise ValueError(f"{path}: unsupported full-head architecture")
         if format_version == 6 and not threat_features:
             raise ValueError(f"{path}: unsupported full-head architecture")
-        if mixed_activation != (format_version in (4, 8, 9, 10, 11)):
+        if mixed_activation != (format_version in (4, 8, 9, 10, 11, 12)):
             raise ValueError(f"{path}: v4/v8/v11 and mixed-activation flag must be used together")
         if mixed_activation and ((full_heads and format_version != 11)
-                                 or (threat_features and format_version != 9) or output_buckets != 8):
+                                 or (threat_features and format_version != 12) or output_buckets != 8):
             raise ValueError(f"{path}: unsupported mixed-activation architecture")
         if psqt_residual != (format_version == 5):
             raise ValueError(f"{path}: v5 and PSQT-residual flag must be used together")
         if psqt_residual and (full_heads or threat_features or mixed_activation
                               or output_buckets != 8):
             raise ValueError(f"{path}: unsupported PSQT-residual architecture")
-        if l2_output_skip != (format_version in (8, 9, 10, 11)):
+        if l2_output_skip != (format_version in (8, 9, 10, 11, 12)):
             raise ValueError(f"{path}: v8/v11 and L2-output-skip flag must be used together")
         if l2_output_skip and (not mixed_activation or (full_heads and format_version != 11)
-                               or (threat_features and format_version != 9)
+                               or (threat_features and format_version != 12)
                                or output_buckets != 8 or output_head_features != 0):
             raise ValueError(f"{path}: unsupported L2-output-skip architecture")
-        if format_version == 9 and not (
+        if format_version == 12 and not (
             threat_features and not full_heads and mixed_activation
             and l2_output_skip and output_buckets == 8
             and output_head_features == 0
         ):
-            raise ValueError(f"{path}: v9 requires threat inputs with shared-head mixed activation and L2-output skip")
+            raise ValueError(f"{path}: v12 requires Stockfish-exact threat inputs with shared-head mixed activation and L2-output skip")
         if format_version == 10 and not (
             pawn_pairs and not threat_features and not full_heads and mixed_activation
             and l2_output_skip and output_buckets == 8 and output_head_features == 0
@@ -1116,30 +1113,30 @@ def write_net(net: Net, path: str | Path) -> None:
         if net.trained_hidden != N_HIDDEN:
             raise ValueError("non-1024 hidden widths require enyo-native-v2")
         data = payload
-    elif net.format_version in (2, 3, 4, 5, 6, 8, 9, 10, 11):
+    elif net.format_version in (2, 3, 4, 5, 6, 8, 9, 10, 11, 12):
         if net.full_heads != (net.format_version in (3, 6, 11)):
             raise ValueError("enyo-native-v3/v6/v11 and full_heads must be used together")
         if net.format_version == 3 and threat_features:
             raise ValueError("enyo-native-v3 does not support threat features - use v6")
         if net.format_version == 6 and not threat_features:
             raise ValueError("enyo-native-v6 requires threat features - use v3")
-        if (net.format_version in (4, 8, 9, 10, 11)) != net.mixed_activation:
+        if (net.format_version in (4, 8, 9, 10, 11, 12)) != net.mixed_activation:
             raise ValueError("enyo-native-v4/v8/v11 and mixed activation must be used together")
         if (net.format_version == 5) != net.psqt_residual:
             raise ValueError("enyo-native-v5 and PSQT residual must be used together")
-        if (net.format_version in (8, 9, 10, 11)) != net.l2_output_skip:
+        if (net.format_version in (8, 9, 10, 11, 12)) != net.l2_output_skip:
             raise ValueError("enyo-native-v8/v11 and L2-output skip must be used together")
         if net.l2_output_skip and ((net.full_heads and net.format_version != 11)
-                                   or (threat_features and net.format_version != 9)
+                                   or (threat_features and net.format_version != 12)
                                    or net.output_buckets != 8
                                    or net.output_head_features != 0):
             raise ValueError("L2-output skip requires the shared-head 8-bucket base")
-        if net.format_version == 9 and not (
+        if net.format_version == 12 and not (
             threat_features and not net.full_heads and net.mixed_activation
             and net.l2_output_skip and net.output_buckets == 8
             and net.output_head_features == 0
         ):
-            raise ValueError("enyo-native-v9 requires threat inputs with shared-head mixed activation and L2-output skip")
+            raise ValueError("enyo-native-v12 requires Stockfish-exact threat inputs with shared-head mixed activation and L2-output skip")
         if net.format_version == 10 and not (
             net.pawn_pairs and not threat_features and not net.full_heads
             and net.mixed_activation and net.l2_output_skip and net.output_buckets == 8
@@ -1153,7 +1150,8 @@ def write_net(net: Net, path: str | Path) -> None:
         ):
             raise ValueError("enyo-native-v11 requires full heads with mixed activation and L2-output skip")
         magic = (
-            NETWORK_V11_HEADER_MAGIC if net.format_version == 11
+            NETWORK_V12_HEADER_MAGIC if net.format_version == 12
+            else NETWORK_V11_HEADER_MAGIC if net.format_version == 11
             else NETWORK_V10_HEADER_MAGIC if net.format_version == 10
             else NETWORK_V9_HEADER_MAGIC if net.format_version == 9
             else NETWORK_V8_HEADER_MAGIC if net.l2_output_skip

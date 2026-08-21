@@ -2,20 +2,20 @@ use std::sync::OnceLock;
 
 use bullet_lib::game::formats::bulletformat::ChessBoard;
 
-pub const DIMENSIONS: usize = 60_720;
+pub const DIMENSIONS: usize = 59_808;
 pub const PAWN_PAIR_DIMENSIONS: usize = 4_560;
 pub const RECKLESS_DIMENSIONS: usize = 66_864;
-pub const MAX_ACTIVE: usize = 128;
+pub const MAX_ACTIVE: usize = 256;
 pub const MAX_PAWN_PAIR_ACTIVE: usize = 64;
 
 const SQUARES: usize = 64;
 const PIECES: usize = 16;
 const NONE: u8 = 0xff;
 
-const VALID_TARGETS: [usize; PIECES] = [0, 6, 10, 8, 8, 10, 0, 0, 0, 6, 10, 8, 8, 10, 0, 0];
+const VALID_TARGETS: [usize; PIECES] = [0, 4, 10, 8, 8, 10, 0, 0, 0, 4, 10, 8, 8, 10, 0, 0];
 
 const TARGET_MAP: [[i32; 6]; 6] = [
-    [0, 1, -1, 2, -1, -1],
+    [-1, 0, -1, 1, -1, -1],
     [0, 1, 2, 3, 4, -1],
     [0, 1, 2, 3, -1, -1],
     [0, 1, 2, 3, -1, -1],
@@ -357,21 +357,6 @@ fn slider_attacks(piece_type: usize, square: usize, occupied: u64) -> u64 {
     attacks
 }
 
-fn pawn_push_or_attacks(color: usize, square: usize) -> u64 {
-    let file = (square % 8) as i32;
-    let rank = (square / 8) as i32;
-    let rank_delta = if color == 0 { 1 } else { -1 };
-    let mut attacks = 0_u64;
-    for file_delta in [-1, 0, 1] {
-        let to_file = file + file_delta;
-        let to_rank = rank + rank_delta;
-        if on_board(to_file, to_rank) {
-            attacks |= 1_u64 << (to_rank * 8 + to_file);
-        }
-    }
-    attacks
-}
-
 fn pawn_attacks(color: usize, square: usize) -> u64 {
     let file = (square % 8) as i32;
     let rank = (square / 8) as i32;
@@ -387,10 +372,9 @@ fn pawn_attacks(color: usize, square: usize) -> u64 {
     attacks
 }
 
-fn pseudo_attacks(piece: usize, square: usize, reckless: bool) -> u64 {
+fn pseudo_attacks(piece: usize, square: usize, _reckless: bool) -> u64 {
     match piece_type(piece) {
-        1 if reckless => pawn_attacks(piece_color(piece), square),
-        1 => pawn_push_or_attacks(piece_color(piece), square),
+        1 => pawn_attacks(piece_color(piece), square),
         2 | 6 => leaper_attacks(piece_type(piece), square),
         _ => slider_attacks(piece_type(piece), square, 0),
     }
@@ -430,8 +414,8 @@ fn make_index(
 pub fn active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
     let board = BoardView::from_bullet(pos);
     let both = |piece_type: usize| board.pieces[0][piece_type] | board.pieces[1][piece_type];
-    let pawn_targets = both(0) | both(1) | both(3);
-    let minor_slider_targets = pawn_targets | both(2);
+    let pawn_targets = both(1) | both(3);
+    let minor_slider_targets = both(0) | pawn_targets | both(2);
     let queen_targets = minor_slider_targets | both(4);
     let king_square = [
         board.pieces[0][5].trailing_zeros() as usize,
@@ -478,13 +462,6 @@ pub fn active_features(pos: &ChessBoard) -> [ActiveFeatures; 2] {
                     if pawn_targets & (1_u64 << to) != 0 {
                         emit(pawn, from, to);
                     }
-                }
-            }
-
-            if on_board(file, target_rank) {
-                let to = (target_rank * 8 + file) as usize;
-                if board.piece_at[to] != NONE && board.piece_at[to] & 7 == 0 {
-                    emit(pawn, from, to);
                 }
             }
         }
@@ -667,5 +644,16 @@ mod tests {
                 assert_eq!(features[perspective].get(offset), *expected_index);
             }
         }
+    }
+
+    #[test]
+    fn full_threats_exclude_pawn_to_pawn_contacts() {
+        let board = ChessBoard::from_str("4k3/8/8/4p3/4P3/8/8/4K3 w - - 0 1|0|0.5")
+            .expect("fixture FEN must parse");
+        let features = active_features(&board);
+
+        assert_eq!(DIMENSIONS, 59_808);
+        assert_eq!(features[0].len(), 0);
+        assert_eq!(features[1].len(), 0);
     }
 }

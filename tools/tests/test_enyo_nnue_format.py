@@ -291,13 +291,13 @@ class EnyoNNUEFormatTests(unittest.TestCase):
                 loaded.l2_output_skip_weights, net.l2_output_skip_weights)
 
 
-    def test_full_threats_l2_output_skip_v9_roundtrip(self) -> None:
+    def test_full_threats_l2_output_skip_v12_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "full-threats-l2-output-skip.nn"
             net = zero_net(
                 input_buckets=32,
                 output_buckets=8,
-                format_version=9,
+                format_version=12,
                 full_threats=True,
             )
             net.mixed_activation = True
