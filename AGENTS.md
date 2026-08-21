@@ -22,7 +22,10 @@ If I ask a question, answer it without making changes. Read-only inspection is a
 ## Configuration
 
 6. Never use foreign NNUE weights; Stockfish-generated data is allowed.
-7. `build.json` must not restate defaults or define undeclared parameters.
+`build.json` must not restate defaults or define undeclared parameters.
+7. The only tracked diff during training should be `build.json`.
+   Exceptions to this rule are `architecture.json` (for architecture experiments), or
+   other changes that are needed for the build/iteration to succeed (Bullet, ...).
 8. Every run uses exactly one of `continue_from` or `initialize_from`; only a lineage root, including an explicitly approved new-architecture scratch root, may omit both.
 9. `initialize_from` is valid only when the conversion preserves the parent's information; additive changes that append new input rows are valid, while changes that reshape an existing dimension require a new scratch root.
 10. `architecture.json` changes only as a dedicated architecture experiment.
@@ -36,7 +39,7 @@ If I ask a question, answer it without making changes. Read-only inspection is a
 12. Put descriptions in `hypothesis`, never in the run name.
 13. Never invent a naming scheme; ask first if the reservation flow does not fit.
 14. Reserve every run name and host in `LINEAGE.md` before launch.
-15. Run names are never reused, even if void.
+15. Run names that have no historical value can be reused.
 
 ## Experiment contract
 
