@@ -1,12 +1,10 @@
 {
-  "run": "enyo-16.0.0-rc1",
-  "hypothesis": "full threat-input features (add_full_threat_rows warm start from the fixed export-quantization path) improve evaluator generalization",
-  "superbatches": 77106,
-  "trainable": "all",
+  "run": "enyo-8.0.0-rc1",
+  "hypothesis": "Stockfish-exact FullThreats tests whether the corrected mapping retains nonzero exported threat weights and improves the selected evaluator.",
+  "superbatches": 25000,
   "wdl": 0.025,
   "lr": 0.004,
-  "final_lr": 0.000005,
-  "save_rate": 77106,
+  "save_rate": 25000,
   "data": {
     "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
   },

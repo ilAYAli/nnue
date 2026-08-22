@@ -1,5 +1,5 @@
 {
-  "name": "native-i32-12ch-1024-v8-l2-output-skip",
+  "name": "native-i32-12ch-1024-v12-l2-output-skip",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
@@ -16,5 +16,5 @@
   "l1_export_scale": 1.0,
   "dense_activation": "relu-screlu-residual",
   "l2_output_skip": true,
-  "export_format": "enyo-native-v9"
+  "export_format": "enyo-native-v12"
 }
