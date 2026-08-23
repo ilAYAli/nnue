@@ -2,7 +2,7 @@ mod enyo_threats;
 
 use std::{
     env,
-    fs::File,
+    fs::{self, File},
     io::{self, Write},
     path::Path,
     time::Duration,
@@ -315,8 +315,15 @@ fn run_trainer<Opt, Inp, Out>(
 }
 
 fn dataset_paths(dataset: &str) -> Vec<String> {
-    dataset
+    let entries = if let Some(manifest) = dataset.trim().strip_prefix('@') {
+        fs::read_to_string(manifest)
+            .unwrap_or_else(|err| panic!("cannot read Bullet dataset manifest {manifest}: {err}"))
+    } else {
+        dataset.to_owned()
+    };
+    entries
         .split(';')
+        .flat_map(str::lines)
         .map(str::trim)
         .filter(|path| !path.is_empty())
         .map(str::to_owned)

@@ -153,13 +153,15 @@ load_config() {
   log_dir="$run_dir/logs"
   candidate_net="$HOME/assets/nets/$run.nn"
   data_file=$(abs_path "$(jq -r --arg run "$run" '
-    .data.bullet_output
-    // (if (((.data.source_binpack // "") | endswith(".bullet"))
-            and ((.data.offset // 0) == 0)
-            and ((.data.limit // 0) == 0))
-        then .data.source_binpack
-        else ("data/bullet/" + $run + ".bullet")
-        end)
+    (
+      .data.bullet_output
+      // (if (((.data.source_binpack // "") | endswith(".bullet"))
+              and ((.data.offset // 0) == 0)
+              and ((.data.limit // 0) == 0))
+          then .data.source_binpack
+          else ("data/bullet/" + $run + ".bullet")
+          end)
+    ) | split(";")[0]
   ' "$BUILD")")
   static_eval_data_file=$data_file
   if [[ $(json '.loader // "direct"') == "sfbinpack" ]]; then

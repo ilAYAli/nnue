@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import importlib.util
+import io
 import json
 import sys
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -102,6 +105,16 @@ class StreamingLabelingTests(unittest.TestCase):
             )
             self.assertEqual(6, len(set().union(*(set(shard) for shard in shards))))
 
+    def test_directory_input_includes_test91_tar_archives(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "training-run2-test91-20260427-2317.tar"
+            archive.touch()
+            ignored = root / "unrelated.tar"
+            ignored.touch()
+            paths = lc0_to_jsonl.selected_input_paths(root)
+            self.assertEqual([archive], paths)
+
     def test_record_quotas_sum_exactly(self) -> None:
         quotas = [lc0_to_jsonl.split_record_limit(10, 4, index) for index in range(4)]
         self.assertEqual([3, 3, 2, 2], quotas)
@@ -122,6 +135,28 @@ class StreamingLabelingTests(unittest.TestCase):
         self.assertTrue(labeler.is_quiet(row()))
         self.assertFalse(labeler.is_quiet(row("a2a3q")))
 
+    def test_tar_input_is_decoded_as_compressed_training_members(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "test91.tar"
+            raw = bytearray(lc0_to_jsonl.RECORD_SIZE)
+            lc0_to_jsonl.HEADER.pack_into(raw, 0, 6, 1)
+            with tarfile.open(archive, "w") as tar:
+                payload = gzip.compress(bytes(raw))
+                member = tarfile.TarInfo("test91/training-run2-test91-20260427-2317.gz")
+                member.size = len(payload)
+                tar.addfile(member, io.BytesIO(payload))
+
+            stats = lc0_to_jsonl.Stats()
+            self.assertEqual(
+                [],
+                list(lc0_to_jsonl.iter_rows(archive, top_policy=0, stats=stats)),
+            )
+            self.assertEqual(1, stats.files)
+            self.assertEqual(1, stats.records)
+            self.assertEqual(0, stats.unsupported_records)
+            self.assertEqual(1, stats.invalid_boards)
+
     def test_streams_to_atomic_bullet_and_stats(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -129,12 +164,15 @@ class StreamingLabelingTests(unittest.TestCase):
             stats_path = root / "shard.stats.json"
             args = argparse.Namespace(
                 input=root,
-                inventory=root / "inventory.json",
+                inventory=None,
                 output=output,
                 stats=stats_path,
                 engine="stockfish",
                 net=None,
                 net_option="EvalFile",
+                score_source="uci",
+                eval_scale=400.0,
+                value_epsilon=1e-6,
                 static=False,
                 depth=12,
                 threads=1,
@@ -166,9 +204,153 @@ class StreamingLabelingTests(unittest.TestCase):
             self.assertEqual(3, stats["read"])
             self.assertEqual(2, stats["selected"])
             self.assertEqual(2, stats["written"])
-            self.assertEqual("enyo.label-stats.v1", stats["schema"])
+            self.assertIsNone(stats["inventory"])
+            self.assertEqual("enyo.label-stats.v2", stats["schema"])
             self.assertEqual(stats, json.loads(stats_path.read_text(encoding="utf-8")))
             self.assertEqual([], list(root.glob("*.partial.*")))
+
+    def test_lc0_root_score_is_stm_relative_and_needs_no_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "shard.bullet"
+            stats_path = root / "shard.stats.json"
+            args = argparse.Namespace(
+                input=root,
+                inventory=root / "inventory.json",
+                output=output,
+                stats=stats_path,
+                engine="must-not-be-opened",
+                net=None,
+                net_option="EvalFile",
+                score_source="lc0-root",
+                eval_scale=400.0,
+                value_epsilon=1e-6,
+                static=False,
+                depth=12,
+                threads=1,
+                hash=16,
+                max_records=5,
+                min_ply=1,
+                quiet_only=True,
+                shard_count=1,
+                shard_index=0,
+                engine_timeout_s=1.0,
+                max_abs_cp=10000,
+                progress=0,
+                enyo_runtime_target=False,
+            )
+            black = row()
+            black["fen"] = "k7/p7/8/8/8/8/8/7K b - - 0 1"
+            black["moves"] = [{"move": "a7a6", "roles": ["played"], "legal": True}]
+            black["lc0"] = {"root_q": 0.8, "root_d": 0.0}
+            white = row()
+            white["lc0"] = {"root_q": 0.8, "root_d": 0.0}
+            invalid = row()
+            invalid["lc0"] = {"root_q": 2.0, "root_d": 0.0}
+
+            def rows(*args: object, stats: lc0_to_jsonl.Stats, **kwargs: object):
+                stats.files = 1
+                stats.records = 3
+                yield white, 1
+                yield black, 2
+                yield invalid, 3
+
+            with mock.patch.object(lc0_to_jsonl, "iter_rows", rows):
+                stats = labeler.label(args, engine_type=FakeEngine)
+
+            self.assertEqual(2, stats["written"])
+            self.assertEqual(1, stats["skipped_invalid_lc0_value"])
+            self.assertEqual(2, stats["lc0_root_value_count"])
+            self.assertEqual(879, stats["lc0_root_score_cp_min"])
+            self.assertEqual(879, stats["lc0_root_score_cp_max"])
+            self.assertEqual(0.9, stats["lc0_root_probability_min"])
+            self.assertEqual(0.9, stats["lc0_root_probability_max"])
+            self.assertEqual(64, output.stat().st_size)
+            scores = [
+                labeler.bullet_format.STRUCT.unpack_from(output.read_bytes(), offset)[2]
+                for offset in range(0, output.stat().st_size, 32)
+            ]
+            self.assertEqual([879, 879], scores)
+
+    def test_lc0_root_score_uses_logit_and_clamps_extremes(self) -> None:
+        score, probability, low, high, out_of_range = labeler.lc0_root_score(
+            {"lc0": {"root_q": 0.8, "root_d": 0.6}},
+            eval_scale=400.0,
+            value_epsilon=1e-6,
+        )
+        self.assertAlmostEqual(0.9, probability)
+        self.assertEqual(879, score)
+        self.assertFalse(low)
+        self.assertFalse(high)
+        self.assertFalse(out_of_range)
+
+        score, probability, low, high, out_of_range = labeler.lc0_root_score(
+            {"lc0": {"root_q": 1.0, "root_d": 0.0}},
+            eval_scale=400.0,
+            value_epsilon=1e-6,
+        )
+        self.assertEqual(1.0, probability)
+        self.assertEqual(5526, score)
+        self.assertFalse(low)
+        self.assertTrue(high)
+        self.assertFalse(out_of_range)
+
+        score, probability, low, high, out_of_range = labeler.lc0_root_score(
+            {"lc0": {"root_q": -1.0, "root_d": 1e-8}},
+            eval_scale=400.0,
+            value_epsilon=1e-6,
+        )
+        self.assertEqual(-5526, score)
+        self.assertEqual(0.0, probability)
+        self.assertTrue(low)
+        self.assertFalse(high)
+        self.assertFalse(out_of_range)
+
+    def test_empty_shard_retains_decoder_stats(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "shard.bullet"
+            stats_path = root / "shard.stats.json"
+            args = argparse.Namespace(
+                input=root,
+                inventory=None,
+                output=output,
+                stats=stats_path,
+                engine="stockfish",
+                net=None,
+                net_option="EvalFile",
+                score_source="lc0-root",
+                eval_scale=400.0,
+                value_epsilon=1e-6,
+                static=False,
+                depth=12,
+                threads=1,
+                hash=16,
+                max_records=5,
+                min_ply=2,
+                quiet_only=True,
+                shard_count=1,
+                shard_index=0,
+                engine_timeout_s=1.0,
+                max_abs_cp=10000,
+                progress=0,
+                enyo_runtime_target=False,
+            )
+
+            def rows(*args: object, stats: lc0_to_jsonl.Stats, **kwargs: object):
+                stats.files = 1
+                stats.records = 1
+                yield row(), 1
+
+            with mock.patch.object(lc0_to_jsonl, "iter_rows", rows):
+                with self.assertRaisesRegex(ValueError, "Bullet shard is empty"):
+                    labeler.label(args, engine_type=FakeEngine)
+
+            stats = json.loads(stats_path.read_text(encoding="utf-8"))
+            self.assertEqual("Bullet shard is empty", stats["error"])
+            self.assertEqual(1, stats["read"])
+            self.assertEqual(1, stats["skipped_min_ply"])
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

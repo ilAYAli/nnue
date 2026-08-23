@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import io
 import json
 import math
 import struct
@@ -286,7 +287,13 @@ def selected_input_paths(
     if inventory is not None:
         paths = inventory_paths(inventory, path)
     elif path.is_dir():
-        paths = sorted(item for item in path.rglob("training.*") if item.is_file())
+        paths = sorted(
+            item for item in path.rglob("*")
+            if item.is_file() and (
+                item.name.startswith("training.")
+                or (item.name.startswith("training-") and item.suffix == ".tar")
+            )
+        )
     else:
         paths = [path]
     return [item for ordinal, item in enumerate(paths) if ordinal % shard_count == shard_index]
@@ -302,12 +309,6 @@ def iter_stream_records(handle: BinaryIO) -> Iterator[tuple[int, bytes]]:
             raise ValueError(f"truncated LC0 record at index {index}")
         yield index, raw
         index += 1
-
-
-def iter_file_records(path: Path) -> Iterator[tuple[int, bytes]]:
-    opener = gzip.open if path.name.endswith(".gz") else Path.open
-    with opener(path, "rb") as handle:
-        yield from iter_stream_records(handle)
 
 
 def read_member_payload(name: str, handle: BinaryIO) -> bytes:
@@ -330,7 +331,7 @@ def iter_payloads(path: Path) -> Iterable[tuple[str, bytes]]:
                     continue
                 name = member.name
                 base = Path(name).name
-                if not base.startswith("training."):
+                if not (base.startswith("training.") or base.startswith("training-")):
                     continue
                 extracted = tar.extractfile(member)
                 if extracted is None:
@@ -363,26 +364,26 @@ def iter_rows(
     ):
         stats.files += 1
         try:
-            records = iter_file_records(source)
-            for file_record_index, raw in records:
-                if quota > 0 and stats.records >= quota:
-                    return
-                stats.records += 1
-                try:
-                    record = parse_record(raw, 0)
-                except struct.error:
-                    stats.invalid_records += 1
-                    continue
-                row = record_to_row(
-                    record,
-                    source_file=source.as_posix(),
-                    record_index=file_record_index,
-                    top_policy=top_policy,
-                    stats=stats,
-                )
-                if row is not None:
-                    stats.rows += 1
-                    yield row, file_record_index
+            for source_file, payload in iter_payloads(source):
+                for file_record_index, raw in iter_stream_records(io.BytesIO(payload)):
+                    if quota > 0 and stats.records >= quota:
+                        return
+                    stats.records += 1
+                    try:
+                        record = parse_record(raw, 0)
+                    except struct.error:
+                        stats.invalid_records += 1
+                        continue
+                    row = record_to_row(
+                        record,
+                        source_file=source_file,
+                        record_index=file_record_index,
+                        top_policy=top_policy,
+                        stats=stats,
+                    )
+                    if row is not None:
+                        stats.rows += 1
+                        yield row, file_record_index
         except (EOFError, OSError, ValueError):
             stats.invalid_records += 1
 

@@ -42,6 +42,17 @@ Files are assigned by sorted inventory ordinal modulo shard count. The global
 raw-record limit is split exactly across shards, and the Bullet/stat outputs
 are validated and atomically renamed.
 
+`--inventory` is required for a reproducible distributed conversion, but an
+individual `.tar` archive can be audited directly without one.
+
+To retain the LC0 root value rather than relabeling every position with
+Stockfish, add `--score-source lc0-root`. This maps LC0's side-to-move
+`root_q`/`root_d` value head to Bullet's search target with
+`score = eval_scale * logit((1 - root_d + root_q) / 2)`. The original
+per-game `wdl` field is preserved; the emitted stats file records probability
+and centipawn ranges, invalid values, endpoint clamps, and any tiny
+out-of-range root probabilities caused by LC0 head roundoff.
+
 ## Binpack count
 
 Build the C++ score tools out of tree:

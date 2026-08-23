@@ -33,6 +33,12 @@ finite weights/loss; 1.44x conservative effective throughput at
 Reserved: `enyo-8.0.0-rc1` on pwa-llm (Forge coordinator; pwa-llm,
 pwa-5090, and pwa-hak training ranks; Stockfish-exact FullThreats v12
 warm-started from `enyo-7.4.0-rc1`).
+Reserved/reused: `enyo-7.5.0-rc1` on pwa-llm (Forge coordinator; data-only
+continuation from `enyo-7.4.0-rc1` using the Forge-labeled LC0 Test91
+root-Q expected-score corpus). The first execution was voided at the
+start-position integrity gate before games: its V6 conversion incorrectly
+used P(win) rather than P(win) + P(draw)/2. The replacement corpus uses
+(1 + root_q) / 2 and is repartitioned into 1,600 chunks.
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------

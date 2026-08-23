@@ -651,7 +651,7 @@ fn data_config(config: &Config) -> DataConfig {
     let bullet_output = string_at(data, "bullet_output")
         .map(str::to_owned)
         .unwrap_or_else(|| {
-            if source_binpack.ends_with(".bullet") && offset == 0 && limit == 0 {
+            if is_unsliced_bullet_source_list(&source_binpack, offset, limit) {
                 source_binpack.clone()
             } else {
                 format!("data/bullet/{}.bullet", run_name(config))
@@ -673,6 +673,31 @@ fn data_config(config: &Config) -> DataConfig {
         ),
         eval_bucket_weights: parse_eval_bucket_weights(&training_eval_bucket_weights(config)),
     }
+}
+
+fn split_source_paths(source: &str) -> Vec<PathBuf> {
+    let source = source.trim();
+    let entries = if let Some(manifest) = source.strip_prefix('@') {
+        fs::read_to_string(expand_path(manifest))
+            .unwrap_or_else(|err| panic!("cannot read Bullet source manifest {manifest}: {err}"))
+    } else {
+        source.to_owned()
+    };
+    entries
+        .split(';')
+        .flat_map(str::lines)
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(expand_path)
+        .collect()
+}
+
+fn is_unsliced_bullet_source_list(source: &str, offset: u64, limit: u64) -> bool {
+    let paths = split_source_paths(source);
+    offset == 0
+        && limit == 0
+        && !paths.is_empty()
+        && paths.iter().all(|path| is_bullet_data_path(path))
 }
 
 fn run_name(config: &Config) -> String {
@@ -851,16 +876,18 @@ fn uses_sfbinpack_loader(config: &Config) -> bool {
     training_loader(config) == "sfbinpack"
 }
 
-fn training_dataset_path(config: &Config, data: &DataConfig) -> PathBuf {
+fn training_dataset_path(config: &Config, data: &DataConfig) -> String {
     if let Ok(path) = env::var("ENYO_BULLET_DISTRIBUTED_DATA") {
         if !path.trim().is_empty() {
-            return expand_path(&path);
+            return path;
         }
     }
     if uses_sfbinpack_loader(config) {
-        expand_path(&data.source_binpack)
+        data.source_binpack.clone()
+    } else if is_unsliced_bullet_source_list(&data.source_binpack, data.offset, data.limit) {
+        data.source_binpack.clone()
     } else {
-        expand_path(&data.bullet_output)
+        data.bullet_output.clone()
     }
 }
 
@@ -1533,6 +1560,31 @@ fn copy_bullet_data(source: &Path, output: &Path, offset: u64, limit: u64) {
 
 fn cmd_data(config: &Config) {
     let data = data_config(config);
+    let source_paths = split_source_paths(&data.source_binpack);
+    if is_unsliced_bullet_source_list(&data.source_binpack, data.offset, data.limit) {
+        if data.output_bucket_weights.iter().any(|weight| (*weight - 1.0).abs() > 1e-6) {
+            eprintln!("error: weighted resampling requires an sfbinpack source");
+            process::exit(2);
+        }
+        for source in &source_paths {
+            if !source.is_file() {
+                eprintln!("error: missing Bullet source: {}", source.display());
+                process::exit(1);
+            }
+        }
+        eprintln!(
+            "using {} existing Bullet data source(s) without materialization",
+            source_paths.len()
+        );
+        return;
+    }
+    if source_paths.len() != 1 {
+        eprintln!(
+            "error: sliced or converted data requires exactly one source; \
+             use an unsliced .bullet source list for direct multi-file training"
+        );
+        process::exit(2);
+    }
     let source = expand_path(&data.source_binpack);
     let output = expand_path(&data.bullet_output);
     if !is_bullet_data_path(&output) {
@@ -1672,11 +1724,11 @@ fn cmd_run(config: &Config) {
     validate_layout(config);
     let data = data_config(config);
     let dataset = training_dataset_path(config, &data);
-    if !dataset.exists() {
-        eprintln!(
-            "error: missing training data: {}",
-            dataset.display()
-        );
+    let dataset_paths = split_source_paths(&dataset);
+    if dataset_paths.is_empty()
+        || dataset_paths.iter().any(|path| !path.is_file())
+    {
+        eprintln!("error: missing training data: {dataset}");
         process::exit(1);
     }
     let output = expand_path(&out_dir(config));
@@ -1701,7 +1753,7 @@ fn cmd_run(config: &Config) {
         }
     }
 
-    set_env("ENYO_BULLET_DATA", dataset.display());
+    set_env("ENYO_BULLET_DATA", &dataset);
     set_env("ENYO_BULLET_LOADER", training_loader(config));
     set_env("ENYO_BULLET_OUT", output.display());
     set_env("ENYO_BULLET_NET_ID", net_id(config));
@@ -2574,7 +2626,17 @@ fn ensure_training_data(config: &Config) {
     if uses_sfbinpack_loader(config) {
         return;
     }
-    let output = expand_path(&data_config(config).bullet_output);
+    let data = data_config(config);
+    if is_unsliced_bullet_source_list(&data.source_binpack, data.offset, data.limit) {
+        for source in split_source_paths(&data.source_binpack) {
+            if !source.is_file() {
+                eprintln!("error: missing Bullet source: {}", source.display());
+                process::exit(1);
+            }
+        }
+        return;
+    }
+    let output = expand_path(&data.bullet_output);
     if !output.is_file() {
         eprintln!("rebuilding missing Bullet data: {}", output.display());
         cmd_data(config);
@@ -3100,6 +3162,21 @@ mod tests {
     }
 
     #[test]
+    fn unsliced_bullet_source_list_is_used_in_place() {
+        let config = config(json!({
+            "run": "candidate",
+            "data": {"source_binpack": "data/one.bullet;data/two.bullet"}
+        }));
+
+        let data = data_config(&config);
+        assert_eq!(data.bullet_output, "data/one.bullet;data/two.bullet");
+        assert_eq!(
+            training_dataset_path(&config, &data),
+            "data/one.bullet;data/two.bullet"
+        );
+    }
+
+    #[test]
     fn sfbinpack_loader_streams_source_without_bullet_materialization() {
         let config = config(json!({
             "run": "candidate",
@@ -3109,7 +3186,7 @@ mod tests {
 
         let data = data_config(&config);
         assert!(uses_sfbinpack_loader(&config));
-        assert_eq!(training_dataset_path(&config, &data), PathBuf::from("data/pylon.binpack"));
+        assert_eq!(training_dataset_path(&config, &data), "data/pylon.binpack");
         assert_eq!(data.bullet_output, "data/bullet/candidate.bullet");
     }
 
