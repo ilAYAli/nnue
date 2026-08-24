@@ -39,6 +39,13 @@ root-Q expected-score corpus). The first execution was voided at the
 start-position integrity gate before games: its V6 conversion incorrectly
 used P(win) rather than P(win) + P(draw)/2. The replacement corpus uses
 (1 + root_q) / 2 and is repartitioned into 1,600 chunks.
+Rejected: `enyo-7.5.0-rc1` (LC0 Test91 v2 raw root-Q targets; -70.4 ±21.0
+Elo, LLR -2.20/2.20 at 380/4,000 games, H0). The corpus omitted Enyo runtime
+score normalization, so this result is retained as invalid calibration
+evidence and is not a parent.
+Reserved: `enyo-7.5.0-rc2` on pwa-llm (Forge coordinator; data-only
+continuation from `enyo-7.4.0-rc1` using the verified LC0 Test91 v3 corpus,
+which applies Enyo runtime score normalization to the identical v2 records).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
