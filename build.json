@@ -1,12 +1,13 @@
 {
-  "run": "enyo-8.0.0-rc1",
-  "hypothesis": "Stockfish-exact FullThreats tests whether the corrected mapping retains nonzero exported threat weights and improves the selected evaluator.",
+  "run": "enyo-7.5.0-rc2",
+  "hypothesis": "Runtime-normalized LC0 Test91 root-value targets retain useful search supervision without saturating Enyo's evaluator and improve parent-relative Elo.",
   "superbatches": 25000,
   "wdl": 0.025,
   "lr": 0.004,
   "save_rate": 25000,
   "data": {
-    "source_binpack": "~/assets/training/bullet/nodes5000pv2/nodes5000pv2-recalibrated-2b.bullet"
+    "source_binpack": "@/home/petter/assets/training/bullet/lc0/test91/lc0-root-test91-v3-runtime-chunk1600/chunks.paths",
+    "bullet_output": "~/assets/training/bullet/lc0/test91/lc0-root-test91-v3-runtime-chunk1600/chunk-0000.bullet"
   },
-  "initialize_from": "enyo-7.4.0-rc1"
+  "continue_from": "enyo-7.4.0-rc1"
 }
