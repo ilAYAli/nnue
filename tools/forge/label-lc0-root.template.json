@@ -100,7 +100,7 @@
       "{output_dir}/{task_name}.bullet",
       "{output_dir}/{task_name}.stats.json"
     ],
-    "command": ".venv/bin/python tools/score/label.py --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.bullet --stats {output_dir}/{task_name}.stats.json --score-source lc0-root --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --shard-count 1 --shard-index 0",
+    "command": ".venv/bin/python tools/score/label.py --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.bullet --stats {output_dir}/{task_name}.stats.json --score-source lc0-root --enyo-runtime-target --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --shard-count 1 --shard-index 0",
     "progress": {
       "unit": "records",
       "log_regex": "read=(?P<done>\\d+) selected=(?P<selected>\\d+) written=(?P<output>\\d+) rate=(?P<rate>[0-9.]+)/s",
@@ -111,10 +111,5 @@
         {"name": "written", "field": "output", "x": "done", "scale": "linear"}
       ]
     }
-  },
-  "finalize": {
-    "type": "bullet-labels",
-    "output": "{output}",
-    "inventory_digest": "{inventory_digest}"
   }
 }
