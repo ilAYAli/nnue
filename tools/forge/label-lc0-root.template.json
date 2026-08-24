@@ -24,7 +24,7 @@
     "labeler": {
       "type": "source",
       "default": "nnue",
-      "include": ["tools/score/**", "tools/lib/**", "tools/posgen/**", "tools/tests/test_streaming_labeling.py"],
+      "include": ["tools/score/**", "tools/lib/**", "tools/posgen/**", "tools/tests/test_streaming_labeling.py", "tools/tests/test_lc0_to_jsonl.py"],
       "exclude": ["**/__pycache__/**", "**/.venv/**", "**/target/**"],
       "output": "~/.cache/forge/sources/nnue-{digest12}",
       "help": "Configured source alias or directory containing the labeling scripts"
@@ -76,7 +76,7 @@
           "PYTHON=python3; test ! -x /opt/homebrew/bin/python3 || PYTHON=/opt/homebrew/bin/python3; test -x .venv/bin/python || \"$PYTHON\" -m venv .venv; .venv/bin/python -m pip install -q python-chess"
         ],
         "probe": [
-          ".venv/bin/python -m unittest tools.tests.test_streaming_labeling"
+          ".venv/bin/python -m unittest tools.tests.test_streaming_labeling tools.tests.test_lc0_to_jsonl"
         ]
       }
     ],

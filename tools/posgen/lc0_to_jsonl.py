@@ -403,6 +403,18 @@ def clean_float(value: float) -> float:
     return float(value)
 
 
+def result_expected_score(result_q: float, result_d: float) -> float:
+    """Return LC0's expected game score from its result heads.
+
+    Both heads are from the side to move. ``result_q`` is P(win)-P(loss),
+    while ``result_d`` is P(draw); therefore P(win)+P(draw)/2 is
+    (1+result_q)/2. The draw head is retained for auditing but must not be
+    subtracted from the scalar expectation.
+    """
+    del result_d
+    return max(0.0, min(1.0, (1.0 + result_q) / 2.0))
+
+
 def add_move(
     moves: dict[int, dict],
     *,
@@ -500,7 +512,7 @@ def record_to_row(
         "id": f"lc0-{Path(source_file).name}-{record_index}",
         "fen": board.fen(),
         "source": "lc0_training_data",
-        "wdl": max(0.0, min(1.0, (1.0 - values["result_d"] + values["result_q"]) / 2.0)),
+        "wdl": result_expected_score(values["result_q"], values["result_d"]),
         "source_file": source_file,
         "record_index": record_index,
         "license": "ODbL-1.0",
