@@ -50,9 +50,10 @@ Void: `enyo-7.5.0-rc3` (25 Aug duplicate-name reuse; −64.7 Elo,
 LLR −2.51/2.20. Its evidence and net are retained, but it is not valid
 lineage evidence: it also changed dose, trainability, final-LR schedule, and
 the corpus relative to `enyo-7.4.0-rc1`).
-Reserved: `enyo-7.5.0-rc8` on pwa-llm (data-only continuation from
-`enyo-7.4.0-rc1`; corrected LC0 Test91 V6 result targets while preserving all
-selected parent training settings).
+Rejected: `enyo-7.5.0-rc8` (−46.3 Elo, CI 16.0, LLR −2.35/2.20 at 596/4,000
+games, H0). This was a valid data-only continuation from `enyo-7.4.0-rc1`:
+the corrected LC0 Test91 V6 result targets did not improve the selected parent
+regimen. Candidate SHA-256: `b5ffc2ba93b917ac6d91c60b0b6908afdfc6f789154862b71fa59f6c4406a70d`.
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------

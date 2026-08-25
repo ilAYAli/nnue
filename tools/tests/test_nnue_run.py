@@ -184,6 +184,28 @@ class NnueRunTests(unittest.TestCase):
         self.assertEqual("", proc.stderr)
         self.assertEqual(f"{home}/assets/training/data.bullet\n", proc.stdout)
 
+    def test_load_config_uses_first_manifest_shard_for_static_eval(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            home.mkdir()
+            shard = tmp / "chunk-0000.bullet"
+            shard.write_bytes(b"bullet")
+            manifest = tmp / "chunks.paths"
+            manifest.write_text(f"{shard}\n", encoding="utf-8")
+            build = tmp / "build.json"
+            build.write_text(
+                f'{{"run":"candidate","data":{{"source_binpack":"@{manifest}"}}}}\n',
+                encoding="utf-8",
+            )
+            proc = self.run_sourced(
+                f"HOME={shlex.quote(str(home))}; BUILD={shlex.quote(str(build))}; "
+                "load_config; printf '%s\\n' \"$static_eval_data_file\""
+            )
+
+        self.assertEqual("", proc.stderr)
+        self.assertEqual(f"{shard}\n", proc.stdout)
+
     def test_load_config_defaults_reference_to_continue_from(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
@@ -1658,6 +1680,7 @@ check_smoke 4.0 -0.22/2.20 positive_elo
         self.assertNotIn("SPRT_MIN_REJECT_GAMES", text)
         self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
         self.assertIn("GAMES=${GAMES:-4000}", text)
+        self.assertNotIn("PROMOTION_GAMES", text)
         # the superseded elo>ci rule must be gone, not merely unused
         self.assertNotIn("SPRT_SIGNAL_MARGIN", text)
         self.assertNotIn("signal_sprt_failed", text)
@@ -1852,7 +1875,7 @@ sprt_gate
 BUILD="$TEST_BUILD"
 HOME="$TEST_HOME"
 NNUE_NTFY=0
-GAMES=6000
+            GAMES=4000
 # The checkpoint fires inside the Forge wait and reports it by returning 3.
 run_sprt_once() {
   printf '%s:%s:%s\n' "$1" "$2" "$3" >> "$TRACE"
@@ -1884,7 +1907,7 @@ sprt_gate || printf 'rejected\n'
             )
 
             self.assertIn("rejected", proc.stdout)
-            self.assertEqual("sprt:6000:sprt\n", trace.read_text(encoding="utf-8"))
+            self.assertEqual("sprt:4000:sprt\n", trace.read_text(encoding="utf-8"))
 
     def test_skip_smoke_runs_full_sprt_directly(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:

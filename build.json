@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc3",
-  "hypothesis": "Correcting LC0 V6 result targets preserves draws instead of converting them to losses while retaining the identical runtime-normalized root-Q score corpus.",
-  "superbatches": 25000,
+  "run": "enyo-7.5.0-rc8",
+  "hypothesis": "Correcting LC0 Test91 V6 result targets preserves draws while testing the otherwise identical selected Enyo-7.4 regimen.",
+  "superbatches": 77106,
+  "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
-  "save_rate": 25000,
+  "final_lr": 0.000005,
   "data": {
-    "source_binpack": "@/home/petter/assets/training/bullet/lc0/test91/lc0-root-test91-v4-corrected-chunk1600/chunks.paths",
-    "bullet_output": "~/assets/training/bullet/lc0/test91/lc0-root-test91-v4-corrected-chunk1600/chunk-0000.bullet"
+    "source_binpack": "@/home/petter/assets/training/bullet/lc0/test91/lc0-root-test91-v4-corrected-chunk1600/chunks.paths"
   },
   "continue_from": "enyo-7.4.0-rc1"
 }

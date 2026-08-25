@@ -39,7 +39,6 @@ ROWS=${ROWS:-50000}
 SMOKE_GAMES=${SMOKE_GAMES:-500}                    # checkpoint 1: stop if catastrophically bad
 SMOKE_FAIL_ELO=${SMOKE_FAIL_ELO:--100.0}
 GAMES=${GAMES:-4000}                               # final game budget (ci ~= 10 at this size)
-PROMOTION_GAMES=${PROMOTION_GAMES:-5000}           # required direct parent match
 SKIP_SMOKE=${SKIP_SMOKE:-0}                        # 1 disables every checkpoint
 SPRT_POLL_SECONDS=${SPRT_POLL_SECONDS:-30}   # how often to re-read Forge status mid-run
 # Hard bound on the poll loop so a silently dead Forge run cannot hang the
@@ -163,9 +162,16 @@ load_config() {
           end)
     ) | split(";")[0]
   ' "$BUILD")")
+  local source_binpack manifest_file
+  source_binpack=$(json '.data.source_binpack // empty')
   static_eval_data_file=$data_file
   if [[ $(json '.loader // "direct"') == "sfbinpack" ]]; then
     static_eval_data_file=${STATIC_EVAL_DATA:-$HOME/assets/training/bullet/lc0/lc0-static-minply24.bullet}
+  elif [[ "$source_binpack" == @* ]]; then
+    manifest_file=$(abs_path "${source_binpack#@}")
+    [[ -f "$manifest_file" ]] || fail "missing source manifest: $manifest_file" config
+    static_eval_data_file=$(sed -n '1p' "$manifest_file")
+    [[ -n "$static_eval_data_file" ]] || fail "empty source manifest: $manifest_file" config
   fi
   mkdir -p "$log_dir" runs/logs
   local ref_source="${REFERENCE_NET:-${reference_name:-${continue_from:-$initialize_from}}}"
@@ -887,6 +893,7 @@ run_sprt_once() {
 
 sprt_gate() {
   load_config
+  validate_parent_sprt_games
   section sprt
   show_config
   [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" sprt
@@ -904,7 +911,7 @@ sprt_gate() {
   fi
 
   local sprt_rc=0
-  if [[ "$SKIP_SMOKE" != 1 && "$GAMES" -lt "$PROMOTION_GAMES" ]]; then
+  if [[ "$SKIP_SMOKE" != 1 && "$GAMES" -lt 4000 ]]; then
     run_sprt_once screen "$GAMES" sprt || sprt_rc=$?
     (( sprt_rc == 0 )) || return 1
     if smoke_sprt_failed "$last_sprt_elo"; then
@@ -917,7 +924,7 @@ sprt_gate() {
   fi
 
   sprt_rc=0
-  run_sprt_once sprt "$PROMOTION_GAMES" sprt || sprt_rc=$?
+  run_sprt_once sprt "$GAMES" sprt || sprt_rc=$?
   if (( sprt_rc == 3 )); then
     printf '  ┌─────────────────────────────────────\n'
     printf '  │ \033[1;31m✗ REJECT\033[0m  %s\n' "$last_sprt_line"
@@ -948,6 +955,7 @@ sprt_gate() {
 }
 full_sprt_gate() {
   load_config
+  validate_parent_sprt_games
   section sprt
   show_config
   [[ -f "$reference_net" ]] || fail "missing reference net: $reference_net" sprt
@@ -973,6 +981,11 @@ full_sprt_gate() {
   result_pass "elo" "$last_sprt_elo" "llr" "$last_sprt_llr"
   printf '  └─────────────────────────────────────\n'
   notify_sprt phase_done sprt "SPRT passed for $run: $last_sprt_line" "$last_sprt_log" 0
+}
+
+validate_parent_sprt_games() {
+  [[ "$GAMES" =~ ^[1-9][0-9]*$ ]] && (( GAMES <= 4000 )) \
+    || fail "parent SPRT game cap is 4000; got GAMES=$GAMES" sprt
 }
 
 sprt_command() {
@@ -1404,12 +1417,12 @@ Useful overrides:
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
   SKIP_SMOKE=1 GAMES=800 ./nnue iterate
   SMOKE_GAMES=400 SMOKE_FAIL_ELO=-100 ./nnue sprt
-  GAMES=5000 CONCURRENCY=8 THREADS=1 ./nnue sprt
+  GAMES=4000 CONCURRENCY=8 THREADS=1 ./nnue sprt
 
 SPRT checkpoints:
   SMOKE_GAMES=500              reject only a catastrophic net (elo <= SMOKE_FAIL_ELO)
   SPRT_ELO1=8                  H1 threshold
-  GAMES=4000                   hard cap; policy launch overrides this to 5000
+  GAMES=4000                   final parent-SPRT cap
   SKIP_SMOKE=1 ./nnue iterate  # disable smoke; always play GAMES
   FORCE=1 ./nnue train
   MOVE_GATE_STRICT=1 ./nnue gates
