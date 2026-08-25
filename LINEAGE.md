@@ -46,9 +46,13 @@ evidence and is not a parent.
 Reserved: `enyo-7.5.0-rc2` on pwa-llm (Forge coordinator; data-only
 continuation from `enyo-7.4.0-rc1` using the verified LC0 Test91 v3 corpus,
 which applies Enyo runtime score normalization to the identical v2 records).
-Reserved: `enyo-7.5.0-rc3` on pwa-llm (data-only continuation from
-`enyo-7.4.0-rc1`; the identical LC0 Test91 runtime-normalized root-Q corpus
-with V6 result targets corrected so draws remain draws).
+Void: `enyo-7.5.0-rc3` (25 Aug duplicate-name reuse; −64.7 Elo,
+LLR −2.51/2.20. Its evidence and net are retained, but it is not valid
+lineage evidence: it also changed dose, trainability, final-LR schedule, and
+the corpus relative to `enyo-7.4.0-rc1`).
+Reserved: `enyo-7.5.0-rc8` on pwa-llm (data-only continuation from
+`enyo-7.4.0-rc1`; corrected LC0 Test91 V6 result targets while preserving all
+selected parent training settings).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
