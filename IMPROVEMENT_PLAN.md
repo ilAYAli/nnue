@@ -106,3 +106,12 @@ receive updates and retain meaningful nonzero coverage after export.
 
 Detailed immutable ancestry and results belong in `LINEAGE.md`, not here.
 Procedural rules belong in `AGENTS.md` and the repository skills.
+
+
+## Before you suggest changing achtitecture
+
+Ask yourself:
+* why Rice has better elo even with a much simpler architecture
+* why Berserk has _MUCH_ better elo better with a similar architecture.
+* why my old engine enyo-1.32.0-rc10.nn has better elo with the _same_ architecture
+
