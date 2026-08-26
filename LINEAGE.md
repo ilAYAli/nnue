@@ -58,6 +58,9 @@ Reserved: `enyo-7.5.0-rc9` on pwa-llm (Forge coordinator; one data-mixture
 variable from `enyo-7.4.0-rc1`: 2,000,000,000 selected-corpus records plus
 666,833,785 deterministic Test91 records, 25.0047% Test91; manifest
 SHA-256 `53f8e1a29bebe4b0d7a81e023bf68cbe69e41a14d0ab9d9e164c23ed25583893`).
+Reserved: `enyo-7.5.0-rc10` on pwa-5090 (data-only continuation from
+`enyo-7.4.0-rc1` using the preserved historical combined corpus;
+SHA-1 `6014cd9863ee31b02ab877adb606e0b4d14df70f`).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
