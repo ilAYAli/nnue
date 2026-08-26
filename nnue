@@ -681,11 +681,17 @@ forge_run_exists() {
 }
 
 read_forge_sprt_status() {
-  local forge_run=$1 status_json state fields
+  local forge_run=$1 status_json state decision fields
   status_json=$("$FORGE" status "$forge_run" --json) || return 1
   state=$(jq -r '.state // empty' <<< "$status_json") || return 1
   case "$state" in
     done|ok|completed) ;;
+    stopped)
+      # Forge publishes a terminal SPRT H0/H1 decision before its state flips
+      # from stopped to done.  That is a completed result, not a resumable run.
+      decision=$(jq -r '.stop.decision.result // empty' <<< "$status_json") || return 1
+      [[ "$decision" == rejected || "$decision" == accepted ]] || return 1
+      ;;
     *) return 1 ;;
   esac
   fields=$(jq -r '.progress_fields // [] | join(" ")' <<< "$status_json") || return 1
@@ -693,6 +699,9 @@ read_forge_sprt_status() {
   last_sprt_llr=$(jq -r '.progress_fields[]? | select(startswith("llr=")) | sub("^llr="; "")' <<< "$status_json" | tail -1)
   last_sprt_ci=$(jq -r '.progress_fields[]? | select(startswith("ci=")) | sub("^ci="; "")' <<< "$status_json" | tail -1)
   last_sprt_los=$(jq -r '.progress_fields[]? | select(startswith("los=")) | sub("^los="; "") | sub("%$"; "")' <<< "$status_json" | tail -1)
+  # Forge retains the fully expanded command for completed runs; preserve it
+  # in the correlated result commit, including recovery after an event race.
+  last_sprt_command=$(jq -r '.commands[0].command // empty' <<< "$status_json") || return 1
   [[ -n "$last_sprt_elo" && -n "$last_sprt_llr" ]] || return 1
   last_sprt_line="Forge $forge_run $fields"
 }
@@ -1030,8 +1039,10 @@ next_promoted_run_name() {
 
 commit_and_bump_build_json() {
   local result=$1 accepted=$2 elo=$3 llr=$4 command=$5 details=$6
-  local next next_base subject hypothesis
+  local next next_base subject hypothesis runner_file
   local -a commit_paths=("$BUILD" "$ARCH")
+  local lineage_file="$(dirname "$BUILD")/LINEAGE.md"
+  runner_file=${BASH_SOURCE[0]}
   [[ "$AUTO_ADVANCE" == 0 || "$AUTO_ADVANCE" == 1 ]] \
     || fail "AUTO_ADVANCE must be 0 or 1, got: $AUTO_ADVANCE" iterate
   if [[ "$result" == PASS ]]; then
@@ -1048,6 +1059,15 @@ commit_and_bump_build_json() {
   fi
   git ls-files --error-unmatch "$STOCKFISH_NET_LEDGER" >/dev/null 2>&1 \
     && commit_paths+=("$STOCKFISH_NET_LEDGER")
+  # Rule 14 requires the run reservation before launch.  Keep that exact
+  # reservation in the correlated result commit instead of leaving LINEAGE.md
+  # as an unrelated post-result diff.
+  [[ -f "$lineage_file" ]] \
+    && grep -Fq "Reserved: \`$accepted\`" "$lineage_file" \
+    && commit_paths+=("$lineage_file")
+  # A runner change made solely to make this iteration build or record its
+  # result is build-critical evidence and belongs in the same commit.
+  git diff --quiet -- "$runner_file" || commit_paths+=("$runner_file")
 
   local commit_rc=0
   git commit --only \

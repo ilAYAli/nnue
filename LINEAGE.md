@@ -54,6 +54,10 @@ Rejected: `enyo-7.5.0-rc8` (−46.3 Elo, CI 16.0, LLR −2.35/2.20 at 596/4,000
 games, H0). This was a valid data-only continuation from `enyo-7.4.0-rc1`:
 the corrected LC0 Test91 V6 result targets did not improve the selected parent
 regimen. Candidate SHA-256: `b5ffc2ba93b917ac6d91c60b0b6908afdfc6f789154862b71fa59f6c4406a70d`.
+Reserved: `enyo-7.5.0-rc9` on pwa-llm (Forge coordinator; one data-mixture
+variable from `enyo-7.4.0-rc1`: 2,000,000,000 selected-corpus records plus
+666,833,785 deterministic Test91 records, 25.0047% Test91; manifest
+SHA-256 `53f8e1a29bebe4b0d7a81e023bf68cbe69e41a14d0ab9d9e164c23ed25583893`).
 
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
