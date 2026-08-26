@@ -20,7 +20,7 @@ record, and promote it. Do not make unrelated changes.
 2. Long-running training may run on `pwa-llm` or `pwa-5090`.
 3. All commands should be executed with a training `;notifai-write "command completed"`
 so that you can take immediate continuing to work when the command completes.
-4. Use only the existing `nnue_cmd` tmux session.
+4. Always use the existing `nnue_cmd` tmux session that should exist on each server.
 5. Never create, rename, or interrupt tmux windows.
 6. Never duplicate or interfere with active Forge jobs.
 
