@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc10",
-  "hypothesis": "Restoring the historically successful self-play-1.2 combined corpus tests whether its established target distribution improves the selected parent without changing its optimization regimen.",
+  "run": "enyo-7.5.0-rc1",
+  "hypothesis": "use Lc0 SF calibrated, enyo calibrated",
   "superbatches": 77106,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
-    "source_binpack": "/home/petter/assets/training/bullet/combined/lc0-nodes5000pv2-selfplay-1.2-shuffled.bullet"
+    "source_binpack": "~/assets/training/bullet/lc0/test91/lc0-static-bulk.bullet"
   },
-  "continue_from": "enyo-7.4.0-rc1"
+  "continue_from": "enyo-7.3.0-rc3"
 }
