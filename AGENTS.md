@@ -45,6 +45,9 @@ so that you can take immediate continuing to work when the command completes.
 14. Never invent a naming scheme; ask first if the reservation flow does not fit.
 15. Reserve every run name and host in `LINEAGE.md` before launch.
 16. Run names that have no historical value can be reused.
+```
+cd /home/petter/sync/code/chess/nnue && FORCE=1 HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=4000 ./nnue iterate; rc=$?; notifai-write "NNUE iterate completed rc=$rc"
+```
 
 ## Experiment contract
 
