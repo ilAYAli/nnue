@@ -1731,6 +1731,11 @@ fn cmd_run(config: &Config) {
         eprintln!("error: missing training data: {dataset}");
         process::exit(1);
     }
+    let dataset = dataset_paths
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect::<Vec<_>>()
+        .join(";");
     let output = expand_path(&out_dir(config));
     fs::create_dir_all(&output).unwrap_or_else(|err| {
         eprintln!("error: cannot create {}: {err}", output.display());
