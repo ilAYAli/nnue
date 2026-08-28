@@ -139,10 +139,16 @@ def fit_anchors(pairs: Iterable[dict], *, bins: int = 64) -> list[list[int]]:
     anchors: list[list[int]] = [[0, 0]]
     for x, y in zip(xs, ys):
         point = [int(round(x)), min(2045, max(0, int(round(y))))]
+        # A zero LC0 coordinate carries no sign information.  It must remain
+        # exactly [0, 0], even when its target bucket has nonzero magnitude.
+        # Moving that anchor makes the artifact invalid and would fabricate a
+        # nonzero label for an input score of zero.
+        if point[0] == 0:
+            continue
         if point[0] <= anchors[-1][0]:
             anchors[-1][1] = max(anchors[-1][1], point[1])
-        else:
-            anchors.append(point)
+            continue
+        anchors.append(point)
     if len(anchors) < 2:
         raise ValueError("fit has no usable source range")
     return anchors

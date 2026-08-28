@@ -123,6 +123,13 @@ class CalibrationTests(unittest.TestCase):
                                      min_holdout_pairs=20, min_improvement=0.2,
                                      max_slope_error=0.1)
 
+    def test_zero_source_rows_cannot_move_zero_anchor(self) -> None:
+        rows = pairs()
+        rows[0]["raw_score"] = 0
+        rows[0]["target_score"] = 500
+        anchors = calibration.fit_anchors(rows, bins=16)
+        self.assertEqual([0, 0], anchors[0])
+
     def test_invalid_holdout_cannot_be_loaded(self) -> None:
         artifact = {
             "schema": calibration.SCHEMA, "valid": False,
