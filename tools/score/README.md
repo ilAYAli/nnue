@@ -56,13 +56,13 @@ Make that artifact from paired observations, not a guessed formula:
 
 1. Forge-distribute deterministic samples of the LC0 records.  Each sample
    records the runtime-normalized white LC0-root score and the static score
-   of a fixed Enyo reference engine/net on the identical FEN.
+   of a fixed, verified static-evaluation engine/net on the identical FEN.
 
    ```sh
    forge run tools/forge/sample-lc0-calibration.template.json \
      --input ~/assets/training/lc0/test91-forge-input \
-     --engine ~/assets/engines/reference \
-     --net ~/assets/nets/enyo-7.3.0-rc3.nn \
+     --engine /path/to/verified-static-eval-engine \
+     --net /path/to/compatible-reference-net \
      --shards 1600
    ```
 
