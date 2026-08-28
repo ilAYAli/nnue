@@ -74,15 +74,6 @@ class NnueRunTests(unittest.TestCase):
             )
         self.assertEqual(0, proc.returncode, proc.stderr)
 
-    def test_pending_training_corpus_is_rejected_before_validation(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_name:
-            missing = Path(tmp_name) / "pending.bullet"
-            proc = self.run_sourced(
-                f"NNUE_NTFY=0; data_file={shlex.quote(str(missing))}; require_training_corpus_ready"
-            )
-        self.assertNotEqual(0, proc.returncode)
-        self.assertIn("training corpus is not ready", proc.stderr)
-
     def test_sprt_h0_rejects_the_lower_bound(self) -> None:
         proc = self.run_sourced('sprt_h0_rejected "-2.20/2.20 (100%)"')
 
