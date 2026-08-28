@@ -376,6 +376,10 @@ require_lc0_calibration() {
     || fail "invalid LC0 calibration attestation: $calibration_manifest" train
 }
 
+require_training_corpus_ready() {
+  [[ -f "$data_file" && -s "$data_file" ]] || fail "training corpus is not ready: $data_file (do not select a Forge output until its atomic merge and LC0 attestation are complete)" train
+}
+
 train() {
   load_config
   require_training_origin train
@@ -386,6 +390,7 @@ train() {
 
   notify phase_start train "training $run" "$log" 0
   ensure_train_helper_current
+  require_training_corpus_ready
   [[ -f "$BULLET_RESULT_VALIDATOR" ]] || fail "missing Bullet result validator: $BULLET_RESULT_VALIDATOR" train
   "$PYTHON" "$BULLET_RESULT_VALIDATOR" \
     --input "$data_file" --require-win-loss \
