@@ -29,6 +29,18 @@ class NnueRunTests(unittest.TestCase):
     def test_shell_syntax_is_valid(self) -> None:
         subprocess.run(["bash", "-n", str(REPO / "nnue")], check=True)
 
+    def test_force_ignores_passed_gate_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            log_dir = Path(tmp_name)
+            (log_dir / ".passed_static_eval").touch()
+
+            proc = self.run_sourced(
+                f"NNUE_NTFY=0; FORCE=1; log_dir={shlex.quote(str(log_dir))}; "
+                "gate_passed static_eval"
+            )
+
+        self.assertNotEqual(0, proc.returncode)
+
     def test_sprt_h0_rejects_the_lower_bound(self) -> None:
         proc = self.run_sourced('sprt_h0_rejected "-2.20/2.20 (100%)"')
 
@@ -2354,6 +2366,100 @@ printf 'llr=%s\n' "$last_sprt_llr"
             self.assertIn("--reference-net ~/assets/nets/reference.nn", calls)
             self.assertIn("--run candidate-sprt-800-", calls)
             self.assertNotIn("--run candidate-sprt-800-old", calls)
+
+    def test_force_sprt_ignores_existing_logged_forge_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            (home / "assets" / "nets").mkdir(parents=True)
+            engine = home / "assets" / "engines" / "enyo_91ede5f"
+            engine.parent.mkdir(parents=True)
+            engine.write_text("#!/bin/sh\n", encoding="utf-8")
+            engine.chmod(0o755)
+            (home / "assets" / "nets" / "candidate.nn").write_bytes(b"candidate")
+            (home / "assets" / "nets" / "reference.nn").write_bytes(b"reference")
+
+            log_dir = tmp / "runs" / "candidate" / "logs"
+            log_dir.mkdir(parents=True)
+            (log_dir / "05-sprt-800.log").write_text(
+                "run: id=candidate-sprt-800-old\n",
+                encoding="utf-8",
+            )
+            build = tmp / "build.json"
+            build.write_text(
+                '{"run":"candidate","continue_from":"reference","hypothesis":"forced fresh candidate"}\n',
+                encoding="utf-8",
+            )
+
+            fake_forge = tmp / "forge"
+            fake_forge.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "if [[ \"$1\" == status && \"${2:-}\" == candidate-sprt-800-old ]]; then\n"
+                "  echo 'FORCE must not inspect the old Forge run' >&2\n"
+                "  exit 90\n"
+                "fi\n"
+                "if [[ \"$1\" == status && \"${2:-}\" == --json ]]; then\n"
+                "  printf '%s\\n' '{\"runs\":[]}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == sprt ]]; then\n"
+                "  printf '%s\\n' \"$*\" >> \"$FORGE_CALLS\"\n"
+                "  exit 0\n"
+                "fi\n"
+                "if [[ \"$1\" == status && \"${2:-}\" == candidate-sprt-800-* ]]; then\n"
+                "  printf '%s\\n' '{\"state\":\"done\",\"progress_fields\":[\"games=800/800\",\"elo=+7.5\",\"llr=0.40/2.20 (18%)\"]}'\n"
+                "  exit 0\n"
+                "fi\n"
+                "echo unexpected forge call: $* >&2\n"
+                "exit 2\n",
+                encoding="utf-8",
+            )
+            fake_forge.chmod(0o755)
+            forge_calls = tmp / "forge-calls.txt"
+
+            source = (REPO / "nnue").read_text(encoding="utf-8")
+            harness = source.split(DISPATCH_MARKER, 1)[0] + """
+NNUE_NTFY=0
+SPRT_POLL_SECONDS=1
+SOLO=0
+FORCE=1
+BUILD="$TEST_BUILD"
+FORGE="$TEST_FORGE"
+HOME="$TEST_HOME"
+ENGINE="$HOME/assets/engines/enyo_91ede5f"
+run=candidate
+continue_from=reference
+reference_net="$HOME/assets/nets/reference.nn"
+candidate_net="$HOME/assets/nets/candidate.nn"
+log_dir="runs/candidate/logs"
+run_sprt_once sprt 800 sprt
+printf 'elo=%s\n' "$last_sprt_elo"
+"""
+            harness_path = tmp / "harness.sh"
+            harness_path.write_text(harness, encoding="utf-8")
+            env = os.environ.copy()
+            env.update({
+                "TEST_BUILD": str(build),
+                "TEST_FORGE": str(fake_forge),
+                "TEST_HOME": str(home),
+                "FORGE_CALLS": str(forge_calls),
+            })
+
+            proc = subprocess.run(
+                ["bash", str(harness_path)],
+                cwd=tmp,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+
+            self.assertIn("elo=7.5", proc.stdout)
+            calls = forge_calls.read_text(encoding="utf-8")
+            self.assertIn("sprt --run candidate-sprt-800-", calls)
+            self.assertNotIn("candidate-sprt-800-old", calls)
 
 if __name__ == "__main__":
     unittest.main()

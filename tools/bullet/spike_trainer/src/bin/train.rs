@@ -1720,8 +1720,42 @@ fn set_env(key: &str, value: impl ToString) {
     }
 }
 
-fn cmd_run(config: &Config) {
+fn remove_force_artifact(path: &Path) {
+    if !path.exists() {
+        return;
+    }
+    let result = if path.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
+    result.unwrap_or_else(|err| {
+        eprintln!("error: cannot remove forced training artifact {}: {err}", path.display());
+        process::exit(1);
+    });
+}
+
+fn reset_training_artifacts_for_force(config: &Config) {
+    let run_root = expand_path(&format!("runs/{}", run_name(config)));
+    let data = data_config(config);
+    for path in [
+        expand_path(&out_dir(config)),
+        run_root,
+        expand_path(&net_path(config)),
+    ] {
+        remove_force_artifact(&path);
+    }
+    if !is_unsliced_bullet_source_list(&data.source_binpack, data.offset, data.limit) {
+        remove_force_artifact(&expand_path(&data.bullet_output));
+    }
+    println!("force_reset=removed prior training artifacts for {}", run_name(config));
+}
+
+fn cmd_run(config: &Config, force: bool) {
     validate_layout(config);
+    if force {
+        reset_training_artifacts_for_force(config);
+    }
     let data = data_config(config);
     let dataset = training_dataset_path(config, &data);
     let dataset_paths = split_source_paths(&dataset);
@@ -1743,7 +1777,7 @@ fn cmd_run(config: &Config) {
     });
     let target_superbatch = training_superbatches(config);
     let checkpoint = latest_current_checkpoint(config);
-    ensure_resume_state(config, checkpoint.is_some());
+    ensure_resume_state(config, checkpoint.is_some(), force);
     if let Some((superbatch, _)) = &checkpoint {
         if *superbatch > target_superbatch {
             eprintln!(
@@ -2448,7 +2482,7 @@ fn resume_state(config: &Config) -> Result<Value, String> {
     }))
 }
 
-fn ensure_resume_state(config: &Config, has_checkpoint: bool) {
+fn ensure_resume_state(config: &Config, has_checkpoint: bool, force: bool) {
     let path = resume_state_path(config);
     let expected = resume_state(config).unwrap_or_else(|err| {
         eprintln!("error: cannot resolve resume state: {err}");
@@ -2460,7 +2494,7 @@ fn ensure_resume_state(config: &Config, has_checkpoint: bool) {
             process::exit(1);
         });
         if actual != expected {
-            if !has_checkpoint {
+            if !has_checkpoint || force {
                 write_json_atomic(&path, &expected).unwrap_or_else(|err| {
                     eprintln!("error: cannot replace resume state: {err}");
                     process::exit(1);
@@ -2473,7 +2507,7 @@ fn ensure_resume_state(config: &Config, has_checkpoint: bool) {
         }
         return;
     }
-    if has_checkpoint {
+    if has_checkpoint && !force {
         eprintln!(
             "error: refusing to resume checkpoints without {}",
             path.display()
@@ -2667,7 +2701,7 @@ fn resume_training(config: &Config, force: bool) -> bool {
     if latest_current_checkpoint(config)
         .is_some_and(|(superbatch, _)| superbatch < training_superbatches(config))
     {
-        ensure_resume_state(config, true);
+        ensure_resume_state(config, true, false);
         return false;
     }
 
@@ -2702,6 +2736,9 @@ fn resume_training(config: &Config, force: bool) -> bool {
 }
 
 fn cmd_all(config: &Config, force: bool) {
+    if force {
+        reset_training_artifacts_for_force(config);
+    }
     let extending = latest_current_checkpoint(config)
         .is_some_and(|(superbatch, _)| superbatch < training_superbatches(config));
     if resume_training(config, force) {
@@ -2715,7 +2752,7 @@ fn cmd_all(config: &Config, force: bool) {
     } else {
         cmd_data(config);
     }
-    cmd_run(config);
+    cmd_run(config, false);
     cmd_export(config, force || extending);
     write_training_provenance(config).unwrap_or_else(|err| {
         eprintln!("error: cannot write training provenance: {err}");
@@ -3356,6 +3393,76 @@ mod tests {
     }
 
     #[test]
+    fn force_reset_removes_every_generated_training_artifact() {
+        let root = test_dir("force-reset");
+        let run = format!(
+            "force-reset-{}-{}",
+            process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos(),
+        );
+        let checkpoints = root.join("checkpoints");
+        let net = root.join("candidate.nn");
+        let materialized = root.join("materialized.bullet");
+        let source = root.join("source.binpack");
+        fs::write(&source, b"source").expect("write source");
+        let config = config(json!({
+            "run": run,
+            "out": checkpoints,
+            "net": net,
+            "data": {
+                "source_binpack": source,
+                "bullet_output": materialized,
+            },
+        }));
+        let run_root = expand_path(&format!("runs/{}", run_name(&config)));
+        for path in [
+            checkpoints.join("native-1/optimiser_state/weights.bin"),
+            run_root.join("init/optimiser_state/weights.bin"),
+            model_path(&config),
+            provenance_path(&config),
+            resume_state_path(&config),
+            expand_path(&net_path(&config)),
+            expand_path(&data_config(&config).bullet_output),
+        ] {
+            fs::create_dir_all(path.parent().expect("test artifact parent"))
+                .expect("create test artifact parent");
+            fs::write(path, b"stale").expect("write test artifact");
+        }
+
+        reset_training_artifacts_for_force(&config);
+
+        assert!(!checkpoints.exists());
+        assert!(!run_root.exists());
+        assert!(!net.exists());
+        assert!(!materialized.exists());
+        assert!(source.exists());
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn force_reset_preserves_direct_bullet_corpus() {
+        let root = test_dir("force-reset-direct-corpus");
+        let source = root.join("source.bullet");
+        fs::write(&source, b"corpus").expect("write corpus");
+        let config = config(json!({
+            "run": format!("force-reset-direct-{}", process::id()),
+            "net": root.join("candidate.nn"),
+            "data": {
+                "source_binpack": source,
+                "bullet_output": source,
+            },
+        }));
+
+        reset_training_artifacts_for_force(&config);
+
+        assert!(source.exists());
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
     fn resume_hash_ignores_only_training_stop() {
         let first = config(json!({
             "run": "candidate",
@@ -3394,6 +3501,8 @@ mod tests {
             false,
             false,
             false,
+            false,
+            false,
         );
         let mut raw = vec![0_u8; size];
         let source_l0w = input_buckets * feature_channels * 64 * hidden * 2;
@@ -3408,6 +3517,8 @@ mod tests {
             output_buckets,
             hidden,
             l2,
+            false,
+            false,
             false,
             false,
             false,
@@ -3440,6 +3551,8 @@ mod tests {
             false,
             false,
             false,
+            false,
+            false,
         );
         let with_psqt = enyo_network_size(
             input_buckets,
@@ -3447,6 +3560,7 @@ mod tests {
             output_buckets,
             hidden,
             l2,
+            false,
             false,
             false,
             false,
@@ -3471,6 +3585,7 @@ mod tests {
                 false,
                 false,
                 false,
+                false,
                 true,
                 false,
             )
@@ -3489,6 +3604,7 @@ mod tests {
             768,
             16,
             8,
+            false,
             false,
             false,
             true,
@@ -3578,7 +3694,7 @@ fn main() {
     match command.as_str() {
         "plan" => cmd_plan(&config),
         "data" => cmd_data(&config),
-        "run" => cmd_run(&config),
+        "run" => cmd_run(&config, force),
         "export" => cmd_export(&config, force),
         "all" => cmd_all(&config, force),
         _ => usage(),

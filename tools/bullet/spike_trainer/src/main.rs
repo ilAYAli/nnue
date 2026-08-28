@@ -815,7 +815,7 @@ mod tests {
         let different = dir.join("different.bin");
         for (path, seed) in [(&first, 17), (&same, 17), (&different, 18)] {
             write_seeded_enyo_weights(
-                path, seed, 24, 12, 8, 4, 2, true, false, false, false, 8.0, 1.0,
+                path, seed, 24, 12, 8, 4, 2, true, false, false, false, false, 8.0, 1.0,
             )
             .expect("write seeded weights");
         }
