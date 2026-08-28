@@ -19,6 +19,7 @@ sys.path.insert(0, str(TOOLS / "score"))
 
 from lib import bullet_format, bullet_text  # noqa: E402
 import lc0_to_jsonl  # noqa: E402
+import lc0_calibration  # noqa: E402
 from label_with_uci import EngineTimeout, UciEngine  # noqa: E402
 
 
@@ -117,10 +118,19 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         raise ValueError("value epsilon must be finite and in (0, 0.5)")
     if score_source == "lc0-root" and args.static:
         raise ValueError("--static is only valid with --score-source uci")
+    calibration = None
+    calibration_sha256 = None
+    calibration_path = getattr(args, "lc0_calibration", None)
+    if score_source == "lc0-root":
+        if not args.enyo_runtime_target:
+            raise ValueError("LC0 root labels require --enyo-runtime-target")
+        if calibration_path is None:
+            raise ValueError("LC0 root labels require --lc0-calibration")
+        calibration, calibration_sha256 = lc0_calibration.load(Path(calibration_path))
 
     decode = lc0_to_jsonl.Stats()
     stats: dict[str, object] = {
-        "schema": "enyo.label-stats.v2",
+        "schema": "enyo.label-stats.v3",
         "input": str(args.input),
         "inventory": str(args.inventory) if args.inventory is not None else None,
         "output": str(output),
@@ -130,6 +140,16 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "score_source": score_source,
         "eval_scale": eval_scale if score_source == "lc0-root" else None,
         "value_epsilon": value_epsilon if score_source == "lc0-root" else None,
+        "calibration": (
+            {
+                "path": str(calibration_path),
+                "sha256": calibration_sha256,
+                "schema": calibration["schema"],
+                "holdout": calibration["holdout"],
+            }
+            if calibration is not None
+            else None
+        ),
         "depth": args.depth,
         "threads": args.threads,
         "hash": args.hash,
@@ -161,6 +181,8 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "lc0_root_clamped_low": 0,
         "lc0_root_clamped_high": 0,
         "lc0_root_probability_out_of_range": 0,
+        "lc0_root_raw_white_score_min": None,
+        "lc0_root_raw_white_score_max": None,
     }
     start = time.monotonic()
     engine = None
@@ -234,6 +256,20 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
                         stats["lc0_root_probability_out_of_range"] = (
                             int(stats["lc0_root_probability_out_of_range"]) + 1
                         )
+                    row["score"] = score
+                    raw_white_score = bullet_text.white_score_from_row(
+                        row, enyo_runtime_target=True
+                    )
+                    for key, value, fn in (
+                        ("lc0_root_raw_white_score_min", raw_white_score, min),
+                        ("lc0_root_raw_white_score_max", raw_white_score, max),
+                    ):
+                        current = stats[key]
+                        stats[key] = value if current is None else fn(int(current), value)
+                    assert calibration is not None
+                    white_score = lc0_calibration.apply_anchors(
+                        raw_white_score, calibration["anchors"]
+                    )
                 else:
                     assert engine is not None
                     try:
@@ -264,19 +300,24 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
                         "input row has no ground-truth result; refusing to "
                         "synthesize a Bullet game result"
                     )
-                row["score"] = score
-                white_score = bullet_text.white_score_from_row(
-                    row,
-                    enyo_runtime_target=args.enyo_runtime_target,
-                )
+                if score_source != "lc0-root":
+                    row["score"] = score
+                    white_score = bullet_text.white_score_from_row(
+                        row,
+                        enyo_runtime_target=args.enyo_runtime_target,
+                    )
                 if args.max_abs_cp > 0 and abs(white_score) > args.max_abs_cp:
                     stats["skipped_cp"] = int(stats["skipped_cp"]) + 1
                     continue
-                bullet_format.write_row(
-                    dst,
-                    row,
-                    enyo_runtime_target=args.enyo_runtime_target,
-                )
+                # BulletFormat's writer accepts the score in its canonical
+                # white coordinate.  LC0 calibration already produced that
+                # exact runtime coordinate, so do not phase-normalize it a
+                # second time through row_to_bytes().
+                bbs, stm = bullet_format.parse_fen_bitboards(str(row["fen"]))
+                dst.write(bullet_format.chessboard_from_raw(
+                    bbs, stm, white_score,
+                    bullet_text.white_result_from_row(row),
+                ))
                 stats["written"] = int(stats["written"]) + 1
                 score_min = stats["output_score_min"]
                 score_max = stats["output_score_max"]
@@ -348,6 +389,11 @@ def parse_args() -> argparse.Namespace:
         "--inventory",
         type=Path,
         help="Canonical inventory for distributed conversion; optional for one standalone archive.",
+    )
+    parser.add_argument(
+        "--lc0-calibration",
+        type=Path,
+        help="Required measured LC0-root calibration artifact for --score-source lc0-root.",
     )
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--stats", required=True, type=Path)

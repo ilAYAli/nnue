@@ -45,13 +45,63 @@ are validated and atomically renamed.
 `--inventory` is required for a reproducible distributed conversion, but an
 individual `.tar` archive can be audited directly without one.
 
-To retain the LC0 root value rather than relabeling every position with
-Stockfish, add `--score-source lc0-root`. This maps LC0's side-to-move
-`root_q`/`root_d` value head to Bullet's search target with
-`score = eval_scale * logit((1 - root_d + root_q) / 2)`. The original
-per-game `wdl` field is preserved; the emitted stats file records probability
-and centipawn ranges, invalid values, endpoint clamps, and any tiny
-out-of-range root probabilities caused by LC0 head roundoff.
+## LC0 -> Enyo calibrated Bullet (required pipeline)
+
+`root_q` is only a source signal. It must never be written directly as an
+Enyo training score. `label.py --score-source lc0-root` therefore refuses to
+run without both `--enyo-runtime-target` and a valid `--lc0-calibration`
+artifact.
+
+Make that artifact from paired observations, not a guessed formula:
+
+1. Forge-distribute deterministic samples of the LC0 records.  Each sample
+   records the runtime-normalized white LC0-root score and the static score
+   of a fixed Enyo reference engine/net on the identical FEN.
+
+   ```sh
+   forge run tools/forge/sample-lc0-calibration.template.json \
+     --input ~/assets/training/lc0/test91-forge-input \
+     --engine ~/assets/engines/reference \
+     --net ~/assets/nets/nn-0ee0657fb25e.nnue \
+     --shards 1600
+   ```
+
+2. Fit only the deterministic `fit` rows and require independent `holdout`
+   improvement and scale checks. The default minimum is 50k fit and 10k
+   holdout pairs; failure produces no usable artifact.
+
+   ```sh
+   .venv/bin/python tools/score/lc0_calibration.py fit \
+     --input /path/to/forge/*.pairs.jsonl \
+     --output ~/assets/training/bullet/lc0/test91/test91.enyo-calibration.json
+   ```
+
+3. Use that immutable artifact in the distributed conversion. Forge stages
+   the exact file on every worker, and every shard records its SHA-256.
+
+   ```sh
+   forge run tools/forge/label-lc0-root.template.json \
+     --input ~/assets/training/lc0/test91-forge-input \
+     --output ~/assets/training/bullet/lc0/test91/test91-enyo.bullet \
+     --calibration ~/assets/training/bullet/lc0/test91/test91.enyo-calibration.json \
+     --shards 1600
+   ```
+
+4. After Forge's atomic merge, attest the exact merged bytes against every
+   shard stats file. This creates the required sidecar
+   `<corpus>.calibration.json`.
+
+   ```sh
+   .venv/bin/python tools/validate/attest_lc0_calibration.py \
+     --input ~/assets/training/bullet/lc0/test91/test91-enyo.bullet \
+     --calibration ~/assets/training/bullet/lc0/test91/test91.enyo-calibration.json \
+     --stats-dir /path/to/forge/shards \
+     --manifest ~/assets/training/bullet/lc0/test91/test91-enyo.bullet.calibration.json
+   ```
+
+`nnue train` independently verifies that sidecar for every corpus below
+`~/assets/training/bullet/lc0/`. A changed corpus, missing sidecar, invalid
+artifact, or a shard from another artifact is a hard training failure.
 
 ## Binpack count
 

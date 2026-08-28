@@ -64,6 +64,19 @@ def row(move: str = "a2a3") -> dict:
     }
 
 
+def calibration(path: Path) -> Path:
+    path.write_text(json.dumps({
+        "schema": "enyo.lc0-calibration.v1",
+        "valid": True,
+        "coordinate": "white-score, runtime-clamped and phase-normalized",
+        "anchors": [[0, 0], [2045, 1000]],
+        "fit": {"pairs": 2},
+        "holdout": {"passed": True},
+        "reference_target": {"net_sha256": "net", "engine_sha256": ["engine"]},
+    }), encoding="utf-8")
+    return path
+
+
 class StreamingLabelingTests(unittest.TestCase):
     def test_script_entrypoint_loads(self) -> None:
         result = subprocess.run(
@@ -206,7 +219,7 @@ class StreamingLabelingTests(unittest.TestCase):
             self.assertEqual(2, stats["selected"])
             self.assertEqual(2, stats["written"])
             self.assertIsNone(stats["inventory"])
-            self.assertEqual("enyo.label-stats.v2", stats["schema"])
+            self.assertEqual("enyo.label-stats.v3", stats["schema"])
             self.assertEqual(stats, json.loads(stats_path.read_text(encoding="utf-8")))
             self.assertEqual([], list(root.glob("*.partial.*")))
 
@@ -266,6 +279,7 @@ class StreamingLabelingTests(unittest.TestCase):
                 score_source="lc0-root",
                 eval_scale=400.0,
                 value_epsilon=1e-6,
+                lc0_calibration=calibration(root / "calibration.json"),
                 static=False,
                 depth=12,
                 threads=1,
@@ -278,7 +292,7 @@ class StreamingLabelingTests(unittest.TestCase):
                 engine_timeout_s=1.0,
                 max_abs_cp=10000,
                 progress=0,
-                enyo_runtime_target=False,
+                enyo_runtime_target=True,
             )
             black = row()
             black["fen"] = "k7/p7/8/8/8/8/8/7K b - - 0 1"
@@ -311,7 +325,22 @@ class StreamingLabelingTests(unittest.TestCase):
                 labeler.bullet_format.STRUCT.unpack_from(output.read_bytes(), offset)[2]
                 for offset in range(0, output.stat().st_size, 32)
             ]
-            self.assertEqual([879, 879], scores)
+            self.assertEqual([430, 430], scores)
+            self.assertIsNotNone(stats["calibration"])
+
+    def test_lc0_root_without_calibration_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                input=root, inventory=None, output=root / "out.bullet", stats=root / "out.json",
+                engine="unused", net=None, net_option="EvalFile", score_source="lc0-root",
+                eval_scale=400.0, value_epsilon=1e-6, lc0_calibration=None, static=False,
+                depth=1, threads=1, hash=1, max_records=1, min_ply=1, quiet_only=True,
+                shard_count=1, shard_index=0, engine_timeout_s=1.0, max_abs_cp=10000,
+                progress=0, enyo_runtime_target=True,
+            )
+            with self.assertRaisesRegex(ValueError, "require --lc0-calibration"):
+                labeler.label(args, engine_type=FakeEngine)
 
     def test_lc0_root_score_uses_logit_and_clamps_extremes(self) -> None:
         score, probability, low, high, out_of_range = labeler.lc0_root_score(
@@ -363,6 +392,7 @@ class StreamingLabelingTests(unittest.TestCase):
                 score_source="lc0-root",
                 eval_scale=400.0,
                 value_epsilon=1e-6,
+                lc0_calibration=calibration(root / "calibration.json"),
                 static=False,
                 depth=12,
                 threads=1,
@@ -375,7 +405,7 @@ class StreamingLabelingTests(unittest.TestCase):
                 engine_timeout_s=1.0,
                 max_abs_cp=10000,
                 progress=0,
-                enyo_runtime_target=False,
+                enyo_runtime_target=True,
             )
 
             def rows(*args: object, stats: lc0_to_jsonl.Stats, **kwargs: object):

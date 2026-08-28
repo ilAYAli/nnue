@@ -56,6 +56,7 @@ SKIP_SF_GATE=${SKIP_SF_GATE:-0}
 SKIP_RESIDUAL_GATE=${SKIP_RESIDUAL_GATE:-0}
 QSPRT=${QSPRT:-tools/validate/sprt_net.py}
 BULLET_RESULT_VALIDATOR=${BULLET_RESULT_VALIDATOR:-tools/validate/validate_bullet_results.py}
+LC0_CALIBRATION_ATTESTOR=${LC0_CALIBRATION_ATTESTOR:-tools/validate/attest_lc0_calibration.py}
 PROMOTED_NET_LINK=${PROMOTED_NET_LINK:-$HOME/assets/nets/candidate.net}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 # H1 is deliberately wide so Forge can reject clear losses promptly.
@@ -364,6 +365,17 @@ plan() {
   "$TRAIN_HELPER" plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS"
 }
 
+require_lc0_calibration() {
+  [[ "$data_file" == "$HOME"/assets/training/bullet/lc0/* ]] || return 0
+  local calibration_manifest="${data_file}.calibration.json"
+  [[ -f "$LC0_CALIBRATION_ATTESTOR" ]] || fail "missing LC0 calibration attestor: $LC0_CALIBRATION_ATTESTOR" train
+  [[ -f "$calibration_manifest" ]] || fail "missing LC0 calibration attestation: $calibration_manifest" train
+  "$PYTHON" "$LC0_CALIBRATION_ATTESTOR" \
+    --input "$data_file" --manifest "$calibration_manifest" --verify-only \
+    > "$log_dir/00-lc0-calibration-attestation.json" \
+    || fail "invalid LC0 calibration attestation: $calibration_manifest" train
+}
+
 train() {
   load_config
   require_training_origin train
@@ -379,6 +391,10 @@ train() {
     --input "$data_file" --require-win-loss \
     > "$log_dir/00-corpus-result-validation.json" \
     || fail "invalid training corpus: $data_file" train
+  # LC0 root-Q data is never a direct training target.  The sidecar binds the
+  # exact merged bytes to one valid calibration artifact and every Forge shard
+  # that produced it.  This is intentionally a hard failure, not a warning.
+  require_lc0_calibration
   section plan
   "$TRAIN_HELPER" plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" | tee "$plan_log" || fail "plan failed for $run" plan
   local train_args=(all --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS")

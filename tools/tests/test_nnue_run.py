@@ -47,6 +47,33 @@ class NnueRunTests(unittest.TestCase):
 
         self.assertNotEqual(0, proc.returncode)
 
+    def test_lc0_training_requires_calibration_attestation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            home = tmp / "home"
+            corpus = home / "assets" / "training" / "bullet" / "lc0" / "test.bullet"
+            corpus.parent.mkdir(parents=True)
+            corpus.write_bytes(b"x")
+            log_dir = tmp / "logs"
+            log_dir.mkdir()
+            proc = self.run_sourced(
+                f"NNUE_NTFY=0; HOME={shlex.quote(str(home))}; data_file={shlex.quote(str(corpus))}; "
+                f"log_dir={shlex.quote(str(log_dir))}; require_lc0_calibration"
+            )
+        self.assertNotEqual(0, proc.returncode)
+        self.assertIn("missing LC0 calibration attestation", proc.stderr)
+
+    def test_non_lc0_training_does_not_require_calibration_attestation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            log_dir = tmp / "logs"
+            log_dir.mkdir()
+            proc = self.run_sourced(
+                f"NNUE_NTFY=0; data_file={shlex.quote(str(tmp / 'nodes.bullet'))}; "
+                f"log_dir={shlex.quote(str(log_dir))}; require_lc0_calibration"
+            )
+        self.assertEqual(0, proc.returncode, proc.stderr)
+
     def test_sprt_h0_rejects_the_lower_bound(self) -> None:
         proc = self.run_sourced('sprt_h0_rejected "-2.20/2.20 (100%)"')
 
