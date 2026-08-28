@@ -29,6 +29,12 @@ class NnueRunTests(unittest.TestCase):
     def test_shell_syntax_is_valid(self) -> None:
         subprocess.run(["bash", "-n", str(REPO / "nnue")], check=True)
 
+    def test_default_engine_is_reference(self) -> None:
+        proc = self.run_sourced('printf "%s\\n" "$ENGINE"')
+
+        self.assertEqual(0, proc.returncode)
+        self.assertEqual(f"{Path.home()}/assets/engines/reference\n", proc.stdout)
+
     def test_force_ignores_passed_gate_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             log_dir = Path(tmp_name)
