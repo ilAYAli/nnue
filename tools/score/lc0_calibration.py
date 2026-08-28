@@ -43,7 +43,9 @@ def file_sha256(path: Path) -> str:
 def deterministic_split(source_file: str, record_index: int, *, holdout_percent: int = 20) -> str:
     if not 1 <= holdout_percent < 100:
         raise ValueError("holdout percent must be in [1, 99]")
-    key = f"{source_file}\0{record_index}".encode()
+    # This domain is deliberately distinct from the sampling predicate.
+    # Reusing one hash makes all sampled rows land in the same split.
+    key = f"split\0{source_file}\0{record_index}".encode()
     return "holdout" if int.from_bytes(hashlib.sha256(key).digest()[:8], "big") % 100 < holdout_percent else "fit"
 
 
@@ -196,6 +198,8 @@ def fit_artifact(pairs: list[dict], *, bins: int, min_fit_pairs: int, min_holdou
     holdout = [pair for pair in pairs if pair.get("split") == "holdout"]
     if len(fit) < min_fit_pairs or len(holdout) < min_holdout_pairs:
         raise ValueError(f"insufficient independent calibration pairs: fit={len(fit)} holdout={len(holdout)}")
+    if not any(_finite_score(pair["target_score"], "target_score") for pair in pairs):
+        raise ValueError("all static target scores are zero; refusing fallback-engine calibration")
     net_hashes = {str(pair.get("reference_net_sha256", "")) for pair in pairs}
     if "" in net_hashes or len(net_hashes) != 1:
         raise ValueError("calibration pairs must identify exactly one reference net SHA-256")
@@ -219,7 +223,7 @@ def fit_artifact(pairs: list[dict], *, bins: int, min_fit_pairs: int, min_holdou
         "holdout": {"passed": passed, "raw": raw, "calibrated": calibrated,
                     "mae_improvement": round(improvement, 6),
                     "min_mae_improvement": min_improvement, "max_slope_error": max_slope_error},
-        "split": "sha256(source_file + NUL + record_index) modulo 100; holdout below 20",
+        "split": "sha256(split + NUL + source_file + NUL + record_index) modulo 100; holdout below 20",
         "pairs_sha256": canonical_sha256(pairs),
     }
     return artifact
@@ -261,7 +265,7 @@ def sample_pairs(args: argparse.Namespace) -> dict:
              "net_option": args.net_option, "sample_modulus": args.sample_modulus,
              "sample_remainder": args.sample_remainder, "read": 0, "selected": 0,
              "sampled": 0, "written": 0, "skipped_timeout": 0, "skipped_no_score": 0,
-             "skipped_invalid_root": 0, "skipped_filter": 0}
+             "skipped_invalid_root": 0, "skipped_filter": 0, "target_nonzero": 0}
     engine = UciEngine(args.engine, threads=args.threads, hash_mb=args.hash,
                        net=args.net, net_option=args.net_option)
     engine_path = Path(args.engine).expanduser()
@@ -271,6 +275,10 @@ def sample_pairs(args: argparse.Namespace) -> dict:
         raise ValueError("calibration engine and net must be regular files")
     engine_sha256 = file_sha256(engine_path)
     net_sha256 = file_sha256(net_path)
+    startup_output = "\n".join(getattr(engine, "output_history", ())).casefold()
+    if "falling back" in startup_output or "unsupported stockfish nnue architecture" in startup_output:
+        engine.close()
+        raise ValueError("target engine rejected the requested net; refusing fallback-engine calibration")
     start = time.monotonic()
     try:
         with temporary.open("w", encoding="utf-8") as handle:
@@ -286,7 +294,7 @@ def sample_pairs(args: argparse.Namespace) -> dict:
                 stats["selected"] += 1
                 source_file = str(row["source_file"])
                 record_index = int(row["record_index"])
-                sample_hash = int.from_bytes(hashlib.sha256(f"{source_file}\0{record_index}".encode()).digest()[:8], "big")
+                sample_hash = int.from_bytes(hashlib.sha256(f"sample\0{source_file}\0{record_index}".encode()).digest()[:8], "big")
                 if sample_hash % args.sample_modulus != args.sample_remainder:
                     continue
                 stats["sampled"] += 1
@@ -307,6 +315,8 @@ def sample_pairs(args: argparse.Namespace) -> dict:
                     continue
                 row["score"] = target_stm
                 target_white = bullet_text.white_score_from_row(row, enyo_runtime_target=True)
+                if target_white:
+                    stats["target_nonzero"] += 1
                 pair = {"source_file": source_file, "record_index": record_index,
                         "split": deterministic_split(source_file, record_index),
                         "raw_score": raw_white, "target_score": target_white,
@@ -318,6 +328,8 @@ def sample_pairs(args: argparse.Namespace) -> dict:
             os.fsync(handle.fileno())
         if not stats["written"]:
             raise ValueError("calibration sample is empty")
+        if not stats["target_nonzero"]:
+            raise ValueError("all static target scores are zero; refusing fallback-engine calibration")
         stats["elapsed_s"] = round(time.monotonic() - start, 3)
         stats["decoder"] = {"files": decode.files, "invalid_records": decode.invalid_records,
                             "invalid_boards": decode.invalid_boards, "unsupported_records": decode.unsupported_records}

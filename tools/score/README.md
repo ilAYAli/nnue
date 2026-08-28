@@ -62,13 +62,14 @@ Make that artifact from paired observations, not a guessed formula:
    forge run tools/forge/sample-lc0-calibration.template.json \
      --input ~/assets/training/lc0/test91-forge-input \
      --engine ~/assets/engines/reference \
-     --net ~/assets/nets/nn-0ee0657fb25e.nnue \
+     --net ~/assets/nets/enyo-7.3.0-rc3.nn \
      --shards 1600
    ```
 
 2. Fit only the deterministic `fit` rows and require independent `holdout`
-   improvement and scale checks. The default minimum is 50k fit and 10k
-   holdout pairs; failure produces no usable artifact.
+   improvement and scale checks. Sampling and holdout use separate hash
+   domains, so both splits are populated. The default minimum is 50k fit and
+   10k holdout pairs; failure produces no usable artifact.
 
    ```sh
    .venv/bin/python tools/score/lc0_calibration.py fit \
@@ -102,6 +103,8 @@ Make that artifact from paired observations, not a guessed formula:
 `nnue train` independently verifies that sidecar for every corpus below
 `~/assets/training/bullet/lc0/`. A changed corpus, missing sidecar, invalid
 artifact, or a shard from another artifact is a hard training failure.
+The sampler also rejects an engine fallback diagnostic or an all-zero static
+target before it writes a pair shard.
 
 ## Binpack count
 

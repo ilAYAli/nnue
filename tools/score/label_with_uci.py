@@ -40,6 +40,7 @@ class UciEngine:
         self.hash_mb = hash_mb
         self.net = net
         self.net_option = net_option
+        self.output_history: list[str] = []
         self.start()
 
     def start(self) -> None:
@@ -85,7 +86,9 @@ class UciEngine:
             self.lines.put(None)
             return
         for line in self.proc.stdout:
-            self.lines.put(line.strip())
+            text = line.strip()
+            self.output_history.append(text)
+            self.lines.put(text)
         self.lines.put(None)
 
     def send(self, command: str) -> None:

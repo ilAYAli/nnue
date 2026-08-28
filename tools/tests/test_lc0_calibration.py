@@ -36,6 +36,17 @@ class CalibrationTests(unittest.TestCase):
         self.assertIn("fit", values)
         self.assertIn("holdout", values)
 
+    def test_sample_and_split_hashes_are_independent(self) -> None:
+        splits = set()
+        for index in range(100_000):
+            source = "a.gz"
+            selected = int.from_bytes(
+                calibration.hashlib.sha256(f"sample\0{source}\0{index}".encode()).digest()[:8], "big"
+            ) % 100 == 0
+            if selected:
+                splits.add(calibration.deterministic_split(source, index))
+        self.assertEqual({"fit", "holdout"}, splits)
+
     def test_fit_requires_independent_improvement(self) -> None:
         artifact = calibration.fit_artifact(
             pairs(), bins=16, min_fit_pairs=100, min_holdout_pairs=20,
@@ -52,6 +63,15 @@ class CalibrationTests(unittest.TestCase):
         rows = pairs()
         rows[-1]["reference_net_sha256"] = "net-b"
         with self.assertRaisesRegex(ValueError, "exactly one reference net"):
+            calibration.fit_artifact(rows, bins=16, min_fit_pairs=100,
+                                     min_holdout_pairs=20, min_improvement=0.2,
+                                     max_slope_error=0.1)
+
+    def test_fit_rejects_zero_target_fallback(self) -> None:
+        rows = pairs()
+        for row in rows:
+            row["target_score"] = 0
+        with self.assertRaisesRegex(ValueError, "all static target scores are zero"):
             calibration.fit_artifact(rows, bins=16, min_fit_pairs=100,
                                      min_holdout_pairs=20, min_improvement=0.2,
                                      max_slope_error=0.1)
