@@ -23,6 +23,7 @@ def pairs() -> list[dict]:
     for index in range(200):
         raw = (-1 if index % 2 else 1) * (20 + index * 4)
         result.append({"raw_score": raw, "target_score": raw // 2,
+                       "source_file": "a.gz", "record_index": index,
                        "split": "holdout" if index % 5 == 0 else "fit",
                        "target_mode": "search", "target_depth": 1,
                        "reference_engine_sha256": "engine-a",
@@ -78,6 +79,41 @@ class CalibrationTests(unittest.TestCase):
             calibration.fit_artifact(rows, bins=16, min_fit_pairs=100,
                                      min_holdout_pairs=20, min_improvement=0.2,
                                      max_slope_error=0.1)
+
+    def test_fit_rejects_duplicate_source_records(self) -> None:
+        rows = pairs()
+        rows[-1]["source_file"] = rows[0]["source_file"]
+        rows[-1]["record_index"] = rows[0]["record_index"]
+        with self.assertRaisesRegex(ValueError, "duplicate source records"):
+            calibration.fit_artifact(rows, bins=16, min_fit_pairs=100,
+                                     min_holdout_pairs=20, min_improvement=0.2,
+                                     max_slope_error=0.1)
+
+    def test_progress_line_matches_template_fields(self) -> None:
+        line = calibration.progress_line({
+            "read": 10, "selected": 8, "sampled": 2,
+            "target_nonzero": 2, "written": 2,
+        })
+        self.assertEqual(
+            "read=10 selected=8 sampled=2 target_nonzero=2 written=2",
+            line,
+        )
+
+    def test_multitask_scope_rejects_full_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "inventory.json"
+            path.write_text(json.dumps({
+                "schema": "forge.lc0-inventory.v1",
+                "files": [{"path": "training.1.gz", "sha256": "a" * 64, "size": 1}],
+            }), encoding="utf-8")
+            digest = calibration.inventory_file_sha256(path)
+            with self.assertRaisesRegex(ValueError, "full LC0 inventory"):
+                calibration.validate_task_scope(path, digest, 2, 0)
+            calibration.validate_task_scope(path, "b" * 64, 2, 0)
+
+    def test_task_scope_always_validates_task_index(self) -> None:
+        with self.assertRaisesRegex(ValueError, "task index/count"):
+            calibration.validate_task_scope(None, "a" * 64, 2, 2)
 
     def test_fit_rejects_nonsearch_targets(self) -> None:
         rows = pairs()

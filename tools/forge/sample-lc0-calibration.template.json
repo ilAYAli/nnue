@@ -31,10 +31,10 @@
     "inputs": [{"name": "input inventory cache", "path": "{source_cache}", "tree": "lc0-inventory", "digest": "{inventory_digest}"}, {"name": "reference net", "path": "{net}"}]
   },
   "task": {
-    "split": {"total": "split_records", "count": "shards", "unit": "records"},
+    "split": {"total": "split_records", "count": "shards"},
     "label": "sample-lc0-calibration:{shard}",
     "outputs": ["{output_dir}/{task_name}.pairs.jsonl"],
-    "command": ".venv/bin/python tools/score/lc0_calibration.py sample --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.pairs.jsonl --engine {engine} --net {net} --net-option nnue_file --threads {threads} --hash {hash} --target-depth {target_depth} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --sample-modulus {sample_modulus} --shard-count 1 --shard-index 0",
-    "progress": {"unit": "records", "log_regex": "read=(?P<done>\\d+)", "series": [{"name": "read", "field": "done", "x": "done", "scale": "linear"}]}
+    "command": ".venv/bin/python tools/score/lc0_calibration.py sample --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.pairs.jsonl --engine {engine} --net {net} --net-option nnue_file --threads {threads} --hash {hash} --target-depth {target_depth} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --sample-modulus {sample_modulus} --expected-inventory-digest {inventory_digest} --task-count {task_count} --task-index {task_index} --shard-count 1 --shard-index 0",
+    "progress": {"unit": "records", "log_regex": "read=(?P<done>\\d+) selected=(?P<selected>\\d+) sampled=(?P<sampled>\\d+) target_nonzero=(?P<target_nonzero>\\d+) written=(?P<output>\\d+)", "output_unit": "pairs", "series": [{"name": "read", "field": "done", "x": "done", "scale": "linear"}, {"name": "selected", "field": "selected", "x": "done", "scale": "linear"}, {"name": "sampled", "field": "sampled", "x": "done", "scale": "linear"}, {"name": "target nonzero", "field": "target_nonzero", "x": "done", "scale": "linear"}, {"name": "written", "field": "output", "x": "done", "scale": "linear"}]}
   }
 }

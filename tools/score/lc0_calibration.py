@@ -40,6 +40,43 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def inventory_file_sha256(path: Path) -> str:
+    """Hash a Forge inventory using the coordinator's canonical encoding."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema") != "forge.lc0-inventory.v1":
+        raise ValueError("unsupported LC0 inventory schema")
+    files = payload.get("files")
+    if not isinstance(files, list):
+        raise ValueError("LC0 inventory has no file list")
+    canonical = {
+        "schema": "forge.lc0-inventory.v1",
+        "files": [
+            {"path": item["path"], "sha256": item["sha256"], "size": item["size"]}
+            for item in files
+            if isinstance(item, dict)
+            and isinstance(item.get("path"), str)
+            and isinstance(item.get("sha256"), str)
+            and isinstance(item.get("size"), int)
+        ],
+    }
+    if len(canonical["files"]) != len(files):
+        raise ValueError("LC0 inventory has an invalid file entry")
+    return hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def canonical_source_file(input_root: Path, source_file: str) -> str:
+    """Remove worker cache prefixes from deterministic record identities."""
+    path = Path(source_file)
+    if not path.is_absolute():
+        return path.as_posix()
+    try:
+        return path.resolve().relative_to(input_root.expanduser().resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def deterministic_split(source_file: str, record_index: int, *, holdout_percent: int = 20) -> str:
     if not 1 <= holdout_percent < 100:
         raise ValueError("holdout percent must be in [1, 99]")
@@ -209,6 +246,15 @@ def fit_artifact(pairs: list[dict], *, bins: int, min_fit_pairs: int, min_holdou
     target_depth = next(iter(target_depths))
     if not any(_finite_score(pair["target_score"], "target_score") for pair in pairs):
         raise ValueError("all fixed-depth target scores are zero; refusing calibration")
+    identities = []
+    for pair in pairs:
+        source_file = pair.get("source_file")
+        record_index = pair.get("record_index")
+        if not isinstance(source_file, str) or not source_file or not isinstance(record_index, int):
+            raise ValueError("calibration pairs must identify source records")
+        identities.append((source_file, record_index))
+    if len(set(identities)) != len(identities):
+        raise ValueError("calibration pairs contain duplicate source records")
     net_hashes = {str(pair.get("reference_net_sha256", "")) for pair in pairs}
     if "" in net_hashes or len(net_hashes) != 1:
         raise ValueError("calibration pairs must identify exactly one reference net SHA-256")
@@ -254,6 +300,34 @@ def read_pairs(paths: list[Path]) -> list[dict]:
     return result
 
 
+def progress_line(stats: dict[str, int]) -> str:
+    return (
+        f"read={stats['read']} selected={stats['selected']} sampled={stats['sampled']} "
+        f"target_nonzero={stats['target_nonzero']} written={stats['written']}"
+    )
+
+
+def validate_task_scope(
+    inventory: Path | None,
+    expected_inventory_digest: str | None,
+    task_count: int,
+    task_index: int,
+) -> None:
+    """Reject a multi-task launch that was given the coordinator inventory."""
+    if task_count <= 0 or not 0 <= task_index < task_count:
+        raise ValueError("invalid calibration task index/count")
+    if not expected_inventory_digest or task_count == 1:
+        return
+    if inventory is None:
+        raise ValueError("multi-task calibration requires a Forge task inventory")
+    actual_inventory_digest = inventory_file_sha256(inventory)
+    if actual_inventory_digest == expected_inventory_digest:
+        raise ValueError(
+            "Forge supplied the full LC0 inventory to a multi-task calibration task; "
+            "task-scoped input partitioning is missing"
+        )
+
+
 def verify_target_engine(engine: object, net_sha256: str, *, depth: int, timeout_s: float) -> dict:
     """Require the engine to prove that the requested native net is active.
 
@@ -284,6 +358,8 @@ def sample_pairs(args: argparse.Namespace) -> dict:
 
     if args.sample_modulus <= 0 or not 0 <= args.sample_remainder < args.sample_modulus:
         raise ValueError("invalid deterministic sampling modulus/remainder")
+    validate_task_scope(args.inventory, args.expected_inventory_digest,
+                        args.task_count, args.task_index)
     output = args.output
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(f".{output.name}.partial.{os.getpid()}")
@@ -306,6 +382,7 @@ def sample_pairs(args: argparse.Namespace) -> dict:
     engine_sha256 = file_sha256(engine_path)
     net_sha256 = file_sha256(net_path)
     start = time.monotonic()
+    next_progress = 10_000
     try:
         stats["target_preflight"] = verify_target_engine(
             engine, net_sha256, depth=args.target_depth, timeout_s=args.engine_timeout_s,
@@ -317,11 +394,14 @@ def sample_pairs(args: argparse.Namespace) -> dict:
                 top_policy=0, stats=decode,
             ):
                 stats["read"] = decode.records
+                if decode.records >= next_progress:
+                    print(progress_line(stats), flush=True)
+                    next_progress = (decode.records // 10_000 + 1) * 10_000
                 if ply < args.min_ply or (args.quiet_only and not is_quiet(row)):
                     stats["skipped_filter"] += 1
                     continue
                 stats["selected"] += 1
-                source_file = str(row["source_file"])
+                source_file = canonical_source_file(args.input, str(row["source_file"]))
                 record_index = int(row["record_index"])
                 sample_hash = int.from_bytes(hashlib.sha256(f"sample\0{source_file}\0{record_index}".encode()).digest()[:8], "big")
                 if sample_hash % args.sample_modulus != args.sample_remainder:
@@ -370,6 +450,7 @@ def sample_pairs(args: argparse.Namespace) -> dict:
         stats["decoder"] = {"files": decode.files, "invalid_records": decode.invalid_records,
                             "invalid_boards": decode.invalid_boards, "unsupported_records": decode.unsupported_records}
         os.replace(temporary, output)
+        print(progress_line(stats), flush=True)
         print(json.dumps(stats, sort_keys=True))
         return stats
     finally:
@@ -406,6 +487,9 @@ def main() -> None:
     sample.add_argument("--shard-index", type=int, default=0)
     sample.add_argument("--sample-modulus", type=int, default=10000)
     sample.add_argument("--sample-remainder", type=int, default=0)
+    sample.add_argument("--expected-inventory-digest")
+    sample.add_argument("--task-count", type=int, default=1)
+    sample.add_argument("--task-index", type=int, default=0)
     sample.add_argument("--eval-scale", type=float, default=400.0)
     sample.add_argument("--value-epsilon", type=float, default=1e-6)
     args = parser.parse_args()
