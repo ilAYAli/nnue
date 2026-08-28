@@ -819,6 +819,11 @@ wait_for_existing_forge_sprt() {
   done
 }
 
+forge_worker_setup_complete() {
+  local log=$1
+  ! grep -Eq '^[[:space:]]*FAILED .*setup rc=|^deploy: setup partial;' "$log"
+}
+
 run_sprt_once() {
   local label=$1 sprt_games=$2 stage=$3 hypothesis
   hypothesis=$(jq -r '.hypothesis // empty' "$BUILD" 2>/dev/null || printf '')
@@ -875,6 +880,10 @@ run_sprt_once() {
     last_sprt_command=$(quote_cmd "${forge_cmd[@]}")
     if ! "${forge_cmd[@]}" 2>&1 | tee "$last_sprt_log"; then
       fail "could not launch Forge SPRT for $run ($forge_run)" sprt
+    fi
+    if ! forge_worker_setup_complete "$last_sprt_log"; then
+      "$FORGE" stop --force "$forge_run" </dev/null 2>&1 | tee -a "$last_sprt_log" || true
+      fail "Forge SPRT worker setup was partial for $run ($forge_run); refusing an invalid test" sprt
     fi
 
     local wait_rc=0

@@ -53,6 +53,21 @@ class NnueRunTests(unittest.TestCase):
         self.assertEqual("", proc.stderr)
         self.assertEqual(0, proc.returncode)
 
+    def test_partial_forge_setup_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_name:
+            tmp = Path(tmp_name)
+            complete = tmp / "complete.log"
+            partial = tmp / "partial.log"
+            complete.write_text("deploy: pwa-llm [12 slots] ready; launching now\n", encoding="utf-8")
+            partial.write_text("deploy: setup partial; 75/80 slots ready\n", encoding="utf-8")
+
+            proc = self.run_sourced(
+                f"forge_worker_setup_complete {shlex.quote(str(complete))} && "
+                f"! forge_worker_setup_complete {shlex.quote(str(partial))}"
+            )
+
+        self.assertEqual(0, proc.returncode)
+
     def test_dispatch_is_parsed_before_long_running_command(self) -> None:
         source = (REPO / "nnue").read_text(encoding="utf-8")
         self.assertEqual(1, source.count(DISPATCH_MARKER))
