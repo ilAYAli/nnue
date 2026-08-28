@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fit and apply a measured LC0-root-Q -> Enyo static-target calibration.
+"""Fit and apply a measured LC0-root-Q -> fixed-depth Enyo calibration.
 
 The direct root-Q logit is only a *source coordinate*.  It is deliberately
 not a trainable target.  A valid artifact records a fit on deterministic
@@ -181,6 +181,9 @@ def validate_artifact(artifact: dict) -> None:
         or not reference_target["net_sha256"]
         or not isinstance(reference_target.get("engine_sha256"), list)
         or not reference_target["engine_sha256"]
+        or reference_target.get("mode") != "search"
+        or not isinstance(reference_target.get("depth"), int)
+        or reference_target["depth"] < 1
     ):
         raise ValueError("calibration artifact has no reference-target provenance")
 
@@ -198,8 +201,14 @@ def fit_artifact(pairs: list[dict], *, bins: int, min_fit_pairs: int, min_holdou
     holdout = [pair for pair in pairs if pair.get("split") == "holdout"]
     if len(fit) < min_fit_pairs or len(holdout) < min_holdout_pairs:
         raise ValueError(f"insufficient independent calibration pairs: fit={len(fit)} holdout={len(holdout)}")
+    if any(pair.get("target_mode") != "search" for pair in pairs):
+        raise ValueError("calibration pairs must use the fixed-depth search target")
+    target_depths = {pair.get("target_depth") for pair in pairs}
+    if len(target_depths) != 1 or not isinstance(next(iter(target_depths)), int) or next(iter(target_depths)) < 1:
+        raise ValueError("calibration pairs must identify exactly one positive target search depth")
+    target_depth = next(iter(target_depths))
     if not any(_finite_score(pair["target_score"], "target_score") for pair in pairs):
-        raise ValueError("all static target scores are zero; refusing fallback-engine calibration")
+        raise ValueError("all fixed-depth target scores are zero; refusing calibration")
     net_hashes = {str(pair.get("reference_net_sha256", "")) for pair in pairs}
     if "" in net_hashes or len(net_hashes) != 1:
         raise ValueError("calibration pairs must identify exactly one reference net SHA-256")
@@ -218,7 +227,8 @@ def fit_artifact(pairs: list[dict], *, bins: int, min_fit_pairs: int, min_holdou
     artifact = {
         "schema": SCHEMA, "valid": passed,
         "coordinate": "white-score, runtime-clamped and phase-normalized", "anchors": anchors,
-        "reference_target": {"net_sha256": next(iter(net_hashes)), "engine_sha256": engine_hashes},
+        "reference_target": {"net_sha256": next(iter(net_hashes)), "engine_sha256": engine_hashes,
+                             "mode": "search", "depth": target_depth},
         "fit": metrics(fit, anchors),
         "holdout": {"passed": passed, "raw": raw, "calibrated": calibrated,
                     "mae_improvement": round(improvement, 6),
@@ -244,6 +254,25 @@ def read_pairs(paths: list[Path]) -> list[dict]:
     return result
 
 
+def verify_target_engine(engine: object, net_sha256: str, *, depth: int, timeout_s: float) -> dict:
+    """Require the engine to prove that the requested native net is active.
+
+    The static ``eval`` UCI extension has returned zeros with a loaded native
+    Enyo net.  Calibration therefore uses normal fixed-depth UCI search and
+    checks both the engine's reported net digest and a material KQK score.
+    This runs inside every Forge task before any source record is accepted.
+    """
+    output = "\n".join(getattr(engine, "output_history", ())).casefold()
+    if "falling back" in output or "unsupported stockfish nnue architecture" in output:
+        raise ValueError("target engine rejected the requested net; refusing fallback-engine calibration")
+    if net_sha256.casefold() not in output:
+        raise ValueError("target engine did not report the requested native net SHA-256")
+    score, mate = engine.label("4k3/8/8/8/8/8/8/4KQ2 w - - 0 1", depth=depth, timeout_s=timeout_s)
+    if mate is not None or score is None or abs(score) < 500:
+        raise ValueError("target engine failed fixed-depth KQK preflight")
+    return {"fen": "4k3/8/8/8/8/8/8/4KQ2 w - - 0 1", "score_stm": score}
+
+
 def sample_pairs(args: argparse.Namespace) -> dict:
     """Write deterministic, independently split source/target evaluation pairs."""
     # Local imports keep artifact verification lightweight and avoid a module
@@ -263,7 +292,8 @@ def sample_pairs(args: argparse.Namespace) -> dict:
     stats = {"schema": "enyo.lc0-calibration-pairs.v1", "input": str(args.input),
              "output": str(output), "engine": args.engine, "net": args.net,
              "net_option": args.net_option, "sample_modulus": args.sample_modulus,
-             "sample_remainder": args.sample_remainder, "read": 0, "selected": 0,
+             "sample_remainder": args.sample_remainder, "target_mode": "search",
+             "target_depth": args.target_depth, "read": 0, "selected": 0,
              "sampled": 0, "written": 0, "skipped_timeout": 0, "skipped_no_score": 0,
              "skipped_invalid_root": 0, "skipped_filter": 0, "target_nonzero": 0}
     engine = UciEngine(args.engine, threads=args.threads, hash_mb=args.hash,
@@ -275,12 +305,11 @@ def sample_pairs(args: argparse.Namespace) -> dict:
         raise ValueError("calibration engine and net must be regular files")
     engine_sha256 = file_sha256(engine_path)
     net_sha256 = file_sha256(net_path)
-    startup_output = "\n".join(getattr(engine, "output_history", ())).casefold()
-    if "falling back" in startup_output or "unsupported stockfish nnue architecture" in startup_output:
-        engine.close()
-        raise ValueError("target engine rejected the requested net; refusing fallback-engine calibration")
     start = time.monotonic()
     try:
+        stats["target_preflight"] = verify_target_engine(
+            engine, net_sha256, depth=args.target_depth, timeout_s=args.engine_timeout_s,
+        )
         with temporary.open("w", encoding="utf-8") as handle:
             for row, ply in lc0_to_jsonl.iter_rows(
                 args.input, inventory=args.inventory, shard_count=args.shard_count,
@@ -305,7 +334,13 @@ def sample_pairs(args: argparse.Namespace) -> dict:
                 row["score"] = root[0]
                 raw_white = bullet_text.white_score_from_row(row, enyo_runtime_target=True)
                 try:
-                    target_stm = engine.static_eval(row["fen"], timeout_s=args.engine_timeout_s)
+                    target_stm, target_mate = engine.label(
+                        row["fen"], depth=args.target_depth,
+                        timeout_s=args.engine_timeout_s,
+                    )
+                    if target_mate is not None:
+                        stats["skipped_no_score"] += 1
+                        continue
                 except EngineTimeout:
                     stats["skipped_timeout"] += 1
                     engine.restart()
@@ -320,6 +355,7 @@ def sample_pairs(args: argparse.Namespace) -> dict:
                 pair = {"source_file": source_file, "record_index": record_index,
                         "split": deterministic_split(source_file, record_index),
                         "raw_score": raw_white, "target_score": target_white,
+                        "target_mode": "search", "target_depth": args.target_depth,
                         "reference_engine_sha256": engine_sha256,
                         "reference_net_sha256": net_sha256}
                 handle.write(json.dumps(pair, sort_keys=True, separators=(",", ":")) + "\n")
@@ -329,7 +365,7 @@ def sample_pairs(args: argparse.Namespace) -> dict:
         if not stats["written"]:
             raise ValueError("calibration sample is empty")
         if not stats["target_nonzero"]:
-            raise ValueError("all static target scores are zero; refusing fallback-engine calibration")
+            raise ValueError("all fixed-depth target scores are zero; refusing calibration")
         stats["elapsed_s"] = round(time.monotonic() - start, 3)
         stats["decoder"] = {"files": decode.files, "invalid_records": decode.invalid_records,
                             "invalid_boards": decode.invalid_boards, "unsupported_records": decode.unsupported_records}
@@ -362,6 +398,7 @@ def main() -> None:
     sample.add_argument("--threads", type=int, default=1)
     sample.add_argument("--hash", type=int, default=64)
     sample.add_argument("--engine-timeout-s", type=float, default=30.0)
+    sample.add_argument("--target-depth", type=int, default=1)
     sample.add_argument("--max-records", type=int, default=0)
     sample.add_argument("--min-ply", type=int, default=16)
     sample.add_argument("--quiet-only", action=argparse.BooleanOptionalAction, default=True)
@@ -373,6 +410,8 @@ def main() -> None:
     sample.add_argument("--value-epsilon", type=float, default=1e-6)
     args = parser.parse_args()
     if args.command == "sample":
+        if args.target_depth < 1:
+            raise ValueError("--target-depth must be positive")
         sample_pairs(args)
         return
     pairs = read_pairs(args.input)

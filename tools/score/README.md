@@ -55,14 +55,17 @@ artifact.
 Make that artifact from paired observations, not a guessed formula:
 
 1. Forge-distribute deterministic samples of the LC0 records.  Each sample
-   records the runtime-normalized white LC0-root score and the static score
-   of a fixed, verified static-evaluation engine/net on the identical FEN.
+   records the runtime-normalized white LC0-root score and the score from a
+   fixed-depth Enyo search using a fixed native Enyo engine/net on the
+   identical FEN. The sampler rejects fallback loading, missing engine-reported
+   net SHA-256, a failed KQK search preflight, or all-zero sampled targets.
 
    ```sh
    forge run tools/forge/sample-lc0-calibration.template.json \
      --input ~/assets/training/lc0/test91-forge-input \
-     --engine /path/to/verified-static-eval-engine \
-     --net /path/to/compatible-reference-net \
+     --engine /path/to/enyo-engine \
+     --net /path/to/compatible-native-enyo-net \
+     --target-depth 1 \
      --shards 1600
    ```
 
@@ -103,8 +106,9 @@ Make that artifact from paired observations, not a guessed formula:
 `nnue train` independently verifies that sidecar for every corpus below
 `~/assets/training/bullet/lc0/`. A changed corpus, missing sidecar, invalid
 artifact, or a shard from another artifact is a hard training failure.
-The sampler also rejects an engine fallback diagnostic or an all-zero static
-target before it writes a pair shard.
+The sampler only accepts fixed-depth search targets; it does not use Enyo's
+currently unusable static `eval` extension. Each Forge task independently
+performs the target-engine preflight before it writes a pair shard.
 
 ## Binpack count
 

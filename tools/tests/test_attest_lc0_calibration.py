@@ -22,7 +22,7 @@ class AttestationTests(unittest.TestCase):
         path.write_text(json.dumps({
             "schema": "enyo.lc0-calibration.v1", "valid": True,
             "anchors": [[0, 0], [100, 50]], "holdout": {"passed": True},
-            "reference_target": {"net_sha256": "net", "engine_sha256": ["engine"]},
+            "reference_target": {"net_sha256": "net", "engine_sha256": ["engine"], "mode": "search", "depth": 1},
         }), encoding="utf-8")
         return path
 

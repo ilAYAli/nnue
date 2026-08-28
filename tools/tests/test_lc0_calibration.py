@@ -24,6 +24,7 @@ def pairs() -> list[dict]:
         raw = (-1 if index % 2 else 1) * (20 + index * 4)
         result.append({"raw_score": raw, "target_score": raw // 2,
                        "split": "holdout" if index % 5 == 0 else "fit",
+                       "target_mode": "search", "target_depth": 1,
                        "reference_engine_sha256": "engine-a",
                        "reference_net_sha256": "net-a"})
     return result
@@ -58,6 +59,8 @@ class CalibrationTests(unittest.TestCase):
         self.assertLess(calibration.apply_anchors(-400, artifact["anchors"]), 0)
         calibration.validate_artifact(artifact)
         self.assertEqual("net-a", artifact["reference_target"]["net_sha256"])
+        self.assertEqual("search", artifact["reference_target"]["mode"])
+        self.assertEqual(1, artifact["reference_target"]["depth"])
 
     def test_fit_rejects_mixed_reference_nets(self) -> None:
         rows = pairs()
@@ -71,7 +74,15 @@ class CalibrationTests(unittest.TestCase):
         rows = pairs()
         for row in rows:
             row["target_score"] = 0
-        with self.assertRaisesRegex(ValueError, "all static target scores are zero"):
+        with self.assertRaisesRegex(ValueError, "all fixed-depth target scores are zero"):
+            calibration.fit_artifact(rows, bins=16, min_fit_pairs=100,
+                                     min_holdout_pairs=20, min_improvement=0.2,
+                                     max_slope_error=0.1)
+
+    def test_fit_rejects_nonsearch_targets(self) -> None:
+        rows = pairs()
+        rows[0]["target_mode"] = "static"
+        with self.assertRaisesRegex(ValueError, "fixed-depth search"):
             calibration.fit_artifact(rows, bins=16, min_fit_pairs=100,
                                      min_holdout_pairs=20, min_improvement=0.2,
                                      max_slope_error=0.1)
@@ -91,6 +102,7 @@ class CalibrationTests(unittest.TestCase):
         artifact = {
             "schema": calibration.SCHEMA, "valid": True,
             "anchors": [[0, 0], [100, 50], [200, 40]], "holdout": {"passed": True},
+            "reference_target": {"net_sha256": "net", "engine_sha256": ["engine"], "mode": "search", "depth": 1},
         }
         with self.assertRaisesRegex(ValueError, "not monotone"):
             calibration.validate_artifact(artifact)

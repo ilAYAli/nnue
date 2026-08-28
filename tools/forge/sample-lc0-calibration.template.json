@@ -2,7 +2,7 @@
   "schema": "forge.template.v1",
   "name": "sample-lc0-calibration",
   "kind": "label",
-  "description": "Distributed deterministic LC0-root/static-Enyo pair sampling for calibration fitting",
+  "description": "Distributed deterministic LC0-root/fixed-depth-Enyo pair sampling for calibration fitting",
   "run_name": "sample-lc0-calibration-{input_stem}-{timestamp}",
   "work_dir": "{labeler}",
   "materialize_inputs": true,
@@ -12,15 +12,16 @@
     "chunk_time_seconds": {"type": "int", "default": 300, "help": "Target wall-clock seconds per adaptive chunk"},
     "labeler": {"type": "source", "default": "nnue", "include": ["tools/score/**", "tools/lib/**", "tools/posgen/**", "tools/tests/test_streaming_labeling.py", "tools/tests/test_lc0_to_jsonl.py", "tools/tests/test_lc0_calibration.py"], "exclude": ["**/__pycache__/**", "**/.venv/**", "**/target/**"], "output": "~/.cache/forge/sources/nnue-{digest12}", "help": "Committed NNUE labeler source"},
     "input": {"required": true, "path_context": "shared_home", "help": "LC0 training.* directory"},
-    "engine": {"required": true, "local_default": true, "path_context": "shared_home", "help": "Static Enyo engine executable"},
-    "net": {"required": true, "local_default": true, "path_context": "shared_home", "help": "Fixed Enyo/Stockfish reference net defining target coordinates"},
+    "engine": {"required": true, "local_default": true, "path_context": "shared_home", "help": "Enyo engine executable that reports the loaded native net SHA-256"},
+    "net": {"required": true, "local_default": true, "path_context": "shared_home", "help": "Native Enyo net compatible with engine, defining target coordinates"},
     "threads": {"type": "int", "default": 1, "help": "Engine threads per shard"},
     "hash": {"type": "int", "default": 64, "help": "Engine hash MiB per shard"},
+    "target_depth": {"type": "int", "default": 1, "help": "Fixed positive Enyo search depth for target scores"},
     "max_records": {"type": "int", "default": 0, "help": "Global raw record limit; zero means all"},
     "split_records": {"type": "int", "default": 1600, "help": "Positive planner placeholder when max_records is zero"},
     "min_ply": {"type": "int", "default": 16, "help": "Minimum game ply"},
     "quiet_only": {"type": "bool", "default": true, "help": "Keep quiet non-check positions"},
-    "sample_modulus": {"type": "int", "default": 10000, "help": "Keep records whose deterministic hash modulo this value is zero"},
+    "sample_modulus": {"type": "int", "default": 1000, "help": "Keep records whose deterministic hash modulo this value is zero; yields enough pairs for the 50k/10k fit/holdout gate"},
     "shards": {"type": "int", "help": "Override adaptive task count"}
   },
   "requirements": {
@@ -33,7 +34,7 @@
     "split": {"total": "split_records", "count": "shards", "unit": "records"},
     "label": "sample-lc0-calibration:{shard}",
     "outputs": ["{output_dir}/{task_name}.pairs.jsonl"],
-    "command": ".venv/bin/python tools/score/lc0_calibration.py sample --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.pairs.jsonl --engine {engine} --net {net} --net-option nnue_file --threads {threads} --hash {hash} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --sample-modulus {sample_modulus} --shard-count 1 --shard-index 0",
+    "command": ".venv/bin/python tools/score/lc0_calibration.py sample --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.pairs.jsonl --engine {engine} --net {net} --net-option nnue_file --threads {threads} --hash {hash} --target-depth {target_depth} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --sample-modulus {sample_modulus} --shard-count 1 --shard-index 0",
     "progress": {"unit": "records", "log_regex": "read=(?P<done>\\d+)", "series": [{"name": "read", "field": "done", "x": "done", "scale": "linear"}]}
   }
 }

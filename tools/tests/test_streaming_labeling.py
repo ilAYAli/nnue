@@ -72,7 +72,7 @@ def calibration(path: Path) -> Path:
         "anchors": [[0, 0], [2045, 1000]],
         "fit": {"pairs": 2},
         "holdout": {"passed": True},
-        "reference_target": {"net_sha256": "net", "engine_sha256": ["engine"]},
+        "reference_target": {"net_sha256": "net", "engine_sha256": ["engine"], "mode": "search", "depth": 1},
     }), encoding="utf-8")
     return path
 
