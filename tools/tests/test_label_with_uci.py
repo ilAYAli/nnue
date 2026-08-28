@@ -160,6 +160,7 @@ class LabelWithUciTests(unittest.TestCase):
     def test_writes_bullet_text_shard(self) -> None:
         path, stats_path = self.run_labeler({
             "fen": "8/8/8/8/8/8/8/K6k b - - 0 1",
+            "result": "1/2-1/2",
         }, output_format="bullet-text")
         try:
             self.assertEqual(
@@ -175,6 +176,7 @@ class LabelWithUciTests(unittest.TestCase):
     def test_writes_bullet_data_shard(self) -> None:
         path, stats_path = self.run_labeler({
             "fen": "8/8/8/8/8/8/8/K6k b - - 0 1",
+            "result": "1/2-1/2",
         }, output_format="bullet-data")
         try:
             data = path.read_bytes()

@@ -58,6 +58,7 @@ class FakeEngine:
 def row(move: str = "a2a3") -> dict:
     return {
         "fen": "7k/8/8/8/8/8/P7/K7 w - - 0 1",
+        "result": "1/2-1/2",
         "wdl": 0.5,
         "moves": [{"move": move, "roles": ["played"], "legal": True}],
     }
@@ -208,6 +209,46 @@ class StreamingLabelingTests(unittest.TestCase):
             self.assertEqual("enyo.label-stats.v2", stats["schema"])
             self.assertEqual(stats, json.loads(stats_path.read_text(encoding="utf-8")))
             self.assertEqual([], list(root.glob("*.partial.*")))
+
+    def test_missing_result_is_rejected_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = argparse.Namespace(
+                input=root,
+                inventory=None,
+                output=root / "shard.bullet",
+                stats=root / "shard.stats.json",
+                engine="stockfish",
+                net=None,
+                net_option="EvalFile",
+                score_source="uci",
+                eval_scale=400.0,
+                value_epsilon=1e-6,
+                static=False,
+                depth=12,
+                threads=1,
+                hash=16,
+                max_records=5,
+                min_ply=1,
+                quiet_only=True,
+                shard_count=1,
+                shard_index=0,
+                engine_timeout_s=1.0,
+                max_abs_cp=10000,
+                progress=0,
+                enyo_runtime_target=False,
+            )
+
+            def rows(*args: object, stats: lc0_to_jsonl.Stats, **kwargs: object):
+                stats.files = 1
+                stats.records = 1
+                missing = row()
+                del missing["result"]
+                yield missing, 1
+
+            with mock.patch.object(lc0_to_jsonl, "iter_rows", rows):
+                with self.assertRaisesRegex(ValueError, "ground-truth result"):
+                    labeler.label(args, engine_type=FakeEngine)
 
     def test_lc0_root_score_is_stm_relative_and_needs_no_engine(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

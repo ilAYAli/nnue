@@ -22,5 +22,28 @@ class ResultExpectedScoreTests(unittest.TestCase):
         self.assertEqual(lc0_to_jsonl.result_expected_score(-1.0, 0.0), 0.0)
 
 
+class CategoricalResultTests(unittest.TestCase):
+    def test_terminal_heads_decode_to_white_result_for_both_sides(self) -> None:
+        for side, expected in (("w", "1-0"), ("b", "0-1")):
+            self.assertEqual(
+                expected,
+                lc0_to_jsonl.categorical_result(1.0, 0.0, side_to_move=side),
+            )
+        for side, expected in (("w", "0-1"), ("b", "1-0")):
+            self.assertEqual(
+                expected,
+                lc0_to_jsonl.categorical_result(-1.0, 0.0, side_to_move=side),
+            )
+        for side in ("w", "b"):
+            self.assertEqual(
+                "1/2-1/2",
+                lc0_to_jsonl.categorical_result(0.0, 1.0, side_to_move=side),
+            )
+
+    def test_non_categorical_terminal_heads_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not categorical"):
+            lc0_to_jsonl.categorical_result(0.2, 0.3, side_to_move="w")
+
+
 if __name__ == "__main__":
     unittest.main()

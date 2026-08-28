@@ -27,11 +27,10 @@ def white_result_from_row(row: dict) -> float:
         return 0.0
     if result == "1/2-1/2":
         return 0.5
-
-    wdl = float(row.get("wdl", 0.5))
-    stm = str(row["fen"]).split()[1]
-    white_wdl = wdl if stm == "w" else 1.0 - wdl
-    return categorical_result(white_wdl)
+    raise ValueError(
+        "missing ground-truth result; continuous wdl/value-head targets "
+        "must not be converted into a categorical Bullet result"
+    )
 
 
 ENYO_RUNTIME_SCORE_CLAMP = 2045

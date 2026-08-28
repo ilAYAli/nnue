@@ -55,6 +55,7 @@ STOCKFISH_NET_MIN_DELTA=${STOCKFISH_NET_MIN_DELTA:-0}
 SKIP_SF_GATE=${SKIP_SF_GATE:-0}
 SKIP_RESIDUAL_GATE=${SKIP_RESIDUAL_GATE:-0}
 QSPRT=${QSPRT:-tools/validate/sprt_net.py}
+BULLET_RESULT_VALIDATOR=${BULLET_RESULT_VALIDATOR:-tools/validate/validate_bullet_results.py}
 PROMOTED_NET_LINK=${PROMOTED_NET_LINK:-$HOME/assets/nets/candidate.net}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 # H1 is deliberately wide so Forge can reject clear losses promptly.
@@ -373,6 +374,11 @@ train() {
 
   notify phase_start train "training $run" "$log" 0
   ensure_train_helper_current
+  [[ -f "$BULLET_RESULT_VALIDATOR" ]] || fail "missing Bullet result validator: $BULLET_RESULT_VALIDATOR" train
+  "$PYTHON" "$BULLET_RESULT_VALIDATOR" \
+    --input "$data_file" --require-win-loss \
+    > "$log_dir/00-corpus-result-validation.json" \
+    || fail "invalid training corpus: $data_file" train
   section plan
   "$TRAIN_HELPER" plan --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" | tee "$plan_log" || fail "plan failed for $run" plan
   local train_args=(all --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS")

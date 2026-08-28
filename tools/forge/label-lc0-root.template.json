@@ -111,5 +111,10 @@
         {"name": "written", "field": "output", "x": "done", "scale": "linear"}
       ]
     }
+  },
+  "finalize": {
+    "type": "bullet-labels",
+    "output": "{output}",
+    "inventory_digest": "{inventory_digest}"
   }
 }

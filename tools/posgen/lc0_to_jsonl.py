@@ -415,6 +415,37 @@ def result_expected_score(result_q: float, result_d: float) -> float:
     return max(0.0, min(1.0, (1.0 + result_q) / 2.0))
 
 
+def categorical_result(
+    result_q: float,
+    result_d: float,
+    *,
+    side_to_move: str,
+) -> str:
+    """Decode LC0 V6's terminal game result into canonical white WDL.
+
+    ``result_q`` and ``result_d`` are categorical terminal heads, expressed
+    from the side to move.  They are not a score target and must never be
+    replaced with a synthetic draw.  Reject any non-categorical value so a
+    format change cannot silently poison a Bullet corpus.
+    """
+    if side_to_move not in {"w", "b"}:
+        raise ValueError(f"invalid LC0 side to move: {side_to_move!r}")
+    if not math.isfinite(result_q) or not math.isfinite(result_d):
+        raise ValueError("LC0 terminal result heads must be finite")
+
+    epsilon = 1e-6
+    if abs(result_q) <= epsilon and abs(result_d - 1.0) <= epsilon:
+        return "1/2-1/2"
+    if abs(result_d) <= epsilon and abs(abs(result_q) - 1.0) <= epsilon:
+        side_to_move_won = result_q > 0.0
+        white_won = side_to_move_won if side_to_move == "w" else not side_to_move_won
+        return "1-0" if white_won else "0-1"
+    raise ValueError(
+        "LC0 V6 terminal result heads are not categorical: "
+        f"result_q={result_q!r} result_d={result_d!r}"
+    )
+
+
 def add_move(
     moves: dict[int, dict],
     *,
@@ -498,6 +529,15 @@ def record_to_row(
         for key, value in zip(VALUE_FIELDS, record.values)
     }
     side = "b" if record.meta[4] else "w"
+    try:
+        result = categorical_result(
+            float(record.values[VALUE_FIELDS.index("result_q")]),
+            float(record.values[VALUE_FIELDS.index("result_d")]),
+            side_to_move=side,
+        )
+    except ValueError:
+        stats.invalid_records += 1
+        return None
     tags = [
         "source:lc0",
         "lc0_format:v6",
@@ -512,6 +552,7 @@ def record_to_row(
         "id": f"lc0-{Path(source_file).name}-{record_index}",
         "fen": board.fen(),
         "source": "lc0_training_data",
+        "result": result,
         "wdl": result_expected_score(values["result_q"], values["result_d"]),
         "source_file": source_file,
         "record_index": record_index,

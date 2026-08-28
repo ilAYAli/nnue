@@ -62,6 +62,7 @@ class NNueDatasetTests(unittest.TestCase):
                 "fen": "8/8/8/8/8/8/8/K6k b - - 0 1",
                 "score": 42,
                 "wdl": 0.25,
+                "result": "1-0",
             }
             with data.open("wb") as handle:
                 bullet_format.write_row(

@@ -136,6 +136,9 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "max_records": args.max_records,
         "min_ply": args.min_ply,
         "quiet_only": args.quiet_only,
+        "result_counts": {"loss": 0, "draw": 0, "win": 0},
+        "output_score_min": None,
+        "output_score_max": None,
         "shard_count": args.shard_count,
         "shard_index": args.shard_index,
         "read": 0,
@@ -256,6 +259,11 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
                     if score is None:
                         stats["skipped_no_score"] = int(stats["skipped_no_score"]) + 1
                         continue
+                if row.get("result") not in {"1-0", "0-1", "1/2-1/2"}:
+                    raise ValueError(
+                        "input row has no ground-truth result; refusing to "
+                        "synthesize a Bullet game result"
+                    )
                 row["score"] = score
                 white_score = bullet_text.white_score_from_row(
                     row,
@@ -270,6 +278,22 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
                     enyo_runtime_target=args.enyo_runtime_target,
                 )
                 stats["written"] = int(stats["written"]) + 1
+                score_min = stats["output_score_min"]
+                score_max = stats["output_score_max"]
+                stats["output_score_min"] = (
+                    white_score if score_min is None else min(int(score_min), white_score)
+                )
+                stats["output_score_max"] = (
+                    white_score if score_max is None else max(int(score_max), white_score)
+                )
+                result_name = {
+                    "0-1": "loss",
+                    "1/2-1/2": "draw",
+                    "1-0": "win",
+                }[row["result"]]
+                result_counts = stats["result_counts"]
+                assert isinstance(result_counts, dict)
+                result_counts[result_name] = int(result_counts[result_name]) + 1
                 if args.progress > 0 and int(stats["selected"]) % args.progress == 0:
                     elapsed = max(time.monotonic() - start, 1e-6)
                     print(
