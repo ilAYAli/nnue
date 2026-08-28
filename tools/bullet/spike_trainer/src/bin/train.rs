@@ -1740,7 +1740,10 @@ fn reset_training_artifacts_for_force(config: &Config) {
     let data = data_config(config);
     for path in [
         expand_path(&out_dir(config)),
-        run_root,
+        run_root.join("init"),
+        model_path(config),
+        provenance_path(config),
+        resume_state_path(config),
         expand_path(&net_path(config)),
     ] {
         remove_force_artifact(&path);
@@ -3431,14 +3434,18 @@ mod tests {
                 .expect("create test artifact parent");
             fs::write(path, b"stale").expect("write test artifact");
         }
+        let prior_log = run_root.join("logs/01-train-export.log");
+        fs::create_dir_all(prior_log.parent().expect("test log parent"))
+            .expect("create test log parent");
+        fs::write(&prior_log, b"preserve reproducibility evidence").expect("write test log");
 
         reset_training_artifacts_for_force(&config);
 
         assert!(!checkpoints.exists());
-        assert!(!run_root.exists());
         assert!(!net.exists());
         assert!(!materialized.exists());
         assert!(source.exists());
+        assert_eq!(fs::read(&prior_log).expect("read preserved log"), b"preserve reproducibility evidence");
         fs::remove_dir_all(root).expect("remove test directory");
     }
 
