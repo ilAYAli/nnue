@@ -7,7 +7,7 @@
   "lr": 0.004,
   "final_lr": 0.000005,
   "data": {
-    "source_binpack": "~/assets/training/bullet/lc0/test91/lc0-static-bulk-enyo-runtime.bullet"
+    "source_binpack": "~/assets/training/bullet/lc0/test91/lc0-root-enyo-runtime-test91.bullet"
   },
   "continue_from": "enyo-7.3.0-rc3"
 }
