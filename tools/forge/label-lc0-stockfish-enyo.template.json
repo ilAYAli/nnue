@@ -1,0 +1,159 @@
+{
+  "schema": "forge.template.v1",
+  "name": "label-lc0-stockfish-enyo",
+  "kind": "label",
+  "description": "Convert the complete LC0 V6 corpus with Stockfish UCI labels, Enyo runtime normalization, and BulletFormat output",
+  "run_name": "label-lc0-stockfish-enyo-{input_stem}-{depth}-{timestamp}",
+  "work_dir": "{labeler}",
+  "path_maps": {
+    "macos": {
+      "~/.cache/forge": "~/Library/Caches/forge"
+    }
+  },
+  "chunking": {
+    "initial_units": 5000,
+    "min_chunks_per_slot": 0,
+    "signature_version": "task-input-v1"
+  },
+  "parameters": {
+    "chunk_time_seconds": {
+      "type": "int",
+      "default": 300,
+      "help": "Target wall-clock seconds per adaptively sized chunk"
+    },
+    "labeler": {
+      "type": "source",
+      "default": "nnue",
+      "include": ["tools/score/**", "tools/lib/**", "tools/posgen/**", "tools/tests/test_streaming_labeling.py"],
+      "exclude": ["**/__pycache__/**", "**/.venv/**", "**/target/**"],
+      "output": "~/.cache/forge/sources/nnue-{digest12}",
+      "help": "Committed source tree containing the LC0 decoder and Stockfish labeler"
+    },
+    "input": {
+      "required": true,
+      "path_context": "shared_home",
+      "help": "Complete LC0 V6 archive directory; the wrapper rejects undersized fixture directories"
+    },
+    "output": {
+      "required": true,
+      "path_context": "shared_home",
+      "help": "Final merged BulletFormat output"
+    },
+    "engine": {
+      "required": true,
+      "local_default": true,
+      "path_context": "shared_home",
+      "help": "Stockfish executable used for UCI search labels"
+    },
+    "net": {
+      "required": true,
+      "local_default": true,
+      "path_context": "shared_home",
+      "help": "Stockfish NNUE net loaded through EvalFile"
+    },
+    "depth": {
+      "type": "int",
+      "default": 12,
+      "help": "Stockfish search depth"
+    },
+    "threads": {
+      "type": "int",
+      "default": 1,
+      "help": "Stockfish threads per task"
+    },
+    "hash": {
+      "type": "int",
+      "default": 128,
+      "help": "Stockfish hash size in MiB per task"
+    },
+    "max_records": {
+      "type": "int",
+      "default": 0,
+      "help": "Global raw input-record limit; zero means the entire inventory"
+    },
+    "split_records": {
+      "type": "int",
+      "default": 1600,
+      "help": "Positive planner placeholder used while max_records=0 assigns all files"
+    },
+    "min_ply": {
+      "type": "int",
+      "default": 16,
+      "help": "Minimum game ply"
+    },
+    "quiet_only": {
+      "type": "bool",
+      "default": true,
+      "help": "Keep only quiet positions outside check"
+    },
+    "shards": {
+      "type": "int",
+      "help": "Override the requested Forge task count"
+    }
+  },
+  "requirements": {
+    "python_min": "3.11",
+    "sources": [
+      {
+        "name": "nnue-labeler",
+        "path": "{labeler}",
+        "digest": "{labeler_digest}",
+        "install_timeout_s": 300,
+        "install": [
+          "PYTHON=python3; test ! -x /opt/homebrew/bin/python3 || PYTHON=/opt/homebrew/bin/python3; test -x .venv/bin/python || \"$PYTHON\" -m venv .venv; .venv/bin/python -m pip install -q python-chess"
+        ],
+        "probe": [
+          ".venv/bin/python -m unittest tools.tests.test_streaming_labeling"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "name": "engine",
+        "path": "{engine}",
+        "command": "test -x {engine} 2>/dev/null || command -v {engine} >/dev/null",
+        "timeout_s": 20
+      }
+    ],
+    "inputs": [
+      {
+        "name": "input inventory cache",
+        "path": "{source_cache}",
+        "tree": "lc0-inventory",
+        "digest": "{inventory_digest}"
+      },
+      {
+        "name": "Stockfish net",
+        "path": "{net}"
+      }
+    ]
+  },
+  "task": {
+    "split": {
+      "total": "split_records",
+      "count": "shards",
+      "unit": "records"
+    },
+    "label": "label-lc0-stockfish-enyo:{shard}",
+    "outputs": [
+      "{output_dir}/{task_name}.bullet",
+      "{output_dir}/{task_name}.stats.json"
+    ],
+    "command": ".venv/bin/python tools/score/label.py --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.bullet --stats {output_dir}/{task_name}.stats.json --engine {engine} --net {net} --net-option EvalFile --score-source uci --enyo-runtime-target --stats-schema v2 --depth {depth} --threads {threads} --hash {hash} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --shard-count 1 --shard-index 0",
+    "progress": {
+      "unit": "records",
+      "log_regex": "read=(?P<done>\\d+) selected=(?P<selected>\\d+) written=(?P<output>\\d+) rate=(?P<rate>[0-9.]+)/s",
+      "output_unit": "positions",
+      "series": [
+        {"name": "read", "field": "done", "x": "done", "scale": "linear"},
+        {"name": "selected", "field": "selected", "x": "done", "scale": "linear"},
+        {"name": "written", "field": "output", "x": "done", "scale": "linear"}
+      ]
+    }
+  },
+  "finalize": {
+    "type": "bullet-labels",
+    "output": "{output}",
+    "inventory_digest": "{inventory_digest}"
+  }
+}

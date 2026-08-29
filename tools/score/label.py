@@ -130,7 +130,7 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
 
     decode = lc0_to_jsonl.Stats()
     stats: dict[str, object] = {
-        "schema": "enyo.label-stats.v3",
+        "schema": f"enyo.label-stats.{getattr(args, 'stats_schema', 'v3')}",
         "input": str(args.input),
         "inventory": str(args.inventory) if args.inventory is not None else None,
         "output": str(output),
@@ -431,6 +431,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-abs-cp", type=int, default=10_000)
     parser.add_argument("--progress", type=int, default=1000)
     parser.add_argument("--enyo-runtime-target", action="store_true")
+    parser.add_argument(
+        "--stats-schema",
+        choices=("v2", "v3"),
+        default="v3",
+        help="Stats schema for the Forge finalizer; v2 is required by older Forge installations.",
+    )
     return parser.parse_args()
 
 
