@@ -40,6 +40,34 @@ class Lc0ToEnyoBulletTests(unittest.TestCase):
         self.assertIn("EvalFile", Path("tools/forge/label-lc0-stockfish-enyo.template.json").read_text())
         self.assertIn("--wait", command)
 
+    def test_start_command_uses_the_validated_manifest(self) -> None:
+        command = pipeline.build_start_command(Path("/tmp/validated.manifest.json"))
+        self.assertEqual(command[:3], ["forge", "start", "/tmp/validated.manifest.json"])
+        self.assertIn("--workers", command)
+        self.assertNotIn("--wait", command)
+        self.assertEqual(
+            pipeline.build_start_command(Path("/tmp/validated.manifest.json"), wait=True)[-1],
+            "--wait",
+        )
+
+    def test_materialized_partition_must_match_preflight(self) -> None:
+        task = {
+            "id": "label_0000",
+            "inputs": [{
+                "tree": "lc0-inventory",
+                "digest": "digest",
+                "files": 2,
+                "bytes": 20,
+                "path": "~/.cache/forge/task-inputs/digest",
+                "inventory_source": "~/.cache/forge/task-inputs/digest",
+            }],
+        }
+        with self.assertRaisesRegex(SystemExit, "partition changed"):
+            pipeline.validate_materialized_partition(
+                {"tasks": [task]},
+                {"tasks": [{**task, "inputs": [{**task["inputs"][0], "files": 3}]}]},
+            )
+
     def test_cleanup_does_not_remove_static_corpus(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

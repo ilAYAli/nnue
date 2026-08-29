@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -154,7 +155,7 @@ def balanced_shard_counts(batch_sizes: list[int], total: int) -> list[int]:
     return counts
 
 
-def verify_forge_partition(command: list[str]) -> dict[str, object]:
+def verify_forge_partition(command: list[str]) -> tuple[dict[str, object], dict[str, object]]:
     """Build a manifest without launching workers and reject overlapping tasks."""
     result = subprocess.run(
         [*command, "--print-manifest"],
@@ -213,11 +214,14 @@ def verify_forge_partition(command: list[str]) -> dict[str, object]:
             "Forge task inventories do not exactly cover the coordinator inventory: "
             f"tasks={len(seen):,} expected={expected_file_count:,}"
         )
-    return {
-        "tasks": len(tasks),
-        "files": len(seen),
-        "inventory_files": expected_file_count,
-    }
+    return (
+        {
+            "tasks": len(tasks),
+            "files": len(seen),
+            "inventory_files": expected_file_count,
+        },
+        manifest,
+    )
 
 
 def build_command(args: argparse.Namespace, template: Path) -> list[str]:
@@ -237,6 +241,93 @@ def build_command(args: argparse.Namespace, template: Path) -> list[str]:
         "--shards", str(args.shards),
         "--wait",
     ] + (["--quiet-only"] if args.quiet_only else ["--no-quiet-only"])
+
+
+def forge_workers_arg() -> str:
+    """Mirror Forge's default worker-file selection for ``forge start``."""
+    if value := os.environ.get("FORGE_WORKERS"):
+        return value
+    config_path = os.environ.get("FORGE_CONFIG")
+    if config_path:
+        return str(Path(config_path).expanduser().parent / "workers.json")
+    return "~/.config/forge/workers.json"
+
+
+def build_start_command(manifest: Path, *, wait: bool = False) -> list[str]:
+    """Launch an already-expanded manifest without replanning its tasks."""
+    command = [
+        "forge", "start", str(manifest),
+        "--workers", forge_workers_arg(),
+    ]
+    if wait:
+        command.append("--wait")
+    return command
+
+
+def materialized_manifest_path(run_name: str) -> Path:
+    """Resolve the coordinator's materialized manifest for a launched run."""
+    result = subprocess.run(
+        ["forge", "status", run_name, "--json"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode not in (0, 1):
+        detail = (result.stderr or result.stdout).strip()
+        raise SystemExit(f"cannot inspect materialized Forge run {run_name}: {detail}")
+    try:
+        payload = json.loads(result.stdout)
+        path = Path(str(payload["manifest"])).expanduser()
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        raise SystemExit(f"Forge status did not return a manifest for {run_name}") from exc
+    if not path.is_file():
+        raise SystemExit(f"materialized Forge manifest is missing: {path}")
+    return path
+
+
+def validate_materialized_partition(
+    expected: dict[str, object], actual: dict[str, object]
+) -> None:
+    """Reject a coordinator manifest whose task inputs differ from preflight."""
+    expected_tasks = expected.get("tasks")
+    actual_tasks = actual.get("tasks")
+    if not isinstance(expected_tasks, list) or not isinstance(actual_tasks, list):
+        raise SystemExit("Forge materialized manifest has no task list")
+    if len(expected_tasks) != len(actual_tasks):
+        raise SystemExit(
+            "Forge materialized task count changed after preflight: "
+            f"expected={len(expected_tasks)} actual={len(actual_tasks)}"
+        )
+    actual_by_id = {
+        str(task.get("id")): task
+        for task in actual_tasks
+        if isinstance(task, dict)
+    }
+    for expected_task in expected_tasks:
+        if not isinstance(expected_task, dict):
+            raise SystemExit("Forge preflight returned an invalid task")
+        task_id = str(expected_task.get("id"))
+        actual_task = actual_by_id.get(task_id)
+        if actual_task is None:
+            raise SystemExit(f"Forge materialized manifest is missing task {task_id}")
+        expected_inputs = [
+            item for item in expected_task.get("inputs", [])
+            if isinstance(item, dict) and item.get("tree") == "lc0-inventory"
+        ]
+        actual_inputs = [
+            item for item in actual_task.get("inputs", [])
+            if isinstance(item, dict) and item.get("tree") == "lc0-inventory"
+        ]
+        if len(expected_inputs) != 1 or len(actual_inputs) != 1:
+            raise SystemExit(f"{task_id}: materialized LC0 input is missing")
+        expected_input = expected_inputs[0]
+        actual_input = actual_inputs[0]
+        for key in ("digest", "files", "bytes", "path", "inventory_source"):
+            if actual_input.get(key) != expected_input.get(key):
+                raise SystemExit(
+                    f"{task_id}: materialized LC0 partition changed ({key})"
+                )
 
 
 def write_provenance(path: Path, *, args: argparse.Namespace, archive_count: int,
@@ -368,9 +459,45 @@ def main() -> int:
             inputs_before = set(FORGE_INPUTS.iterdir()) if FORGE_INPUTS.is_dir() else set()
             task_inputs_before = set(FORGE_TASK_INPUTS.iterdir()) if FORGE_TASK_INPUTS.is_dir() else set()
             try:
-                partition = verify_forge_partition(batch_command)
+                partition, manifest = verify_forge_partition(batch_command)
                 print(json.dumps({"batch": index + 1, "partition": partition}), flush=True)
-                subprocess.run(batch_command, cwd=REPO_ROOT, check=True)
+                # The preflight manifest is the plan we validated.  Starting
+                # the original `forge run` command here would expand the
+                # template a second time and could produce a different task
+                # partition (especially when workers/configuration differ).
+                # `forge start` materializes this exact manifest instead.
+                with tempfile.TemporaryDirectory(prefix="forge-validated-") as tmp:
+                    manifest_path = Path(tmp) / "validated.manifest.json"
+                    manifest_path.write_text(
+                        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                    subprocess.run(
+                        build_start_command(manifest_path),
+                        cwd=REPO_ROOT,
+                        check=True,
+                    )
+                    run_name = str(manifest.get("name") or "")
+                    if not run_name:
+                        raise SystemExit("Forge preflight manifest has no run name")
+                    actual_manifest_path = materialized_manifest_path(run_name)
+                    actual_manifest = json.loads(
+                        actual_manifest_path.read_text(encoding="utf-8")
+                    )
+                    try:
+                        validate_materialized_partition(manifest, actual_manifest)
+                    except SystemExit:
+                        subprocess.run(
+                            ["forge", "stop", run_name, "--force", "--no-wait"],
+                            cwd=REPO_ROOT,
+                            check=False,
+                        )
+                        raise
+                    subprocess.run(
+                        ["forge", "wait", "--manifest", str(actual_manifest_path)],
+                        cwd=REPO_ROOT,
+                        check=True,
+                    )
             finally:
                 cleanup_new_cache_entries(unpacked_before, FORGE_UNPACKED)
                 cleanup_new_cache_entries(inputs_before, FORGE_INPUTS)
