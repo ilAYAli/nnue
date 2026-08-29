@@ -55,31 +55,55 @@ class UciEngine:
         self.lines: queue.Queue[str | None] = queue.Queue()
         self.reader = threading.Thread(target=self.read_stdout, daemon=True)
         self.reader.start()
-        self.send("uci")
-        self.wait_for("uciok", timeout_s=60.0)
-        self.setoption("Threads", str(self.threads))
-        self.setoption("Hash", str(self.hash_mb))
-        if self.net:
-            self.setoption(self.net_option, self.net)
-        self.send("isready")
-        self.wait_for("readyok", timeout_s=60.0)
+        try:
+            self.send("uci")
+            self.wait_for("uciok", timeout_s=60.0)
+            self.setoption("Threads", str(self.threads))
+            self.setoption("Hash", str(self.hash_mb))
+            if self.net:
+                self.setoption(self.net_option, self.net)
+            self.send("isready")
+            self.wait_for("readyok", timeout_s=60.0)
+        except Exception:
+            # A crashed process leaves a reader thread and pipes behind. Make
+            # a failed handshake fully disposable before a restart attempt.
+            self.close()
+            raise
 
     def close(self) -> None:
+        proc = getattr(self, "proc", None)
+        if proc is None:
+            return
         try:
-            if self.proc.poll() is None:
+            if proc.poll() is None:
                 self.send("quit")
         except (BrokenPipeError, OSError):
             pass
         finally:
             try:
-                self.proc.wait(timeout=5)
+                proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                self.proc.kill()
-                self.proc.wait()
+                proc.kill()
+                proc.wait()
 
-    def restart(self) -> None:
+    def restart(self, *, attempts: int = 3, delay_s: float = 1.0) -> None:
+        if attempts <= 0:
+            raise ValueError("engine restart attempts must be positive")
         self.close()
-        self.start()
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                self.start()
+                return
+            except (OSError, EngineTimeout, RuntimeError) as exc:
+                last_error = exc
+                self.close()
+                if attempt + 1 < attempts and delay_s > 0:
+                    time.sleep(delay_s * (attempt + 1))
+        assert last_error is not None
+        raise RuntimeError(
+            f"engine restart failed after {attempts} attempts: {last_error}"
+        ) from last_error
 
     def read_stdout(self) -> None:
         if self.proc.stdout is None:

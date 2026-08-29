@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 try:
     import numpy as np
@@ -42,6 +43,26 @@ class TimeoutEngine(FakeEngine):
 
 
 class LabelWithUciTests(unittest.TestCase):
+    def test_restart_retries_a_failed_engine_handshake(self) -> None:
+        engine = object.__new__(label_with_uci.UciEngine)
+        engine.close = mock.Mock()
+        engine.start = mock.Mock(side_effect=[RuntimeError("dead"), None])
+
+        engine.restart(delay_s=0)
+
+        self.assertEqual(2, engine.start.call_count)
+        self.assertGreaterEqual(engine.close.call_count, 2)
+
+    def test_restart_reports_all_failed_handshakes(self) -> None:
+        engine = object.__new__(label_with_uci.UciEngine)
+        engine.close = mock.Mock()
+        engine.start = mock.Mock(side_effect=RuntimeError("dead"))
+
+        with self.assertRaisesRegex(RuntimeError, "after 3 attempts"):
+            engine.restart(delay_s=0)
+
+        self.assertEqual(3, engine.start.call_count)
+
     def run_labeler(
         self,
         row: dict,

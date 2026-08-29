@@ -169,6 +169,7 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "skipped_mate": 0,
         "skipped_no_score": 0,
         "skipped_timeout": 0,
+        "engine_restart_failures": 0,
         "skipped_cp": 0,
         "skipped_invalid_lc0_value": 0,
         "lc0_root_value_count": 0,
@@ -285,9 +286,23 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
                                 depth=args.depth,
                                 timeout_s=args.engine_timeout_s,
                             )
-                    except EngineTimeout:
+                    except EngineTimeout as exc:
                         stats["skipped_timeout"] = int(stats["skipped_timeout"]) + 1
-                        engine.restart()
+                        print(
+                            f"timeout selected={stats['selected']}: {exc}; restarting engine",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        try:
+                            engine.restart()
+                        except RuntimeError as restart_exc:
+                            stats["engine_restart_failures"] = (
+                                int(stats["engine_restart_failures"]) + 1
+                            )
+                            raise RuntimeError(
+                                "Stockfish became unavailable after a label timeout; "
+                                "task is unsafe to continue"
+                            ) from restart_exc
                         continue
                     if mate is not None:
                         stats["skipped_mate"] = int(stats["skipped_mate"]) + 1

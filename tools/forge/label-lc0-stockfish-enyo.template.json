@@ -66,6 +66,11 @@
       "default": 128,
       "help": "Stockfish hash size in MiB per task"
     },
+    "engine_timeout_s": {
+      "type": "int",
+      "default": 120,
+      "help": "Bounded seconds allowed for one Stockfish position"
+    },
     "max_records": {
       "type": "int",
       "default": 0,
@@ -139,7 +144,7 @@
       "{output_dir}/{task_name}.bullet",
       "{output_dir}/{task_name}.stats.json"
     ],
-    "command": ".venv/bin/python tools/score/label.py --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.bullet --stats {output_dir}/{task_name}.stats.json --engine {engine} --net {net} --net-option EvalFile --score-source uci --enyo-runtime-target --stats-schema v2 --depth {depth} --threads {threads} --hash {hash} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --shard-count 1 --shard-index 0",
+    "command": ".venv/bin/python tools/score/label.py --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.bullet --stats {output_dir}/{task_name}.stats.json --engine {engine} --net {net} --net-option EvalFile --score-source uci --enyo-runtime-target --stats-schema v2 --depth {depth} --threads {threads} --hash {hash} --engine-timeout-s {engine_timeout_s} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --shard-count 1 --shard-index 0",
     "progress": {
       "unit": "records",
       "log_regex": "read=(?P<done>\\d+) selected=(?P<selected>\\d+) written=(?P<output>\\d+) rate=(?P<rate>[0-9.]+)/s",

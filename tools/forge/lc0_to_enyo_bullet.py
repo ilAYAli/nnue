@@ -27,6 +27,7 @@ LEGACY_OUTPUT_DIR = Path.home() / "assets/training/bullet/lc0/test91"
 MIN_ARCHIVES = 100
 MIN_BYTES = 100_000_000_000
 DEFAULT_BATCH_BYTES = 20_000_000_000
+DEFAULT_ENGINE_TIMEOUT_S = 120
 FORGE_UNPACKED = Path.home() / ".cache/forge/unpacked-lc0"
 FORGE_INPUTS = Path.home() / ".cache/forge/inputs"
 FORGE_TASK_INPUTS = Path.home() / ".cache/forge/task-inputs"
@@ -229,6 +230,7 @@ def build_command(args: argparse.Namespace, template: Path) -> list[str]:
         "--depth", str(args.depth),
         "--threads", str(args.threads),
         "--hash", str(args.hash),
+        "--engine-timeout-s", str(getattr(args, "engine_timeout_s", DEFAULT_ENGINE_TIMEOUT_S)),
         "--max-records", "0",
         "--split-records", str(args.shards),
         "--min-ply", str(args.min_ply),
@@ -259,6 +261,7 @@ def write_provenance(path: Path, *, args: argparse.Namespace, archive_count: int
         "depth": args.depth,
         "threads": args.threads,
         "hash": args.hash,
+        "engine_timeout_s": getattr(args, "engine_timeout_s", DEFAULT_ENGINE_TIMEOUT_S),
         "min_ply": args.min_ply,
         "quiet_only": args.quiet_only,
         "output": str(path),
@@ -281,6 +284,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--depth", type=int, default=12)
     parser.add_argument("--threads", type=int, default=1)
     parser.add_argument("--hash", type=int, default=128)
+    parser.add_argument("--engine-timeout-s", type=int, default=DEFAULT_ENGINE_TIMEOUT_S,
+                        help="Maximum seconds allowed for one Stockfish position")
     parser.add_argument("--shards", type=int, default=1600)
     parser.add_argument("--batch-bytes", type=int, default=DEFAULT_BATCH_BYTES,
                         help="Maximum compressed archive bytes staged per sequential Forge run")
@@ -304,8 +309,9 @@ def main() -> int:
     archives = archive_paths(args.input)
     require_file(args.engine, "Stockfish engine")
     require_file(args.net, "Stockfish net")
-    if args.shards <= 0 or args.depth <= 0 or args.threads <= 0 or args.hash <= 0 or args.batch_bytes <= 0:
-        raise SystemExit("depth, threads, hash, shards, and batch-bytes must be positive")
+    if (args.shards <= 0 or args.depth <= 0 or args.threads <= 0 or args.hash <= 0
+            or args.engine_timeout_s <= 0 or args.batch_bytes <= 0):
+        raise SystemExit("depth, threads, hash, engine-timeout-s, shards, and batch-bytes must be positive")
     template = Path(__file__).resolve().with_name("label-lc0-stockfish-enyo.template.json")
     removed: list[Path] = []
     if args.clean_only:
