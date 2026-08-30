@@ -17,23 +17,24 @@ record, and promote it. Do not make unrelated changes.
 ## Hosts & Forge
 
 1. `pwa-llm` is the only Forge coordinator.
-2. Long-running training may run on `pwa-llm` or `pwa-5090`.
-3. All commands should be executed with a training `;notifai-write "command completed"`
-so that you can take immediate continuing to work when the command completes.
-4. Always use the existing `nnue_cmd` tmux session that should exist on each server.
+2. Long-running GPU training may run on `pwa-llm` or `pwa-5090`.
+3. All commands should be executed with a trailing `;notifai-write "command completed"`
+and you should immediately continue working when you receive this notification.
+3. All servers you work on must have a tmux session names `nnue_cmd`
+4. All commands must be executed in the `nnue_cmd` session.
 5. Never create, rename, or interrupt tmux windows.
 6. Never duplicate or interfere with active Forge jobs.
 
 ## Configuration
 
-7. Never use foreign NNUE weights; Stockfish-generated data is allowed.
-`build.json` must not restate defaults or define undeclared parameters.
+7. Never use foreign NNUE weights
+8. `build.json` must not restate defaults or define undeclared parameters.
 8. The only tracked diff during training should be `build.json`.
-   Exceptions to this rule are `architecture.json` (for architecture experiments), or
-   other changes that are needed for the build/iteration to succeed (Bullet, ...).
-9. Every run uses exactly one of `continue_from` or `initialize_from`; only a lineage root, including an explicitly approved new-architecture scratch root, may omit both.
-10. `initialize_from` is valid only when the conversion preserves the parent's information; additive changes that append new input rows are valid, while changes that reshape an existing dimension require a new scratch root.
-11. `architecture.json` changes only as a dedicated architecture experiment.
+   Exceptions to this rule are needed changes for the build/iteration to succeed (nnue, Bullet, ...)
+or explicitly approved architecture changes specified in `architecture.json`
+9. Every run uses exactly one of `continue_from` or `initialize_from`; only an explicitly approved lineage root may omit both.
+10. `initialize_from` should only be used for a compatible architecture change that preserves the parent information
+11. `architecture.json` changes to this file requires explicit approval.
 
 ## Run naming
 
@@ -45,12 +46,9 @@ so that you can take immediate continuing to work when the command completes.
 14. Never invent a naming scheme; ask first if the reservation flow does not fit.
 15. Reserve every run name and host in `LINEAGE.md` before launch.
 16. Run names that have no historical value can be reused.
-```
-cd /home/petter/sync/code/chess/nnue && FORCE=1 HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=4000 ./nnue iterate; rc=$?; notifai-write "NNUE iterate completed rc=$rc"
-```
+
 
 ## Experiment contract
-
 17. Read `IMPROVEMENT_PLAN.md` before selecting an experiment.
 18. Change exactly one meaningful variable per iteration.
 19. `build.json` must contain a concise hypothesis explaining **why**.
@@ -60,7 +58,14 @@ cd /home/petter/sync/code/chess/nnue && FORCE=1 HOOK_EVENTS=done,fail MIN_SLOPE=
 23. Scratch roots benchmark against `nn-0ee0657fb25e.nnue`;
 SPRT should be run like this (values should be changed to reflect the test):
 ```
-HOOK_EVENTS=done,fail forge run sprt --comment "enyo-1.32.0-rc10 vs nn-0ee0657fb25e.nnue" --candidate ~/assets/engines/reference --reference ~/assets/engines/reference --reference-net ~/assets/nets/nn-0ee0657fb25e.nnue --candidate-net ~/assets/nets/enyo-scc-1.0.0-rc1.nn --elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300 --games 4000
+HOOK_EVENTS=done,fail forge run sprt \
+  --comment "enyo-1.32.0-rc10 vs nn-0ee0657fb25e.nnue" \
+  --candidate ~/assets/engines/reference \
+  --reference ~/assets/engines/reference \
+  --reference-net ~/assets/nets/nn-0ee0657fb25e.nnue \
+  --candidate-net ~/assets/nets/enyo-scc-1.0.0-rc1.nn \
+  --elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300 \
+  --games 4000; rc=$?; notifai-write "Forge SPRT completed rc=$rc"
 ```
 24. Integrity gates (export, distinct-net, engine-load, start-position, catastrophic static) must pass before promotion; residual improvement is report-only.
 25. Generated runs, caches, datasets, and validation output must never remain as source changes.
@@ -70,11 +75,6 @@ HOOK_EVENTS=done,fail forge run sprt --comment "enyo-1.32.0-rc10 vs nn-0ee0657fb
 26. NNUE completion is event-driven: `done`/`fail` arrives automatically via `llmsh`; never poll or arm background waiters.
 27. Never launch a duplicate while a run is in flight.
 28. For a long-running command that does not support `HOOK_EVENTS`, run `command; notifai-write.sh "command completed"` in `nnue_cmd` so completion is event-driven.
-29. Launch exactly:
-
-cd ~/code/chess/nnue
-HOOK_EVENTS=done,fail MIN_SLOPE=0.05 SKIP_SMOKE=1 GAMES=4000 ./nnue iterate
-
 30. Keep `AUTO_ADVANCE` disabled unless explicitly requested for a single-host run.
 31. On rejection, pick one new hypothesis; on acceptance, advance the
     data slice.
