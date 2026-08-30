@@ -23,7 +23,7 @@ from tools.validate.validate_bullet_results import validate_and_merge  # noqa: E
 DEFAULT_INPUT = Path.home() / "assets/training/lc0/test91-forge-input"
 DEFAULT_OUTPUT = Path.home() / "assets/training/bullet/lc0-stockfish/test91-stockfish-enyo.bullet"
 DEFAULT_ENGINE = Path.home() / "assets/engines/reference"
-DEFAULT_NET = Path.home() / "assets/nets/nn-0ee0657fb25e.nnue"
+DEFAULT_NET = Path.home() / "assets/nets/nn-1a298aa575a0.nnue"
 LEGACY_OUTPUT_DIR = Path.home() / "assets/training/bullet/lc0/test91"
 MIN_ARCHIVES = 100
 MIN_BYTES = 100_000_000_000

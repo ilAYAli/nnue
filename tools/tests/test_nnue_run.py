@@ -216,13 +216,13 @@ class NnueRunTests(unittest.TestCase):
             home.mkdir()
             proc = self.run_sourced(
                 f"HOME={shlex.quote(str(home))}; "
-                "net_for_name_or_path '~/assets/nets/nn-0ee0657fb25e.nnue'"
+                "net_for_name_or_path '~/assets/nets/nn-1a298aa575a0.nnue'"
             )
 
             self.assertEqual("", proc.stderr)
             self.assertEqual(0, proc.returncode)
             self.assertEqual(
-                f"{home}/assets/nets/nn-0ee0657fb25e.nnue\n",
+                f"{home}/assets/nets/nn-1a298aa575a0.nnue\n",
                 proc.stdout,
             )
 
@@ -378,7 +378,7 @@ printf 'data=%s\n' "$data_file"
             nets = home / "assets" / "nets"
             nets.mkdir(parents=True)
             (nets / "uho-native-1.0.42.nn").write_bytes(b"parent")
-            (nets / "nn-0ee0657fb25e.nnue").write_bytes(b"stockfish")
+            (nets / "nn-1a298aa575a0.nnue").write_bytes(b"stockfish")
             build = tmp / "build.json"
             build.write_text(
                 '{"run":"uho-native-1.0.43","continue_from":"uho-native-1.0.42"}\n',
@@ -399,7 +399,7 @@ printf 'net=%s\n' "$reference_net"
                 "BUILD": str(build),
                 "HOME": str(home),
                 "NNUE_NTFY": "0",
-                "REFERENCE_NET": "~/assets/nets/nn-0ee0657fb25e.nnue",
+                "REFERENCE_NET": "~/assets/nets/nn-1a298aa575a0.nnue",
             })
 
             proc = subprocess.run(
@@ -414,7 +414,7 @@ printf 'net=%s\n' "$reference_net"
 
             self.assertEqual("", proc.stderr)
             self.assertEqual(
-                f"label=~/assets/nets/nn-0ee0657fb25e.nnue\nnet={nets}/nn-0ee0657fb25e.nnue\n",
+                f"label=~/assets/nets/nn-1a298aa575a0.nnue\nnet={nets}/nn-1a298aa575a0.nnue\n",
                 proc.stdout,
             )
 
@@ -1058,7 +1058,7 @@ stockfish_net_gate challenger
                     "run": "native-2.0.0-rc1",
                     "lineage": "native",
                     "continue_from": "native-2.0.0-rc0",
-                    "reference": "~/assets/nets/nn-0ee0657fb25e.nnue",
+                    "reference": "~/assets/nets/nn-1a298aa575a0.nnue",
                     "hypothesis": "fresh scratch candidate",
                     "data": {
                         "source_binpack": "data/stockfish/master-binpacks/farseerT76.binpack",

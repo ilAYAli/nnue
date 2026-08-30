@@ -148,7 +148,7 @@ def main() -> None:
         "--candidate", default=os.environ.get("CANDIDATE_NET", "~/assets/nets/candidate.net")
     )
     parser.add_argument(
-        "--reference", default=os.environ.get("REFERENCE_NET", "~/assets/nets/nn-0ee0657fb25e.nnue")
+        "--reference", default=os.environ.get("REFERENCE_NET", "~/assets/nets/nn-1a298aa575a0.nnue")
     )
     parser.add_argument("--engine", default=os.environ.get("ENGINE", "~/assets/engines/reference"))
     parser.add_argument("--comment")

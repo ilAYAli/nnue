@@ -1,7 +1,7 @@
 # Enyo 5 Lineage
 
 `Parent SPRT` is against the immediately preceding selected net.
-`SF` is the fixed 4,000-game benchmark against `nn-0ee0657fb25e.nnue`
+`SF` is the fixed 4,000-game benchmark against `nn-1a298aa575a0.nnue`
 
 Architecture 5: SCReLU dense activation (`relu-screlu-residual`).
 Architecture 6: Architecture 5 plus the activated L2→output skip.

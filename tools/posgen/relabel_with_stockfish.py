@@ -31,7 +31,7 @@ def main() -> int:
     ap.add_argument("--input", required=True, type=Path, help="rows.jsonl from pgn_to_jsonl.py")
     ap.add_argument("--output", required=True, type=Path)
     ap.add_argument("--engine", default=str(Path.home() / "assets/engines/candidate"))
-    ap.add_argument("--net", default=str(Path.home() / "assets/nets/nn-0ee0657fb25e.nnue"))
+    ap.add_argument("--net", default=str(Path.home() / "assets/nets/nn-1a298aa575a0.nnue"))
     ap.add_argument("--net-option", default="nnue_file")
     ap.add_argument("--mode", choices=("search", "static"), required=True)
     ap.add_argument("--depth", type=int, default=12)

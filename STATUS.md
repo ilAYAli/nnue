@@ -4,14 +4,14 @@ read AGENTS.md there and the associated SKILL.md's
 ## Current champion
 
 enyo-1.32.0-rc10 (continue_from enyo-1.31.0-rc57), commit 650a4fcc (2026-07-29).
-Absolute vs the fixed external target nn-0ee0657fb25e.nnue:
+Absolute vs the fixed external target nn-1a298aa575a0.nnue:
 elo=-139.8  ci=19.2  (4000 games, 2026-07-30, engine enyo_11ca4d7)
 This is the number to beat in absolute terms; promotion itself is decided parent-relative.
 
-Also recorded, own separate Elo scale, not directly comparable to the nn-0ee0657fb25e.nnue
+Also recorded, own separate Elo scale, not directly comparable to the nn-1a298aa575a0.nnue
 numbers below: enyo-1.30.0-rc3 vs berserk-9b84c340af7e.nn: elo=-122.2 (1500 games, ci=31.9).
 
-All Elo figures below are vs nn-0ee0657fb25e.nnue unless stated otherwise. The "vs
+All Elo figures below are vs nn-1a298aa575a0.nnue unless stated otherwise. The "vs
 default.net" progression that used to live here is dropped from this document -
 default.net is a much weaker, non-comparable reference and added confusion rather than
 signal. See benchmarks/default-net.jsonl directly if that history is ever needed.
@@ -31,7 +31,7 @@ signal. See benchmarks/default-net.jsonl directly if that history is ever needed
   9d829ac   enyo-1.0.0-rc1                enyo-scratch-long-1.5.0-rc1    +4.9   (0.18/2.20, 8%)
 
   None of this chain except its final step was ever benchmarked directly vs
-  nn-0ee0657fb25e.nnue:
+  nn-1a298aa575a0.nnue:
   enyo-1.0.0-rc1 vs SF: elo=-181.2  ci=29.3  (1000 games, 2026-07-07) - the true
   starting point of the numbered lineage's absolute distance from Stockfish.
 
@@ -39,7 +39,7 @@ signal. See benchmarks/default-net.jsonl directly if that history is ever needed
 
   A high-churn architecture/hyperparameter search phase - well over a hundred rc
   candidates across ~30 promotion numbers in 9 days, no parent links preserved. Every
-  directly-recorded absolute result vs nn-0ee0657fb25e.nnue in this stretch, in date
+  directly-recorded absolute result vs nn-1a298aa575a0.nnue in this stretch, in date
   order (source: benchmarks/stockfish-net.jsonl; duplicate rows are repeat/re-runs of
   the same candidate, kept as-is for a faithful record):
 
@@ -299,7 +299,7 @@ NOT committed) to distribute tools/bullet/selfplay_to_bullet_sf_oracle.py across
 relabeling gen2 consistently (gen2 is the one generation with raw PGNs still on disk - gen1/gen3's
 raw games were already cleaned up after their original conversion). Verified the underlying script
 and its exact default parameters (skip_plies=8, min_depth=1, max_abs_cp=10000, mode=static,
-tb_pieces=0, sf_net=nn-0ee0657fb25e.nnue) work correctly on a small local (non-distributed) sample.
+tb_pieces=0, sf_net=nn-1a298aa575a0.nnue) work correctly on a small local (non-distributed) sample.
 
 The distributed Forge deployment of the new template hung: a 20-PGN-file test run
 (selfplay-to-bullet-sf-oracle-.tmp-sfo-template-test-20260731-012513) sat at 0/20 done for ~3.7 hours
@@ -360,7 +360,7 @@ enyo-1.0.0-rc1's own -181.2 vs SF starting point, above). Not evidence against
 the Lc0 data itself - the champion comparison isn't the relevant signal for
 judging a founding net's data quality, only for the promotion decision.
 
-enyo-scc-1.0.0-rc1 vs nn-0ee0657fb25e.nnue (absolute, documentation only):
+enyo-scc-1.0.0-rc1 vs nn-1a298aa575a0.nnue (absolute, documentation only):
 elo=-136.2  llr=-11.76/690.78 (-2%)  draw=45.2%  (1500/1500 games, 2026-08-05).
 Meaningfully better than enyo-ancestor.1.0.0-rc1's -208.6 (same two data
 sources, unshuffled concatenation) and close to enyo-1.0.0-rc1's own -181.2
@@ -407,7 +407,7 @@ lineage), cubic loss |e|^3 replacing squared loss (spike_trainer rebuild,
 +14.8 Elo at fixed nodes per July 2024 research), AdamW beta1 0.9→0.95 (+4
 Elo per same research), final_lr 5e-6→2.5e-5 (fix 200:1 LR decay ratio).
 
-vs nn-0ee0657fb25e.nnue: elo=-223.9  llr=-13.60/690.78 (-2%)  ci=13.9
+vs nn-1a298aa575a0.nnue: elo=-223.9  llr=-13.60/690.78 (-2%)  ci=13.9
 draw=48.0%  (1500/1500 games, 2026-08-06) - catastrophic. 87 Elo worse than the
 founding net (-136.2) and ~110 Elo below rc1.1's estimated absolute.
 

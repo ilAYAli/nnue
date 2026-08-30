@@ -55,14 +55,14 @@ or explicitly approved architecture changes specified in `architecture.json`
 20. During training, no source file may be modified except `build.json`, unless the iteration is an architecture experiment or requires a build-critical fix (a change required for that iteration to build or run).
 21. Commit unrelated changes individually; never bundle them into the same commit as the active iteration's tracked diff. A build-critical source change required for an iteration belongs in that iteration's commit with `build.json` (and `architecture.json` when applicable). A semantic trainer change is its own experiment and must not be combined with a corpus or hyperparameter change.
 22. Training/testing should always be active; never stop unless user interaction is required.
-23. Scratch roots benchmark against `nn-0ee0657fb25e.nnue`;
+23. Scratch roots benchmark against `nn-1a298aa575a0.nnue`;
 SPRT should be run like this (values should be changed to reflect the test):
 ```
 HOOK_EVENTS=done,fail forge run sprt \
-  --comment "enyo-1.32.0-rc10 vs nn-0ee0657fb25e.nnue" \
+  --comment "enyo-1.32.0-rc10 vs nn-1a298aa575a0.nnue" \
   --candidate ~/assets/engines/reference \
   --reference ~/assets/engines/reference \
-  --reference-net ~/assets/nets/nn-0ee0657fb25e.nnue \
+  --reference-net ~/assets/nets/nn-1a298aa575a0.nnue \
   --candidate-net ~/assets/nets/enyo-scc-1.0.0-rc1.nn \
   --elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300 \
   --games 4000; rc=$?; notifai-write "Forge SPRT completed rc=$rc"

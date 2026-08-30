@@ -57,13 +57,13 @@ Stockfish-net checks are rejection filters.
 ## Validation
 
 The primary absolute benchmark is the Stockfish net
-`nn-0ee0657fb25e.nnue`
+`nn-1a298aa575a0.nnue`
 
 Use the net SPRT helper for fixed net comparisons:
 
 ```sh
 tools/validate/sprt_net.py --candidate ~/assets/nets/candidate.net
-tools/validate/sprt_net.py --candidate ~/assets/nets/enyo-1.20.0-rc12.nn --reference ~/assets/nets/nn-0ee0657fb25e.nnue
+tools/validate/sprt_net.py --candidate ~/assets/nets/enyo-1.20.0-rc12.nn --reference ~/assets/nets/nn-1a298aa575a0.nnue
 ```
 
 ## Data

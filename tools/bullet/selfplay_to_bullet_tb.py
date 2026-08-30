@@ -126,7 +126,7 @@ def main() -> int:
     ap.add_argument("--min-depth", type=int, default=1)
     ap.add_argument("--max-abs-cp", type=int, default=10000)
     ap.add_argument("--sf-engine", default=str(Path.home() / "assets/engines/candidate"))
-    ap.add_argument("--sf-net", default=str(Path.home() / "assets/nets/nn-0ee0657fb25e.nnue"))
+    ap.add_argument("--sf-net", default=str(Path.home() / "assets/nets/nn-1a298aa575a0.nnue"))
     ap.add_argument("--sf-hash", type=int, default=64)
     ap.add_argument("--tb-pieces", type=int, default=6)
     ap.add_argument(

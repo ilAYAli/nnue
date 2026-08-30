@@ -3,7 +3,7 @@
 ## Goal
 
 Build a fully traceable Enyo-native lineage that achieves positive Elo against
-`nn-0ee0657fb25e.nnue` under fixed Forge conditions.
+`nn-1a298aa575a0.nnue` under fixed Forge conditions.
 
 Historical nets, including `enyo-1.32.0-rc10`, are benchmarks only and are not
 ancestors of the new lineage.
