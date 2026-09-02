@@ -7,6 +7,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import sys
 import time
 
@@ -18,6 +19,7 @@ sys.path.insert(0, str(TOOLS / "posgen"))
 sys.path.insert(0, str(TOOLS / "score"))
 
 from lib import bullet_format, bullet_text  # noqa: E402
+from lib.hashing import sha256_file  # noqa: E402
 import lc0_to_jsonl  # noqa: E402
 import lc0_calibration  # noqa: E402
 from label_with_uci import EngineTimeout, UciEngine  # noqa: E402
@@ -128,6 +130,20 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
             raise ValueError("LC0 root labels require --lc0-calibration")
         calibration, calibration_sha256 = lc0_calibration.load(Path(calibration_path))
 
+    def _resolve_binary(command: str) -> Path | None:
+        # Mirror how subprocess.Popen([command]) resolves an executable, so
+        # this hashes what the engine subprocess actually runs, whether
+        # --engine was passed as an absolute path or a bare PATH command.
+        candidate = Path(command)
+        if candidate.is_file():
+            return candidate
+        resolved = shutil.which(command)
+        return Path(resolved) if resolved else None
+
+    engine_path = _resolve_binary(args.engine) if score_source == "uci" else None
+    engine_sha256 = sha256_file(engine_path) if engine_path is not None else None
+    net_sha256 = sha256_file(args.net) if args.net else None
+
     decode = lc0_to_jsonl.Stats()
     stats: dict[str, object] = {
         "schema": f"enyo.label-stats.{getattr(args, 'stats_schema', 'v3')}",
@@ -135,8 +151,12 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
         "inventory": str(args.inventory) if args.inventory is not None else None,
         "output": str(output),
         "engine": args.engine if score_source == "uci" else None,
+        "engine_sha256": engine_sha256,
         "net": args.net,
+        "net_sha256": net_sha256,
         "net_option": args.net_option,
+        "net_load_confirmed": None,
+        "net_load_confirmation": None,
         "score_source": score_source,
         "eval_scale": eval_scale if score_source == "lc0-root" else None,
         "value_epsilon": value_epsilon if score_source == "lc0-root" else None,
@@ -195,6 +215,8 @@ def label(args: argparse.Namespace, *, engine_type: type[UciEngine] = UciEngine)
             net=args.net,
             net_option=args.net_option,
         )
+        stats["net_load_confirmed"] = getattr(engine, "net_load_confirmed", None)
+        stats["net_load_confirmation"] = getattr(engine, "net_load_confirmation", None)
     try:
         with output_tmp.open("wb") as dst:
             for row, ply in lc0_to_jsonl.iter_rows(

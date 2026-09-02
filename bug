@@ -1,0 +1,29 @@
+  The previous process failed because it allowed these facts to pass unnoticed:
+
+  - The conversion input was a four-archive fixture, not the 2,019-archive corpus.
+  - The calibration was also fitted against that four-archive fixture.
+  - The output was 128,043,023 records, versus the known full-corpus expectation of about 1.232 billion.
+  - The conversion summary explicitly reported 127.3 m positions, and I failed to stop there.
+  - The calibration validator proved syntax/MAE/slope, but not adequate polarity: only 71.878% sign
+    agreement.
+
+  The next attempt is only valid if it stops before training unless all of these are proven in recorded
+  metadata:
+
+  1. Full inventory: 2,019 archives, digest 483a….
+  2. Calibration sampled from that full inventory, not 4a065….
+  3. Calibration passes a meaningful sign-agreement gate.
+  4. Conversion aggregates to approximately 1.906 billion raw and 1.232 billion retained records.
+  5. The final corpus hash and calibration hash are recorded.
+  6. Training dose is calculated from the verified record count.
+
+  If any one fails, no net gets trained. That is the difference required; otherwise it is just repeating
+  the same failure for a seventh time.
+
+I just want a single script that correctly converts from lc0, stockfish labeled -> enyo calibrated ->
+  bullet, prefarbly using Forge.
+Ensure that all junk that is generated during the process is cleaned up afterwards
+
+
+new script?
+/home/petter/code/chess/nnue/tools/forge/lc0_to_enyo_bullet.py

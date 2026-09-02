@@ -43,13 +43,18 @@
       "required": true,
       "local_default": true,
       "path_context": "shared_home",
-      "help": "Stockfish executable used for UCI search labels"
+      "help": "UCI engine used for search labels (loaded via nnue_file, e.g. Enyo's Stockfish-NNUE-format loader). Deliberately absent from requirements.inputs: each worker compiles its own binary for its own CPU, and Forge's generic input sync pushes the coordinator's copy onto every worker whenever its declared bytes/sha256 don't match a real per-host difference -- or, with neither declared at all, unconditionally on every check. Existence/executability is verified via requirements.commands instead, which does pure local verification with no coordinator sync."
     },
     "net": {
       "required": true,
       "local_default": true,
       "path_context": "shared_home",
-      "help": "Stockfish NNUE net loaded through EvalFile"
+      "help": "Stockfish-format NNUE net loaded through the engine's nnue_file UCI option"
+    },
+    "net_sha256": {
+      "type": "str",
+      "required": true,
+      "help": "Content hash of {net}, binding task identity to what the net contains rather than where it lives"
     },
     "depth": {
       "type": "int",
@@ -129,7 +134,8 @@
       },
       {
         "name": "Stockfish net",
-        "path": "{net}"
+        "path": "{net}",
+        "sha256": "{net_sha256}"
       }
     ]
   },
@@ -144,7 +150,7 @@
       "{output_dir}/{task_name}.bullet",
       "{output_dir}/{task_name}.stats.json"
     ],
-    "command": ".venv/bin/python tools/score/label.py --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.bullet --stats {output_dir}/{task_name}.stats.json --engine {engine} --net {net} --net-option EvalFile --score-source uci --enyo-runtime-target --stats-schema v2 --depth {depth} --threads {threads} --hash {hash} --engine-timeout-s {engine_timeout_s} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --shard-count 1 --shard-index 0",
+    "command": ".venv/bin/python tools/score/label.py --input {task_input} --inventory {task_inventory} --output {output_dir}/{task_name}.bullet --stats {output_dir}/{task_name}.stats.json --engine {engine} --net {net} --net-option nnue_file --score-source uci --enyo-runtime-target --stats-schema v2 --depth {depth} --threads {threads} --hash {hash} --engine-timeout-s {engine_timeout_s} --max-records {task_records} --min-ply {min_ply} {quiet_only_arg} --shard-count 1 --shard-index 0",
     "progress": {
       "unit": "records",
       "log_regex": "read=(?P<done>\\d+) selected=(?P<selected>\\d+) written=(?P<output>\\d+) rate=(?P<rate>[0-9.]+)/s",

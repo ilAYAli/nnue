@@ -15,10 +15,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib import bullet_format, bullet_text
+from lib.hashing import sha256_file
 
 
 SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
 EVAL_RE = re.compile(r"^eval\s+(-?\d+)\s*$")
+ENGINE_ID_NAME_RE = re.compile(r"^id name (.+)$")
+NET_LOAD_ERROR_RE = re.compile(r"^info string ERROR:", re.IGNORECASE)
+NET_LOAD_FALLBACK_RE = re.compile(r"falling back|source=embedded", re.IGNORECASE)
+# Different engines report a successful net load differently: Stockfish
+# names the file ("NNUE evaluation using nn-<hash>.nnue"), Enyo reports its
+# content hash ("evaluator=enyo-nnue path='...' sha256=<hash> ..."). Neither
+# format is trusted on its own; confirmation requires the reported name or
+# hash to match the net this process actually asked for.
+NET_LOAD_STOCKFISH_CONFIRM_RE = re.compile(r"^info string NNUE evaluation using (\S+)")
+NET_LOAD_SHA256_RE = re.compile(r"\bsha256=([0-9a-f]{16,64})\b", re.IGNORECASE)
+NET_LOAD_PROBE_MAX_LINES = 200
 
 
 class EngineTimeout(RuntimeError):
@@ -41,6 +53,8 @@ class UciEngine:
         self.net = net
         self.net_option = net_option
         self.output_history: list[str] = []
+        self.net_load_confirmed = False
+        self.net_load_confirmation: str | None = None
         self.start()
 
     def start(self) -> None:
@@ -55,20 +69,107 @@ class UciEngine:
         self.lines: queue.Queue[str | None] = queue.Queue()
         self.reader = threading.Thread(target=self.read_stdout, daemon=True)
         self.reader.start()
+        self.net_load_confirmed = False
+        self.net_load_confirmation = None
         try:
             self.send("uci")
             self.wait_for("uciok", timeout_s=60.0)
+            self._verify_engine_identity()
             self.setoption("Threads", str(self.threads))
             self.setoption("Hash", str(self.hash_mb))
             if self.net:
                 self.setoption(self.net_option, self.net)
             self.send("isready")
-            self.wait_for("readyok", timeout_s=60.0)
+            if self.net:
+                self._verify_net_loaded()
+            else:
+                self.wait_for("readyok", timeout_s=60.0)
         except Exception:
             # A crashed process leaves a reader thread and pipes behind. Make
             # a failed handshake fully disposable before a restart attempt.
             self.close()
             raise
+
+    def _verify_engine_identity(self) -> None:
+        """Sanity-check the handshake actually produced an engine identity."""
+        name = ""
+        for line in self.output_history:
+            match = ENGINE_ID_NAME_RE.match(line)
+            if match:
+                name = match.group(1)
+        if not name:
+            raise RuntimeError("engine did not report an id name during the UCI handshake")
+
+    def _verify_net_loaded(self, *, timeout_s: float = 30.0) -> None:
+        """Prove the requested net actually loaded rather than trusting readyok.
+
+        A UCI engine's handshake answers readyok even when the net option
+        points at a missing, corrupt, or architecturally incompatible file.
+        Engines differ in *when* they report the outcome: Enyo reports it
+        eagerly, as an info string between isready and readyok; Stockfish
+        reports it lazily, only the first time the net is actually used.
+        They also differ in *how* they confirm success: Stockfish names the
+        file, Enyo reports a content hash. This must be called right after
+        sending isready (not after wait_for("readyok"), which would consume
+        and discard an eager engine's report before this ever sees it).
+        """
+        assert self.net is not None
+        expected_name = Path(self.net).name
+        expected_sha256 = sha256_file(Path(self.net))
+        reported: list[str] = []
+
+        def scan(line: str) -> bool:
+            if NET_LOAD_ERROR_RE.match(line) or NET_LOAD_FALLBACK_RE.search(line):
+                raise RuntimeError(f"engine failed to load the requested net {self.net!r}: {line}")
+            sha_match = NET_LOAD_SHA256_RE.search(line)
+            if sha_match:
+                reported.append(sha_match.group(1))
+                if sha_match.group(1).lower() == expected_sha256.lower():
+                    self.net_load_confirmed = True
+                    self.net_load_confirmation = line
+                    return True
+                return False
+            name_match = NET_LOAD_STOCKFISH_CONFIRM_RE.match(line)
+            if name_match:
+                reported.append(name_match.group(1))
+                if name_match.group(1) == expected_name:
+                    self.net_load_confirmed = True
+                    self.net_load_confirmation = line
+                    return True
+            return False
+
+        deadline = time.monotonic() + timeout_s
+        saw_readyok = False
+        for _ in range(NET_LOAD_PROBE_MAX_LINES):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise EngineTimeout("engine did not answer readyok during net-load verification")
+            line = self.readline(timeout_s=remaining)
+            if line == "readyok":
+                saw_readyok = True
+                break
+            if scan(line):
+                self.wait_for("readyok", timeout_s=max(0.0, deadline - time.monotonic()))
+                return
+        if not saw_readyok:
+            raise RuntimeError(f"engine did not answer readyok while loading net {self.net!r}")
+
+        # Not confirmed (or refuted) before readyok: this engine reports
+        # lazily. Force the report with a throwaway eval instead of
+        # discovering a silent mislabel after a whole shard has been written.
+        self.send("position startpos")
+        self.send("eval")
+        for _ in range(NET_LOAD_PROBE_MAX_LINES):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise EngineTimeout("engine did not respond to the net-load verification probe")
+            line = self.readline(timeout_s=remaining)
+            if scan(line):
+                return
+        raise RuntimeError(
+            f"engine did not confirm loading the requested net {self.net!r}; "
+            f"reported {reported or 'nothing'}"
+        )
 
     def close(self) -> None:
         proc = getattr(self, "proc", None)

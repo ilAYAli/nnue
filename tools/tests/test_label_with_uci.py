@@ -21,6 +21,47 @@ sys.path.insert(0, str(REPO / "tools" / "score"))
 import label_with_uci  # noqa: E402
 
 
+def make_engine_with_transcript(
+    *,
+    id_name: str = "Stockfish 17.1",
+    net_response: list[str] | None = None,
+    use_net: bool = True,
+    net_path: Path | None = None,
+) -> label_with_uci.UciEngine:
+    """Run UciEngine's handshake verification steps against a scripted transcript.
+
+    Exercises _verify_engine_identity()/_verify_net_loaded() exactly as
+    start() calls them, without spawning a real subprocess. _verify_net_loaded
+    hashes the net file for real, so a real (temporary) file is required.
+    """
+    engine = object.__new__(label_with_uci.UciEngine)
+    engine.net = str(net_path) if use_net else None
+    engine.net_option = "EvalFile"
+    engine.output_history = list(
+        ([f"id name {id_name}"] if id_name else []) + ["id author test", "uciok"]
+    )
+    engine.net_load_confirmed = False
+    engine.net_load_confirmation = None
+
+    remaining = list(net_response or [])
+
+    def fake_send(command: str) -> None:
+        pass
+
+    def fake_readline(*, timeout_s: float | None = None) -> str:
+        if not remaining:
+            raise label_with_uci.EngineTimeout("no more scripted output")
+        return remaining.pop(0)
+
+    engine.send = fake_send  # type: ignore[method-assign]
+    engine.readline = fake_readline  # type: ignore[method-assign]
+
+    label_with_uci.UciEngine._verify_engine_identity(engine)
+    if engine.net is not None:
+        label_with_uci.UciEngine._verify_net_loaded(engine, timeout_s=5.0)
+    return engine
+
+
 class FakeEngine:
     def __init__(self, path: str, *, threads: int, hash_mb: int) -> None:
         self.path = path
@@ -62,6 +103,87 @@ class LabelWithUciTests(unittest.TestCase):
             engine.restart(delay_s=0)
 
         self.assertEqual(3, engine.start.call_count)
+
+    def test_start_confirms_a_stockfish_style_net_load(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".nnue") as handle:
+            handle.write(b"net-bytes")
+            handle.flush()
+            net_path = Path(handle.name)
+            engine = make_engine_with_transcript(
+                net_path=net_path,
+                # Stockfish answers readyok immediately; the confirmation
+                # only appears lazily, in response to the eval probe.
+                net_response=["readyok", f"info string NNUE evaluation using {net_path.name} (1MiB)"],
+            )
+        self.assertTrue(engine.net_load_confirmed)
+        self.assertIn(net_path.name, engine.net_load_confirmation)
+
+    def test_start_confirms_an_enyo_style_net_load_by_content_hash(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".nn") as handle:
+            handle.write(b"enyo-net-bytes")
+            handle.flush()
+            net_path = Path(handle.name)
+            import hashlib
+            digest = hashlib.sha256(b"enyo-net-bytes").hexdigest()
+            engine = make_engine_with_transcript(
+                net_path=net_path,
+                # Enyo reports net-load status eagerly, before readyok.
+                net_response=[
+                    f"info string evaluator=enyo-nnue path='{net_path}' sha256={digest} hidden=1024",
+                    "readyok",
+                ],
+            )
+        self.assertTrue(engine.net_load_confirmed)
+        self.assertIn(digest, engine.net_load_confirmation)
+
+    def test_start_rejects_a_net_that_failed_to_load(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".nnue") as handle:
+            handle.write(b"net-bytes")
+            handle.flush()
+            with self.assertRaisesRegex(RuntimeError, "failed to load"):
+                make_engine_with_transcript(
+                    net_path=Path(handle.name),
+                    # Stockfish's ERROR line also only appears lazily.
+                    net_response=[
+                        "readyok",
+                        "info string ERROR: Network evaluation parameters compatible with the engine must be available.",
+                    ],
+                )
+
+    def test_start_rejects_an_enyo_architecture_mismatch_error(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".nnue") as handle:
+            handle.write(b"net-bytes")
+            handle.flush()
+            with self.assertRaisesRegex(RuntimeError, "failed to load"):
+                make_engine_with_transcript(
+                    net_path=Path(handle.name),
+                    net_response=[
+                        "info string ERROR: nnue_file unsupported Stockfish NNUE architecture hash; "
+                        "falling back to embedded default.nn",
+                    ],
+                )
+
+    def test_start_rejects_a_silent_fallback_even_without_the_word_error(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".nnue") as handle:
+            handle.write(b"net-bytes")
+            handle.flush()
+            with self.assertRaisesRegex(RuntimeError, "failed to load"):
+                make_engine_with_transcript(
+                    net_path=Path(handle.name),
+                    net_response=["info string evaluator=enyo-nnue source=embedded sha256=deadbeef"],
+                )
+
+    def test_start_rejects_an_unconfirmed_net(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".nnue") as handle:
+            handle.write(b"net-bytes")
+            handle.flush()
+            filler = ["readyok", "info string NNUE evaluation using nn-different.nnue (1MiB)"] + ["info string filler"] * 199
+            with self.assertRaisesRegex(RuntimeError, "did not confirm"):
+                make_engine_with_transcript(net_path=Path(handle.name), net_response=filler)
+
+    def test_start_requires_an_id_name(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "did not report an id name"):
+            make_engine_with_transcript(id_name="", use_net=False)
 
     def run_labeler(
         self,
