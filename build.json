@@ -1,7 +1,7 @@
 {
-  "run": "enyo-7.5.0-rc3",
-  "hypothesis": "similar training to enyo-1.32.0-rc10, increasing superbatches to 1024",
-  "superbatches": 1024,
+  "run": "enyo-7.5.0-rc12",
+  "hypothesis": "similar training to enyo-1.32.0-rc10; narrowing superbatches sweep between 256 (best so far) and 1024 (worse)",
+  "superbatches": 512,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
