@@ -7,7 +7,7 @@
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1300000000,
+    "offset": 0000000000,
     "limit": 100000000
   },
   "sfbinpack": {
