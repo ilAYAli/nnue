@@ -1,13 +1,17 @@
 {
   "run": "enyo-7.5.0-rc1",
-  "hypothesis": "use Lc0 SF calibrated, enyo calibrated",
-  "superbatches": 77106,
+  "hypothesis": "similar training to enyo-1.32.0-rc10",
+  "superbatches": 128,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
-  "final_lr": 0.000005,
   "data": {
-    "source_binpack": "~/assets/training/bullet/lc0-stockfish/test91-stockfish-enyo-smoke.bullet"
+    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
+    "offset": 1300000000,
+    "limit": 100000000
+  },
+  "sfbinpack": {
+    "min_ply": 24
   },
   "continue_from": "enyo-7.3.0-rc3"
 }
