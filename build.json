@@ -1,17 +1,17 @@
 {
-  "run": "enyo-7.5.0-rc14",
-  "hypothesis": "similar training to enyo-1.32.0-rc10; repeat of rc13 (superbatches=768, elo=-0.8 inconclusive) to check reproducibility before exploring neighbors",
+  "run": "enyo-7.5.0-rc15",
+  "hypothesis": "same recipe as rc14 (Pylon binpack, sb=768, wdl=0.025, lr=0.004) but correctly anchored to the current mainline parent instead of the stale enyo-7.3.0-rc3",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 0000000000,
+    "offset": 0,
     "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
   },
-  "continue_from": "enyo-7.3.0-rc3"
+  "continue_from": "enyo-7.4.0-rc1"
 }
