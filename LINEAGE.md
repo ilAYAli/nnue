@@ -11,11 +11,14 @@ the fixed `add_full_threat_rows`; smoke diagnostic confirmed 89.3% nonzero
 threat-row coverage post-quantization and passed distinct_net/startpos/static_eval).
 Architecture 8: Architecture 7 plus Stockfish-exact FullThreats (v12 export
 contract and matching 59,808-row feature map).
-Current selected parent: `enyo-7.5.0-rc17` (+2.9 ±6.2 vs `enyo-7.5.0-rc16`,
-LLR 0.93/2.20 (42%) at 4,000/4,000 games, inconclusive — promoted on SF
-tie-break (-121.0 ±6.8 vs -124.9 ±7.0 for rc16); best SF score in the Enyo-5
-line so far. Next full dose off `rc16` (Pylon binpack, sb=768, wdl=0.025,
-lr=0.004, fresh 100M-position slice).
+Current selected parent: `enyo-7.5.0-rc21` (+11.5 ±7.8 vs `enyo-7.5.0-rc17`,
+LLR 2.41/2.20 (110%) at 2,530/4,000 games, H1 — clean win; −125.4 ±6.8 vs
+fixed SF, `enyo_40e0d7e` (slightly below rc17's -121.0, within noise —
+direct SPRT is authoritative for a clean H1 pass, SF is only the
+inconclusive-result tie-breaker). `rc18`-`rc20` were all rejected on the SF
+tie-break at intermediate data slices before `rc21` cleared H1 outright.
+Next full dose off `rc21` (Pylon binpack, sb=768, wdl=0.025, lr=0.004, fresh
+100M-position slice).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
@@ -96,6 +99,7 @@ the preserved historical combined corpus, SHA-1
 | 23 | enyo-7.5.0-rc14 | 2f02279d | pwa-llm  | +0.1 ± 6.6    | -127.1 ± 6.9  | SF tie-break vs actual champion rc1 (inconclusive); continue_from mislabeled as rc3 (naming collision), rejected -9.3±7.9 there — not a valid Parent SPRT chain link, see note above
 | 24 | enyo-7.5.0-rc16 | 6034eea0 | pwa-llm  | +8.3 ± 6.7    | -124.9 ± 7.0  | next full dose off rc14, fresh 100M-position slice
 | 25 | enyo-7.5.0-rc17 | c5840c2b | pwa-llm  | +2.9 ± 6.2    | -121.0 ± 6.8  | SF tie-break (inconclusive parent SPRT); next full dose off rc16, fresh 100M-position slice
+| 26 | enyo-7.5.0-rc21 | d3162e81 | pwa-llm  | +11.5 ± 7.8   | -125.4 ± 6.8  | clean H1 win; rc18/rc19/rc20 all rejected on SF tie-break at intermediate slices
 
 Void: `enyo-10.0.0-rc1` (independent dense heads; no promotion).
 Void: `enyo-11.0.0-rc1` (reset-tail output scale; invalid startpos +2023 cp).
