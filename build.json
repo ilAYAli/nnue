@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc20",
-  "hypothesis": "next full dose off enyo-7.5.0-rc17 (current parent; rc18 and rc19 both rejected on SF tie-break), same recipe (Pylon binpack, sb=768, wdl=0.025, lr=0.004), fresh 100M-position slice",
+  "run": "enyo-7.5.0-rc21",
+  "hypothesis": "next full dose off enyo-7.5.0-rc17 (current parent; rc18-rc20 all rejected on SF tie-break), same recipe (Pylon binpack, sb=768, wdl=0.025, lr=0.004), fresh 100M-position slice",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 500000000,
+    "offset": 600000000,
     "limit": 100000000
   },
   "sfbinpack": {
