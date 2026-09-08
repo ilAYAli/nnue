@@ -2,22 +2,21 @@
 set -Eeuo pipefail
 
 # Thin native NNUE loop:
-#   ./nnue iterate   train, gate, SPRT, commit result, stop for reconciliation
-#   ./nnue iterate --full-sprt-first  run full SPRT directly for iteration 1 only
+#   ./nnue train     train, gate, SPRT, commit result
+#   ./nnue train --full-sprt-first  skip train/gates, run full SPRT directly
 #   ./nnue plan      show resolved tools/bullet/train plan
-#   ./nnue train     data + train + export
 #   ./nnue gates     startpos + static eval + move gate
 #   ./nnue sprt      candidate vs reference games
 #   ./nnue status    print current run/reference and latest logs
 
-cmd=iterate
+cmd=train
 SOLO=0
 FULL_SPRT_FIRST=0
 for arg in "$@"; do
   case "$arg" in
     --solo) SOLO=1 ;;
     --full-sprt-first) FULL_SPRT_FIRST=1 ;;
-    iterate|plan|train|gates|sprt|status|help|-h|--help) cmd=$arg ;;
+    plan|train|gates|sprt|status|help|-h|--help) cmd=$arg ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -46,8 +45,6 @@ SPRT_POLL_SECONDS=${SPRT_POLL_SECONDS:-30}   # how often to re-read Forge status
 SPRT_MAX_WAIT_SECONDS=${SPRT_MAX_WAIT_SECONDS:-86400}
 CONCURRENCY=${CONCURRENCY:-8}
 THREADS=${THREADS:-1}
-ITERATIONS=${ITERATIONS:-999}
-AUTO_ADVANCE=${AUTO_ADVANCE:-0}                    # 1 restores legacy build bump + symlink promotion
 STOCKFISH_NET=${STOCKFISH_NET:-nn-1a298aa575a0.nnue}
 STOCKFISH_NET_GAMES=${STOCKFISH_NET_GAMES:-4000}
 STOCKFISH_NET_LEDGER=${STOCKFISH_NET_LEDGER:-benchmarks/stockfish-net.jsonl}
@@ -83,7 +80,7 @@ EVENT_HOOK=${EVENT_HOOK:-tools/events/nnue_event_ntfy.sh}
 NNUE_NTFY=${NNUE_NTFY:-1}
 HOOK_EVENTS=${HOOK_EVENTS:-done,fail}
 export HOOK_EVENTS
-NNUE_ITERATE_LOCK_DIR=${NNUE_ITERATE_LOCK_DIR:-runs/.nnue-iterate.lock}
+NNUE_TRAIN_LOCK_DIR=${NNUE_TRAIN_LOCK_DIR:-runs/.nnue-train.lock}
 
 run=
 continue_from=
@@ -182,7 +179,7 @@ load_config() {
   else
     reference_net=
   fi
-  summary_file=${summary_file:-runs/logs/nnue-iterate-$(date +%Y%m%d_%H%M%S).txt}
+  summary_file=${summary_file:-runs/logs/nnue-train-$(date +%Y%m%d_%H%M%S).txt}
   if [[ $(json '.skip_stockfish_gate // false') == "true" ]]; then
     SKIP_SF_GATE=1
   fi
@@ -376,7 +373,7 @@ require_lc0_calibration() {
     || fail "invalid LC0 calibration attestation: $calibration_manifest" train
 }
 
-train() {
+_train() {
   load_config
   require_training_origin train
   local build_for_train
@@ -783,7 +780,7 @@ wait_for_existing_forge_sprt() {
     stopped|failed|fail)
       local message="Forge SPRT for $run is $state and incomplete: $forge_run"
       [[ -z "$progress" ]] || message+=" $progress"
-      message+="; resume or retry it manually, then rerun ./nnue iterate"
+      message+="; resume or retry it manually, then rerun ./nnue train"
       fail "$message" sprt
       ;;
   esac
@@ -806,7 +803,7 @@ wait_for_existing_forge_sprt() {
       state=$(jq -r '.state // empty' <<< "$status_json")
       case "$state" in
         stopped|failed|fail)
-          fail "Forge SPRT for $run is $state and incomplete: $forge_run; resume or retry it manually, then rerun ./nnue iterate" sprt
+          fail "Forge SPRT for $run is $state and incomplete: $forge_run; resume or retry it manually, then rerun ./nnue train" sprt
           ;;
       esac
       played=$(jq -r '.progress_fields[]? | select(startswith("games=")) | sub("^games="; "") | split("/")[0]' <<< "$status_json" | tail -1)
@@ -875,7 +872,7 @@ run_sprt_once() {
       wait_for_existing_forge_sprt "$forge_run" || wait_rc=$?
       (( wait_rc == 3 )) && return 3
       (( wait_rc == 0 )) \
-        || fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue iterate" sprt
+        || fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue train" sprt
       return 0
     fi
 
@@ -910,7 +907,7 @@ run_sprt_once() {
     wait_for_existing_forge_sprt "$forge_run" || wait_rc=$?
     (( wait_rc == 3 )) && return 3
     (( wait_rc == 0 )) \
-      || fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue iterate" sprt
+      || fail "Forge SPRT did not complete for $run ($forge_run); resume or retry it manually, then rerun ./nnue train" sprt
     return 0
   fi
 
@@ -1059,34 +1056,12 @@ sprt_command() {
   return 1
 }
 
-next_run_name() {
-  if [[ "$1" =~ ^(.*-v|.*v)([0-9]+)$ ]]; then
-    printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
-  elif [[ "$1" =~ ^(.+-rc)([0-9]+)$ ]]; then
-    printf '%s%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]} + 1))"
-  elif [[ "$1" =~ ^(.+-)([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    printf '%s%d.%d.%d\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]}))" "$((10#${BASH_REMATCH[4]} + 1))"
-  else
-    fail "cannot bump run name: $1" iterate
-  fi
-}
-
-next_promoted_run_name() {
-  if [[ "$1" =~ ^(.+-)([0-9]+)\.([0-9]+)\.([0-9]+)-rc[0-9]+$ ]]; then
-    printf '%s%d.%d.0-rc1\n' "${BASH_REMATCH[1]}" "$((10#${BASH_REMATCH[2]}))" "$((10#${BASH_REMATCH[3]} + 1))"
-  else
-    next_run_name "$1"
-  fi
-}
-
-commit_and_bump_build_json() {
+commit_run_result() {
   local result=$1 accepted=$2 elo=$3 llr=$4 command=$5 details=$6
-  local next next_base subject hypothesis runner_file
+  local subject hypothesis runner_file
   local -a commit_paths=("$BUILD" "$ARCH")
   local lineage_file="$(dirname "$BUILD")/LINEAGE.md"
   runner_file=${BASH_SOURCE[0]}
-  [[ "$AUTO_ADVANCE" == 0 || "$AUTO_ADVANCE" == 1 ]] \
-    || fail "AUTO_ADVANCE must be 0 or 1, got: $AUTO_ADVANCE" iterate
   if [[ "$result" == PASS ]]; then
     subject="${accepted}.nn: Elo ${elo},LLR ${llr}"
   else
@@ -1130,83 +1105,26 @@ $details" \
       return $commit_rc
     fi
   fi
-
-  if [[ "$AUTO_ADVANCE" != 1 ]]; then
-    echo "committed $BUILD: run=$accepted; automatic advancement disabled"
-    return 0
-  fi
-
-  if [[ "$result" == PASS ]]; then
-    next_base=$accepted
-    next=$(next_promoted_run_name "$accepted")
-    ln -sfn "$accepted.nn" "$PROMOTED_NET_LINK" || return
-  else
-    next_base=${continue_from:-}
-    next=$(next_run_name "$accepted")
-  fi
-
-  local tmp
-  tmp=$(mktemp)
-  if [[ "$result" == PASS ]]; then
-    jq \
-      --arg run "$next" \
-      --arg continue_from "$next_base" \
-      '.run = $run
-       | if $continue_from == "" then del(.continue_from) else .continue_from = $continue_from end
-       | if ((.data.offset? | type) == "number") and ((.data.limit? | type) == "number") then
-           .data.offset = (.data.offset + .data.limit)
-         else
-           .
-         end
-       | del(.reference)
-       | del(.initialize_from)
-       | del(.changed_variables.reference)' \
-      "$BUILD" > "$tmp"
-  else
-    jq \
-      --arg run "$next" \
-      --arg continue_from "$next_base" \
-      '.run = $run
-       | if $continue_from == "" then
-           .
-         else
-           .continue_from = $continue_from
-           | del(.reference)
-           | del(.initialize_from)
-           | del(.changed_variables.reference)
-         end
-       | if ((.data.offset? | type) == "number") and ((.data.limit? | type) == "number") then
-           .data.offset = (.data.offset + .data.limit)
-         else
-           .
-         end' \
-      "$BUILD" > "$tmp"
-  fi
-  mv "$tmp" "$BUILD"
-  echo "updated $BUILD: run=$next"
+  echo "committed $BUILD: run=$accepted"
 }
 
-bump_build_json() {
-  commit_and_bump_build_json PASS "$@"
+commit_pass() {
+  commit_run_result PASS "$@"
 }
 
-fail_build_json() {
-  commit_and_bump_build_json FAIL "$@"
+commit_fail() {
+  commit_run_result FAIL "$@"
 }
 
-commit_failed_iteration() {
-  fail_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-failed sprt}" \
-    || fail "failed build.json commit failed for $run" iterate
-  if [[ "$AUTO_ADVANCE" == 1 ]]; then
-    record_iteration FAIL "rejected; build.json advanced"
-  else
-    record_iteration FAIL "rejected; awaiting reconciliation"
-  fi
-  notify fail iterate "rejected $run: ${last_sprt_line:-sprt failed}" "$summary_file" 1
+commit_failed_run() {
+  commit_fail "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-failed sprt}" \
+    || fail "failed build.json commit failed for $run" train
+  record_result FAIL "rejected; awaiting reconciliation"
+  notify fail train "rejected $run: ${last_sprt_line:-sprt failed}" "$summary_file" 1
   print_summary || true
 }
 
-record_iteration() {
+record_result() {
   local result=$1
   local detail=$2
   {
@@ -1377,76 +1295,70 @@ stockfish_tie_break() {
   float_lt "$parent_elo" "$candidate_elo"
 }
 
-iterate() {
+train() {
   need jq
   need git
   ensure_git_identity
-  if ! mkdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null; then
+  if ! mkdir "$NNUE_TRAIN_LOCK_DIR" 2>/dev/null; then
     local lock_pid
-    lock_pid=$(cat "$NNUE_ITERATE_LOCK_DIR/pid" 2>/dev/null || true)
+    lock_pid=$(cat "$NNUE_TRAIN_LOCK_DIR/pid" 2>/dev/null || true)
     if [[ "$lock_pid" =~ ^[0-9]+$ ]] && kill -0 "$lock_pid" 2>/dev/null; then
-      fail "another NNUE iterate process is active (pid=$lock_pid)" iterate
+      fail "another NNUE train process is active (pid=$lock_pid)" train
     fi
-    rm -f "$NNUE_ITERATE_LOCK_DIR/pid"
-    rmdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null || fail "cannot clear stale iterate lock" iterate
-    mkdir "$NNUE_ITERATE_LOCK_DIR" || fail "cannot acquire iterate lock" iterate
+    rm -f "$NNUE_TRAIN_LOCK_DIR/pid"
+    rmdir "$NNUE_TRAIN_LOCK_DIR" 2>/dev/null || fail "cannot clear stale train lock" train
+    mkdir "$NNUE_TRAIN_LOCK_DIR" || fail "cannot acquire train lock" train
   fi
-  printf '%s\n' "$$" > "$NNUE_ITERATE_LOCK_DIR/pid"
-  trap 'rm -f "$NNUE_ITERATE_LOCK_DIR/pid"; rmdir "$NNUE_ITERATE_LOCK_DIR" 2>/dev/null || true' EXIT
-  for ((i = 1; i <= ITERATIONS; i++)); do
-    load_config
-    section "iteration $i"
-    show_config
-    notify phase_start iterate "starting iteration $i: $run" "$summary_file" 0
-    if (( FULL_SPRT_FIRST != 1 || i != 1 )); then
-      train || fail "train failed for $run" train
-      gates || fail "gates failed for $run" gates
-    fi
+  printf '%s\n' "$$" > "$NNUE_TRAIN_LOCK_DIR/pid"
+  trap 'rm -f "$NNUE_TRAIN_LOCK_DIR/pid"; rmdir "$NNUE_TRAIN_LOCK_DIR" 2>/dev/null || true' EXIT
+  load_config
+  section "run"
+  show_config
+  notify phase_start train "starting $run" "$summary_file" 0
+  if [[ "$FULL_SPRT_FIRST" != 1 ]]; then
+    _train || fail "train failed for $run" train
+    gates || fail "gates failed for $run" gates
+  fi
 
-    if [[ -z "$continue_from" && -z "$initialize_from" && -z "$reference_name" ]]; then
-      run_stockfish_benchmark "$run"
-      last_sprt_elo=$(jq -r '.elo' <<< "$stockfish_result")
-      last_sprt_ci=$(jq -r '.ci' <<< "$stockfish_result")
-      last_sprt_llr="fixed-SF baseline"
-      last_sprt_command="$QSPRT --candidate $run.nn"
-      last_sprt_line="Stockfish baseline: elo=$last_sprt_elo ci=$last_sprt_ci games=$STOCKFISH_NET_GAMES"
-      bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "$last_sprt_line" \
-        || fail "root build.json commit failed for $run" iterate
-      record_iteration PASS "scratch root established; fixed-SF baseline recorded"
-      notify iteration_done iterate "scratch root $run established: $last_sprt_line" "$summary_file" 1
-      break
+  if [[ -z "$continue_from" && -z "$initialize_from" && -z "$reference_name" ]]; then
+    run_stockfish_benchmark "$run"
+    last_sprt_elo=$(jq -r '.elo' <<< "$stockfish_result")
+    last_sprt_ci=$(jq -r '.ci' <<< "$stockfish_result")
+    last_sprt_llr="fixed-SF baseline"
+    last_sprt_command="$QSPRT --candidate $run.nn"
+    last_sprt_line="Stockfish baseline: elo=$last_sprt_elo ci=$last_sprt_ci games=$STOCKFISH_NET_GAMES"
+    commit_pass "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "$last_sprt_line" \
+      || fail "root build.json commit failed for $run" train
+    record_result PASS "scratch root established; fixed-SF baseline recorded"
+    notify iteration_done train "scratch root $run established: $last_sprt_line" "$summary_file" 1
+    print_summary
+    return 0
+  fi
+  local sprt_rc=0
+  if (( FULL_SPRT_FIRST == 1 )); then
+    if ! full_sprt_gate; then
+      commit_failed_run
+      return 0
     fi
-    local sprt_rc=0
-    if (( FULL_SPRT_FIRST == 1 && i == 1 )); then
-      if ! full_sprt_gate; then
-        commit_failed_iteration
-        break
-      fi
-    else
-      sprt_gate || sprt_rc=$?
-      if (( sprt_rc == 1 )); then
-        commit_failed_iteration
-        break
-      fi
+  else
+    sprt_gate || sprt_rc=$?
+    if (( sprt_rc == 1 )); then
+      commit_failed_run
+      return 0
     fi
-    if (( SKIP_SF_GATE != 1 )); then
-      run_stockfish_benchmark "$run"
-      if (( sprt_rc == 2 )) && ! stockfish_tie_break "$run" "${continue_from:-$initialize_from}"; then
-        last_sprt_line="${last_sprt_line:-parent SPRT inconclusive}; ${last_stockfish_line}"
-        commit_failed_iteration
-        break
-      fi
+  fi
+  if (( SKIP_SF_GATE != 1 )); then
+    run_stockfish_benchmark "$run"
+    if (( sprt_rc == 2 )) && ! stockfish_tie_break "$run" "${continue_from:-$initialize_from}"; then
+      last_sprt_line="${last_sprt_line:-parent SPRT inconclusive}; ${last_stockfish_line}"
+      commit_failed_run
+      return 0
     fi
-    bump_build_json "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
-      || fail "build.json commit failed for $run" iterate
-    if [[ "$AUTO_ADVANCE" == 1 ]]; then
-      record_iteration PASS "accepted; build.json advanced"
-    else
-      record_iteration PASS "accepted; awaiting reconciliation"
-    fi
-    notify iteration_done iterate "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
-    [[ "$AUTO_ADVANCE" == 1 ]] || break
-  done
+  fi
+  commit_pass "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
+    || fail "build.json commit failed for $run" train
+  record_result PASS "accepted; awaiting reconciliation"
+  notify iteration_done train "accepted $run: ${last_sprt_line:-sprt passed}" "$summary_file" 1
   print_summary
 }
 
@@ -1462,22 +1374,18 @@ status() {
 help() {
   cat <<'EOF'
 Usage:
-  ./nnue iterate   # train, gate, SPRT, commit result, stop for reconciliation
-  ./nnue iterate --full-sprt-first
+  ./nnue train   # train, gate, SPRT, commit result
+  ./nnue train --full-sprt-first  # skip train/gates, run full SPRT directly
   ./nnue plan
-  ./nnue train
   ./nnue gates
   ./nnue sprt
   ./nnue sprt --solo
   ./nnue status
 
 Useful overrides:
-  AUTO_ADVANCE=1 ./nnue iterate  # legacy: promote symlink and prepare next build
-  ITERATIONS=5 ./nnue iterate
-  STOCKFISH_NET_GAMES=4000 ./nnue iterate
-  ./nnue iterate --full-sprt-first  # first iteration skips train/gates/smoke
+  STOCKFISH_NET_GAMES=4000 ./nnue train
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
-  SKIP_SMOKE=1 GAMES=800 ./nnue iterate
+  SKIP_SMOKE=1 GAMES=800 ./nnue train
   SMOKE_GAMES=400 SMOKE_FAIL_ELO=-100 ./nnue sprt
   GAMES=4000 CONCURRENCY=8 THREADS=1 ./nnue sprt
 
@@ -1485,22 +1393,15 @@ SPRT checkpoints:
   SMOKE_GAMES=500              reject only a catastrophic net (elo <= SMOKE_FAIL_ELO)
   SPRT_ELO1=8                  H1 threshold
   GAMES=4000                   final parent-SPRT cap
-  SKIP_SMOKE=1 ./nnue iterate  # disable smoke; always play GAMES
-  FORCE=1 ./nnue iterate       # regenerate and revalidate; never reuse prior run artifacts
+  SKIP_SMOKE=1 ./nnue train    # disable smoke; always play GAMES
+  FORCE=1 ./nnue train         # regenerate and revalidate; never reuse prior run artifacts
   MOVE_GATE_STRICT=1 ./nnue gates
 
 Safety:
-  automatic build advancement and symlink promotion are disabled by default
   continuation runs must set build.json continue_from
   missing continue_from asks before scratch training in an interactive terminal
   non-interactive missing continue_from fails before training
 EOF
-}
-
-train_command() {
-  train
-  notify training_done train "training/export completed for $run" \
-    "$log_dir/01-train-export.log" 1
 }
 
 # Keep dispatch inside one parsed compound command. A long-running invocation
@@ -1508,9 +1409,8 @@ train_command() {
 # from the script path after Forge returns.
 main() {
   case "$cmd" in
-    iterate) iterate ;;
     plan) plan ;;
-    train) train_command ;;
+    train) train ;;
     gates) gates ;;
     sprt) sprt_command ;;
     status) status ;;
