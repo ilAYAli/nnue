@@ -127,9 +127,15 @@ def run_sprt(
     run = match.group(1)
 
     manifest = Path.home() / "code" / "chess" / "forge" / "runs" / run / "manifest.json"
-    wait = subprocess.run(["forge", "wait", "--manifest", str(manifest)])
+    notify_command = Path.home() / "code" / "chess" / "forge" / "scripts" / "forge_event_ntfy.sh"
+    wait_command = ["forge", "wait", "--manifest", str(manifest)]
+    wait_env = os.environ.copy()
+    if notify_command.is_file():
+        wait_command += ["--notify-command", str(notify_command)]
+        wait_env.setdefault("HOOK_EVENTS", "done,fail")
+    wait = subprocess.run(wait_command, env=wait_env)
     if wait.returncode:
-        raise subprocess.CalledProcessError(wait.returncode, ["forge", "wait", "--manifest", str(manifest)])
+        raise subprocess.CalledProcessError(wait.returncode, wait_command)
 
     status = subprocess.run(
         ["forge", "status", run, "--json"], capture_output=True, text=True, check=True
