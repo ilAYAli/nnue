@@ -5,7 +5,7 @@ use std::{
     env,
     ffi::OsStr,
     fs::{self, File},
-    io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    io::{BufReader, BufWriter, IsTerminal, Read, Seek, SeekFrom, Write},
     mem,
     path::{Path, PathBuf},
     process::{self, Command},
@@ -1636,6 +1636,8 @@ fn cmd_data(config: &Config) {
     let mut written = 0_u64;
     let mut skipped = 0_u64;
     let mut sampled = 0_u64;
+    let live_progress = std::io::stderr().is_terminal();
+    let mut progress_shown = false;
     let mut bucket_seen = vec![0_u64; data.output_bucket_weights.len()];
     let mut bucket_written = vec![0_u64; data.output_bucket_weights.len()];
     let mut eval_seen = vec![0_u64; data.eval_bucket_weights.len()];
@@ -1651,11 +1653,17 @@ fn cmd_data(config: &Config) {
             chunk = &chunk[skip..];
             if skipped % 5_000_000 < skipped - before {
                 let secs = start.elapsed().as_secs_f32();
-                eprintln!(
+                let text = format!(
                     "skipped {} positions ({:.1}M/s)",
                     skipped,
                     skipped as f32 / secs.max(0.001) / 1e6
                 );
+                if live_progress {
+                    eprint!("\r\x1b[K{text}");
+                    progress_shown = true;
+                } else {
+                    eprintln!("{text}");
+                }
             }
             if chunk.is_empty() {
                 return false;
@@ -1692,15 +1700,24 @@ fn cmd_data(config: &Config) {
         written += selected.len() as u64;
         if written % 5_000_000 < selected.len() as u64 {
             let secs = start.elapsed().as_secs_f32();
-            eprintln!(
+            let text = format!(
                 "converted {} positions ({:.1}M/s)",
                 written,
                 written as f32 / secs.max(0.001) / 1e6
             );
+            if live_progress {
+                eprint!("\r\x1b[K{text}");
+                progress_shown = true;
+            } else {
+                eprintln!("{text}");
+            }
         }
         data.limit != 0 && written >= data.limit
     });
     publish_bullet_output(tmp, writer, &output, written);
+    if progress_shown {
+        eprintln!();
+    }
     let secs = start.elapsed().as_secs_f32();
     eprintln!(
         "done: skipped {} positions, converted {} positions to {} in {:.1}s ({:.1}M/s)",
