@@ -11,7 +11,18 @@ the fixed `add_full_threat_rows`; smoke diagnostic confirmed 89.3% nonzero
 threat-row coverage post-quantization and passed distinct_net/startpos/static_eval).
 Architecture 8: Architecture 7 plus Stockfish-exact FullThreats (v12 export
 contract and matching 59,808-row feature map).
-Current selected parent: `enyo-7.4.0-rc1` (+0.4 ±5.7 vs `enyo-7.3.0-rc3`; −138.0 ±7.3 vs fixed SF, `enyo_f2a0417`).
+Current selected parent: `enyo-7.5.0-rc14` (+0.1 ±6.6 vs `enyo-7.4.0-rc1`,
+inconclusive H0/H1 at 4,000/4,000 games, promoted on SF tie-break; −127.1
+±6.9 vs fixed SF, `enyo_40e0d7e`). Irregular promotion: `rc14`'s own
+`continue_from` is the stale `enyo-7.3.0-rc3` (a naming collision between two
+unrelated `enyo-7.5.0-rcN` experiment lines, see commit history around
+2026-09-07/08), against which it was rejected (-9.3 ±7.9, LLR -2.27/2.20,
+H0) — promotion was decided by the direct SPRT against the actual reigning
+champion `enyo-7.4.0-rc1` (inconclusive) plus the SF tie-break, not by its
+own `continue_from` chain. Caveat: `enyo-7.4.0-rc1`'s SF figure below was
+measured against engine build `enyo_f2a0417`, `rc14`'s against `enyo_40e0d7e`
+— not a controlled comparison; the direct SPRT (same engine both sides) is
+the trustworthy signal and it was a dead heat.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
@@ -89,6 +100,7 @@ the preserved historical combined corpus, SHA-1
 | 20 | enyo-7.2.0-rc2  | e383cbf4 | pwa-llm  | +2.0 ± 5.6    | -145.2 ± 7.3  | one additional corpus pass; SF tie-break over rc3
 | 21 | enyo-7.3.0-rc3  | 0f7513e1 | pwa-llm  | +6.8 ± 6.1    | -138.9 ± 7.1  | recalibrated nodes5000pv2 labels
 | 22 | enyo-7.4.0-rc1  | d7a94117 | pwa-llm  | +0.4 ± 5.7    | -138.0 ± 7.3  | WDL 0.05 → 0.025; SF tie-break
+| 23 | enyo-7.5.0-rc14 | 2f02279d | pwa-llm  | +0.1 ± 6.6    | -127.1 ± 6.9  | SF tie-break vs actual champion rc1 (inconclusive); continue_from mislabeled as rc3 (naming collision), rejected -9.3±7.9 there — not a valid Parent SPRT chain link, see note above
 
 Void: `enyo-10.0.0-rc1` (independent dense heads; no promotion).
 Void: `enyo-11.0.0-rc1` (reset-tail output scale; invalid startpos +2023 cp).
