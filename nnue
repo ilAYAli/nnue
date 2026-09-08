@@ -386,6 +386,10 @@ train() {
 
   notify phase_start train "training $run" "$log" 0
   ensure_train_helper_current
+  if [[ ! -f "$data_file" ]]; then
+    "$TRAIN_HELPER" data --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" \
+      || fail "corpus generation failed for $run" train
+  fi
   [[ -f "$BULLET_RESULT_VALIDATOR" ]] || fail "missing Bullet result validator: $BULLET_RESULT_VALIDATOR" train
   "$PYTHON" "$BULLET_RESULT_VALIDATOR" \
     --input "$data_file" --require-win-loss \
