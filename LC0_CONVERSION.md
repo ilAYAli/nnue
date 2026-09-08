@@ -12,7 +12,7 @@ For every selected position, Forge must:
 1. decode the LC0 record;
 2. obtain the **Stockfish UCI search label** using
    `~/assets/engines/reference` and
-   `~/assets/nets/nn-0ee0657fb25e.nnue` through `EvalFile`;
+   `~/assets/nets/nn-1a298aa575a0.nnue` through `EvalFile`;
 3. apply `--enyo-runtime-target` (Enyo clamp/phase normalization) to that
    Stockfish score; and
 4. serialize the result as BulletFormat.
