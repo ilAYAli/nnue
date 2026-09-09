@@ -11,15 +11,18 @@ the fixed `add_full_threat_rows`; smoke diagnostic confirmed 89.3% nonzero
 threat-row coverage post-quantization and passed distinct_net/startpos/static_eval).
 Architecture 8: Architecture 7 plus Stockfish-exact FullThreats (v12 export
 contract and matching 59,808-row feature map).
-Current selected parent: `enyo-7.5.0-rc27` (+3.7 ±6.2 vs `enyo-7.5.0-rc21`,
-LLR 1.28/2.20 (58%) at 4,000/4,000 games, inconclusive — promoted on SF
-tie-break (-123.5 ±6.9 vs -125.4 ±6.8 for rc21); next full dose off rc21,
-same recipe (Pylon binpack, sb=768, wdl=0.025, lr=0.004). Between rc21 and
-rc27, five straight rejections (rc22-rc26): two single-variable
-hyperparameter probes (lr 0.004→0.005 on rc24, wdl 0.025→0.015 on rc25) both
-underperformed and were reverted; the rest were plain data-slice attempts
-that lost the SF tie-break. rc21 itself: +11.5 ±7.8 vs `enyo-7.5.0-rc17`,
-LLR 2.41/2.20, clean H1 win.
+Current selected parent: `enyo-7.5.0-rc36` (-2.9 ±6.1 vs `enyo-7.5.0-rc27`,
+LLR -0.98/2.20 (-45%) at 4,000/4,000 games, inconclusive — promoted on SF
+tie-break (-122.7 ±6.5 vs -123.5 ±6.9 for rc27), narrow. Between rc27 and
+rc36, eight straight rejections (rc28-rc35): a fixed-slice superbatches
+sweep (384/768/1536, with 768 as a proper same-slice control) conclusively
+showed dose is not a useful lever — both directions underperformed the
+768 baseline; the rest were plain data-slice attempts that lost the SF
+tie-break. rc27 itself was independently verified genuinely better than
+`enyo-7.5.0-rc17` via a wider 8000-game direct SPRT (LLR 2.31/2.20, elo+5.4,
+los=97.5%) after the default 4,000-game samples on this whole chain proved
+too noisy (~7 Elo CI) to resolve an effect this small — individual SF points
+should not be over-interpreted without a comparably-sized paired check.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
@@ -102,6 +105,7 @@ the preserved historical combined corpus, SHA-1
 | 25 | enyo-7.5.0-rc17 | c5840c2b | pwa-llm  | +2.9 ± 6.2    | -121.0 ± 6.8  | SF tie-break (inconclusive parent SPRT); next full dose off rc16, fresh 100M-position slice
 | 26 | enyo-7.5.0-rc21 | d3162e81 | pwa-llm  | +11.5 ± 7.8   | -125.4 ± 6.8  | clean H1 win; rc18/rc19/rc20 all rejected on SF tie-break at intermediate slices
 | 27 | enyo-7.5.0-rc27 | 11b768c3 | pwa-llm  | +3.7 ± 6.2    | -123.5 ± 6.9  | SF tie-break (inconclusive); rc22-rc26 all rejected first (lr/wdl probes reverted, data slices lost tie-break)
+| 28 | enyo-7.5.0-rc36 | 95e1e0b5 | pwa-llm  | -2.9 ± 6.1    | -122.7 ± 6.5  | SF tie-break (inconclusive, narrow); rc28-rc35 all rejected first (sb sweep + data slices), rc27 independently verified +5.4 vs rc17 at 8000g first
 
 Void: `enyo-10.0.0-rc1` (independent dense heads; no promotion).
 Void: `enyo-11.0.0-rc1` (reset-tail output scale; invalid startpos +2023 cp).
