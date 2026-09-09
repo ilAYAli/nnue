@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc25",
-  "hypothesis": "off current parent enyo-7.5.0-rc21; lr=0.005 rejected hard (-25.1 Elo) on rc24, reverting to lr=0.004; probing WDL 0.025 -> 0.015 instead, continuing the historical direction of the lineage's prior WDL decrease (0.05->0.025)",
+  "run": "enyo-7.5.0-rc26",
+  "hypothesis": "off current parent enyo-7.5.0-rc21; both hyperparameter probes since rc21 (lr=0.005 on rc24, wdl=0.015 on rc25) underperformed the baseline recipe, reverting to rc21's exact wdl=0.025/lr=0.004 and continuing plain data progression, fresh 100M-position slice",
   "superbatches": 768,
   "trainable": "all",
-  "wdl": 0.015,
+  "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1000000000,
+    "offset": 1100000000,
     "limit": 100000000
   },
   "sfbinpack": {
