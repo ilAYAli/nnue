@@ -1636,7 +1636,14 @@ fn cmd_data(config: &Config) {
     let mut written = 0_u64;
     let mut skipped = 0_u64;
     let mut sampled = 0_u64;
-    let live_progress = std::io::stderr().is_terminal();
+    // ./nnue's train() merges both stdout and stderr into a `tee` pipe, so
+    // neither stream can self-detect a live terminal here; it sets this env
+    // var explicitly instead, checked before the redirect happens. Standalone
+    // invocations (no wrapper) fall back to the normal isatty() check.
+    let live_progress = match env::var("NNUE_LIVE_PROGRESS") {
+        Ok(v) => v == "1",
+        Err(_) => std::io::stderr().is_terminal(),
+    };
     let mut progress_shown = false;
     let mut bucket_seen = vec![0_u64; data.output_bucket_weights.len()];
     let mut bucket_written = vec![0_u64; data.output_bucket_weights.len()];
