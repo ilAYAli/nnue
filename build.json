@@ -1,7 +1,7 @@
 {
-  "run": "enyo-7.5.0-rc31",
-  "hypothesis": "sb=768->384, same fixed data slice as rc30 (dose sweep off rc27)",
-  "superbatches": 384,
+  "run": "enyo-7.5.0-rc32",
+  "hypothesis": "sb=768 control point on the same fixed slice as rc30/rc31 (missing baseline for the sweep)",
+  "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
