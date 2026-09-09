@@ -1,17 +1,17 @@
 {
-  "run": "enyo-7.5.0-rc36",
-  "hypothesis": "next full dose off rc27, fresh slice",
+  "run": "enyo-7.5.0-rc37",
+  "hypothesis": "next full dose off rc36, fresh slice",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1900000000,
+    "offset": 2000000000,
     "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
   },
-  "continue_from": "enyo-7.5.0-rc27"
+  "continue_from": "enyo-7.5.0-rc36"
 }
