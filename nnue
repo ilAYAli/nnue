@@ -403,7 +403,12 @@ _train() {
     train_args+=(--force)
   fi
   section train
-  "$TRAIN_HELPER" "${train_args[@]}" \
+  # Both stdout and stderr get merged into the tee pipe below, so the
+  # trainer binary can't detect a live terminal via isatty() on either of
+  # its own streams. Tell it explicitly, checked here before the redirect.
+  local live_progress=0
+  [[ -t 1 ]] && live_progress=1
+  NNUE_LIVE_PROGRESS=$live_progress "$TRAIN_HELPER" "${train_args[@]}" \
     2>&1 | tee "$log" \
     || fail "train/export failed for $run" train
   notify phase_done train "training/export passed for $run" "$log" 0

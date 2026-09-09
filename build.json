@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc29",
-  "hypothesis": "off current parent enyo-7.5.0-rc27 (rc28 rejected on SF tie-break despite favorable inconclusive parent-SPRT, LLR 1.74/2.20 los=96.7%), plain data progression continues, fresh 100M-position slice",
-  "superbatches": 768,
+  "run": "enyo-7.5.0-rc30",
+  "hypothesis": "sb=768->1536, fixed data slice (dose sweep off rc27)",
+  "superbatches": 1536,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1400000000,
+    "offset": 1500000000,
     "limit": 100000000
   },
   "sfbinpack": {
