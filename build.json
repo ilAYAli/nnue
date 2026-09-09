@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc33",
-  "hypothesis": "dose sweep concluded (384/768/1536 on fixed slice: 768 ties baseline, both directions worse); back to plain data progression off rc27, fresh slice",
+  "run": "enyo-7.5.0-rc34",
+  "hypothesis": "next full dose off rc27, fresh slice",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1600000000,
+    "offset": 1700000000,
     "limit": 100000000
   },
   "sfbinpack": {
