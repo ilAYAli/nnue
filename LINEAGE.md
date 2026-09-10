@@ -50,6 +50,23 @@ grounding than the final-LR pick — no validated win in this direction on
 record, just elimination of the alternatives — but the pattern of two
 consecutive failed increases is consistent with 0.004 already being past
 optimal rather than under it).
+Rejected: `enyo-7.5.0-rc40` (initial LR 0.004 → 0.003; -2.5 ±6.0, LLR
+-0.87/2.20 (inconclusive), los=20.7%, draw=55.6%, games=4000/4000, Stockfish
+tie-break also unfavorable (-126.9 vs -122.7), commit `e274374a`).
+Reserved: `enyo-7.5.0-rc41` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: `activation_l1` 0.0 → 0.0001, everything else held at
+baseline, same data slice — rejection-driven, no advance. First iteration
+in this chain touching a genuinely untested dimension rather than another
+LR/WDL/dose nudge (all of which are now closed off in both directions).
+`activation_l1` is a standard NNUE-specific technique — L1 penalty on the
+clipped feature-transformer activations (`spike_trainer/src/main.rs:1239`,
+`activation_l1 / (2*hidden)` normalized), used in the wider NNUE-training
+community specifically to reduce int8/int16 quantization error, not a
+generic regularizer. Never touched anywhere in this repo's history (always
+0.0 in every prior build.json). Magnitude (1e-4) is a literature-typical
+starting point, not calibrated to this trainer's exact scale — if it's
+badly off, the static_eval/residual gates should catch a degraded net
+before the SPRT stage runs at all).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
