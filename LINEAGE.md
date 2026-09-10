@@ -92,6 +92,13 @@ for a short (768-superbatch) continuation fine-tune off an already-converged
 checkpoint. A much smaller value (if this is revisited, think 1e-4 to 1e-5,
 not 0.01) would be needed to avoid dominating the loss at this scale.
 
+Reserved: `enyo-7.5.0-rc43` on pwa-llm (final conventional fallback before
+the compact-topology architecture work; single-variable continuation from
+`enyo-7.5.0-rc36`: `weight_decay` 0.0 → 0.0001, everything else held at
+baseline, same data slice. This tests the small decay scale suggested by
+rc42's postmortem: about 2% cumulative shrinkage over 49,152 steps rather
+than rc42's roughly 86%).
+
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
 coverage and gates verified clean beforehand; -97.8 ±17.4, LLR -5.00/2.20, H0).
