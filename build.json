@@ -1,11 +1,11 @@
 {
-  "run": "enyo-7.5.0-rc42",
-  "hypothesis": "weight_decay 0.0 -> 0.01 off verified parent rc36; bullet crate's own AdamW default, never tested in this lineage",
+  "run": "enyo-7.5.0-rc43",
+  "hypothesis": "weight_decay 0.0 -> 0.0001 off verified parent rc36; mild AdamW decay should regularize without rc42's catastrophic 86% cumulative shrinkage",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
-  "weight_decay": 0.01,
+  "weight_decay": 0.0001,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 2100000000,

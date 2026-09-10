@@ -98,6 +98,10 @@ the compact-topology architecture work; single-variable continuation from
 baseline, same data slice. This tests the small decay scale suggested by
 rc42's postmortem: about 2% cumulative shrinkage over 49,152 steps rather
 than rc42's roughly 86%).
+Rejected: `enyo-7.5.0-rc43` (`weight_decay` 0.0 → 0.0001; parent SPRT
+inconclusive but unfavorable: −6.1 ±6.1 Elo, LLR −1.99/2.20, los=2.6%,
+draw=55.0%, games=4000/4000; fixed-SF tie-break also unfavorable:
+−131.0 ±7.0 versus rc36 −122.7 ±6.5, games=4000/4000, commit `145d150e`).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
