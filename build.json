@@ -1,6 +1,6 @@
 {
   "run": "enyo-7.5.0-rc44",
-  "hypothesis": "weight_decay 0.0 -> 0.00001 off verified parent rc36; the remaining post-rc42 scale gives about 0.2% cumulative AdamW shrinkage, retaining only a light regularization signal",
+  "hypothesis": "weight_decay 0.0 -> 0.00001 off verified parent rc36",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,

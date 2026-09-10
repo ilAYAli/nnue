@@ -107,6 +107,10 @@ Reserved: `enyo-7.5.0-rc44` on pwa-llm (single-variable continuation from
 baseline and the same data slice. This is the remaining scale explicitly
 identified by rc42's postmortem: approximately 0.2% cumulative AdamW shrinkage
 over 49,152 steps, rather than rc43's approximately 2% or rc42's 86%).
+Rejected: `enyo-7.5.0-rc44` (`weight_decay` 0.0 → 0.00001; parent SPRT
+inconclusive but unfavorable: −4.3 ±6.3 Elo, LLR −1.45/2.20, los=9.4%,
+draw=54.7%, games=4000/4000; fixed-SF tie-break also unfavorable:
+−126.4 ±6.7 versus rc36 −122.7 ±6.5, games=4000/4000).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
