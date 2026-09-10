@@ -32,6 +32,12 @@ ceiling direct SPRT of `rc38` vs `rc36` was run: it resolved cleanly against
 games=10,000/12,000. `rc38`'s SF-tie-break promotion does not hold up under
 verification; selected parent reverts to `rc36`. `rc38`'s evidence and net
 are retained for the record but it is not a valid parent.
+Reserved: `enyo-7.5.0-rc39` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: final LR 0.000005 → 0.00001, everything else held at
+baseline; historically-grounded lever — Enyo-5 validated wins in both
+directions on final LR, `0.000005 → 0.000010` at row 3 and `0.000010 →
+0.000005` at row 14 — unlike initial LR and dose, both already ruled out
+this chain).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
