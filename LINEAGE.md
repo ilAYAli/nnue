@@ -81,6 +81,16 @@ and 0.01 is literally the bullet crate's own built-in default
 0.0 with no record of that override ever being tested. Different mechanism
 from `activation_l1` (global weight-norm shrinkage vs FT-activation
 sparsity), so its rejection doesn't pre-empt this one).
+Rejected: `enyo-7.5.0-rc42` (weight_decay 0.0 → 0.01; catastrophic, -87.2
+±22.5, LLR -2.46/2.20 (-112%, H0), los=0.0%, games=350/4000, early smoke
+triage, commit `e3597280`). In hindsight the magnitude was badly
+miscalibrated for this use: 768 superbatches × 64 batches = 49,152 steps of
+`w *= (1 - lr*decay)` ≈ `(1-0.00004)^49152` ≈ 0.14 — roughly 86% cumulative
+weight shrinkage over the run. The bullet crate's 0.01 default is presumably
+sane for training from scratch over a different step count/schedule, not
+for a short (768-superbatch) continuation fine-tune off an already-converged
+checkpoint. A much smaller value (if this is revisited, think 1e-4 to 1e-5,
+not 0.01) would be needed to avoid dominating the loss at this scale.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
