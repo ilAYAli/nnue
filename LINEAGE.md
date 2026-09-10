@@ -38,6 +38,18 @@ baseline; historically-grounded lever — Enyo-5 validated wins in both
 directions on final LR, `0.000005 → 0.000010` at row 3 and `0.000010 →
 0.000005` at row 14 — unlike initial LR and dose, both already ruled out
 this chain).
+Rejected: `enyo-7.5.0-rc39` (final LR 0.000005 → 0.00001; -9.9 ±7.4, LLR
+-2.32/2.20, H0, los=0.4%, games=2836/4000, commit `81131e2e`).
+Reserved: `enyo-7.5.0-rc40` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: initial LR 0.004 → 0.003, everything else held at
+baseline, same data slice — no advance, this follows a rejection not an
+acceptance. Every LR probe on this chain so far has been an *increase*
+(initial LR 0.004→0.005: -25.1 Elo; final LR 0.000005→0.00001: -9.9 Elo,
+just above); a decrease is the only untested LR direction left. Weaker
+grounding than the final-LR pick — no validated win in this direction on
+record, just elimination of the alternatives — but the pattern of two
+consecutive failed increases is consistent with 0.004 already being past
+optimal rather than under it).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
