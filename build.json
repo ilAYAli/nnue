@@ -1,10 +1,11 @@
 {
-  "run": "enyo-7.5.0-rc40",
-  "hypothesis": "initial LR 0.004 -> 0.003 off verified parent rc36; only untested LR direction left",
+  "run": "enyo-7.5.0-rc41",
+  "hypothesis": "activation_l1 0.0 -> 0.0001 off verified parent rc36; untested quantization-robustness regularization on clipped FT activations",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.003,
+  "lr": 0.004,
+  "activation_l1": 0.0001,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 2100000000,
