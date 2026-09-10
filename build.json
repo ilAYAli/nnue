@@ -1,11 +1,11 @@
 {
-  "run": "enyo-7.5.0-rc43",
-  "hypothesis": "weight_decay 0.0 -> 0.0001 off verified parent rc36; mild AdamW decay should regularize without rc42's catastrophic 86% cumulative shrinkage",
+  "run": "enyo-7.5.0-rc44",
+  "hypothesis": "weight_decay 0.0 -> 0.00001 off verified parent rc36; the remaining post-rc42 scale gives about 0.2% cumulative AdamW shrinkage, retaining only a light regularization signal",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
-  "weight_decay": 0.0001,
+  "weight_decay": 0.00001,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 2100000000,
