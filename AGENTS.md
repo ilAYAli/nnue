@@ -18,7 +18,7 @@ record, and promote it. Do not make unrelated changes.
 
 1. `pwa-llm` is the only Forge coordinator.
 2. Long-running GPU training may run on `pwa-llm` or `pwa-5090`.
-3. All commands should be executed with a trailing `;notifai-write "command completed"`
+3. All commands should be executed with a trailing `;notifai-write.sh "command completed"`
 and you should immediately continue working when you receive this notification.
 3. All servers you work on must have a tmux session names `nnue_cmd`
 4. All commands must be executed in the `nnue_cmd` session.
@@ -65,7 +65,7 @@ HOOK_EVENTS=done,fail forge run sprt \
   --reference-net ~/assets/nets/nn-1a298aa575a0.nnue \
   --candidate-net ~/assets/nets/enyo-scc-1.0.0-rc1.nn \
   --elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300 \
-  --games 4000; rc=$?; notifai-write "Forge SPRT completed rc=$rc"
+  --games 4000; rc=$?; notifai-write.sh "Forge SPRT completed rc=$rc"
 ```
 24. Integrity gates (export, distinct-net, engine-load, start-position, catastrophic static) must pass before promotion; residual improvement is report-only.
 25. Generated runs, caches, datasets, and validation output must never remain as source changes.
