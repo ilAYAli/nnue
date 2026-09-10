@@ -70,6 +70,17 @@ before the SPRT stage runs at all).
 Rejected: `enyo-7.5.0-rc41` (activation_l1 0.0 → 0.0001; -4.6 ±6.2, LLR
 -1.35/2.20 (inconclusive), los=7.2%, draw=55.4%, games=4000/4000, Stockfish
 tie-break also unfavorable (-129.1 vs -122.7), commit `5fa4e2de`).
+Reserved: `enyo-7.5.0-rc42` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: `weight_decay` 0.0 → 0.01, everything else held at
+baseline, same data slice. Never touched anywhere in this lineage (always
+0.0). Unlike the `activation_l1` guess, the magnitude has concrete
+grounding: standard decoupled AdamW-style decay (`w -= lr*decay*w` per
+step, `tools/bullet/bullet-patched/crates/trainer/src/optimiser/decay.rs`),
+and 0.01 is literally the bullet crate's own built-in default
+(`optimiser/adam.rs:29`) — this project's `defaults.json` overrides it to
+0.0 with no record of that override ever being tested. Different mechanism
+from `activation_l1` (global weight-norm shrinkage vs FT-activation
+sparsity), so its rejection doesn't pre-empt this one).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
