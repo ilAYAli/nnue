@@ -1,11 +1,10 @@
 {
-  "run": "enyo-7.5.0-rc39",
-  "hypothesis": "final LR 0.000005 -> 0.00001 off verified parent rc36",
+  "run": "enyo-7.5.0-rc40",
+  "hypothesis": "initial LR 0.004 -> 0.003 off verified parent rc36; only untested LR direction left",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.004,
-  "final_lr": 0.00001,
+  "lr": 0.003,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 2100000000,
