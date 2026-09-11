@@ -1,7 +1,8 @@
 {
-  "run": "enyo-7.5.0-rc48",
-  "hypothesis": "640-superbatch continuation interpolates the 512-superbatch parent-SPRT signal",
-  "superbatches": 640,
+  "run": "enyo-7.5.0-rc49",
+  "hypothesis": "smaller activation L1 retains quantization regularization below the rejected 0.0001 scale",
+  "superbatches": 768,
+  "activation_l1": 0.00001,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
