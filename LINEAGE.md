@@ -138,6 +138,10 @@ Rejected: `enyo-7.5.0-rc47` (`superbatches` 768 → 512; parent SPRT
 inconclusive: +3.7 ±6.1 Elo, LLR 1.21/2.20, los=88.3%, draw=56.0%,
 games=4000/4000; fixed-SF tie-break unfavorable: −127.0 ±6.7 versus rc36
 −122.7 ±6.5, games=4000/4000).
+Reserved: `enyo-7.5.0-rc48` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: `superbatches` 768 → 640, everything else held at
+baseline and the same data slice. This midpoint interpolates rc47's
+parent-SPRT signal at 512 superbatches against the 768-superbatch baseline).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start

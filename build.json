@@ -1,7 +1,7 @@
 {
-  "run": "enyo-7.5.0-rc47",
-  "hypothesis": "512-superbatch continuation tests the intermediate historical Pylon dose",
-  "superbatches": 512,
+  "run": "enyo-7.5.0-rc48",
+  "hypothesis": "640-superbatch continuation interpolates the 512-superbatch parent-SPRT signal",
+  "superbatches": 640,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
