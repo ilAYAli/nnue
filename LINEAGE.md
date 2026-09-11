@@ -211,6 +211,16 @@ dose/superbatches (128/512/576/640/768), `activation_l1` (0.00001/0.00002/
 (`input`). None held up, including both replicated "promising" point
 estimates. `rc36` remains the selected parent.
 
+Reserved: `enyo-7.5.0-rc55` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: `wdl` 0.025 → 0.035, everything else held at baseline
+and the same data slice. WDL has only been probed downward in this lineage
+(0.025 → 0.015, neutral, pre-dating this session; 0.05 → 0.025 was a
+genuine win at architecture 7.4). This completes the local WDL neighborhood
+before considering anything beyond conventional hyperparameters — the
+`enyo-1.32.0-rc10` benchmark's other difference, "recalibrated nodes5000pv2
+labels," is a corpus-relabeling change, not a build.json-tunable variable,
+and is out of scope for a single-iteration probe).
+
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
 coverage and gates verified clean beforehand; -97.8 ±17.4, LLR -5.00/2.20, H0).
