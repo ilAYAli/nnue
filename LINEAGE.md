@@ -191,6 +191,11 @@ Rejected: `enyo-7.5.0-rc53` (`superbatches` 768 → 512; parent SPRT:
 −7.5 ±6.4 Elo, LLR −2.33/2.20, los=1.1%, draw=54.0%, games=3704/4000,
 H0). The independent replication rejects rc47's positive estimate; close
 the superbatch branch.
+Reserved: `enyo-7.5.0-rc54` on pwa-llm (independent single-variable
+replication from `enyo-7.5.0-rc36`: `activation_l1` 0.0 → 0.00001; all
+other baseline settings and the same data slice held fixed. The loader's
+time-seeded shuffling produces an independent trajectory, directly testing
+whether rc49's +3.2 ±6.3 result reproduces).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
