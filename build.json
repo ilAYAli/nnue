@@ -1,7 +1,8 @@
 {
-  "run": "enyo-7.5.0-rc53",
-  "hypothesis": "independent time-seeded-shuffle replication tests whether rc47's positive 512-superbatch result is reproducible",
-  "superbatches": 512,
+  "run": "enyo-7.5.0-rc54",
+  "hypothesis": "independent time-seeded-shuffle replication tests whether rc49's positive activation L1 0.00001 result is reproducible",
+  "superbatches": 768,
+  "activation_l1": 0.00001,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
