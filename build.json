@@ -1,7 +1,7 @@
 {
-  "run": "enyo-7.5.0-rc52",
-  "hypothesis": "576 superbatches probes the neighborhood between rc47's positive 512 result and the unfavorable 640 point",
-  "superbatches": 576,
+  "run": "enyo-7.5.0-rc53",
+  "hypothesis": "independent time-seeded-shuffle replication tests whether rc47's positive 512-superbatch result is reproducible",
+  "superbatches": 512,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {

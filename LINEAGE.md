@@ -187,6 +187,10 @@ replication from `enyo-7.5.0-rc36`: `superbatches` 768 → 512; all other
 baseline settings and the same data slice held fixed. The loader's
 time-seeded shuffling produces an independent training trajectory, directly
 testing whether rc47's +3.7 ±6.1 result reproduces).
+Rejected: `enyo-7.5.0-rc53` (`superbatches` 768 → 512; parent SPRT:
+−7.5 ±6.4 Elo, LLR −2.33/2.20, los=1.1%, draw=54.0%, games=3704/4000,
+H0). The independent replication rejects rc47's positive estimate; close
+the superbatch branch.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
