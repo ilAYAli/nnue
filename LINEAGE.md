@@ -152,6 +152,10 @@ Reserved: `enyo-7.5.0-rc49` on pwa-llm (single-variable continuation from
 baseline and the same data slice. rc41's 0.0001 activation penalty was
 unfavorable; this tenfold smaller scale retains a light quantization-aware
 regularization signal rather than retesting that magnitude).
+Rejected: `enyo-7.5.0-rc49` (`activation_l1` 0.0 → 0.00001; parent SPRT
+inconclusive: +3.2 ±6.3 Elo, LLR 1.01/2.20, los=84.2%, draw=55.5%,
+games=4000/4000; fixed-SF tie-break unfavorable: −130.2 ±6.9 versus rc36
+−122.7 ±6.5, games=4000/4000).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
