@@ -1068,6 +1068,8 @@ commit_run_result() {
   runner_file=${BASH_SOURCE[0]}
   if [[ "$result" == PASS ]]; then
     subject="${accepted}.nn: Elo ${elo},LLR ${llr}"
+  elif [[ "$result" == INCONCLUSIVE ]]; then
+    subject="${accepted}.nn: inconclusive: Elo ${elo},LLR ${llr}"
   else
     subject="${accepted}.nn: rejected: Elo ${elo},LLR ${llr}"
   fi
@@ -1120,11 +1122,24 @@ commit_fail() {
   commit_run_result FAIL "$@"
 }
 
+commit_inconclusive() {
+  commit_run_result INCONCLUSIVE "$@"
+}
+
 commit_failed_run() {
   commit_fail "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-failed sprt}" \
     || fail "failed build.json commit failed for $run" train
   record_result FAIL "rejected; awaiting reconciliation"
   notify fail train "rejected $run: ${last_sprt_line:-sprt failed}" "$summary_file" 1
+  print_summary || true
+}
+
+commit_inconclusive_run() {
+  commit_inconclusive "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" \
+    "${last_sprt_line:-parent SPRT inconclusive}" \
+    || fail "inconclusive build.json commit failed for $run" train
+  record_result INCONCLUSIVE "parent retained; fixed-SF report recorded"
+  notify iteration_done train "parent SPRT inconclusive; retained parent for $run: ${last_sprt_line:-result unavailable}" "$summary_file" 1
   print_summary || true
 }
 
@@ -1349,13 +1364,12 @@ train() {
       return 0
     fi
   fi
-  if (( SKIP_SF_GATE != 1 )); then
+  if (( sprt_rc == 2 && SKIP_SF_GATE != 1 )); then
     run_stockfish_benchmark "$run"
-    if (( sprt_rc == 2 )) && ! stockfish_tie_break "$run" "${continue_from:-$initialize_from}"; then
-      last_sprt_line="${last_sprt_line:-parent SPRT inconclusive}; ${last_stockfish_line}"
-      commit_failed_run
-      return 0
-    fi
+  fi
+  if (( sprt_rc == 2 )); then
+    commit_inconclusive_run
+    return 0
   fi
   commit_pass "$run" "$last_sprt_elo" "$last_sprt_llr" "$last_sprt_command" "${last_sprt_line:-passed sprt}" \
     || fail "build.json commit failed for $run" train
