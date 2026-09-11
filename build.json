@@ -1,8 +1,7 @@
 {
-  "run": "enyo-7.5.0-rc51",
-  "hypothesis": "activation L1 0.00002 refines rc49's only positive recent parent-relative signal below the unfavorable 0.00005 scale",
-  "superbatches": 768,
-  "activation_l1": 0.00002,
+  "run": "enyo-7.5.0-rc52",
+  "hypothesis": "576 superbatches probes the neighborhood between rc47's positive 512 result and the unfavorable 640 point",
+  "superbatches": 576,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {

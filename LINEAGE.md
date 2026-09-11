@@ -178,6 +178,10 @@ Reserved: `enyo-7.5.0-rc52` on pwa-llm (single-variable continuation from
 `enyo-7.5.0-rc36`: `superbatches` 768 → 576; all other baseline settings
 and the same data slice are held fixed. This locally follows rc47's +3.7
 ±6.1 estimate at 512 and rc48's −2.3 ±6.1 result at 640).
+Inconclusive: `enyo-7.5.0-rc52` (`superbatches` 768 → 576; parent SPRT:
+−4.5 ±6.2 Elo, LLR −1.51/2.20, los=7.8%, draw=54.8%, games=4000/4000).
+Fixed-SF report: −127.2 ±7.1 versus rc36 −122.7 ±6.5, games=4000/4000.
+Retain rc36: fixed-SF does not select the parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
