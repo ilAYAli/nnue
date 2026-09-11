@@ -67,35 +67,38 @@ HOOK_EVENTS=done,fail forge run sprt \
   --elo0 0 --elo1 10 --alpha 1e-300 --beta 1e-300 \
   --games 4000; rc=$?; notifai-write.sh "Forge SPRT completed rc=$rc"
 ```
+note `--command` should _only_ contain "reverence vs candidate" like above.
+
 24. Integrity gates (export, distinct-net, engine-load, start-position, catastrophic static) must pass before promotion; residual improvement is report-only.
-25. Generated runs, caches, datasets, and validation output must never remain as source changes.
+25. SPRT vs. Stockfish is only needed if SRPT vs. the previous champion is inconclusive
+26. Generated runs, caches, datasets, and validation output must never remain as source changes.
 
 ## Events & launch
 
-26. NNUE completion is event-driven: `done`/`fail` arrives automatically via `llmsh`; never poll or arm background waiters.
-27. Never launch a duplicate while a run is in flight.
-28. For a long-running command that does not support `HOOK_EVENTS`, run `command; notifai-write.sh "command completed"` in `nnue_cmd` so completion is event-driven.
-30. Keep `AUTO_ADVANCE` disabled unless explicitly requested for a single-host run.
-31. On rejection, pick one new hypothesis; on acceptance, advance the
+27. NNUE completion is event-driven: `done`/`fail` arrives automatically via `llmsh`; never poll or arm background waiters.
+28. Never launch a duplicate while a run is in flight.
+29. For a long-running command that does not support `HOOK_EVENTS`, run `command; notifai-write.sh "command completed"` in `nnue_cmd` so completion is event-driven.
+31. Keep `AUTO_ADVANCE` disabled unless explicitly requested for a single-host run.
+32. On rejection, pick one new hypothesis; on acceptance, advance the
     data slice.
-32. After a promotion is selected, record it in `LINEAGE.md`.
+33. After a promotion is selected, record it in `LINEAGE.md`.
 
 ## Validation
 
-33. Report games, Elo, confidence interval, LLR, LOS, draw rate, failures, and test conditions.
-34. Compare candidates only under identical engines, books, time controls, and worker conditions.
-35. Reject invalid exports, duplicate nets, engine-load failures, and catastrophic static failures.
-36. Do not select a parent until every parallel candidate from the same parent has completed, failed, or been voided.
-37. Preserve reproducibility evidence; never delete the only recorded copy of a result.
+34. Report games, Elo, confidence interval, LLR, LOS, draw rate, failures, and test conditions.
+35. Compare candidates only under identical engines, books, time controls, and worker conditions.
+36. Reject invalid exports, duplicate nets, engine-load failures, and catastrophic static failures.
+37. Do not select a parent until every parallel candidate from the same parent has completed, failed, or been voided.
+38. Preserve reproducibility evidence; never delete the only recorded copy of a result.
 
 ## Git
 
-38. Work directly on `main`; never create branches.
-39. Never pull on `pwa-llm`; integrate by fetch + cherry-pick.
-40. Avoid fixup commits; amend when practical.
-41. Never add AI or bot co-author trailers.
-42. Stage only requested files and verify commit identity.
-43. Include SPRT Elo in the commit subject whenever a result exists.
-44. Never modify other repositories.
-45. Before a `pwa-5090` winner becomes a parent, transfer the entire `runs/{run}/` directory, verify the checkpoint SHA-256, and confirm `continue_from` resolves to the optimizer checkpoint rather than the exported-net fallback.
-46. After canonical promotion, update `candidate.net` and the Forge reference net; never point either at an active, rejected, or foreign net.
+39. Work directly on `main`; never create branches.
+40. Never pull on `pwa-llm`; integrate by fetch + cherry-pick.
+41. Avoid fixup commits; amend when practical.
+42. Never add AI or bot co-author trailers.
+43. Stage only requested files and verify commit identity.
+44. Include SPRT Elo in the commit subject whenever a result exists.
+45. Never modify other repositories unless explicitly given permission
+46. Before a `pwa-5090` winner becomes a parent, transfer the entire `runs/{run}/` directory, verify the checkpoint SHA-256, and confirm `continue_from` resolves to the optimizer checkpoint rather than the exported-net fallback.
+47. After canonical promotion, update `candidate.net` and the Forge reference net; never point either at an active, rejected, or foreign net.
