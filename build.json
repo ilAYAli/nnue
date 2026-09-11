@@ -1,9 +1,8 @@
 {
-  "run": "enyo-7.5.0-rc54",
-  "hypothesis": "independent time-seeded-shuffle replication tests whether rc49's positive activation L1 0.00001 result is reproducible",
+  "run": "enyo-7.5.0-rc55",
+  "hypothesis": "WDL 0.025 -> 0.035 off verified parent rc36; only remaining untested WDL direction after 0.015 (neutral) and closing out the dose/activation_l1 branches",
   "superbatches": 768,
-  "activation_l1": 0.00001,
-  "wdl": 0.025,
+  "wdl": 0.035,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
