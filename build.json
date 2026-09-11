@@ -1,8 +1,8 @@
 {
-  "run": "enyo-7.5.0-rc50",
-  "hypothesis": "midpoint activation L1 tests regularization between baseline and the rejected 0.0001 scale",
+  "run": "enyo-7.5.0-rc51",
+  "hypothesis": "activation L1 0.00002 refines rc49's only positive recent parent-relative signal below the unfavorable 0.00005 scale",
   "superbatches": 768,
-  "activation_l1": 0.00005,
+  "activation_l1": 0.00002,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
