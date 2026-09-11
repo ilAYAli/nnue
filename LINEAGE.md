@@ -196,6 +196,20 @@ replication from `enyo-7.5.0-rc36`: `activation_l1` 0.0 → 0.00001; all
 other baseline settings and the same data slice held fixed. The loader's
 time-seeded shuffling produces an independent trajectory, directly testing
 whether rc49's +3.2 ±6.3 result reproduces).
+Inconclusive: `enyo-7.5.0-rc54` (`activation_l1` 0.0 → 0.00001, independent
+replication; parent SPRT: −3.5 ±6.0 Elo, LLR −1.05/2.20, los=12.9%,
+draw=54.5%, games=4000/4000). The independent replication does not confirm
+rc49's positive estimate either — both `activation_l1` and `superbatches`
+"promising but inconclusive" branches (rc47/rc53, rc49/rc54) failed to
+reproduce under independent trajectories. Treat both as noise, not signal;
+close both branches. Retain `rc36`.
+
+Every conventional single-variable lever near `rc36` has now been swept:
+initial LR (both directions), final LR (up), WDL (down, historical),
+dose/superbatches (128/512/576/640/768), `activation_l1` (0.00001/0.00002/
+0.00005/0.0001), `weight_decay` (0.00001/0.0001/0.01), and `trainable`
+(`input`). None held up, including both replicated "promising" point
+estimates. `rc36` remains the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
