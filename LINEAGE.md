@@ -121,6 +121,11 @@ Rejected: `enyo-7.5.0-rc45` (`trainable` `all` → `input`; parent SPRT
 inconclusive: +1.0 ±6.1 Elo, LLR 0.35/2.20, los=63.0%, draw=53.3%,
 games=4000/4000; fixed-SF tie-break unfavorable: −130.0 ±6.8 versus rc36
 −122.7 ±6.5, games=4000/4000).
+Reserved: `enyo-7.5.0-rc46` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: `superbatches` 768 → 128, everything else held at
+baseline and the same data slice. The stronger same-architecture historical
+benchmark `enyo-1.32.0-rc10` used 128 superbatches; this isolates its
+continuation-length difference after rc45 ruled out its input-only scope).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start

@@ -1,11 +1,9 @@
 {
-  "run": "enyo-7.5.0-rc45",
-  "hypothesis": "input-only continuation matches stronger enyo-1.32.0-rc10 training scope",
-  "superbatches": 768,
-  "trainable": "all",
+  "run": "enyo-7.5.0-rc46",
+  "hypothesis": "128-superbatch continuation matches stronger enyo-1.32.0-rc10 training dose",
+  "superbatches": 128,
   "wdl": 0.025,
   "lr": 0.004,
-  "trainable": "input",
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 2100000000,
