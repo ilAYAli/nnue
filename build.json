@@ -1,8 +1,8 @@
 {
-  "run": "enyo-7.5.0-rc49",
-  "hypothesis": "smaller activation L1 retains quantization regularization below the rejected 0.0001 scale",
+  "run": "enyo-7.5.0-rc50",
+  "hypothesis": "midpoint activation L1 tests regularization between baseline and the rejected 0.0001 scale",
   "superbatches": 768,
-  "activation_l1": 0.00001,
+  "activation_l1": 0.00005,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {

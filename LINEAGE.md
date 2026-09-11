@@ -156,6 +156,10 @@ Rejected: `enyo-7.5.0-rc49` (`activation_l1` 0.0 → 0.00001; parent SPRT
 inconclusive: +3.2 ±6.3 Elo, LLR 1.01/2.20, los=84.2%, draw=55.5%,
 games=4000/4000; fixed-SF tie-break unfavorable: −130.2 ±6.9 versus rc36
 −122.7 ±6.5, games=4000/4000).
+Reserved: `enyo-7.5.0-rc50` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: `activation_l1` 0.0 → 0.00005, everything else held at
+baseline and the same data slice. This midpoint tests the remaining
+regularization scale between baseline and rc41's rejected 0.0001 penalty).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
