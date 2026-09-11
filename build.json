@@ -1,7 +1,7 @@
 {
-  "run": "enyo-7.5.0-rc46",
-  "hypothesis": "128-superbatch continuation matches stronger enyo-1.32.0-rc10 training dose",
-  "superbatches": 128,
+  "run": "enyo-7.5.0-rc47",
+  "hypothesis": "512-superbatch continuation tests the intermediate historical Pylon dose",
+  "superbatches": 512,
   "wdl": 0.025,
   "lr": 0.004,
   "data": {

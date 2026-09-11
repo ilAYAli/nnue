@@ -130,6 +130,10 @@ Rejected: `enyo-7.5.0-rc46` (`superbatches` 768 → 128; parent SPRT
 unfavorable: −6.4 ±6.3 Elo, LLR −2.19/2.20, los=2.2%, draw=54.5%,
 games=3848/4000; fixed-SF tie-break also unfavorable: −125.3 ±7.0 versus
 rc36 −122.7 ±6.5, games=4000/4000).
+Reserved: `enyo-7.5.0-rc47` on pwa-llm (single-variable continuation from
+`enyo-7.5.0-rc36`: `superbatches` 768 → 512, everything else held at
+baseline and the same data slice. This is the intermediate historical Pylon
+dose after rc46 ruled out the much shorter 128-superbatch continuation).
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
