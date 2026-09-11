@@ -220,6 +220,19 @@ before considering anything beyond conventional hyperparameters — the
 `enyo-1.32.0-rc10` benchmark's other difference, "recalibrated nodes5000pv2
 labels," is a corpus-relabeling change, not a build.json-tunable variable,
 and is out of scope for a single-iteration probe).
+Rejected: `enyo-7.5.0-rc55` (`wdl` 0.025 → 0.035; parent SPRT unfavorable:
+−7.2 ±6.2 Elo, LLR −2.27/2.20 (H0), los=1.2%, draw=54.2%, games=3820/4000,
+commit `40690703`). Closes the WDL neighborhood: both directions (0.015,
+0.035) are now worse than 0.025; `rc36`'s WDL is a local optimum.
+
+Every conventional single-variable lever near `rc36` is now exhausted:
+initial LR (up and down), final LR (up), WDL (up and down),
+dose/superbatches (128/512/576/640/768), `activation_l1` (four magnitudes,
+including a failed independent replication of its one promising estimate),
+`weight_decay` (three magnitudes), and `trainable` (`input`). None held up.
+`rc36` remains the selected parent. Further progress from here likely
+requires something outside build.json-tunable hyperparameters — e.g. a
+genuinely different corpus/label source, not another magnitude sweep.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
