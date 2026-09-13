@@ -1,12 +1,12 @@
 {
-  "run": "enyo-7.5.0-rc55",
-  "hypothesis": "WDL 0.025 -> 0.035 off verified parent rc36; only remaining untested WDL direction after 0.015 (neutral) and closing out the dose/activation_l1 branches",
+  "run": "enyo-7.5.0-rc56",
+  "hypothesis": "almost same as rc36, different offset",
   "superbatches": 768,
-  "wdl": 0.035,
+  "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 2100000000,
+    "offset": 0000000000,
     "limit": 100000000
   },
   "sfbinpack": {
