@@ -234,6 +234,29 @@ including a failed independent replication of its one promising estimate),
 requires something outside build.json-tunable hyperparameters — e.g. a
 genuinely different corpus/label source, not another magnitude sweep.
 
+Inconclusive: `enyo-7.5.0-rc56` (data offset 2,100,000,000 → 0, everything
+else at baseline, off `rc36`; parent SPRT: -1.0 ±6.1 Elo, LLR -0.26/2.20,
+los=36.9%, draw=54.1%, games=4000/4000, commit `e3cb25f1`). No signal either
+way from the fresh slice at offset 0.
+Rejected: `enyo-7.5.0-rc57` (`lr` 0.004 → 0.010, off `rc36`, offset 0;
+catastrophic — parent SPRT: -216.7 ±38.6 Elo, LLR -2.81/2.20 (H0),
+los=0.0%, draw=46.8%, games=186/4000, early-triaged, commit `67ff7724`).
+Consistent with, not contradicting, the earlier finding that even a modest
+LR increase (0.004→0.005) was clearly bad (-25.1 Elo) — this was a much
+larger untested step size into already-known-bad territory, not a new
+result.
+Inconclusive: `enyo-7.5.0-rc58` (`wdl` 0.025 → 0.05, `lr` 0.004 → 0.001,
+offset 0, off `rc36` — reverting both to pre-tuning historical defaults on
+a fresh data slice; three variables changed at once, not a clean
+single-variable probe. Parent SPRT inconclusive: +3.8 ±6.0 Elo, LLR
+1.23/2.20 (56%), los=89.6%, draw=56.2%, games=4000/4000; Stockfish tie-break
+unfavorable: -129.4 ±6.8 vs `rc36` -122.7 ±6.5, commit `fe1dae01`). The
+positive point estimate and high los% echo the same "promising but
+inconclusive" shape `rc47` and `rc49` had, both of which failed independent
+replication — not a result to act on without isolating which of the three
+changed variables (if any) is responsible, and a replication check before
+trusting the point estimate at all. `rc36` remains the selected parent.
+
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
 coverage and gates verified clean beforehand; -97.8 ±17.4, LLR -5.00/2.20, H0).
