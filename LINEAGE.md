@@ -309,6 +309,15 @@ draw=54.9%, games=4000/4000; Stockfish tie-break unfavorable: -129.1 ±6.9 vs
 `rc36` -122.7 ±6.5, commit `4bc07408`). Back to no-signal at this combination
 too; still confounded (lr+dose+wdl all off baseline at once). `rc36` remains
 the selected parent.
+Inconclusive: `enyo-7.5.0-rc65` (`continue_from` switched to `enyo-7.5.0-rc27`
+instead of `rc36` — a different, earlier point in the lineage; hypothesis
+"next full dose off rc27, fresh slice" at baseline hyperparameters,
+offset=2,000,000,000. Parent SPRT vs `rc27`: -1.7 ±6.2 Elo, LLR -0.55/2.20
+(-25%), los=30.1%, draw=54.7%, games=4000/4000; Stockfish tie-break
+unfavorable: -127.3 ±6.9 vs `rc27`'s own -123.5 ±6.9, commit `4f18e5d7`).
+Note this compares against `rc27`, not the currently-selected `rc36` — does
+not bear on `rc36`'s status either way, and does not itself become a new
+parent since it lost its own comparison. `rc36` remains the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
