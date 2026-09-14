@@ -1,9 +1,9 @@
 {
-  "run": "enyo-7.5.0-rc61",
+  "run": "enyo-7.5.0-rc63",
   "hypothesis": "almost same as rc36, different lr, wdl",
-  "superbatches": 768,
+  "superbatches": 1536,
   "wdl": 0.500,
-  "lr": 0.001,
+  "lr": 0.005,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 0000000000,
