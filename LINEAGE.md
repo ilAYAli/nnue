@@ -266,6 +266,15 @@ point estimates in the same direction (rc58 los=89.6%, rc59 los=94.0%) as
 `wdl` rises is suggestive, but still confounded by the same offset+lr
 changes both times, and still losing the SF tie-break both times. `rc36`
 remains the selected parent.
+Inconclusive: `enyo-7.5.0-rc60` (`wdl` 0.025 → 0.20, `lr` 0.004 → 0.001,
+offset 0, off `rc36` — same pattern, wdl pushed much further. Parent SPRT
+inconclusive: +1.3 ±6.1 Elo, LLR 0.55/2.20 (25%), los=66.3%, draw=54.2%,
+games=4000/4000; Stockfish tie-break unfavorable: -124.3 ±6.8 vs `rc36`
+-122.7 ±6.5, commit `cd15f835`). Breaks the rc58→rc59 rising-los% pattern
+(89.6%→94.0%→66.3%) — consistent with that trend having been noise around
+a small/zero effect rather than a real monotonic wdl relationship. Three
+consecutive losses on the SF tie-break in this offset-0/lr-0.001/wdl-up
+branch. `rc36` remains the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
