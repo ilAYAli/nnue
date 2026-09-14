@@ -275,6 +275,15 @@ games=4000/4000; Stockfish tie-break unfavorable: -124.3 ±6.8 vs `rc36`
 a small/zero effect rather than a real monotonic wdl relationship. Three
 consecutive losses on the SF tie-break in this offset-0/lr-0.001/wdl-up
 branch. `rc36` remains the selected parent.
+Rejected: `enyo-7.5.0-rc61` (`wdl` 0.025 → 0.50, `lr` 0.004 → 0.001,
+offset 0, off `rc36` — same branch, wdl pushed to an extreme. Parent SPRT
+unfavorable: -11.8 ±8.0 Elo, LLR -2.25/2.20 (H0), los=0.2%, draw=54.2%,
+games=2322/4000, commit `29f0bec6`). Closes the branch with a clear
+downturn: `wdl` 0.05/0.08/0.20/0.50 → elo +3.8/+4.9/+1.3/-11.8, i.e. a mild
+peak somewhere near 0.05-0.08 falling off to clearly bad by 0.5 — consistent
+with noise around a small/null effect in the 0.05-0.20 range rather than a
+real exploitable signal, not a lever worth pursuing further at these
+(offset 0, lr 0.001) settings. `rc36` remains the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
