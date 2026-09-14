@@ -301,6 +301,14 @@ Elo, LLR -2.21/2.20 (H0), los=0.0%, draw=54.3%, games=1324/4000, commit
 `91664134`). Not informative about any one variable given the confound;
 consistent with the individual components already being bad. `rc36`
 remains the selected parent.
+Inconclusive: `enyo-7.5.0-rc64` (same as `rc63` but `wdl` 0.50 → 0.20, off
+`rc36`, offset 0, `lr=0.005`, `superbatches=1536` — dropping wdl back into
+the earlier mild/inconclusive range while keeping doubled dose and the
+higher lr. Parent SPRT: -1.6 ±6.0 Elo, LLR -0.53/2.20 (-24%), los=30.6%,
+draw=54.9%, games=4000/4000; Stockfish tie-break unfavorable: -129.1 ±6.9 vs
+`rc36` -122.7 ±6.5, commit `4bc07408`). Back to no-signal at this combination
+too; still confounded (lr+dose+wdl all off baseline at once). `rc36` remains
+the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
