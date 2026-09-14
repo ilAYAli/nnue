@@ -284,6 +284,23 @@ peak somewhere near 0.05-0.08 falling off to clearly bad by 0.5 — consistent
 with noise around a small/null effect in the 0.05-0.20 range rather than a
 real exploitable signal, not a lever worth pursuing further at these
 (offset 0, lr 0.001) settings. `rc36` remains the selected parent.
+Inconclusive (unreconciled): `enyo-7.5.0-rc62` (`wdl` 0.025 → 0.20, `lr`
+0.004 → 0.005, offset 0, off `rc36`). Parent SPRT confirmed complete via
+`forge status enyo-7.5.0-rc62-sprt-4000-20260914-123817`: +1.7 ±6.0 Elo,
+LLR 0.61/2.20 (28%), los=71.4%, draw=55.8%, games=4000/4000 — but `rc63`
+was launched before the Stockfish tie-break/commit step ran, so no git
+commit exists for this result; recorded here from the live Forge run for
+completeness. Since it never crossed H1 either way, the missing tie-break
+does not change the outcome: not promoted.
+Rejected: `enyo-7.5.0-rc63` (`wdl` 0.025 → 0.50, `lr` 0.004 → 0.005,
+`superbatches` 768 → 1536, off `rc36`, offset 0 — three variables at once,
+each already independently suspect: `wdl=0.5` already rejected alone in
+`rc61`, `lr=0.005` already rejected alone much earlier this chain, doubled
+dose untested at this exact value. Parent SPRT unfavorable: -20.2 ±10.3
+Elo, LLR -2.21/2.20 (H0), los=0.0%, draw=54.3%, games=1324/4000, commit
+`91664134`). Not informative about any one variable given the confound;
+consistent with the individual components already being bad. `rc36`
+remains the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
