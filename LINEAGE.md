@@ -256,6 +256,16 @@ inconclusive" shape `rc47` and `rc49` had, both of which failed independent
 replication — not a result to act on without isolating which of the three
 changed variables (if any) is responsible, and a replication check before
 trusting the point estimate at all. `rc36` remains the selected parent.
+Inconclusive: `enyo-7.5.0-rc59` (`wdl` 0.025 → 0.08, `lr` 0.004 → 0.001,
+offset 0, off `rc36` — same three-variable pattern as `rc58`, pushing `wdl`
+further. Parent SPRT inconclusive: +4.9 ±6.1 Elo, LLR 1.78/2.20 (81%, closer
+to H1 than rc58's 56% but still short), los=94.0%, draw=54.0%,
+games=4000/4000; Stockfish tie-break unfavorable: -126.2 ±6.8 vs `rc36`
+-122.7 ±6.5, commit `b7a91c53`). Two consecutive positive-but-short-of-H1
+point estimates in the same direction (rc58 los=89.6%, rc59 los=94.0%) as
+`wdl` rises is suggestive, but still confounded by the same offset+lr
+changes both times, and still losing the SF tie-break both times. `rc36`
+remains the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
