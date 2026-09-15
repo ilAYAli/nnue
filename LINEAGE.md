@@ -318,6 +318,19 @@ unfavorable: -127.3 ±6.9 vs `rc27`'s own -123.5 ±6.9, commit `4f18e5d7`).
 Note this compares against `rc27`, not the currently-selected `rc36` — does
 not bear on `rc36`'s status either way, and does not itself become a new
 parent since it lost its own comparison. `rc36` remains the selected parent.
+Void: `enyo-7.5.0-rc66` ("next full dose off rc27, fresh slice", baseline
+hyperparameters, offset=1,800,000,000; trained and passed static_eval, but
+no Forge SPRT run was ever launched for it — abandoned before any games
+were played, no result exists. `enyo-7.5.0-rc67` reused this same offset
+next.).
+Rejected: `enyo-7.5.0-rc67` ("increase lr 0.001": `lr` 0.004 → 0.005, off
+`rc27`, offset=1,800,000,000, same slice `rc66` never tested. Parent SPRT
+vs `rc27` unfavorable: -10.2 ±7.3 Elo, LLR -2.23/2.20 (H0), los=0.3%,
+draw=55.2%, games=2648/4000, commit `524c3504`). Consistent with every
+other `lr` 0.004→0.005 probe this session (`rc57`'s more extreme 0.010 was
+also bad; the original rc36-branch 0.004→0.005 test was -25.1 Elo) — this
+direction is thoroughly closed regardless of which parent it's tested from.
+`rc36` remains the selected parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
