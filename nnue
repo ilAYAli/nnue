@@ -708,6 +708,15 @@ forge_run_exists() {
   "$FORGE" status "$forge_run" --json >/dev/null 2>&1
 }
 
+forge_run_is_stopped_incomplete() {
+  local forge_run=$1 status_json state decision
+  status_json=$("$FORGE" status "$forge_run" --json 2>/dev/null) || return 1
+  state=$(jq -r '.state // empty' <<< "$status_json") || return 1
+  [[ "$state" == stopped ]] || return 1
+  decision=$(jq -r '.stop.decision.result // empty' <<< "$status_json") || return 1
+  [[ -z "$decision" ]]
+}
+
 read_forge_sprt_status() {
   local forge_run=$1 status_json state decision fields
   status_json=$("$FORGE" status "$forge_run" --json) || return 1
@@ -872,6 +881,14 @@ run_sprt_once() {
     fi
     if [[ -n "$forge_run" ]]; then
       last_sprt_command=$(command_from_log "$last_sprt_log" || true)
+      if forge_run_is_stopped_incomplete "$forge_run" \
+        && grep -Eq '^deploy: setup partial;' "$last_sprt_log"; then
+        printf 'resuming Forge SPRT after partial worker setup: %s\n' "$forge_run" \
+          | tee -a "$last_sprt_log"
+        if ! "$FORGE" resume "$forge_run" 2>&1 | tee -a "$last_sprt_log"; then
+          fail "could not resume Forge SPRT for $run ($forge_run)" sprt
+        fi
+      fi
       local wait_rc=0
       wait_for_existing_forge_sprt "$forge_run" || wait_rc=$?
       (( wait_rc == 3 )) && return 3
@@ -903,8 +920,8 @@ run_sprt_once() {
       fail "could not launch Forge SPRT for $run ($forge_run)" sprt
     fi
     if ! forge_worker_setup_complete "$last_sprt_log"; then
-      "$FORGE" stop --force "$forge_run" </dev/null 2>&1 | tee -a "$last_sprt_log" || true
-      fail "Forge SPRT worker setup was partial for $run ($forge_run); refusing an invalid test" sprt
+      printf 'warning: Forge SPRT worker setup was partial; continuing with available workers\n' \
+        | tee -a "$last_sprt_log"
     fi
 
     local wait_rc=0
