@@ -11,7 +11,8 @@ the fixed `add_full_threat_rows`; smoke diagnostic confirmed 89.3% nonzero
 threat-row coverage post-quantization and passed distinct_net/startpos/static_eval).
 Architecture 8: Architecture 7 plus Stockfish-exact FullThreats (v12 export
 contract and matching 59,808-row feature map).
-Current selected parent: `enyo-7.5.0-rc36` (reverted 2026-09-10; see below).
+Current selected parent: `enyo-7.5.0-rc74` (promoted 2026-09-17 from `rc27`
+on the combined higher-dose/lower-LR recipe; see below).
 Flagged 2026-09-09: rc37/rc38 continued the mechanical "next full dose,
 fresh slice" pattern for six more iterations after the fixed-slice
 superbatches sweep (rc30-rc32) had already made the point that blind
@@ -32,6 +33,12 @@ ceiling direct SPRT of `rc38` vs `rc36` was run: it resolved cleanly against
 games=10,000/12,000. `rc38`'s SF-tie-break promotion does not hold up under
 verification; selected parent reverts to `rc36`. `rc38`'s evidence and net
 are retained for the record but it is not a valid parent.
+Independent direct check against the active `rc27` parent completed
+2026-09-17: `rc38` was rejected at H0, elo=-6.8 ±7.3, LLR -2.26/2.20,
+los=3.3%, draw=52.2%, games=2,962/10,000 (aggregate SPRT stopped at the
+boundary; 5,000/5,000 shards completed, zero failures). This confirms that
+the higher fixed-Stockfish score for `rc38` does not justify promotion over
+`rc27`.
 Reserved: `enyo-7.5.0-rc39` on pwa-llm (single-variable continuation from
 `enyo-7.5.0-rc36`: final LR 0.000005 → 0.00001, everything else held at
 baseline; historically-grounded lever — Enyo-5 validated wins in both
@@ -331,6 +338,12 @@ other `lr` 0.004→0.005 probe this session (`rc57`'s more extreme 0.010 was
 also bad; the original rc36-branch 0.004→0.005 test was -25.1 Elo) — this
 direction is thoroughly closed regardless of which parent it's tested from.
 `rc36` remains the selected parent.
+Promoted: `enyo-7.5.0-rc74` (off `rc27`, fresh slice, `superbatches`
+768 → 1536 and `lr` 0.004 → 0.0015 as the deliberately combined recipe).
+Parent SPRT: +5.0 ±6.3 Elo, LLR 1.56/2.20, los=93.9%, draw=54.5%,
+games=4000/4000; fixed-SF tie-break: -120.6 ±6.8 versus `rc27` -123.5 ±6.9,
+games=4000/4000, zero failures. The combined higher-dose/lower-LR hypothesis
+was selected on the stronger fixed-SF result; rc74 is now the canonical parent.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
