@@ -11,8 +11,8 @@ the fixed `add_full_threat_rows`; smoke diagnostic confirmed 89.3% nonzero
 threat-row coverage post-quantization and passed distinct_net/startpos/static_eval).
 Architecture 8: Architecture 7 plus Stockfish-exact FullThreats (v12 export
 contract and matching 59,808-row feature map).
-Current selected parent: `enyo-7.5.0-rc74` (promoted 2026-09-17 from `rc27`
-on the combined higher-dose/lower-LR recipe; see below).
+Current selected parent: `enyo-7.5.0-rc36` (rc74 tie-break promotion reverted
+2026-09-17 after a wide direct SPRT against its parent; see below).
 Flagged 2026-09-09: rc37/rc38 continued the mechanical "next full dose,
 fresh slice" pattern for six more iterations after the fixed-slice
 superbatches sweep (rc30-rc32) had already made the point that blind
@@ -338,12 +338,14 @@ other `lr` 0.004→0.005 probe this session (`rc57`'s more extreme 0.010 was
 also bad; the original rc36-branch 0.004→0.005 test was -25.1 Elo) — this
 direction is thoroughly closed regardless of which parent it's tested from.
 `rc36` remains the selected parent.
-Promoted: `enyo-7.5.0-rc74` (off `rc27`, fresh slice, `superbatches`
-768 → 1536 and `lr` 0.004 → 0.0015 as the deliberately combined recipe).
-Parent SPRT: +5.0 ±6.3 Elo, LLR 1.56/2.20, los=93.9%, draw=54.5%,
-games=4000/4000; fixed-SF tie-break: -120.6 ±6.8 versus `rc27` -123.5 ±6.9,
-games=4000/4000, zero failures. The combined higher-dose/lower-LR hypothesis
-was selected on the stronger fixed-SF result; rc74 is now the canonical parent.
+Reverted 2026-09-17: `enyo-7.5.0-rc74` (off `rc27`, fresh slice,
+`superbatches` 768 → 1536 and `lr` 0.004 → 0.0015 as the deliberately
+combined recipe) initially had parent SPRT +5.0 ±6.3 Elo, LLR 1.56/2.20,
+los=93.9%, draw=54.5%, games=4000/4000; its fixed-SF tie-break was -120.6
+±6.8 versus `rc27` -123.5 ±6.9. A required wide direct SPRT against `rc27`
+then resolved H0: elo=-1.9 ±4.5, LLR -2.24/2.20, los=19.9%, draw=55.0%,
+games=7,226/10,000, zero failures. The tie-break promotion does not hold;
+the canonical selected parent remains `rc36`.
 
 Void: `enyo-15.0.0-rc1` (legacy-direct-16x12-512; abandoned uncommitted, never SPRT-tested).
 Void: `enyo-16.0.0-rc1` (FullThreats via `initialize_from`, warm-start
