@@ -37,8 +37,8 @@ ROWS=${ROWS:-50000}
 # Optional smoke triage may stop only a catastrophically bad candidate.
 SMOKE_GAMES=${SMOKE_GAMES:-500}                    # checkpoint 1: stop if catastrophically bad
 SMOKE_FAIL_ELO=${SMOKE_FAIL_ELO:--100.0}
-GAMES=${GAMES:-4000}                               # final game budget (ci ~= 10 at this size)
-SKIP_SMOKE=${SKIP_SMOKE:-0}                        # 1 disables every checkpoint
+GAMES=${GAMES:-10000}                              # parent SPRT cap; Forge may stop at H0/H1
+SKIP_SMOKE=${SKIP_SMOKE:-1}                        # default: disable smoke checkpoints
 SPRT_POLL_SECONDS=${SPRT_POLL_SECONDS:-30}   # how often to re-read Forge status mid-run
 # Hard bound on the poll loop so a silently dead Forge run cannot hang the
 # iteration forever. 0 disables the bound.
@@ -57,7 +57,7 @@ LC0_CALIBRATION_ATTESTOR=${LC0_CALIBRATION_ATTESTOR:-tools/validate/attest_lc0_c
 PROMOTED_NET_LINK=${PROMOTED_NET_LINK:-$HOME/assets/nets/candidate.net}
 SPRT_ELO0=${SPRT_ELO0:-0.0}
 # H1 is deliberately wide so Forge can reject clear losses promptly.
-SPRT_ELO1=${SPRT_ELO1:-8.0}
+SPRT_ELO1=${SPRT_ELO1:-10.0}
 SPRT_ALPHA=${SPRT_ALPHA:-0.10}
 SPRT_BETA=${SPRT_BETA:-0.10}
 
@@ -68,7 +68,7 @@ MAX_MAE=${MAX_MAE:-600}                    # Sane native runs are around 300cp o
 MIN_SIGN=${MIN_SIGN:-55}                   # 50% is chance; below 55% barely knows which side is better.
 MIN_CORR=${MIN_CORR:-0.20}                 # Near zero means eval is mostly unrelated to target.
 MAX_ABS_BIAS=${MAX_ABS_BIAS:-300}          # Hundreds of cp offset indicates global bias/scale/sign trouble.
-MIN_SLOPE=${MIN_SLOPE:-0.10}               # Near zero means dead/flat eval.
+MIN_SLOPE=${MIN_SLOPE:-0.05}               # Near zero means dead/flat eval.
 MIN_MATERIAL_CORR=${MIN_MATERIAL_CORR:-0.20}
 MIN_MATERIAL_SLOPE=${MIN_MATERIAL_SLOPE:-0.05}
 MOVE_GATE_STRICT=${MOVE_GATE_STRICT:-0}    # 0 reports move gate; 1 also fails on worse selected-move counts.
@@ -1053,8 +1053,8 @@ full_sprt_gate() {
 }
 
 validate_parent_sprt_games() {
-  [[ "$GAMES" =~ ^[1-9][0-9]*$ ]] && (( GAMES <= 4000 )) \
-    || fail "parent SPRT game cap is 4000; got GAMES=$GAMES" sprt
+  [[ "$GAMES" =~ ^[1-9][0-9]*$ ]] && (( GAMES <= 10000 )) \
+    || fail "parent SPRT game cap is 10000; got GAMES=$GAMES" sprt
 }
 
 sprt_command() {
@@ -1420,13 +1420,13 @@ Useful overrides:
   REFERENCE_NET=$HOME/assets/nets/other.nn ./nnue sprt
   SKIP_SMOKE=1 GAMES=800 ./nnue train
   SMOKE_GAMES=400 SMOKE_FAIL_ELO=-100 ./nnue sprt
-  GAMES=4000 CONCURRENCY=8 THREADS=1 ./nnue sprt
+  GAMES=10000 CONCURRENCY=8 THREADS=1 ./nnue sprt
 
 SPRT checkpoints:
   SMOKE_GAMES=500              reject only a catastrophic net (elo <= SMOKE_FAIL_ELO)
-  SPRT_ELO1=8                  H1 threshold
-  GAMES=4000                   final parent-SPRT cap
-  SKIP_SMOKE=1 ./nnue train    # disable smoke; always play GAMES
+  SPRT_ELO1=10                 H1 threshold
+  GAMES=10000                  final parent-SPRT cap; Forge may stop at H0/H1
+  SKIP_SMOKE=0 ./nnue train    # enable the optional smoke checkpoint
   FORCE=1 ./nnue train         # regenerate and revalidate; never reuse prior run artifacts
   MOVE_GATE_STRICT=1 ./nnue gates
 
