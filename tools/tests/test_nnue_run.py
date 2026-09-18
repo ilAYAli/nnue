@@ -80,7 +80,7 @@ class NnueRunTests(unittest.TestCase):
         self.assertEqual("", proc.stderr)
         self.assertEqual(0, proc.returncode)
 
-    def test_partial_forge_setup_is_rejected(self) -> None:
+    def test_partial_forge_setup_is_detected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_name:
             tmp = Path(tmp_name)
             complete = tmp / "complete.log"
@@ -1734,12 +1734,16 @@ check_smoke 4.0 -0.22/2.20 positive_elo
     def test_sprt_checkpoint_defaults_encode_the_los_policy(self) -> None:
         text = (REPO / "nnue").read_text(encoding="utf-8")
         # Promotion is determined only by the final LLR threshold.
-        self.assertIn("SPRT_ELO1=${SPRT_ELO1:-8.0}", text)
+        self.assertIn("SPRT_ELO1=${SPRT_ELO1:-10.0}", text)
+        self.assertIn("SPRT_ALPHA=${SPRT_ALPHA:-0.10}", text)
+        self.assertIn("SPRT_BETA=${SPRT_BETA:-0.10}", text)
         self.assertNotIn("SPRT_REJECT_LOS", text)
         self.assertNotIn("SPRT_ACCEPT_LOS", text)
         self.assertNotIn("SPRT_MIN_REJECT_GAMES", text)
         self.assertIn("SMOKE_GAMES=${SMOKE_GAMES:-500}", text)
-        self.assertIn("GAMES=${GAMES:-4000}", text)
+        self.assertIn("SKIP_SMOKE=${SKIP_SMOKE:-1}", text)
+        self.assertIn("MIN_SLOPE=${MIN_SLOPE:-0.05}", text)
+        self.assertIn("GAMES=${GAMES:-10000}", text)
         self.assertNotIn("PROMOTION_GAMES", text)
         # the superseded elo>ci rule must be gone, not merely unused
         self.assertNotIn("SPRT_SIGNAL_MARGIN", text)

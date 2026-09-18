@@ -2,10 +2,7 @@
 
 Repository-wide standing conventions. These rules always apply. Specialized workflows belong in `SKILL.md`.
 
-Answer questions directly and use read-only inspection as needed. When pursuing an
-explicitly requested experiment, edit `build.json` and `architecture.json` as the
-experiment requires, and perform the normal Forge and Git workflow needed to run,
-record, and promote it. Do not make unrelated changes.
+Answer questions directly and use read-only inspection as needed.
 
 ## Repository
 

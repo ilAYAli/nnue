@@ -32,12 +32,13 @@ After the root, every candidate:
 - is committed whether accepted or rejected.
 
 The root and every passing candidate receive an identical-condition benchmark
-against the fixed SF net. A 4,000-game parent-relative SPRT selects parents;
+against the fixed SF net. A 10,000-game parent-relative SPRT with H0/H1 early
+stopping selects parents;
 shorter matches are screening only. Absolute SF Elo tracks progress toward the
 goal. Residual improvement is report-only.
 
 Promotion is simple: H0 rejects and H1 selects early. If neither is reached by
-the 4,000-game cap, select the stronger fixed-SF result under identical
+the 10,000-game cap, select the stronger fixed-SF result under identical
 conditions; retain the incumbent if neither is better. H1 is sufficient, never
 required.
 
@@ -114,4 +115,3 @@ Ask yourself:
 * why Rice has better elo even with a much simpler architecture
 * why Berserk has _MUCH_ better elo better with a similar architecture.
 * why my old engine enyo-1.32.0-rc10.nn has better elo with the _same_ architecture
-
