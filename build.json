@@ -3,7 +3,7 @@
   "hypothesis": "new binpack",
   "superbatches": 768,
   "trainable": "all",
-  "wdl": 0.025,
+  "wdl": 0.035,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/binpacks/test80-2024-03-mar-2tb7p.min-v2.v6.binpack",
