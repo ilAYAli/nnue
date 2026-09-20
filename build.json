@@ -1,10 +1,10 @@
 {
-  "run": "enyo-7.5.0-rc81",
-  "hypothesis": "new binpack",
-  "superbatches": 768,
+  "run": "enyo-7.5.0-rc82",
+  "hypothesis": "next full dose off rc27, fresh slice",
+  "superbatches": 1536,
   "trainable": "all",
-  "wdl": 0.030,
-  "lr": 0.005,
+  "wdl": 0.025,
+  "lr": 0.0015,
   "data": {
     "source_binpack": "~/assets/training/binpacks/test80-2024-03-mar-2tb7p.min-v2.v6.binpack",
     "offset": 0000000000,
