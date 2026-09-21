@@ -1,13 +1,13 @@
 {
-  "run": "enyo-7.5.0-rc85",
-  "hypothesis": "restore the selected parent recipe LR on a fresh current-corpus slice",
+  "run": "enyo-7.5.0-rc87",
+  "hypothesis": "test the selected recipe on the next fresh current-corpus slice",
   "superbatches": 768,
   "trainable": "all",
-  "wdl": 0.025,
+  "wdl": 0.015,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/binpacks/test80-2024-03-mar-2tb7p.min-v2.v6.binpack",
-    "offset": 1000000000,
+    "offset": 1100000000,
     "limit": 100000000
   },
   "sfbinpack": {
