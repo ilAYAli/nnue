@@ -1,10 +1,10 @@
 {
-  "run": "enyo-7.5.0-rc84",
-  "hypothesis": "test the 0.00005 LR used by the stronger same-architecture benchmark; keep the current slice and scope",
+  "run": "enyo-7.5.0-rc85",
+  "hypothesis": "restore the selected parent recipe LR on a fresh current-corpus slice",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.00005,
+  "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/binpacks/test80-2024-03-mar-2tb7p.min-v2.v6.binpack",
     "offset": 1000000000,
