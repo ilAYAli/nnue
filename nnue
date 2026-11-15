@@ -383,15 +383,21 @@ _train() {
 
   notify phase_start train "training $run" "$log" 0
   ensure_train_helper_current
-  if [[ ! -f "$data_file" ]]; then
-    "$TRAIN_HELPER" data --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" \
-      || fail "corpus generation failed for $run" train
+  # The sfbinpack loader streams source_binpack inside the trainer. Do not
+  # materialize it: a multi-source corpus is tens of billions of positions at
+  # 32 bytes each. The result validator reads BulletFormat, so it is skipped
+  # with it.
+  if [[ $(json '.loader // "direct"') != "sfbinpack" ]]; then
+    if [[ ! -f "$data_file" ]]; then
+      "$TRAIN_HELPER" data --build "$build_for_train" --arch "$ARCH" --defaults "$DEFAULTS" \
+        || fail "corpus generation failed for $run" train
+    fi
+    [[ -f "$BULLET_RESULT_VALIDATOR" ]] || fail "missing Bullet result validator: $BULLET_RESULT_VALIDATOR" train
+    "$PYTHON" "$BULLET_RESULT_VALIDATOR" \
+      --input "$data_file" --require-win-loss \
+      > "$log_dir/00-corpus-result-validation.json" \
+      || fail "invalid training corpus: $data_file" train
   fi
-  [[ -f "$BULLET_RESULT_VALIDATOR" ]] || fail "missing Bullet result validator: $BULLET_RESULT_VALIDATOR" train
-  "$PYTHON" "$BULLET_RESULT_VALIDATOR" \
-    --input "$data_file" --require-win-loss \
-    > "$log_dir/00-corpus-result-validation.json" \
-    || fail "invalid training corpus: $data_file" train
   # LC0 root-Q data is never a direct training target.  The sidecar binds the
   # exact merged bytes to one valid calibration artifact and every Forge shard
   # that produced it.  This is intentionally a hard failure, not a warning.
