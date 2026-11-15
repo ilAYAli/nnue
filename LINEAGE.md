@@ -403,6 +403,19 @@ the preserved historical combined corpus, SHA-1
 `6014cd9863ee31b02ab877adb606e0b4d14df70f`; inconclusive, -5.7 Elo, LLR
 -1.79/2.20 — neither H0 nor H1 reached).
 
+Reserved (recorded after launch, 2026-11-15): `enyo-18.0.0-rc1` on pwa-llm,
+scratch root with no `continue_from` or `initialize_from`, approved by the
+user in session. `architecture.json` is unchanged from Architecture 7; the
+number 18 marks a new lineage root, which the naming rule does not cover, so
+the name is open to correction. One 762,940-superbatch run (batch 16,384 x 8,
+100B positions), LR 0.001 -> 0.000005 cosine, WDL 0.025, sfbinpack loader,
+min ply 24, on `~/assets/training/binpacks/master-interleaved-v1.binpack`
+(259,017,610,955 bytes: the eleven Stockfish master binpacks plus
+test80-2024-03, interleaved chunk-wise by `tools/pack/interleave_binpacks.py`
+with seed 1; raw scores, not recalibrated). Differs from the Enyo-7 path in
+origin, corpus, batch size and schedule at once, so a result cannot be
+attributed to one of them.
+
 |  # | Selected run    | Commit   | Host     | Parent SPRT  | SF            | Change
 |----|-----------------|----------|----------|--------------|---------------|--------------------------------
 |  0 | enyo-5.0.0-rc1  | 11aa8bc4 | pwa-llm  | —            | -315.2 ± 10.6 | scratch SCReLU root
