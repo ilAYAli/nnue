@@ -1346,6 +1346,12 @@ train() {
   printf '%s\n' "$$" > "$NNUE_TRAIN_LOCK_DIR/pid"
   trap 'rm -f "$NNUE_TRAIN_LOCK_DIR/pid"; rmdir "$NNUE_TRAIN_LOCK_DIR" 2>/dev/null || true' EXIT
   load_config
+  # Each run materializes its data slice as data/bullet/<run>.bullet (3.2 GB
+  # per 100M positions). A slice is regenerated from source_binpack in a few
+  # minutes, so keep only the active run's and drop interrupted conversions.
+  find data/bullet -maxdepth 1 -type f \
+    \( -name 'enyo-*.bullet' -o -name 'enyo-*.bullet.tmp.*' \) \
+    ! -name "$run.bullet" -delete 2>/dev/null || true
   section "run"
   show_config
   notify phase_start train "starting $run" "$summary_file" 0
