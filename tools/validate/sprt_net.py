@@ -164,7 +164,7 @@ def main() -> None:
         help="allow H0/H1 stopping for a parent-relative match; fixed-SF benchmarks stay full-length",
     )
     args = parser.parse_args()
-    games = int(os.environ.get("GAMES", "1500"))
+    games = int(os.environ.get("GAMES", "4000"))
 
     candidate_net = Path(args.candidate).expanduser()
     reference_net = Path(args.reference).expanduser()
