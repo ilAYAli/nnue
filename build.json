@@ -1,17 +1,19 @@
 {
-  "run": "enyo-7.5.0-rc87",
-  "hypothesis": "test the selected recipe on the next fresh current-corpus slice",
-  "superbatches": 768,
+  "run": "enyo-18.0.0-rc1",
+  "hypothesis": "one from-scratch run of the architecture-7 network on the full interleaved Stockfish master corpus, with a single cosine schedule at batch size 16384, tests whether the chain of warm restarts on small slices is what holds the lineage near -118 Elo",
+  "loader": "sfbinpack",
+  "batch_size": 16384,
+  "batches": 8,
+  "superbatches": 762940,
+  "save_rate": 95368,
   "trainable": "all",
-  "wdl": 0.015,
-  "lr": 0.004,
+  "wdl": 0.025,
+  "lr": 0.001,
+  "final_lr": 0.000005,
   "data": {
-    "source_binpack": "~/assets/training/binpacks/test80-2024-03-mar-2tb7p.min-v2.v6.binpack",
-    "offset": 1100000000,
-    "limit": 100000000
+    "source_binpack": "~/assets/training/binpacks/master-interleaved-v1.binpack"
   },
   "sfbinpack": {
     "min_ply": 24
-  },
-  "continue_from": "enyo-7.5.0-rc27"
+  }
 }
