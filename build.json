@@ -1,17 +1,16 @@
 {
-  "run": "enyo-18.0.0-rc1",
-  "hypothesis": "one from-scratch run of the architecture-7 network on the full interleaved Stockfish master corpus, with a single cosine schedule at batch size 16384, tests whether the chain of warm restarts on small slices is what holds the lineage near -118 Elo",
-  "loader": "sfbinpack",
-  "batch_size": 16384,
-  "batches": 8,
-  "superbatches": 762940,
-  "save_rate": 95368,
+  "run": "enyo-19.0.0-rc1",
+  "hypothesis": "Architecture 19 test: target sigmoid scale 400 -> 160 (Grapheus model scale), initialized from enyo-7.5.0-rc36 by the scale-aware converter so the starting net evaluates the same; one variable vs rc36 regimen (same data slice, lr, wdl, superbatches)",
+  "initialize_from": "enyo-7.5.0-rc36",
+  "superbatches": 768,
+  "save_rate": 768,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.001,
-  "final_lr": 0.000005,
+  "lr": 0.004,
   "data": {
-    "source_binpack": "~/assets/training/binpacks/master-interleaved-v1.binpack"
+    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
+    "offset": 1900000000,
+    "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
