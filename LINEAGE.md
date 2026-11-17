@@ -494,3 +494,8 @@ transforms, not training runs.
 | 24 | enyo-1.30.0-rc3-unscaled          | —        | —    | —             | —  | inverse scale; input/L1/L2 identical across grid
 | 25 | enyo-1.31.0-rc57                  | 3c464a3b | —    | +8.6          | —  | Stockfish-static relabel of 46.4M self-play positions; 354 SB
 | 26 | enyo-1.32.0-rc10                  | 650a4fcc | —    | +3.3          | —  | recalibrated nodes5000pv2 labels; 4,000 SB
+
+Reserved: `enyo-19.0.0-rc1` on pwa-llm (architecture 19: eval_scale 400 -> 160,
+target sigmoid scale as in Grapheus/Berserk; initialize_from enyo-7.5.0-rc36 via the
+scale-aware converter; otherwise rc36's regimen and data slice). Single variable.
+Control at eval_scale 400 not yet reserved.
