@@ -1,4 +1,14 @@
 # Enyo 5 Lineage
+  ┌───────────────┬───────────┬────────────────┐
+  │    Engine     │ Mean eval │ Spread (stdev) │
+  ├───────────────┼───────────┼────────────────┤
+  │ Enyo rc36     │ 115 cp    │ 123 cp         │
+  ├───────────────┼───────────┼────────────────┤
+  │ Stockfish net │ 70 cp     │ 59 cp          │
+  ├───────────────┼───────────┼────────────────┤
+  │ Berserk net   │ 45 cp     │ 48 cp          │
+  └───────────────┴───────────┴────────────────┘
+
 
 `Parent SPRT` is against the immediately preceding selected net.
 `SF` is the fixed 4,000-game benchmark against `nn-1a298aa575a0.nnue`

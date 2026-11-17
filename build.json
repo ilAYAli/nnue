@@ -1,7 +1,7 @@
 {
-  "run": "enyo-19.0.0-rc1",
-  "hypothesis": "Architecture 19 test: target sigmoid scale 400 -> 160 (Grapheus model scale), initialized from enyo-7.5.0-rc36 by the scale-aware converter so the starting net evaluates the same; one variable vs rc36 regimen (same data slice, lr, wdl, superbatches)",
-  "initialize_from": "enyo-7.5.0-rc36",
+  "run": "enyo-7.5.0-rc88",
+  "hypothesis": "Single variable vs rc36 regimen: drop training positions with |score| > 300 cp (sfbinpack max_abs_cp 10000 -> 300). Structural audit vs fixed SF net shows the net overshoots large evaluations (300-799 cp bucket, mean -125 cp), so the large-score positions are the ones to filter.",
+  "continue_from": "enyo-7.5.0-rc36",
   "superbatches": 768,
   "save_rate": 768,
   "trainable": "all",
@@ -13,6 +13,7 @@
     "limit": 100000000
   },
   "sfbinpack": {
-    "min_ply": 24
+    "min_ply": 24,
+    "max_abs_cp": 300
   }
 }
