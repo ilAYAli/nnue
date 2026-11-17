@@ -156,7 +156,7 @@ def main() -> None:
     parser.add_argument(
         "--reference", default=os.environ.get("REFERENCE_NET", "~/assets/nets/nn-1a298aa575a0.nnue")
     )
-    parser.add_argument("--engine", default=os.environ.get("ENGINE", "~/assets/engines/reference"))
+    parser.add_argument("--engine", default=os.environ.get("ENGINE", "~/assets/engines/enyo_40e0d7e"))
     parser.add_argument("--comment")
     parser.add_argument(
         "--early-stop",
