@@ -515,3 +515,4 @@ Reserved: `enyo-7.5.0-rc88` on pwa-llm (continue_from rc36; same regimen and dat
 Reserved: `enyo-20.0.0-rc1` on pwa-llm (architecture 20: input buckets 32 -> 16, output buckets 8 -> 1; initialize_from enyo-7.5.0-rc36 with averaged contraction; rc36 regimen and data slice).
 Void: `enyo-20.0.0-rc1` (16 input buckets with 1 output bucket; failed at train: mixed activation requires the 8-bucket base).
 Reserved: `enyo-20.0.0-rc2` on pwa-llm (16 input buckets, 8 output buckets; single variable vs rc36).
+Reserved: `enyo-7.5.0-rc89` on pwa-llm (continue_from rc36; lr_schedule step, drop x0.3 every 256 superbatches; otherwise rc36's regimen and data slice. Single variable.)
