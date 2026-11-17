@@ -511,3 +511,5 @@ scale-aware converter; otherwise rc36's regimen and data slice). Single variable
 Control at eval_scale 400 not yet reserved.
 
 Reserved: `enyo-7.5.0-rc88` on pwa-llm (continue_from rc36; same regimen and data slice as rc36; single variable: sfbinpack max_abs_cp 10000 -> 300, from the structural audit of rc36 vs the Stockfish net).
+
+Reserved: `enyo-20.0.0-rc1` on pwa-llm (architecture 20: input buckets 32 -> 16, output buckets 8 -> 1; initialize_from enyo-7.5.0-rc36 with averaged contraction; rc36 regimen and data slice).
