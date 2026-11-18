@@ -1,12 +1,12 @@
 {
-  "run": "enyo-7.5.0-rc90",
-  "hypothesis": "Focused fine-tune of rc36 on the Stockfish-labelled positions where rc36 disagrees with Stockfish by more than 300 cp (10,159 positions with ply >= 24, repeated to 200,000 records). 40 superbatches, lr 0.001, cosine. Labels from the Stockfish binpack; no foreign weights.",
+  "run": "enyo-7.5.0-rc91",
+  "hypothesis": "Gentler focused fine-tune of rc36 on the same 10,159 Stockfish-labelled disagreement positions (rc90 was rejected at -601): lr 0.0002, 10 superbatches.",
   "continue_from": "enyo-7.5.0-rc36",
-  "superbatches": 40,
-  "save_rate": 40,
+  "superbatches": 10,
+  "save_rate": 10,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.001,
+  "lr": 0.0002,
   "data": {
     "source_binpack": "data/bullet/sfsel-rc90-source.bullet",
     "offset": 0,
