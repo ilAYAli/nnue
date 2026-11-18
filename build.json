@@ -1,14 +1,14 @@
 {
-  "run": "enyo-7.5.0-rc95",
-  "hypothesis": "Mix-ratio test vs rc94 (rejected -47.8): weak-position share cut from 10% to 3% (60,000 of 2,000,000 records), otherwise identical: phase-normalised, rc36 parent, lr 0.001, 40 superbatches.",
+  "run": "enyo-7.5.0-rc97",
+  "hypothesis": "Fix of rc94-rc95: earlier weak sets repeated a few dozen unique positions thousands of times. Now the 4,651 distinct weak positions appear once each (phase-normalised), mixed with 1,995,349 normal Pylon positions once each; 15 superbatches = one pass; lr 0.001; continue from rc36.",
   "continue_from": "enyo-7.5.0-rc36",
-  "superbatches": 40,
-  "save_rate": 40,
+  "superbatches": 15,
+  "save_rate": 15,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.001,
   "data": {
-    "source_binpack": "data/bullet/mix-rc95-source.bullet",
+    "source_binpack": "data/bullet/fixmix-rc97-source.bullet",
     "offset": 0,
     "limit": 0
   },
