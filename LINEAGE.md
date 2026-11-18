@@ -517,3 +517,4 @@ Void: `enyo-20.0.0-rc1` (16 input buckets with 1 output bucket; failed at train:
 Reserved: `enyo-20.0.0-rc2` on pwa-llm (16 input buckets, 8 output buckets; single variable vs rc36).
 Reserved: `enyo-7.5.0-rc89` on pwa-llm (continue_from rc36; lr_schedule step, drop x0.3 every 256 superbatches; otherwise rc36's regimen and data slice. Single variable.)
 Reserved: `enyo-7.5.0-rc90` on pwa-llm (continue_from rc36; focused fine-tune on the 11,042 positions where rc36 and Stockfish disagree by more than 300 cp; 40 superbatches, lr 0.001).
+Reserved: `enyo-7.5.0-rc91` on pwa-llm (continue_from rc36; same disagreement set; gentler: lr 0.0002, 10 superbatches; follows rejected rc90).
