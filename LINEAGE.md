@@ -529,3 +529,4 @@ Reserved: `enyo-7.5.0-rc98` on pwa-llm (continue_from rc36; 48,468 distinct disa
 Reserved: `enyo-7.6.0-rc1` on pwa-llm (scratch root, same architecture as rc36; 200M Pylon positions once, 1500 superbatches, cosine lr 0.001 to 5e-6).
 Reserved: `enyo-7.6.0-rc2` on pwa-llm (scratch root retry: same as enyo-7.6.0-rc1 but 6,000 superbatches; rc1 was underfit, correlation 0.50 with Stockfish).
 Reserved: `enyo-21.0.0-rc1` on pwa-llm (architecture 21: scratch root, eval_scale 400 -> 160; sigmoid target was flat above about 800 cp, compressing large advantages in enyo-7.6.0-rc2).
+Reserved: `enyo-7.6.0-rc3` on pwa-llm (scratch root; cleaned Pylon data, |score| <= 2000 cp, phase-normalised, one pass; 1500 superbatches).
