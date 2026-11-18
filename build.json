@@ -1,16 +1,16 @@
 {
-  "run": "enyo-7.5.0-rc93",
-  "hypothesis": "Control: continue from rc36 on the normal Pylon data with a tiny learning rate (2 superbatches, lr 0.000001). Tests whether the continuation path itself breaks the net.",
+  "run": "enyo-7.5.0-rc94",
+  "hypothesis": "Mixed fine-tune of rc36: 10% Stockfish disagreement positions (phase-normalised) and 90% normal Pylon positions (phase-normalised), 2,000,000 records, 40 superbatches, lr 0.001. Tests whether mixing stops the narrow-set collapse seen in rc90-rc92.",
   "continue_from": "enyo-7.5.0-rc36",
-  "superbatches": 2,
-  "save_rate": 2,
+  "superbatches": 40,
+  "save_rate": 40,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 1e-06,
+  "lr": 0.001,
   "data": {
-    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1900000000,
-    "limit": 100000000
+    "source_binpack": "data/bullet/mix-rc94-source.bullet",
+    "offset": 0,
+    "limit": 0
   },
   "sfbinpack": {
     "min_ply": 24
