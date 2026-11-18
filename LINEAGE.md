@@ -519,3 +519,4 @@ Reserved: `enyo-7.5.0-rc89` on pwa-llm (continue_from rc36; lr_schedule step, dr
 Reserved: `enyo-7.5.0-rc90` on pwa-llm (continue_from rc36; focused fine-tune on the 11,042 positions where rc36 and Stockfish disagree by more than 300 cp; 40 superbatches, lr 0.001).
 Reserved: `enyo-7.5.0-rc91` on pwa-llm (continue_from rc36; same disagreement set; gentler: lr 0.0002, 10 superbatches; follows rejected rc90).
 Reserved: `enyo-7.5.0-rc92` on pwa-llm (continue_from rc36; rc90 regimen with phase-normalised targets; rc90 and rc91 trained on raw centipawns and were rejected).
+Reserved: `enyo-7.5.0-rc93` on pwa-llm (control: continue_from rc36 on the normal Pylon data, lr 0.000001, 2 superbatches).
