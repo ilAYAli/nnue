@@ -527,3 +527,4 @@ Reserved: `enyo-7.5.0-rc97` on pwa-llm (continue_from rc36; all 10,159 weak posi
 Reserved: `enyo-7.5.0-rc97` on pwa-llm (continue_from rc36; 4,651 distinct weak positions once + normal Pylon once; 15 superbatches = one pass). Fixes rc90-rc95, whose weak sets repeated a few dozen unique positions.
 Reserved: `enyo-7.5.0-rc98` on pwa-llm (continue_from rc36; 48,468 distinct disagreement positions once + normal Pylon once; 15 superbatches = one pass).
 Reserved: `enyo-7.6.0-rc1` on pwa-llm (scratch root, same architecture as rc36; 200M Pylon positions once, 1500 superbatches, cosine lr 0.001 to 5e-6).
+Reserved: `enyo-7.6.0-rc2` on pwa-llm (scratch root retry: same as enyo-7.6.0-rc1 but 6,000 superbatches; rc1 was underfit, correlation 0.50 with Stockfish).
