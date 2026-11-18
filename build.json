@@ -1,16 +1,16 @@
 {
-  "run": "enyo-7.5.0-rc98",
-  "hypothesis": "Scale test: 48,468 distinct Stockfish-disagreement positions (rc36 vs Stockfish > 300 cp, from 500k scored positions), phase-normalised, once each, mixed with 1,951,532 normal Pylon positions once each; 15 superbatches = one pass; lr 0.001; continue from rc36.",
-  "continue_from": "enyo-7.5.0-rc36",
-  "superbatches": 15,
-  "save_rate": 15,
+  "run": "enyo-21.0.0-rc1",
+  "hypothesis": "Architecture 21: scratch root with eval_scale 160 (was 400). At 400 the sigmoid target is flat above about 800 cp, so the scratch net compressed large advantages (rc2 predicts 505 cp where the label is 1,146). Same data and regimen as rc2 (6,000 superbatches, cosine lr 0.001 to 5e-6).",
+  "superbatches": 6000,
+  "save_rate": 6000,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.001,
+  "lr_superbatches": 6000,
   "data": {
-    "source_binpack": "data/bullet/fixmix-rc98-source.bullet",
+    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
     "offset": 0,
-    "limit": 0
+    "limit": 200000000
   },
   "sfbinpack": {
     "min_ply": 24

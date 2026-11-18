@@ -9,7 +9,7 @@
   "output_buckets": 8,
   "input_factoriser": true,
   "slider_xray_threats": false,
-  "eval_scale": 400.0,
+  "eval_scale": 160.0,
   "l0_std": 8.0,
   "l1_std": 1.0,
   "l1_export_scale": 1.0,
