@@ -1,19 +1,18 @@
 {
-  "run": "enyo-7.5.0-rc88",
-  "hypothesis": "Single variable vs rc36 regimen: drop training positions with |score| > 300 cp (sfbinpack max_abs_cp 10000 -> 300). Structural audit vs fixed SF net shows the net overshoots large evaluations (300-799 cp bucket, mean -125 cp), so the large-score positions are the ones to filter.",
+  "run": "enyo-7.5.0-rc90",
+  "hypothesis": "Focused fine-tune of rc36 on the Stockfish-labelled positions where rc36 disagrees with Stockfish by more than 300 cp (10,159 positions with ply >= 24, repeated to 200,000 records). 40 superbatches, lr 0.001, cosine. Labels from the Stockfish binpack; no foreign weights.",
   "continue_from": "enyo-7.5.0-rc36",
-  "superbatches": 768,
-  "save_rate": 768,
+  "superbatches": 40,
+  "save_rate": 40,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.004,
+  "lr": 0.001,
   "data": {
-    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 1900000000,
-    "limit": 100000000
+    "source_binpack": "data/bullet/sfsel-rc90-source.bullet",
+    "offset": 0,
+    "limit": 0
   },
   "sfbinpack": {
-    "min_ply": 24,
-    "max_abs_cp": 300
+    "min_ply": 24
   }
 }
