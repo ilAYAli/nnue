@@ -525,3 +525,4 @@ Reserved: `enyo-7.5.0-rc95` on pwa-llm (continue_from rc36; weak-position share 
 Reserved: `enyo-7.5.0-rc96` on pwa-llm (continue_from rc36; normal Pylon only, phase-normalised; baseline for the weak-position mix tests rc94/rc95).
 Reserved: `enyo-7.5.0-rc97` on pwa-llm (continue_from rc36; all 10,159 weak positions once + normal Pylon once; 15 superbatches = one pass). Fixes rc90-rc95, whose weak sets were 73 unique positions repeated.
 Reserved: `enyo-7.5.0-rc97` on pwa-llm (continue_from rc36; 4,651 distinct weak positions once + normal Pylon once; 15 superbatches = one pass). Fixes rc90-rc95, whose weak sets repeated a few dozen unique positions.
+Reserved: `enyo-7.5.0-rc98` on pwa-llm (continue_from rc36; 48,468 distinct disagreement positions once + normal Pylon once; 15 superbatches = one pass).
