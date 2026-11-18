@@ -1,14 +1,14 @@
 {
-  "run": "enyo-7.5.0-rc91",
-  "hypothesis": "Gentler focused fine-tune of rc36 on the same 10,159 Stockfish-labelled disagreement positions (rc90 was rejected at -601): lr 0.0002, 10 superbatches.",
+  "run": "enyo-7.5.0-rc92",
+  "hypothesis": "Same as rc90 (lr 0.001, 40 superbatches, 10,159 Stockfish disagreement positions) with the one fix: targets phase-normalised as the trainer's data step does (clamp +-2045, divide by (128+phase)/128). rc90 trained on raw centipawns (in-place .bullet source skipped normalisation).",
   "continue_from": "enyo-7.5.0-rc36",
-  "superbatches": 10,
-  "save_rate": 10,
+  "superbatches": 40,
+  "save_rate": 40,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.0002,
+  "lr": 0.001,
   "data": {
-    "source_binpack": "data/bullet/sfsel-rc90-source.bullet",
+    "source_binpack": "data/bullet/sfsel-rc92-source.bullet",
     "offset": 0,
     "limit": 0
   },
