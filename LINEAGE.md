@@ -522,3 +522,4 @@ Reserved: `enyo-7.5.0-rc92` on pwa-llm (continue_from rc36; rc90 regimen with ph
 Reserved: `enyo-7.5.0-rc93` on pwa-llm (control: continue_from rc36 on the normal Pylon data, lr 0.000001, 2 superbatches).
 Reserved: `enyo-7.5.0-rc94` on pwa-llm (continue_from rc36; 10% disagreement positions + 90% normal Pylon, both phase-normalised; lr 0.001, 40 superbatches).
 Reserved: `enyo-7.5.0-rc95` on pwa-llm (continue_from rc36; weak-position share 3% (vs 10% in rc94, rejected -47.8); otherwise identical).
+Reserved: `enyo-7.5.0-rc96` on pwa-llm (continue_from rc36; normal Pylon only, phase-normalised; baseline for the weak-position mix tests rc94/rc95).
