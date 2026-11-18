@@ -1,16 +1,16 @@
 {
-  "run": "enyo-7.5.0-rc92",
-  "hypothesis": "Same as rc90 (lr 0.001, 40 superbatches, 10,159 Stockfish disagreement positions) with the one fix: targets phase-normalised as the trainer's data step does (clamp +-2045, divide by (128+phase)/128). rc90 trained on raw centipawns (in-place .bullet source skipped normalisation).",
+  "run": "enyo-7.5.0-rc93",
+  "hypothesis": "Control: continue from rc36 on the normal Pylon data with a tiny learning rate (2 superbatches, lr 0.000001). Tests whether the continuation path itself breaks the net.",
   "continue_from": "enyo-7.5.0-rc36",
-  "superbatches": 40,
-  "save_rate": 40,
+  "superbatches": 2,
+  "save_rate": 2,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.001,
+  "lr": 1e-06,
   "data": {
-    "source_binpack": "data/bullet/sfsel-rc92-source.bullet",
-    "offset": 0,
-    "limit": 0
+    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
+    "offset": 1900000000,
+    "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
