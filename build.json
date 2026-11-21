@@ -1,14 +1,14 @@
 {
-  "run": "enyo-23.0.0-rc2",
-  "hypothesis": "Continue the integer-dense rc1 (direct +5.3 \u00b19.9 vs rc38; vs Stockfish on enyo_11e57a2 at 1500 games rc1 -156.0 \u00b110.6, rc38 -168.4 \u00b111.1) with the unchanged rc38 regimen on the next Pylon slice.",
-  "superbatches": 768,
+  "run": "enyo-23.0.0-rc3",
+  "hypothesis": "Dose: 5x more data per run (500M Pylon positions, 3840 superbatches) from enyo-23.0.0-rc1; rc2 (another 100M at the same regimen) was level with rc1 (+0.2 \u00b19.9). Otherwise the rc38 regimen.",
+  "superbatches": 3840,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 2300000000,
-    "limit": 100000000
+    "offset": 2400000000,
+    "limit": 500000000
   },
   "sfbinpack": {
     "min_ply": 24
