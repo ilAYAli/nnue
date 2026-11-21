@@ -60,6 +60,7 @@ NETWORK_FLAG_PSQT_RESIDUAL = 8
 NETWORK_FLAG_SLIDER_XRAY_THREATS = 16
 NETWORK_FLAG_PAWN_PAIRS = 32
 NETWORK_FLAG_L2_OUTPUT_SKIP = 64
+NETWORK_FLAG_INTEGER_DENSE = 128
 NETWORK_HEADER = struct.Struct("<8s14I")
 NETWORK_HEADER_SIZE = NETWORK_HEADER.size
 N_FEATURES = N_KING_BUCKETS * N_PIECE_TYPES * N_SQUARES
@@ -288,6 +289,9 @@ class Net:
     psqt_weights: np.ndarray | None = None
     psqt_biases: np.ndarray | None = None
     l2_output_skip_weights: np.ndarray | None = None
+    integer_dense: bool = False
+    int_l1_shift: int = 6
+    int_l2_shift: int = 6
 
     @property
     def output_bias(self) -> float:
@@ -795,6 +799,9 @@ def load_net(path: str | Path) -> Net:
     mixed_activation = False
     psqt_residual = False
     l2_output_skip = False
+    integer_dense = False
+    int_l1_shift = 6
+    int_l2_shift = 6
     payload = data
     if data.startswith((NETWORK_V2_HEADER_MAGIC, NETWORK_V3_HEADER_MAGIC,
                         NETWORK_V4_HEADER_MAGIC, NETWORK_V5_HEADER_MAGIC,
@@ -850,6 +857,15 @@ def load_net(path: str | Path) -> Net:
             NETWORK_FLAG_PSQT_RESIDUAL if format_version == 5 else 0) | (
             NETWORK_FLAG_L2_OUTPUT_SKIP if format_version in (8, 9, 10, 11, 12) else 0) | (
             NETWORK_FLAG_PAWN_PAIRS if format_version == 10 else 0)
+        if format_version in (8, 12):
+            allowed_flags |= NETWORK_FLAG_INTEGER_DENSE
+        integer_dense = bool(flags & NETWORK_FLAG_INTEGER_DENSE)
+        if integer_dense:
+            int_l1_shift = reserved0 & 0xFF
+            int_l2_shift = ((reserved0 >> 8) & 0xFF) or 6
+            if int_l1_shift > 12 or int_l2_shift > 6:
+                raise ValueError(f"{path}: invalid integer-dense shifts")
+            reserved0 &= ~0xFFFF
         if (flags & ~allowed_flags) or reserved0 or reserved1:
             raise ValueError(f"{path}: unsupported header flags or reserved fields")
         full_threats = bool(flags & NETWORK_FLAG_FULL_THREATS)
@@ -986,7 +1002,10 @@ def load_net(path: str | Path) -> Net:
         l2_squared_biases=l2sb,
         psqt_weights=psqtw,
         psqt_biases=psqtb,
-        l2_output_skip_weights=l2osw)
+        l2_output_skip_weights=l2osw,
+        integer_dense=integer_dense,
+        int_l1_shift=int_l1_shift,
+        int_l2_shift=int_l2_shift)
 
 
 def write_net(net: Net, path: str | Path) -> None:

@@ -25,7 +25,9 @@ class EnyoNNUE:
                  full_heads: bool, mixed_activation: bool = False,
                  l2_squared_weight: np.ndarray | None = None,
                  l2_squared_bias: np.ndarray | None = None,
-                 l2_output_skip_weight: np.ndarray | None = None):
+                 l2_output_skip_weight: np.ndarray | None = None,
+                 integer_dense: bool = False, int_l1_shift: int = 6,
+                 int_l2_shift: int = 6):
         self.input_weights = input_weights
         self.input_bias = input_bias
         self.l1_weight = l1_weight
@@ -47,6 +49,9 @@ class EnyoNNUE:
         self.l2_squared_weight = l2_squared_weight
         self.l2_squared_bias = l2_squared_bias
         self.l2_output_skip_weight = l2_output_skip_weight
+        self.integer_dense = integer_dense
+        self.int_l1_shift = int_l1_shift
+        self.int_l2_shift = int_l2_shift
         if mixed_activation:
             if l2_squared_weight is None or l2_squared_bias is None:
                 raise ValueError("mixed activation requires the squared branch")
@@ -144,6 +149,25 @@ class EnyoNNUE:
                     + self.l2_squared_bias[output_bucket]
                 )
             x2 = np.maximum(x2_pre, 0.0)
+        elif self.integer_dense:
+            # Integer dense head, mirroring the engine's PropagateIntegerDense.
+            x1_pre = x0 @ self.l1_weight.T + self.l1_bias
+            a1 = np.clip(np.floor(np.trunc(x1_pre) / float(1 << self.int_l1_shift)), 0, 127).astype(np.int64)
+            sq = (a1 * a1) >> 7
+            w2 = self.l2_weight.astype(np.int64)
+            w2s = self.l2_squared_weight[0].astype(np.int64)
+            b2 = (self.l2_bias + self.l2_squared_bias[0]).astype(np.int64)
+            s2 = a1 @ w2.T + sq @ w2s.T + b2
+            a2 = np.clip(s2 >> self.int_l2_shift, 0, 127)
+            out = (a2 @ self.output_weight[:, :nn2.N_L3].astype(np.int64).T
+                   + a1 @ self.l2_output_skip_weight.astype(np.int64).T
+                   + self.output_bias.astype(np.int64))
+            div = (16 * 32) << (6 - self.int_l2_shift)
+            q = np.sign(out) * (np.abs(out) // div)
+            raw = q.astype(np.float64)
+            if self.output_buckets == 1:
+                return raw[:, 0]
+            return np.take_along_axis(raw, output_bucket[:, None], axis=1)[:, 0]
         else:
             x1_pre = x0 @ self.l1_weight.T + self.l1_bias
             x1 = np.maximum(x1_pre, 0.0)
@@ -280,6 +304,9 @@ def load_model_from_nn(
             None if net.l2_output_skip_weights is None
             else net.l2_output_skip_weights.astype(np.float32)
         ),
+        integer_dense=getattr(net, "integer_dense", False),
+        int_l1_shift=getattr(net, "int_l1_shift", 6),
+        int_l2_shift=getattr(net, "int_l2_shift", 6),
     )
 
 
