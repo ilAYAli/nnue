@@ -149,6 +149,42 @@ int scaled = (128 + phase) * score / 128;
 return std::clamp(scaled, -2045, 2045);
 ```
 
+### Integer dense layers (`integer_dense`)
+
+With `"integer_dense": true` in `architecture.json` (shared-head mixed-activation
+L2-skip layout, `l1_export_scale` 1, export `enyo-native-v8` or `v12`) steps 2-4
+are integer and identical on every CPU, as in Stockfish:
+
+```
+a1  = clamp(L1 sum >> int_l1_shift, 0, 127)      // int_l1_shift in header byte 56
+sq  = a1 * a1 >> 7
+a2  = clamp((sum a1*W2 + sq*W2s + b2) >> int_l2_shift, 0, 127)  // W2, W2s: int8, 1/64 grid
+out = (b3 + sum a2*W3 + sum a1*Wskip) / (512 << (6 - int_l2_shift))
+      // W3: 1/16 of eval*32; b3, Wskip carry the extra 2^(6 - int_l2_shift)
+```
+
+The trainer applies the same clamps, floors and 1/64 weight grid during
+training (faux-quantised), so the engine evaluates the function that was
+trained. The float paths round differently per SIMD path (scalar, AVX2,
+AVX-512, NEON differ by about 1 cp); integer nets do not. Header flag 128 marks
+the format; header byte 57 holds int_l2_shift (0 = 6). Engine support since
+enyo 68248f4 (int_l2_shift since cdfa247).
+
+int_l2_shift sets the L2-output resolution: 2^(6 - int_l2_shift) steps per
+trained unit. A/B on the rc3 regimen (1500 superbatches, cleaned Pylon data),
+each integer net vs the same float control, 10+0.1, enyo 11e57a2:
+
+| int_l1_shift | int_l2_shift | vs float control |
+|---|---|---|
+| 3 | 6 | -205.6 +-36 (418 games; 74% of L2 outputs exactly 0) |
+| 3 | 2 | -262.5 +-51 (260 games) |
+| 0 | 2 | 600-0, all by mate (600 games) |
+
+Noise baseline: the float control with only init_seed changed scored -47 +-27.
+The shift-0/2 integer net scored -627.7 +-72 vs nn-0ee0657 (400 games), where
+the float rc3 net of this regimen was -1179. The float control barely learned
+material (queen up: +61 cp; integer net +278), so the clamped integer
+activations appear to help training as well as making evals identical. 
 ## Training Notes
 
 Training changes the weights. Search does not.
