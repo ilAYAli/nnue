@@ -391,9 +391,10 @@ def write_metadata(path: Path, args: argparse.Namespace) -> None:
         "l2_output_skip": bool(args.l2_output_skip),
         "legacy_inputs": bool(args.legacy_inputs),
         "dense_tail_initialization": (
-            "reset" if args.reset_dense_tail else "preserved"
+            "reset" if args.reset_dense_tail
+            else "head-reset" if args.reset_dense_head else "preserved"
         ),
-        "tail_seed": args.tail_seed if args.reset_dense_tail else None,
+        "tail_seed": args.tail_seed if (args.reset_dense_tail or args.reset_dense_head) else None,
     }
     (path.parent / "meta.json").write_text(
         json.dumps(meta, indent=2, sort_keys=True) + "\n",
@@ -419,6 +420,13 @@ def main() -> int:
         "--reset-dense-tail",
         action="store_true",
         help="Preserve exported L0 and deterministically reinitialize the ordinary ReLU dense tail.",
+    )
+    parser.add_argument(
+        "--reset-dense-head",
+        action="store_true",
+        help=("Preserve exported L0 and L1; reinitialize L2, the squared branch, "
+              "the output layer and the L2-output skip (for a parent whose dense "
+              "head does not carry over, e.g. float to integer dense layers)."),
     )
     parser.add_argument(
         "--tail-seed",
@@ -542,6 +550,16 @@ def main() -> int:
     l1_biases = l1_biases.reshape(l1_output_rows)
     l2_weights = l2_weights.reshape(l2_output_rows, N_L2)
     l2_biases = l2_biases.reshape(l2_output_rows)
+    if args.reset_dense_head:
+        if args.reset_dense_tail:
+            raise SystemExit("--reset-dense-head and --reset-dense-tail are exclusive")
+        rng = np.random.default_rng(args.tail_seed)
+        l2_weights = (rng.standard_normal((l2_output_rows, N_L2)).astype(np.float32)
+                      * np.float32((2.0 / N_L2) ** 0.5))
+        l2_biases = np.zeros(l2_output_rows, dtype=np.float32)
+        output_weights = (rng.standard_normal((args.output_buckets, N_L3)).astype(np.float32)
+                          * np.float32((2.0 / N_L3) ** 0.5))
+        output_biases = np.zeros(args.output_buckets, dtype=np.float32)
     with args.output.expanduser().open("wb") as handle:
         write_tensor(handle, "l0w", input_weights)
         write_tensor(handle, "l0b", input_biases)
@@ -560,6 +578,9 @@ def main() -> int:
         if args.mixed_activation:
             l2_squared_weights, l2_squared_biases = mixed_activation_weights(
                 net, args.output_buckets, args.full_heads)
+            if args.reset_dense_head:
+                l2_squared_weights = np.zeros_like(l2_squared_weights)
+                l2_squared_biases = np.zeros_like(l2_squared_biases)
             l2_squared_weights = l2_squared_weights.reshape(
                 l2_output_rows, N_L2)
             l2_squared_biases = l2_squared_biases.reshape(l2_output_rows)
@@ -576,7 +597,8 @@ def main() -> int:
         )
         write_tensor(handle, "l3b", output_biases / output_scale)
         if args.l2_output_skip:
-            source_skip = getattr(net, "l2_output_skip_weights", None)
+            source_skip = (None if args.reset_dense_head
+                           else getattr(net, "l2_output_skip_weights", None))
             l2_output_skip = (
                 np.asarray(source_skip, dtype=np.float32)
                 if source_skip is not None

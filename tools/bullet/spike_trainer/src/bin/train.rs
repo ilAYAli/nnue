@@ -791,7 +791,7 @@ fn initialize_from_path(value: &str) -> PathBuf {
 
 fn arch_resets_dense_tail(config: &Config) -> bool {
     match string_at(&config.arch, "tail_initialization").unwrap_or("preserve") {
-        "preserve" => false,
+        "preserve" | "reset-head" => false,
         "reset" => true,
         value => {
             eprintln!("error: unsupported tail_initialization={value}");
@@ -832,6 +832,12 @@ fn convert_initialize_from(config: &Config, initialize_from: &str, reset_dense_t
         .arg(usize_at(&config.arch, "output_buckets", 1).to_string())
         .arg("--hidden")
         .arg(usize_at(&config.arch, "hidden", ENYO_RUNTIME_HIDDEN).to_string());
+    if string_at(&config.arch, "tail_initialization") == Some("reset-head") {
+        command
+            .arg("--reset-dense-head")
+            .arg("--tail-seed")
+            .arg(training_u64(config, "init_seed", 1).to_string());
+    }
     if reset_dense_tail {
         command
             .arg("--reset-dense-tail")
