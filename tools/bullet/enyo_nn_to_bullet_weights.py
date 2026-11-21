@@ -215,6 +215,15 @@ def expand_output_head(net, output_buckets: int):
     if current == output_buckets:
         return weights, biases
 
+    if current > output_buckets and current % output_buckets == 0:
+        # Output-bucket contraction: each target head is the mean of its
+        # group of source heads, so the starting evaluation is the average
+        # of the material heads it replaces.
+        group = current // output_buckets
+        target_weights = weights.reshape(output_buckets, group, N_L3).mean(axis=1)
+        target_biases = biases.reshape(output_buckets, group).mean(axis=1)
+        return target_weights.astype(np.float32), target_biases.astype(np.float32)
+
     target_weights = np.empty((output_buckets, N_L3), dtype=np.float32)
     target_biases = np.empty(output_buckets, dtype=np.float32)
     for target_bucket in range(output_buckets):

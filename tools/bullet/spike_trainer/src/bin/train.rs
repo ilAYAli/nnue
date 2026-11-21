@@ -1628,9 +1628,33 @@ fn cmd_data(config: &Config) {
         max_abs_cp: data.max_abs_cp,
         quiet_only: data.quiet_only,
     };
+    // Optional ENYO_FEN_LIST: keep only positions whose FEN (first field of
+    // each line) appears in the file. Used for selected training subsets.
+    let fen_list: Option<std::collections::HashSet<String>> =
+        env::var("ENYO_FEN_LIST").ok().map(|path| {
+            std::fs::read_to_string(expand_path(&path))
+                .expect("read ENYO_FEN_LIST")
+                .lines()
+                .filter_map(|l| l.split('|').next().map(str::to_owned))
+                .filter(|s| !s.is_empty())
+                .collect()
+        });
+    // Optional ENYO_SCAN_LIMIT: stop considering positions after this many
+    // scanned entries (keeps the subset step bounded on very large sources).
+    static SCANNED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let scan_limit: u64 = env::var("ENYO_SCAN_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(u64::MAX);
     let loader =
         SfBinpackLoader::new_concat_multiple(&refs, data.buffer_mb, data.threads, move |entry| {
+            if SCANNED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) >= scan_limit {
+                return false;
+            }
             filter.keep(entry)
+                && fen_list
+                    .as_ref()
+                    .map_or(true, |set| set.contains(&entry.pos.fen().unwrap_or_default()))
         });
     let start = Instant::now();
     let mut written = 0_u64;
@@ -1853,6 +1877,7 @@ fn cmd_run(config: &Config, force: bool) {
     set_env("ENYO_BULLET_WDL", training_wdl(config));
     set_env("ENYO_BULLET_LR", training_lr(config));
     set_env("ENYO_BULLET_FINAL_LR", training_final_lr(config));
+    set_env("ENYO_BULLET_LR_SCHEDULE", training_string(config, "lr_schedule", "cosine"));
     set_env(
         "ENYO_BULLET_ENYO_L0_STD",
         f64_at(&config.arch, "l0_std", 8.0),

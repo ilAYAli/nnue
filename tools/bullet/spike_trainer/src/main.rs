@@ -31,6 +31,52 @@ use bullet_lib::{
         ValueTrainerBuilder,
     },
 };
+
+// Learning-rate schedule chosen at run time: cosine (default) or step decay.
+// ENYO_BULLET_LR_SCHEDULE=step drops the rate by ENYO_BULLET_LR_GAMMA (default
+// 0.3) every lr_superbatches/3 superbatches (ENYO_BULLET_LR_STEP overrides).
+#[derive(Clone, Debug)]
+enum EnyoLr {
+    Cosine(lr::CosineDecayLR),
+    Step(lr::StepLR),
+}
+
+impl lr::LrScheduler for EnyoLr {
+    fn lr(&self, batch: usize, superbatch: usize) -> f32 {
+        match self {
+            Self::Cosine(s) => s.lr(batch, superbatch),
+            Self::Step(s) => s.lr(batch, superbatch),
+        }
+    }
+
+    fn colourful(&self) -> String {
+        match self {
+            Self::Cosine(s) => s.colourful(),
+            Self::Step(s) => s.colourful(),
+        }
+    }
+}
+
+fn enyo_lr(initial_lr: f32, final_lr: f32, lr_superbatches: usize) -> EnyoLr {
+    match std::env::var("ENYO_BULLET_LR_SCHEDULE").as_deref() {
+        Ok("step") => {
+            let step = std::env::var("ENYO_BULLET_LR_STEP")
+                .ok()
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or((lr_superbatches / 3).max(1));
+            let gamma = std::env::var("ENYO_BULLET_LR_GAMMA")
+                .ok()
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.3);
+            EnyoLr::Step(lr::StepLR { start: initial_lr, gamma, step })
+        }
+        _ => EnyoLr::Cosine(lr::CosineDecayLR {
+            initial_lr,
+            final_lr,
+            final_superbatch: lr_superbatches,
+        }),
+    }
+}
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use rand_distr::{Distribution, Normal};
@@ -1539,11 +1585,7 @@ fn train_enyo<
                 wdl_scheduler: wdl::ConstantWDL {
                     value: wdl_proportion,
                 },
-                lr_scheduler: lr::CosineDecayLR {
-                    initial_lr,
-                    final_lr,
-                    final_superbatch: lr_superbatches,
-                },
+                lr_scheduler: enyo_lr(initial_lr, final_lr, lr_superbatches),
                 save_rate,
             };
 
@@ -1811,11 +1853,7 @@ fn train_legacy_direct(
             end_superbatch,
         },
         wdl_scheduler: wdl::ConstantWDL { value: wdl_proportion },
-        lr_scheduler: lr::CosineDecayLR {
-            initial_lr,
-            final_lr,
-            final_superbatch: lr_superbatches,
-        },
+        lr_scheduler: enyo_lr(initial_lr, final_lr, lr_superbatches),
         save_rate,
     };
     let settings = LocalSettings {
@@ -2161,11 +2199,7 @@ fn main() {
         wdl_scheduler: wdl::ConstantWDL {
             value: wdl_proportion,
         },
-        lr_scheduler: lr::CosineDecayLR {
-            initial_lr,
-            final_lr,
-            final_superbatch: end_superbatch,
-        },
+        lr_scheduler: enyo_lr(initial_lr, final_lr, end_superbatch),
         save_rate,
     };
 

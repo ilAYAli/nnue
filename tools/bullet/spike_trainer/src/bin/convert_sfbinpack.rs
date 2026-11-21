@@ -118,6 +118,25 @@ fn main() {
     });
     let mut writer = BufWriter::new(out_file);
 
+    // ENYO_FEN_LIST: keep only the listed positions. The loader keeps every
+    // entry (so its chunks fill), and the chunk step below keeps boards whose
+    // occupancy and absolute score match a listed position.
+    let keyset: Option<std::collections::HashSet<(u64, i32)>> =
+        env::var("ENYO_FEN_LIST").ok().map(|path| {
+            std::fs::read_to_string(&path)
+                .expect("read ENYO_FEN_LIST")
+                .lines()
+                .filter_map(|l| {
+                    let parts: Vec<&str> = l.split('|').collect();
+                    if parts.len() < 2 {
+                        return None;
+                    }
+                    let pos = sfbinpack::chess::position::Position::from_fen(parts[0]).ok()?;
+                    let score: i32 = parts[1].parse().ok()?;
+                    Some((pos.occupied().bits(), score.abs()))
+                })
+                .collect()
+        });
     let loader = SfBinpackLoader::new_concat_multiple(&paths, buffer_mb, threads, move |entry| {
         filter.keep(entry)
     });
@@ -129,6 +148,15 @@ fn main() {
     loader.map_chunks(0, |chunk: &[ChessBoard]| {
         let active_chunk;
         let mut chunk = chunk;
+        let matched_chunk: Vec<ChessBoard>;
+        if let Some(keys) = &keyset {
+            matched_chunk = chunk
+                .iter()
+                .copied()
+                .filter(|b| keys.contains(&(b.occ, i32::from(b.score).abs())))
+                .collect();
+            chunk = &matched_chunk;
+        }
         if filter.xray_active_only {
             active_chunk = chunk
                 .iter()

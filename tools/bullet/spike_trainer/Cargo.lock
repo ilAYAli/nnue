@@ -115,6 +115,7 @@ dependencies = [
  "rand_chacha",
  "rand_distr",
  "serde_json",
+ "sfbinpack",
  "sha2",
 ]
 
