@@ -531,3 +531,4 @@ Reserved: `enyo-7.6.0-rc2` on pwa-llm (scratch root retry: same as enyo-7.6.0-rc
 Reserved: `enyo-21.0.0-rc1` on pwa-llm (architecture 21: scratch root, eval_scale 400 -> 160; sigmoid target was flat above about 800 cp, compressing large advantages in enyo-7.6.0-rc2).
 Reserved: `enyo-7.6.0-rc3` on pwa-llm (scratch root; cleaned Pylon data, |score| <= 2000 cp, phase-normalised, one pass; 1500 superbatches).
 Reserved: `enyo-22.0.0-rc1` on pwa-llm (architecture 22: integer dense layers, int_l1_shift 0, int_l2_shift 2, on architecture 21; scratch root with the enyo-21.0.0-rc1 regimen; games on enyo_11e57a2, the first engine that loads integer-dense nets).
+Void: `enyo-22.0.0-rc1` (abandoned at superbatch 556: wrong baseline, eval_scale 160 from architecture 21 instead of the champion enyo-7.5.0-rc38 architecture; number consumed).
