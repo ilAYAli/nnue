@@ -82,6 +82,8 @@ const ENYO_NETWORK_FLAG_SLIDER_XRAY_THREATS: u32 = 16;
 const ENYO_NETWORK_FLAG_RECKLESS_THREATS: u32 = 32;
 const ENYO_NETWORK_FLAG_PAWN_PAIRS: u32 = 32;
 const ENYO_NETWORK_FLAG_L2_OUTPUT_SKIP: u32 = 64;
+const ENYO_NETWORK_FLAG_INTEGER_DENSE: u32 = 128;
+const ENYO_INT_L1_SHIFT_OFFSET: usize = 56;
 const RECKLESS_THREAT_DIMENSIONS: usize = 66_864;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 59_808;
 const ENYO_PAWN_PAIR_DIMENSIONS: usize = 4_560;
@@ -1042,6 +1044,14 @@ fn arch_l2_output_skip(config: &Config) -> bool {
     bool_at(&config.arch, "l2_output_skip", false)
 }
 
+fn arch_integer_dense(config: &Config) -> bool {
+    bool_at(&config.arch, "integer_dense", false)
+}
+
+fn arch_int_l1_shift(config: &Config) -> usize {
+    usize_at(&config.arch, "int_l1_shift", 6)
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -1235,6 +1245,17 @@ fn validate_layout(config: &Config) {
     if (threat_features || pawn_pairs) && input_buckets != runtime_input_buckets {
         eprintln!("error: extended inputs do not support runtime_input_buckets expansion yet");
         process::exit(2);
+    }
+    if arch_integer_dense(config) {
+        let shift = arch_int_l1_shift(config);
+        if !(mixed_activation && l2_output_skip && !full_heads && output_buckets == 8)
+            || !matches!(export_format, "enyo-native-v8" | "enyo-native-v12")
+            || f64_at(&config.arch, "l1_export_scale", 1.0) != 1.0
+            || !(1..=12).contains(&shift)
+        {
+            eprintln!("error: integer_dense requires the shared-head mixed-activation 8-bucket L2-skip layout (enyo-native-v8 or v12), l1_export_scale=1 and int_l1_shift 1..=12");
+            process::exit(2);
+        }
     }
     if export_format == "enyo-native-v12"
         && !(threat_features && !full_heads && mixed_activation && l2_output_skip && output_buckets == 8)
@@ -1939,6 +1960,11 @@ fn cmd_run(config: &Config, force: bool) {
         "ENYO_BULLET_ENYO_L2_OUTPUT_SKIP",
         usize::from(arch_l2_output_skip(config)),
     );
+    set_env(
+        "ENYO_BULLET_ENYO_INTEGER_DENSE",
+        usize::from(arch_integer_dense(config)),
+    );
+    set_env("ENYO_BULLET_ENYO_INT_L1_SHIFT", arch_int_l1_shift(config));
     set_env(
         "ENYO_BULLET_EVAL_SCALE",
         f64_at(&config.arch, "eval_scale", 400.0),
@@ -3040,6 +3066,12 @@ fn write_model(config: &Config) {
         ),
         _ => model,
     };
+    let mut model = model;
+    if arch_integer_dense(config) {
+        let flags = u32::from_le_bytes(model[48..52].try_into().unwrap());
+        write_u32_le(&mut model, 48, flags | ENYO_NETWORK_FLAG_INTEGER_DENSE);
+        model[ENYO_INT_L1_SHIFT_OFFSET] = arch_int_l1_shift(config) as u8;
+    }
     let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
     if let Some(parent) = model_path.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {

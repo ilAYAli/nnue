@@ -1045,6 +1045,25 @@ fn train_enyo<
         .ok()
         .map(|value| value.parse::<u64>().expect("invalid ENYO_BULLET_INIT_SEED"));
     let export_init_only = env_parse("ENYO_BULLET_EXPORT_INIT_ONLY", 0usize) != 0;
+    // Integer dense layers: the L1 output becomes a1 = clamp(acc >> shift, 0, 127)
+    // and the L2 output a2 = clamp(sum >> 6, 0, 127), with L2 weights and
+    // biases on a 1/64 grid. Everything the engine computes after the int8 L1
+    // product is then integer, so every SIMD path gives the same eval.
+    let integer_dense = env_parse("ENYO_BULLET_ENYO_INTEGER_DENSE", 0usize) != 0;
+    let int_l1_shift = env_parse("ENYO_BULLET_ENYO_INT_L1_SHIFT", 6usize);
+    if integer_dense {
+        if !(MIXED_ACTIVATION && L2_OUTPUT_SKIP && !FULL_HEADS) {
+            panic!("integer_dense requires the shared-head mixed-activation L2-skip layout");
+        }
+        if l1_export_scale != 1.0 {
+            panic!("integer_dense requires l1_export_scale=1");
+        }
+        if !(1..=12).contains(&int_l1_shift) {
+            panic!("int_l1_shift must be 1..=12");
+        }
+    }
+    println!("enyo_integer_dense={integer_dense} enyo_int_l1_shift={int_l1_shift}");
+    let int_l1_divisor = (1u32 << int_l1_shift) as f32;
 
     macro_rules! l0w_format {
         () => {
@@ -1082,22 +1101,28 @@ fn train_enyo<
                         SavedFormat::id("l0b").round().quantise::<i16>(1),
                         SavedFormat::id("l1w").transpose().round().quantise::<i8>(l1_export_scale as i16),
                         SavedFormat::id("l1b").round().quantise::<i32>(l1_export_scale as i32),
+                        // integer_dense stores integer-valued floats: L2 on the 1/64
+                        // grid, output and skip in 1/16 of the eval*32 units.
                         SavedFormat::id("l2w").transpose().transform(move |_store, weights| {
-                            weights.into_iter().map(|w| w / l1_export_scale).collect()
+                            weights.into_iter().map(|w| if integer_dense { (w * 64.0).round() } else { w / l1_export_scale }).collect()
                         }),
-                        SavedFormat::id("l2b"),
+                        SavedFormat::id("l2b").transform(move |_store, weights| {
+                            weights.into_iter().map(|w| if integer_dense { (w * 64.0).round() } else { w }).collect()
+                        }),
                         SavedFormat::id("l2sw").transpose().transform(move |_store, weights| {
-                            weights.into_iter().map(|w| w / l1_export_scale).collect()
+                            weights.into_iter().map(|w| if integer_dense { (w * 64.0).round() } else { w / l1_export_scale }).collect()
                         }),
-                        SavedFormat::id("l2sb"),
+                        SavedFormat::id("l2sb").transform(move |_store, weights| {
+                            weights.into_iter().map(|w| if integer_dense { (w * 64.0).round() } else { w }).collect()
+                        }),
                         SavedFormat::id("l3w").transpose().transform(move |_store, weights| {
-                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                            weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0).round() } else { w * eval_scale * 32.0 }).collect()
                         }),
                         SavedFormat::id("l3b").transform(move |_store, weights| {
-                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                            weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0).round() } else { w * eval_scale * 32.0 }).collect()
                         }),
                         SavedFormat::id("l2skipw").transpose().transform(move |_store, weights| {
-                            weights.into_iter().map(|w| w * eval_scale * 32.0).collect()
+                            weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0 / 127.0).round() } else { w * eval_scale * 32.0 }).collect()
                         }),
                     ])
             } else if MIXED_ACTIVATION {
@@ -1369,9 +1394,13 @@ fn train_enyo<
             });
             l1.weights = l1.weights.faux_quantise(l1_export_scale, true);
             l1.bias = l1.bias.faux_quantise(l1_export_scale, true);
-            let l2 = maybe_frozen($builder, !train_l2, || {
+            let mut l2 = maybe_frozen($builder, !train_l2, || {
                 $builder.new_affine("l2", l2_size, head_count * 32)
             });
+            if integer_dense {
+                l2.weights = l2.weights.faux_quantise(64.0, true);
+                l2.bias = l2.bias.faux_quantise(64.0, true);
+            }
             let l2s = if MIXED_ACTIVATION {
                 let weights = maybe_frozen($builder, !train_squared, || {
                     $builder.new_weights("l2sw", Shape::new(head_count * 32, l2_size), InitSettings::Zeroed)
@@ -1379,6 +1408,11 @@ fn train_enyo<
                 let bias = maybe_frozen($builder, !train_squared, || {
                     $builder.new_weights("l2sb", Shape::new(head_count * 32, 1), InitSettings::Zeroed)
                 });
+                let (weights, bias) = if integer_dense {
+                    (weights.faux_quantise(64.0, true), bias.faux_quantise(64.0, true))
+                } else {
+                    (weights, bias)
+                };
                 Some(Affine { weights, bias })
             } else {
                 None
@@ -1424,15 +1458,22 @@ fn train_enyo<
             } else {
                 l1.forward(x0)
             };
-            let x1 = x1_pre.relu();
+            let x1 = if integer_dense {
+                (x1_pre / int_l1_divisor).max(0.0).min(127.0).faux_quantise(1.0, false)
+            } else {
+                x1_pre.relu()
+            };
             let x2_linear = if FULL_HEADS {
                 l2.forward(x1).select($output_buckets)
             } else {
                 l2.forward(x1)
             };
             let x2_pre = if let Some(l2s) = l2s {
-                let clipped = x1_pre.max(0.0).min(127.0);
-                let squared = clipped.abs_pow(2.0) / 127.0;
+                let squared = if integer_dense {
+                    (x1.abs_pow(2.0) / 128.0).faux_quantise(1.0, false)
+                } else {
+                    x1_pre.max(0.0).min(127.0).abs_pow(2.0) / 127.0
+                };
                 let x2_squared = if FULL_HEADS {
                     l2s.forward(squared).select($output_buckets)
                 } else {
@@ -1442,9 +1483,17 @@ fn train_enyo<
             } else {
                 x2_linear
             };
-            let x2 = x2_pre.relu();
+            let x2 = if integer_dense {
+                x2_pre.max(0.0).min(127.0).faux_quantise(1.0, false)
+            } else {
+                x2_pre.relu()
+            };
             let output = if let Some(l2skip) = l2skip {
-                let skip_input = x1.max(0.0).min(127.0) / 127.0;
+                let skip_input = if integer_dense {
+                    x1 / 127.0
+                } else {
+                    x1.max(0.0).min(127.0) / 127.0
+                };
                 (l3.forward(x2) + l2skip.matmul(skip_input)).select($output_buckets)
             } else {
                 l3.forward(x2).select($output_buckets)
@@ -1506,6 +1555,22 @@ fn train_enyo<
                             ..Default::default()
                         },
                     );
+                }
+            }
+            if integer_dense {
+                for (id, trainable) in [("l2w", train_l2), ("l2sw", train_squared)] {
+                    if trainable {
+                        trainer.optimiser.set_params_for_weight(
+                            id,
+                            AdamWParams {
+                                decay: weight_decay,
+                                beta1: 0.95,
+                                max_weight: 127.0 / 64.0,
+                                min_weight: -128.0 / 64.0,
+                                ..Default::default()
+                            },
+                        );
+                    }
                 }
             }
             if train_l1 {
