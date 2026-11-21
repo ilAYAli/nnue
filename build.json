@@ -1,14 +1,14 @@
 {
-  "run": "enyo-23.0.0-rc3",
-  "hypothesis": "Dose: 5x more data per run (500M Pylon positions, 3840 superbatches) from enyo-23.0.0-rc1; rc2 (another 100M at the same regimen) was level with rc1 (+0.2 \u00b19.9). Otherwise the rc38 regimen.",
-  "superbatches": 3840,
+  "run": "enyo-23.0.0-rc4",
+  "hypothesis": "Learning rate: fine-tune from enyo-23.0.0-rc1 starting at lr 0.0005 instead of 0.004 (cosine to 5e-6). rc2 (+100M) was level (+0.2) and rc3 (+500M) slightly worse (-7.9): restarting at 0.004 may undo the parent. 100M Pylon positions, otherwise the rc38 regimen.",
+  "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.004,
+  "lr": 0.0005,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 2400000000,
-    "limit": 500000000
+    "offset": 2900000000,
+    "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
