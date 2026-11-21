@@ -84,6 +84,7 @@ const ENYO_NETWORK_FLAG_PAWN_PAIRS: u32 = 32;
 const ENYO_NETWORK_FLAG_L2_OUTPUT_SKIP: u32 = 64;
 const ENYO_NETWORK_FLAG_INTEGER_DENSE: u32 = 128;
 const ENYO_INT_L1_SHIFT_OFFSET: usize = 56;
+const ENYO_INT_L2_SHIFT_OFFSET: usize = 57;
 const RECKLESS_THREAT_DIMENSIONS: usize = 66_864;
 const ENYO_FULL_THREATS_DIMENSIONS: usize = 59_808;
 const ENYO_PAWN_PAIR_DIMENSIONS: usize = 4_560;
@@ -1052,6 +1053,10 @@ fn arch_int_l1_shift(config: &Config) -> usize {
     usize_at(&config.arch, "int_l1_shift", 6)
 }
 
+fn arch_int_l2_shift(config: &Config) -> usize {
+    usize_at(&config.arch, "int_l2_shift", 6)
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -1252,6 +1257,7 @@ fn validate_layout(config: &Config) {
             || !matches!(export_format, "enyo-native-v8" | "enyo-native-v12")
             || f64_at(&config.arch, "l1_export_scale", 1.0) != 1.0
             || !(1..=12).contains(&shift)
+            || arch_int_l2_shift(config) > 6
         {
             eprintln!("error: integer_dense requires the shared-head mixed-activation 8-bucket L2-skip layout (enyo-native-v8 or v12), l1_export_scale=1 and int_l1_shift 1..=12");
             process::exit(2);
@@ -1965,6 +1971,7 @@ fn cmd_run(config: &Config, force: bool) {
         usize::from(arch_integer_dense(config)),
     );
     set_env("ENYO_BULLET_ENYO_INT_L1_SHIFT", arch_int_l1_shift(config));
+    set_env("ENYO_BULLET_ENYO_INT_L2_SHIFT", arch_int_l2_shift(config));
     set_env(
         "ENYO_BULLET_EVAL_SCALE",
         f64_at(&config.arch, "eval_scale", 400.0),
@@ -3071,6 +3078,7 @@ fn write_model(config: &Config) {
         let flags = u32::from_le_bytes(model[48..52].try_into().unwrap());
         write_u32_le(&mut model, 48, flags | ENYO_NETWORK_FLAG_INTEGER_DENSE);
         model[ENYO_INT_L1_SHIFT_OFFSET] = arch_int_l1_shift(config) as u8;
+        model[ENYO_INT_L2_SHIFT_OFFSET] = arch_int_l2_shift(config) as u8;
     }
     let model_path = expand_path(&format!("runs/{}/model.nn", run_name(config)));
     if let Some(parent) = model_path.parent() {

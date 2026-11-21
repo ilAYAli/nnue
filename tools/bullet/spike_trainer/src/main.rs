@@ -1051,6 +1051,13 @@ fn train_enyo<
     // product is then integer, so every SIMD path gives the same eval.
     let integer_dense = env_parse("ENYO_BULLET_ENYO_INTEGER_DENSE", 0usize) != 0;
     let int_l1_shift = env_parse("ENYO_BULLET_ENYO_INT_L1_SHIFT", 6usize);
+    // L2-output shift: a2 = clamp(L2 sum >> int_l2_shift, 0, 127) on the engine
+    // side, i.e. 2^(6 - int_l2_shift) integer steps per trained unit.
+    let int_l2_shift = env_parse("ENYO_BULLET_ENYO_INT_L2_SHIFT", 6usize);
+    if integer_dense && int_l2_shift > 6 {
+        panic!("int_l2_shift must be 0..=6");
+    }
+    let int_l2_steps = (1u32 << (6 - int_l2_shift.min(6))) as f32;
     if integer_dense {
         if !(MIXED_ACTIVATION && L2_OUTPUT_SKIP && !FULL_HEADS) {
             panic!("integer_dense requires the shared-head mixed-activation L2-skip layout");
@@ -1062,7 +1069,7 @@ fn train_enyo<
             panic!("int_l1_shift must be 1..=12");
         }
     }
-    println!("enyo_integer_dense={integer_dense} enyo_int_l1_shift={int_l1_shift}");
+    println!("enyo_integer_dense={integer_dense} enyo_int_l1_shift={int_l1_shift} enyo_int_l2_shift={int_l2_shift}");
     let int_l1_divisor = (1u32 << int_l1_shift) as f32;
 
     macro_rules! l0w_format {
@@ -1119,10 +1126,10 @@ fn train_enyo<
                             weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0).round() } else { w * eval_scale * 32.0 }).collect()
                         }),
                         SavedFormat::id("l3b").transform(move |_store, weights| {
-                            weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0).round() } else { w * eval_scale * 32.0 }).collect()
+                            weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0 * int_l2_steps).round() } else { w * eval_scale * 32.0 }).collect()
                         }),
                         SavedFormat::id("l2skipw").transpose().transform(move |_store, weights| {
-                            weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0 / 127.0).round() } else { w * eval_scale * 32.0 }).collect()
+                            weights.into_iter().map(|w| if integer_dense { (w * eval_scale * 32.0 * 16.0 * int_l2_steps / 127.0).round() } else { w * eval_scale * 32.0 }).collect()
                         }),
                     ])
             } else if MIXED_ACTIVATION {
@@ -1484,7 +1491,7 @@ fn train_enyo<
                 x2_linear
             };
             let x2 = if integer_dense {
-                x2_pre.max(0.0).min(127.0).faux_quantise(1.0, false)
+                (x2_pre * int_l2_steps).max(0.0).min(127.0).faux_quantise(1.0, false) / int_l2_steps
             } else {
                 x2_pre.relu()
             };
