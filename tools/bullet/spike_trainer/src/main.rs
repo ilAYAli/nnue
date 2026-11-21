@@ -1065,8 +1065,8 @@ fn train_enyo<
         if l1_export_scale != 1.0 {
             panic!("integer_dense requires l1_export_scale=1");
         }
-        if !(1..=12).contains(&int_l1_shift) {
-            panic!("int_l1_shift must be 1..=12");
+        if int_l1_shift > 12 {
+            panic!("int_l1_shift must be 0..=12");
         }
     }
     println!("enyo_integer_dense={integer_dense} enyo_int_l1_shift={int_l1_shift} enyo_int_l2_shift={int_l2_shift}");

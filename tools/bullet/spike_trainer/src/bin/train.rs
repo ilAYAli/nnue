@@ -1256,10 +1256,10 @@ fn validate_layout(config: &Config) {
         if !(mixed_activation && l2_output_skip && !full_heads && output_buckets == 8)
             || !matches!(export_format, "enyo-native-v8" | "enyo-native-v12")
             || f64_at(&config.arch, "l1_export_scale", 1.0) != 1.0
-            || !(1..=12).contains(&shift)
+            || shift > 12
             || arch_int_l2_shift(config) > 6
         {
-            eprintln!("error: integer_dense requires the shared-head mixed-activation 8-bucket L2-skip layout (enyo-native-v8 or v12), l1_export_scale=1 and int_l1_shift 1..=12");
+            eprintln!("error: integer_dense requires the shared-head mixed-activation 8-bucket L2-skip layout (enyo-native-v8 or v12), l1_export_scale=1 and int_l1_shift 0..=12");
             process::exit(2);
         }
     }
