@@ -1,17 +1,17 @@
 {
-  "run": "enyo-23.0.0-rc1",
-  "hypothesis": "Architecture 23: the champion enyo-7.5.0-rc38 architecture with integer dense layers (int_l1_shift 7 from rc38 L1 sums: 80% zero, p90 3140, p95 7775, p99 21069; int_l2_shift 2). initialize_from rc38 keeping L0 and L1; L2, squared branch, output and skip reinitialised (rc38 float head: 97% of L2 outputs zero, weights outside the int8 grid). rc38 regimen on the next Pylon slice.",
-  "initialize_from": "enyo-7.5.0-rc38",
+  "run": "enyo-23.0.0-rc2",
+  "hypothesis": "Continue the integer-dense rc1 (direct +5.3 \u00b19.9 vs rc38; vs Stockfish on enyo_11e57a2 at 1500 games rc1 -156.0 \u00b110.6, rc38 -168.4 \u00b111.1) with the unchanged rc38 regimen on the next Pylon slice.",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
   "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 2200000000,
+    "offset": 2300000000,
     "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
-  }
+  },
+  "continue_from": "enyo-23.0.0-rc1"
 }
