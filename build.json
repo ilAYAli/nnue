@@ -1,16 +1,15 @@
 {
-  "run": "enyo-21.0.0-rc1",
-  "hypothesis": "Architecture 21: scratch root with eval_scale 160 (was 400). At 400 the sigmoid target is flat above about 800 cp, so the scratch net compressed large advantages (rc2 predicts 505 cp where the label is 1,146). Same data and regimen as rc2 (6,000 superbatches, cosine lr 0.001 to 5e-6).",
-  "superbatches": 6000,
-  "save_rate": 6000,
+  "run": "enyo-23.0.0-rc1",
+  "hypothesis": "Architecture 23: the champion enyo-7.5.0-rc38 architecture with integer dense layers (int_l1_shift 7 from rc38 L1 sums: 80% zero, p90 3140, p95 7775, p99 21069; int_l2_shift 2). initialize_from rc38 keeping L0 and L1; L2, squared branch, output and skip reinitialised (rc38 float head: 97% of L2 outputs zero, weights outside the int8 grid). rc38 regimen on the next Pylon slice.",
+  "initialize_from": "enyo-7.5.0-rc38",
+  "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.001,
-  "lr_superbatches": 6000,
+  "lr": 0.004,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 0,
-    "limit": 200000000
+    "offset": 2200000000,
+    "limit": 100000000
   },
   "sfbinpack": {
     "min_ply": 24
