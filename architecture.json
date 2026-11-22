@@ -1,5 +1,5 @@
 {
-  "name": "native-i32-12ch-1024-v8-l2-output-skip-int-dense",
+  "name": "native-i32-12ch-1024-v12-fullthreats-l2-output-skip-int-dense",
   "lineage": "native",
   "mode": "enyo",
   "hidden": 1024,
@@ -15,9 +15,10 @@
   "l1_export_scale": 1.0,
   "dense_activation": "relu-screlu-residual",
   "l2_output_skip": true,
-  "export_format": "enyo-native-v8",
+  "export_format": "enyo-native-v12",
   "integer_dense": true,
   "int_l1_shift": 7,
   "int_l2_shift": 2,
-  "tail_initialization": "reset-head"
+  "full_threats": true,
+  "net_format": "enyo-v1"
 }

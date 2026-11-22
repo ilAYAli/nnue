@@ -1,12 +1,12 @@
 {
-  "run": "enyo-23.1.0-rc1",
-  "hypothesis": "Promotion after rc7 (+15.5 vs rc1 on the interleaved data path): same regimen (interleaved binpacks, random skip 3, min ply 18, wdl 0, batch 16384, cosine lr 0.001 over 1000 superbatches), fresh positions via random start chunks.",
+  "run": "enyo-25.0.0-rc1",
+  "hypothesis": "Architecture 25: architecture 23/24 plus Stockfish-exact FullThreats inputs (int8 rows, format 1). The nnue-pytorch net with threat inputs reached -39 vs nn-1a298 against -146 for the native rc7. initialize_from enyo-23.0.0-rc7 (exact head via the integer-dense converter fix), threat rows at 3% of each column std, 10000 superbatches (~10B positions) on the interleaved recipe (random skip 3, min ply 18, wdl 0, batch 16384, cosine lr 0.001).",
   "loader": "sfbinpack",
-  "superbatches": 1000,
+  "superbatches": 10000,
   "batch_size": 16384,
   "lr": 0.001,
   "wdl": 0.0,
-  "save_rate": 1000,
+  "save_rate": 2000,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack;~/assets/training/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack;~/assets/training/stockfish/master-binpacks/nodes5000pv2_UHO.binpack;~/assets/training/stockfish/master-binpacks/farseerT74.binpack;~/assets/training/stockfish/master-binpacks/farseerT75.binpack;~/assets/training/stockfish/master-binpacks/farseerT76.binpack;~/assets/training/stockfish/master-binpacks/multinet_pv-2_diff-100_nodes-5000.binpack;~/assets/training/stockfish/master-binpacks/data_pv-2_diff-100_nodes-5000.binpack;~/assets/training/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack;~/assets/training/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack"
   },
@@ -15,5 +15,5 @@
     "random_skip": 3,
     "min_ply": 18
   },
-  "continue_from": "enyo-23.0.0-rc7"
+  "initialize_from": "enyo-23.0.0-rc7"
 }
