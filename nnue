@@ -474,9 +474,14 @@ startpos_gate() {
   printf 'uci\nsetoption name nnue_file value %s\nisready\nposition startpos\ngo depth 4\nquit\n' "$candidate_net" \
     | "$ENGINE" | tee "$log"
 
-  if [[ $(jq -r '.mode // "enyo"' "$ARCH") == legacy-direct ]]; then
+  local arch_mode
+  arch_mode=$(jq -r '.mode // "enyo"' "$ARCH")
+  if [[ "$arch_mode" == legacy-direct ]]; then
     grep -Eq 'evaluator=(enyo|native)-nnue|evaluator=legacy-default source=file' "$log" \
       || fail "engine did not load legacy direct NNUE" startpos
+  elif [[ "$arch_mode" == layer-stacks ]]; then
+    # Stockfish-format .nnue (Full_Threats+HalfKAv2_hm^ layer stacks).
+    grep -q 'evaluator=stockfish-nnue' "$log" || fail "engine did not load the Stockfish-format net" startpos
   else
     grep -Eq 'evaluator=(enyo|native)-nnue' "$log" || fail "engine did not load Enyo NNUE" startpos
   fi
@@ -485,7 +490,9 @@ startpos_gate() {
   hidden=$(jq -r .hidden "$ARCH")
   buckets=$(jq -r '.runtime_input_buckets // .input_buckets' "$ARCH")
   channels=$(jq -r .feature_channels "$ARCH")
-  if [[ $(jq -r '.net_format // ""' "$ARCH") == enyo-v1 ]]; then
+  if [[ "$arch_mode" == layer-stacks ]]; then
+    grep -q "hidden=$hidden" "$log" || fail "hidden mismatch, expected $hidden" startpos
+  elif [[ $(jq -r '.net_format // ""' "$ARCH") == enyo-v1 ]]; then
     # Format-1 nets carry only an architecture number; the engine reports it.
     local architecture=24
     [[ $(jq -r '.full_threats // false' "$ARCH") == true ]] && architecture=25
@@ -529,7 +536,7 @@ static_gate() {
     --net "$candidate_net" --data "$static_eval_data_file" --rows "$ROWS"
     --batch-size 4096 --device cpu --buckets
   )
-  if [[ "$mode" == reckless ]]; then
+  if [[ "$mode" == reckless || "$mode" == layer-stacks ]]; then
     local engine_static_jsonl
     engine_static_jsonl=${ENGINE_STATIC_JSONL:-$HOME/assets/enyo_nnue_data/sf_labels/sf_combined_904k.val.jsonl}
     [[ -f "$engine_static_jsonl" ]] \
@@ -537,7 +544,7 @@ static_gate() {
     "$PYTHON" tools/validate/eval_jsonl_engine.py \
       --engine "$ENGINE" --net "$candidate_net" --jsonl "$engine_static_jsonl" \
       --rows "$ROWS" --threads 1 --hash 64 --buckets \
-      --material-buckets reckless 2>&1 | tee "$log"
+      $([[ "$mode" == reckless ]] && echo --material-buckets reckless) 2>&1 | tee "$log"
   else
     [[ "$full_heads" == true ]] && eval_args+=(--material-buckets)
     "$PYTHON" tools/validate/eval_dataset.py \

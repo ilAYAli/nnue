@@ -35,10 +35,49 @@ use bullet_lib::{
 // Learning-rate schedule chosen at run time: cosine (default) or step decay.
 // ENYO_BULLET_LR_SCHEDULE=step drops the rate by ENYO_BULLET_LR_GAMMA (default
 // 0.3) every lr_superbatches/3 superbatches (ENYO_BULLET_LR_STEP overrides).
+// ENYO_BULLET_LR_SCHEDULE=onecycle follows torch's OneCycleLR (cosine
+// annealing, per batch): lr/start_div rising to lr over the first warmup
+// fraction of the schedule, then falling to final_lr at its end.
 #[derive(Clone, Debug)]
 enum EnyoLr {
     Cosine(lr::CosineDecayLR),
     Step(lr::StepLR),
+    OneCycle(OneCycleLr),
+}
+
+#[derive(Clone, Debug)]
+struct OneCycleLr {
+    max_lr: f32,
+    start_lr: f32,
+    final_lr: f32,
+    warmup_steps: f32,
+    total_steps: f32,
+    batches_per_superbatch: usize,
+}
+
+impl OneCycleLr {
+    fn anneal(start: f32, end: f32, pct: f32) -> f32 {
+        end + (start - end) / 2.0 * (1.0 + (std::f32::consts::PI * pct.clamp(0.0, 1.0)).cos())
+    }
+}
+
+impl lr::LrScheduler for OneCycleLr {
+    fn lr(&self, batch: usize, superbatch: usize) -> f32 {
+        let step = ((superbatch - 1) * self.batches_per_superbatch + batch) as f32;
+        if step < self.warmup_steps {
+            Self::anneal(self.start_lr, self.max_lr, step / self.warmup_steps)
+        } else {
+            let span = (self.total_steps - self.warmup_steps).max(1.0);
+            Self::anneal(self.max_lr, self.final_lr, (step - self.warmup_steps) / span)
+        }
+    }
+
+    fn colourful(&self) -> String {
+        format!(
+            "one-cycle {} -> {} -> {} (warmup {} of {} steps)",
+            self.start_lr, self.max_lr, self.final_lr, self.warmup_steps, self.total_steps
+        )
+    }
 }
 
 impl lr::LrScheduler for EnyoLr {
@@ -46,6 +85,7 @@ impl lr::LrScheduler for EnyoLr {
         match self {
             Self::Cosine(s) => s.lr(batch, superbatch),
             Self::Step(s) => s.lr(batch, superbatch),
+            Self::OneCycle(s) => s.lr(batch, superbatch),
         }
     }
 
@@ -53,6 +93,7 @@ impl lr::LrScheduler for EnyoLr {
         match self {
             Self::Cosine(s) => s.colourful(),
             Self::Step(s) => s.colourful(),
+            Self::OneCycle(s) => s.colourful(),
         }
     }
 }
@@ -69,6 +110,19 @@ fn enyo_lr(initial_lr: f32, final_lr: f32, lr_superbatches: usize) -> EnyoLr {
                 .and_then(|v| v.parse::<f32>().ok())
                 .unwrap_or(0.3);
             EnyoLr::Step(lr::StepLR { start: initial_lr, gamma, step })
+        }
+        Ok("onecycle") => {
+            let batches_per_superbatch = env_parse("ENYO_BULLET_BATCHES", 64usize);
+            let total_steps = (lr_superbatches * batches_per_superbatch) as f32;
+            let warmup_pct = env_parse("ENYO_BULLET_LR_WARMUP_PCT", 0.0f32);
+            EnyoLr::OneCycle(OneCycleLr {
+                max_lr: initial_lr,
+                start_lr: initial_lr / env_parse("ENYO_BULLET_LR_START_DIV", 25.0f32),
+                final_lr,
+                warmup_steps: warmup_pct.clamp(0.0, 1.0) * total_steps,
+                total_steps,
+                batches_per_superbatch,
+            })
         }
         _ => EnyoLr::Cosine(lr::CosineDecayLR {
             initial_lr,
@@ -1991,6 +2045,300 @@ fn train_legacy_direct(
     }
 }
 
+/// nnue-pytorch's loss (model/nnue.py calculate_sf_loss with w1 = 0): both
+/// the net and the search score go through the win-rate model
+/// 0.5 * (1 + sigmoid((x - offset) / scaling) - sigmoid((-x - offset) / scaling)),
+/// the score side is blended with the game result by lambda, and the error is
+/// |target - prediction|^pow_exp averaged over the batch.
+#[derive(Clone, Copy, Debug)]
+struct LayerStackLoss {
+    in_offset: f32,
+    in_scaling: f32,
+    out_offset: f32,
+    out_scaling: f32,
+    pow_exp: f32,
+    lambda: f32,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn train_layer_stacks(
+    dataset: String,
+    output: String,
+    net_id: String,
+    spec: enyo_bullet_spike::sf_layer_stacks::Spec,
+    batch_size: usize,
+    batches_per_superbatch: usize,
+    start_superbatch: usize,
+    end_superbatch: usize,
+    lr_superbatches: usize,
+    threads: usize,
+    wdl_proportion: f32,
+    initial_lr: f32,
+    final_lr: f32,
+    save_rate: usize,
+    weight_decay: f32,
+) {
+    use bullet_lib::nn::ModelNode;
+    use enyo_bullet_spike::sf_layer_stacks as sfls;
+
+    spec.validate().unwrap_or_else(|err| panic!("{err}"));
+    if start_superbatch == 0 || start_superbatch > end_superbatch {
+        panic!("invalid superbatch range {start_superbatch}..={end_superbatch}");
+    }
+    if lr_superbatches < end_superbatch {
+        panic!("LR schedule ends at superbatch {lr_superbatches}, before training ends at {end_superbatch}");
+    }
+    if !(0.0..=1.0).contains(&wdl_proportion) {
+        panic!("wdl must be in [0, 1]");
+    }
+    let sfls::Spec { l1, l2, l3 } = spec;
+    let fake_quant = env_parse("ENYO_BULLET_LS_FAKE_QUANT", 1usize) != 0;
+    let loss = LayerStackLoss {
+        in_offset: env_parse("ENYO_BULLET_LOSS_IN_OFFSET", 270.0f32),
+        in_scaling: env_parse("ENYO_BULLET_LOSS_IN_SCALING", 340.0f32),
+        out_offset: env_parse("ENYO_BULLET_LOSS_OUT_OFFSET", 270.0f32),
+        out_scaling: env_parse("ENYO_BULLET_LOSS_OUT_SCALING", 380.0f32),
+        pow_exp: env_parse("ENYO_BULLET_LOSS_POW_EXP", 2.5f32),
+        // nnue-pytorch lambda weighs the score; Enyo's wdl weighs the result.
+        lambda: 1.0 - wdl_proportion,
+    };
+    let tb_remap = (env_parse("ENYO_BULLET_LOSS_TB_REMAP", 1usize) != 0).then(|| sfls::TablebaseRemap {
+        base: env_parse("ENYO_BULLET_LOSS_TB_BASE", 4000.0f32),
+        scale: env_parse("ENYO_BULLET_LOSS_TB_SCALE", 4000.0f32),
+        decay: env_parse("ENYO_BULLET_LOSS_TB_DECAY", 0.85f32),
+    });
+
+    println!("mode=layer-stacks");
+    println!("dataset={dataset}");
+    println!("output={output}");
+    println!("net_id={net_id}");
+    println!("layer_stacks l1={l1} l2={l2} l3={l3} stacks={} fake_quant={fake_quant}", sfls::STACKS);
+    println!("loss={loss:?} tb_remap={tb_remap:?}");
+    println!(
+        "batch_size={batch_size} batches_per_superbatch={batches_per_superbatch} \
+         start_superbatch={start_superbatch} end_superbatch={end_superbatch} \
+         lr_superbatches={lr_superbatches} weight_decay={weight_decay}"
+    );
+
+    // Fake quantisation as nnue-pytorch: weights round to their export grid,
+    // activations floor to 1/128 steps, both with straight-through gradients.
+    fn fq(node: ModelNode<'_>, enabled: bool, scale: f32, round: bool) -> ModelNode<'_> {
+        if enabled { node.faux_quantise(scale, round) } else { node }
+    }
+    // Two (rows, n) weights side by side as one (rows, n + m) matrix.
+    fn concat_cols<'a>(a: ModelNode<'a>, b: ModelNode<'a>) -> ModelNode<'a> {
+        let (a_shape, b_shape) = (a.shape(), b.shape());
+        assert_eq!(a_shape.rows(), b_shape.rows());
+        a.reshape(Shape::new(a_shape.size(), 1))
+            .concat(b.reshape(Shape::new(b_shape.size(), 1)))
+            .reshape(Shape::new(a_shape.rows(), a_shape.cols() + b_shape.cols()))
+    }
+    // [floor(x^2), floor(x)] on the 1/128 grid, clipped to [0, 127/128].
+    fn squared_crelu(x: ModelNode<'_>, fake_quant: bool) -> ModelNode<'_> {
+        let squared = fq(x.abs_pow(2.0), fake_quant, sfls::HIDDEN_ONE, false);
+        let linear = fq(x, fake_quant, sfls::HIDDEN_ONE, false);
+        squared.concat(linear).max(0.0).min(sfls::HIDDEN_MAX)
+    }
+    fn ft_half(acc: ModelNode<'_>) -> ModelNode<'_> {
+        acc.max(0.0).min(sfls::FT_MAX).pairwise_mul()
+    }
+    fn win_rate(x: ModelNode<'_>, offset: f32, scaling: f32) -> ModelNode<'_> {
+        0.5 * (1.0 + ((x - offset) / scaling).sigmoid() - ((-1.0 * x - offset) / scaling).sigmoid())
+    }
+
+    let mut trainer = ValueTrainerBuilder::default()
+        .dual_perspective()
+        .optimiser(AdamW)
+        .inputs(sfls::LayerStackInputs)
+        .output_buckets(sfls::PieceCountBuckets)
+        // Export reads optimiser_state/weights.bin (tools/bullet/train).
+        .save_format(&[SavedFormat::custom(b"layer-stacks: export from optimiser_state/weights.bin".to_vec())])
+        .build_custom(move |builder, (stm, nstm, buckets), _targets| {
+            let w = |id: &str, rows: usize, cols: usize| {
+                builder.new_weights(id, Shape::new(rows, cols), InitSettings::Zeroed)
+            };
+            let threats = sfls::THREAT_FEATURES;
+            let halfka = sfls::HALFKA_FEATURES;
+            let inputs = sfls::INPUTS;
+            let psqt_buckets = sfls::PSQT_BUCKETS;
+            let stacks = sfls::STACKS;
+
+            // Feature transformer: [threat rows | HalfKA rows + shared factor].
+            let l0h = w("l0h", l1, halfka)
+                + w("l0v", l1, sfls::PLANES).repeat(sfls::KING_BUCKETS).reshape(Shape::new(l1, halfka));
+            let ft = concat_cols(w("l0t", l1, threats), l0h);
+            let ft = fq(ft, fake_quant, sfls::FT_ONE, true);
+            let ft_bias = fq(w("l0b", l1, 1), fake_quant, sfls::FT_ONE, true);
+            let p0h = w("p0h", psqt_buckets, halfka)
+                + w("p0v", psqt_buckets, sfls::PLANES)
+                    .repeat(sfls::KING_BUCKETS)
+                    .reshape(Shape::new(psqt_buckets, halfka));
+            let psqt = concat_cols(w("p0t", psqt_buckets, threats), p0h);
+            let psqt = fq(psqt, fake_quant, sfls::PSQT_SCALE, true);
+            assert_eq!(ft.shape(), Shape::new(l1, inputs));
+
+            let x0 = fq(ft_half(ft.matmul(stm) + ft_bias), fake_quant, sfls::HIDDEN_ONE, false)
+                .concat(fq(ft_half(ft.matmul(nstm) + ft_bias), fake_quant, sfls::HIDDEN_ONE, false));
+
+            // fc0, factorised across stacks; the merged weight stays on the
+            // int8 grid range as nnue-pytorch's virtual-aware clipping keeps it.
+            let l1w = w("l1w", stacks * l2, l1);
+            let l1f = w("l1f", l2, l1);
+            let mut fc0_w = l1w.slice_rows(0, l2) + l1f;
+            for s in 1..stacks {
+                fc0_w = fc0_w.concat(l1w.slice_rows(s * l2, (s + 1) * l2) + l1f);
+            }
+            let fc0_w = fq(fc0_w.max(-127.0 / sfls::FC0_SCALE).min(127.0 / sfls::FC0_SCALE), fake_quant, sfls::FC0_SCALE, true);
+            let fc0_b = w("l1b", stacks * l2, 1) + w("l1fb", l2, 1).repeat(stacks).reshape(Shape::new(stacks * l2, 1));
+            let fc0_b = fq(fc0_b, fake_quant, sfls::FC0_SCALE * sfls::HIDDEN_ONE, true);
+            let fc0 = (fc0_w.matmul(x0) + fc0_b).select(buckets);
+
+            let passthrough = fc0.slice_rows(l2 - 2, l2 - 1) - fc0.slice_rows(l2 - 1, l2);
+            let a1 = squared_crelu(fc0, fake_quant);
+
+            let fc1_w = fq(w("l2w", stacks * l3, 2 * l2), fake_quant, sfls::FC1_SCALE, true);
+            let fc1_b = fq(w("l2b", stacks * l3, 1), fake_quant, sfls::FC1_SCALE * sfls::HIDDEN_ONE, true);
+            let a2 = squared_crelu((fc1_w.matmul(a1) + fc1_b).select(buckets), fake_quant);
+
+            let fc2_w = fq(w("l3w", stacks, 2 * l2 + 2 * l3), fake_quant, sfls::FC2_SCALE, true);
+            let fc2_b = fq(w("l3b", stacks, 1), fake_quant, sfls::FC2_SCALE * sfls::HIDDEN_ONE, true);
+            let fc2 = (fc2_w.matmul(a1.concat(a2)) + fc2_b).select(buckets);
+
+            let psqt_term = (psqt.matmul(stm) - psqt.matmul(nstm)).select(buckets) * 0.5;
+            let out = fc2 + passthrough + psqt_term;
+
+            let prediction = win_rate(out * sfls::NNUE2SCORE, loss.in_offset, loss.in_scaling);
+            let target = if loss.lambda <= 0.0 {
+                builder.new_dense_input("results", Shape::new(1, 1))
+            } else {
+                let scores = builder.new_dense_input("scores", Shape::new(1, 1));
+                let from_score = win_rate(scores, loss.out_offset, loss.out_scaling);
+                if loss.lambda >= 1.0 {
+                    from_score
+                } else {
+                    let results = builder.new_dense_input("results", Shape::new(1, 1));
+                    loss.lambda * from_score + (1.0 - loss.lambda) * results
+                }
+            };
+            (out, prediction.power_error(target, loss.pow_exp))
+        });
+
+    // AdamW as nnue-pytorch's (beta 0.9/0.999), clipping as its WeightClipper:
+    // threat rows (and their PSQT columns) to the int8 range, fc1 and fc2 to
+    // their int8 grids; the fc0 merge is clamped in the graph.
+    let params = |limit: f32| AdamWParams {
+        decay: weight_decay,
+        beta1: 0.9,
+        beta2: 0.999,
+        min_weight: -limit,
+        max_weight: limit,
+    };
+    trainer.optimiser.set_params(params(1.0e9));
+    trainer.optimiser.set_params_for_weight("l0t", params(sfls::THREAT_MAX));
+    trainer.optimiser.set_params_for_weight("p0t", params(sfls::THREAT_MAX));
+    trainer.optimiser.set_params_for_weight("l1w", params(2.0 * 127.0 / sfls::FC0_SCALE));
+    trainer.optimiser.set_params_for_weight("l1f", params(2.0 * 127.0 / sfls::FC0_SCALE));
+    trainer.optimiser.set_params_for_weight("l2w", params(127.0 / sfls::FC1_SCALE));
+    trainer.optimiser.set_params_for_weight("l3w", params(127.0 / sfls::FC2_SCALE));
+
+    let init_weights = env_string("ENYO_BULLET_INIT_WEIGHTS", "");
+    let resume_checkpoint = env_string("ENYO_BULLET_RESUME_CHECKPOINT", "");
+    let eval_fens = env_string("ENYO_BULLET_LS_EVAL_FENS", "");
+    if !resume_checkpoint.is_empty() {
+        if !init_weights.is_empty() {
+            panic!("checkpoint resume and initial weights are mutually exclusive");
+        }
+        trainer.load_from_checkpoint(&resume_checkpoint);
+        println!("loaded_checkpoint={resume_checkpoint}");
+    } else if !init_weights.is_empty() {
+        trainer.optimiser.load_weights_from_file(&init_weights).expect("failed to load initial Bullet weights");
+        println!("loaded_init_weights={init_weights}");
+    } else {
+        let seed = env_parse("ENYO_BULLET_INIT_SEED", 1u64);
+        let seeded_path = Path::new(&output).join(format!("{net_id}-seeded-init.bin"));
+        sfls::write_weights(&seeded_path, &sfls::initial_weights(spec, seed))
+            .expect("failed to write layer-stacks initial weights");
+        trainer
+            .optimiser
+            .load_weights_from_file(seeded_path.to_str().expect("UTF-8 init path"))
+            .expect("failed to load layer-stacks initial weights");
+        let _ = fs::remove_file(&seeded_path);
+        println!("loaded_init_seed={seed}");
+    }
+
+    // Evaluate positions with the graph (fake quantisation as configured)
+    // and save the loaded weights as checkpoint 0, then stop.
+    if !eval_fens.is_empty() {
+        let text = fs::read_to_string(&eval_fens).unwrap_or_else(|err| panic!("cannot read {eval_fens}: {err}"));
+        let out_path = env_string("ENYO_BULLET_LS_EVAL_OUT", &format!("{output}/eval.tsv"));
+        let mut out = io::BufWriter::new(File::create(&out_path).expect("eval output"));
+        for fen in text.lines().map(str::trim).filter(|line| !line.is_empty()) {
+            let value = trainer.eval_raw_output(fen)[0];
+            writeln!(out, "{fen}\t{value}").expect("write eval output");
+        }
+        out.flush().expect("flush eval output");
+        println!("eval_output={out_path}");
+        trainer.save_to_checkpoint(&format!("{output}/{net_id}-0"));
+        return;
+    }
+
+    let schedule = TrainingSchedule {
+        net_id,
+        // Unused by this graph's loss; the targets input is not read.
+        eval_scale: 400.0,
+        steps: TrainingSteps { batch_size, batches_per_superbatch, start_superbatch, end_superbatch },
+        // Bullet's own target is not used; blend 1 keeps it the plain result.
+        wdl_scheduler: wdl::ConstantWDL { value: 1.0 },
+        lr_scheduler: enyo_lr(initial_lr, final_lr, lr_superbatches),
+        save_rate,
+    };
+    let settings = LocalSettings { threads, test_set: None, output_directory: &output, batch_queue_size: 16 };
+
+    let loader = env_string("ENYO_BULLET_LOADER", "sfbinpack");
+    if loader != "sfbinpack" {
+        panic!("layer-stacks trains from Stockfish binpacks (loader=sfbinpack), got {loader}");
+    }
+    let paths = dataset_paths(&dataset);
+    let path_refs = paths.iter().map(String::as_str).collect::<Vec<_>>();
+    let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
+    let interleave = env_parse("ENYO_BULLET_SFBINPACK_INTERLEAVE", 0usize) != 0;
+    let reader_threads = env_parse("ENYO_BULLET_SFBINPACK_READER_THREADS", 1usize);
+    if reader_threads > 1 && !interleave {
+        panic!("sfbinpack reader_threads > 1 requires interleave=true");
+    }
+    println!("sfbinpack interleave={interleave} reader_threads={reader_threads}");
+    macro_rules! run_with_filter {
+        ($filter:expr) => {{
+            let inner = if interleave {
+                SfBinpackLoader::new_interleaved(&path_refs, buffer_mb, threads, $filter)
+                    .with_reader_threads(reader_threads)
+            } else {
+                SfBinpackLoader::new_concat_multiple(&path_refs, buffer_mb, threads, $filter)
+            };
+            let dataloader = sfls::RemappedLoader { inner, remap: tb_remap };
+            run_trainer(&mut trainer, &schedule, &settings, &dataloader);
+        }};
+    }
+    match env_string("ENYO_BULLET_SFBINPACK_SKIP_PREDICATE", "enyo").as_str() {
+        "enyo" => run_with_filter!(make_sfbinpack_filter()),
+        "nnue-pytorch" => {
+            let config = sfls::NptSkipConfig {
+                // Enyo's min_ply keeps ply >= min_ply; nnue-pytorch's
+                // early_fen_skipping drops ply <= early_fen_skipping.
+                early_fen_skipping: env_parse("ENYO_BULLET_SFBINPACK_MIN_PLY", 0i32) - 1,
+                random_fen_skipping: env_parse("ENYO_BULLET_SFBINPACK_RANDOM_SKIP", 0u32),
+                filtered: true,
+                wld_filtered: true,
+                soft_early_fen_skipping: 20,
+                piece_count_filter: true,
+            };
+            println!("skip_predicate=nnue-pytorch {config:?}");
+            run_with_filter!(sfls::npt_skip_predicate(config))
+        }
+        other => panic!("unsupported sfbinpack skip_predicate={other}"),
+    }
+}
+
 fn main() {
     let mode = env_string("ENYO_BULLET_MODE", "reckless");
     let dataset = env_string("ENYO_BULLET_DATA", "data/baseline.bullet");
@@ -2065,6 +2413,32 @@ fn main() {
             eval_scale,
             save_rate,
             trainable,
+            weight_decay,
+        );
+        return;
+    }
+
+    if mode == "layer-stacks" {
+        let spec = enyo_bullet_spike::sf_layer_stacks::Spec {
+            l1: hidden,
+            l2: l2_size,
+            l3: env_parse("ENYO_BULLET_L3", 32usize),
+        };
+        train_layer_stacks(
+            dataset,
+            output,
+            net_id,
+            spec,
+            batch_size,
+            batches_per_superbatch,
+            start_superbatch,
+            end_superbatch,
+            lr_superbatches,
+            threads,
+            wdl_proportion,
+            initial_lr,
+            final_lr,
+            save_rate,
             weight_decay,
         );
         return;

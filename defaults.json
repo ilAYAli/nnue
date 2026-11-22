@@ -25,7 +25,9 @@
     "max_abs_cp": 10000,
     "quiet_only": true,
     "interleave": false,
-    "random_skip": 0
+    "random_skip": 0,
+    "skip_predicate": "enyo",
+    "reader_threads": 1
   },
   "validation": {
     "static_rows": 50000,
@@ -34,5 +36,7 @@
     "sprt_games_smoke": 100,
     "sprt_concurrency": 16
   },
-  "lr_schedule": "cosine"
+  "lr_schedule": "cosine",
+  "lr_warmup_pct": 0.0,
+  "lr_start_div": 25.0
 }

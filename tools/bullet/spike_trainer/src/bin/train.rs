@@ -19,6 +19,7 @@ use bullet_lib::{
         DataLoader, SfBinpackLoader,
     },
 };
+use enyo_bullet_spike::sf_layer_stacks as sfls;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -192,7 +193,8 @@ impl Filter {
 fn usage() -> ! {
     eprintln!(
         "usage: tools/bullet/train <plan|data|run|export|all> \
-         [--build build.json] [--arch architecture.json] [--defaults defaults.json] [--force]"
+         [--build build.json] [--arch architecture.json] [--defaults defaults.json] [--force]\n\
+         \x20      tools/bullet/train eval --arch architecture.json --net NET.nnue --fens FENS --out DIR [--float]"
     );
     process::exit(2);
 }
@@ -811,6 +813,10 @@ fn convert_initialize_from(config: &Config, initialize_from: &str, reset_dense_t
         process::exit(1);
     }
     let output = init_weights_path(config);
+    if is_layer_stacks(&config.arch) {
+        import_layer_stacks(&config.arch, &input, &output);
+        return output;
+    }
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
             eprintln!("error: cannot create {}: {err}", parent.display());
@@ -1067,6 +1073,218 @@ fn arch_int_l2_shift(config: &Config) -> usize {
     usize_at(&config.arch, "int_l2_shift", 6)
 }
 
+fn is_layer_stacks(arch: &Value) -> bool {
+    string_at(arch, "mode") == Some("layer-stacks")
+}
+
+/// architecture.json of mode "layer-stacks": hidden (L1), l2_size, l3_size,
+/// fake_quantization, description, and the nnue-pytorch loss under "loss".
+fn layer_stack_spec(arch: &Value) -> sfls::Spec {
+    sfls::Spec {
+        l1: usize_at(arch, "hidden", 1024),
+        l2: usize_at(arch, "l2_size", 32),
+        l3: usize_at(arch, "l3_size", 32),
+    }
+}
+
+const LAYER_STACK_LOSS_KEYS: &[(&str, f64)] = &[
+    ("in_offset", 270.0),
+    ("in_scaling", 340.0),
+    ("out_offset", 270.0),
+    ("out_scaling", 380.0),
+    ("pow_exp", 2.5),
+];
+
+const LAYER_STACK_TB_REMAP_KEYS: &[(&str, f64)] = &[("base", 4000.0), ("scale", 4000.0), ("decay", 0.85)];
+
+fn layer_stack_description(config: &Config) -> String {
+    string_at(&config.arch, "description")
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("{} Run {}.", sfls::DEFAULT_DESCRIPTION, run_name(config)))
+}
+
+fn validate_layer_stacks(config: &Config) {
+    let fail = |message: String| -> ! {
+        eprintln!("error: layer-stacks: {message}");
+        process::exit(2);
+    };
+    layer_stack_spec(&config.arch).validate().unwrap_or_else(|err| fail(err));
+    if layer_stack_spec(&config.arch) != sfls::Spec::STOCKFISH {
+        eprintln!("warning: layer-stacks widths differ from 1024/32/32; the engine only loads 1024/32/32");
+    }
+    if !uses_sfbinpack_loader(config) {
+        fail("requires loader=sfbinpack".to_string());
+    }
+    let loss = object_at(&config.arch, "loss");
+    if !loss.is_null() && !loss.is_object() {
+        fail("architecture.loss must be an object".to_string());
+    }
+    if let Some(map) = loss.as_object() {
+        for key in map.keys() {
+            if key != "tb_remap" && !LAYER_STACK_LOSS_KEYS.iter().any(|(k, _)| k == key) {
+                fail(format!("unknown architecture.loss.{key}"));
+            }
+        }
+    }
+    let remap = object_at(loss, "tb_remap");
+    if !(remap.is_null() || remap.is_object() || remap == &Value::Bool(false)) {
+        fail("architecture.loss.tb_remap must be an object or false".to_string());
+    }
+    if !matches!(training_lr_schedule(config).as_str(), "cosine" | "step" | "onecycle") {
+        fail(format!("unsupported lr_schedule {}", training_lr_schedule(config)));
+    }
+    if !matches!(training_skip_predicate(config).as_str(), "enyo" | "nnue-pytorch") {
+        fail(format!("unsupported sfbinpack.skip_predicate {}", training_skip_predicate(config)));
+    }
+    if training_nested_usize(config, "sfbinpack", "reader_threads", 1) > 1
+        && !training_nested_bool(config, "sfbinpack", "interleave", false)
+    {
+        fail("sfbinpack.reader_threads > 1 requires sfbinpack.interleave=true".to_string());
+    }
+    if training_trainable(config) != "all" {
+        fail("requires trainable=all".to_string());
+    }
+    if training_lr_superbatches(config) < training_superbatches(config) {
+        fail("lr_superbatches cannot be smaller than superbatches".to_string());
+    }
+}
+
+fn set_layer_stack_env(arch: &Value) {
+    let spec = layer_stack_spec(arch);
+    set_env("ENYO_BULLET_MODE", "layer-stacks");
+    set_env("ENYO_BULLET_HIDDEN", spec.l1);
+    set_env("ENYO_BULLET_L2", spec.l2);
+    set_env("ENYO_BULLET_L3", spec.l3);
+    set_env("ENYO_BULLET_LS_FAKE_QUANT", usize::from(bool_at(arch, "fake_quantization", true)));
+    let loss = object_at(arch, "loss");
+    for (key, default) in LAYER_STACK_LOSS_KEYS {
+        set_env(
+            &format!("ENYO_BULLET_LOSS_{}", key.to_ascii_uppercase()),
+            f64_at(loss, key, *default),
+        );
+    }
+    let remap = object_at(loss, "tb_remap");
+    set_env("ENYO_BULLET_LOSS_TB_REMAP", usize::from(remap != &Value::Bool(false)));
+    for (key, default) in LAYER_STACK_TB_REMAP_KEYS {
+        set_env(&format!("ENYO_BULLET_LOSS_TB_{}", key.to_ascii_uppercase()), f64_at(remap, key, *default));
+    }
+}
+
+fn training_lr_schedule(config: &Config) -> String {
+    training_string(config, "lr_schedule", "cosine")
+}
+
+fn training_skip_predicate(config: &Config) -> String {
+    resolved_training_nested_value(config, "sfbinpack", "skip_predicate")
+        .map(|(value, path)| value_string(value, &path))
+        .unwrap_or_else(|| "enyo".to_owned())
+}
+
+/// Converts a Full_Threats+HalfKAv2_hm^ .nnue into Bullet initial weights.
+fn import_layer_stacks(arch: &Value, input: &Path, output: &Path) {
+    let bytes = fs::read(input).unwrap_or_else(|err| {
+        eprintln!("error: cannot read {}: {err}", input.display());
+        process::exit(1);
+    });
+    let (weights, description) = sfls::import_nnue(layer_stack_spec(arch), &bytes).unwrap_or_else(|err| {
+        eprintln!("error: {}: {err}", input.display());
+        process::exit(1);
+    });
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).unwrap_or_else(|err| {
+            eprintln!("error: cannot create {}: {err}", parent.display());
+            process::exit(1);
+        });
+    }
+    sfls::write_weights(output, &weights).unwrap_or_else(|err| {
+        eprintln!("error: cannot write {}: {err}", output.display());
+        process::exit(1);
+    });
+    println!("imported {} ('{description}') -> {}", input.display(), output.display());
+}
+
+fn export_layer_stacks(arch: &Value, weights: &Path, description: &str) -> Vec<u8> {
+    let weights = sfls::read_weights(weights).unwrap_or_else(|err| {
+        eprintln!("error: {err}");
+        process::exit(1);
+    });
+    sfls::export_nnue(layer_stack_spec(arch), &weights, description).unwrap_or_else(|err| {
+        eprintln!("error: layer-stacks export: {err}");
+        process::exit(1);
+    })
+}
+
+/// `eval`: imports a .nnue into the Bullet graph, evaluates FENs with it,
+/// saves the loaded weights as a checkpoint and exports that checkpoint.
+/// Writes DIR/eval.tsv (fen, graph output, PSQT term; network units, side
+/// to move) and DIR/roundtrip.nnue.
+fn cmd_eval(args: &[String]) {
+    let mut arch = None;
+    let mut net = None;
+    let mut fens = None;
+    let mut out = None;
+    let mut float = false;
+    let mut rest = args[1..].iter();
+    while let Some(flag) = rest.next() {
+        let mut value = || rest.next().cloned().unwrap_or_else(|| usage());
+        match flag.as_str() {
+            "--arch" => arch = Some(value()),
+            "--net" => net = Some(value()),
+            "--fens" => fens = Some(value()),
+            "--out" => out = Some(value()),
+            "--float" => float = true,
+            _ => usage(),
+        }
+    }
+    let (Some(arch), Some(net), Some(fens), Some(out)) = (arch, net, fens, out) else { usage() };
+    let arch = load_json(&arch);
+    if !is_layer_stacks(&arch) {
+        eprintln!("error: eval supports architecture mode layer-stacks");
+        process::exit(2);
+    }
+    let out = expand_path(&out);
+    let init = out.join("import.bin");
+    import_layer_stacks(&arch, &expand_path(&net), &init);
+    set_layer_stack_env(&arch);
+    if float {
+        set_env("ENYO_BULLET_LS_FAKE_QUANT", 0);
+    }
+    set_env("ENYO_BULLET_OUT", out.display());
+    set_env("ENYO_BULLET_NET_ID", "eval");
+    set_env("ENYO_BULLET_INIT_WEIGHTS", init.display());
+    set_env("ENYO_BULLET_LS_EVAL_FENS", expand_path(&fens).display());
+    let table = out.join("eval-graph.tsv");
+    set_env("ENYO_BULLET_LS_EVAL_OUT", table.display());
+    trainer_main::run_from_env();
+
+    let spec = layer_stack_spec(&arch);
+    let weights_path = out.join("eval-0/optimiser_state/weights.bin");
+    let weights = sfls::read_weights(&weights_path).unwrap_or_else(|err| {
+        eprintln!("error: {err}");
+        process::exit(1);
+    });
+    let description = sfls::import_nnue(spec, &fs::read(expand_path(&net)).unwrap()).unwrap().1;
+    let bytes = sfls::export_nnue(spec, &weights, &description).unwrap_or_else(|err| {
+        eprintln!("error: layer-stacks export: {err}");
+        process::exit(1);
+    });
+    fs::write(out.join("roundtrip.nnue"), &bytes).unwrap();
+    println!("wrote {} ({} bytes)", out.join("roundtrip.nnue").display(), bytes.len());
+
+    let mut rows = String::new();
+    for line in fs::read_to_string(&table).unwrap().lines() {
+        let (fen, value) = line.split_once('\t').unwrap();
+        let board = format!("{fen} | 0 | 0.5").parse::<ChessBoard>().unwrap();
+        let psqt = sfls::psqt_term(spec, &weights, &board).unwrap();
+        rows.push_str(&format!("{fen}\t{value}\t{psqt}\n"));
+    }
+    fs::write(out.join("eval.tsv"), rows).unwrap();
+    let _ = fs::remove_file(&table);
+    let _ = fs::remove_file(&init);
+    let _ = fs::remove_dir_all(out.join("eval-0"));
+    println!("wrote {}", out.join("eval.tsv").display());
+}
+
 fn validate_layout(config: &Config) {
     let input_buckets = usize_at(&config.arch, "input_buckets", 1);
     let runtime_input_buckets = usize_at(&config.arch, "runtime_input_buckets", input_buckets);
@@ -1088,6 +1306,10 @@ fn validate_layout(config: &Config) {
     let psqt_residual = arch_psqt_residual(config);
     let l2_output_skip = arch_l2_output_skip(config);
     let mode = string_at(&config.arch, "mode").unwrap_or("enyo");
+    if mode == "layer-stacks" {
+        validate_layer_stacks(config);
+        return;
+    }
     if mode == "legacy-direct" {
         if input_buckets != 16
             || runtime_input_buckets != 16
@@ -1914,7 +2136,14 @@ fn cmd_run(config: &Config, force: bool) {
     set_env("ENYO_BULLET_WDL", training_wdl(config));
     set_env("ENYO_BULLET_LR", training_lr(config));
     set_env("ENYO_BULLET_FINAL_LR", training_final_lr(config));
-    set_env("ENYO_BULLET_LR_SCHEDULE", training_string(config, "lr_schedule", "cosine"));
+    set_env("ENYO_BULLET_LR_SCHEDULE", training_lr_schedule(config));
+    set_env("ENYO_BULLET_LR_WARMUP_PCT", training_f64(config, "lr_warmup_pct", 0.0));
+    set_env("ENYO_BULLET_LR_START_DIV", training_f64(config, "lr_start_div", 25.0));
+    set_env("ENYO_BULLET_SFBINPACK_SKIP_PREDICATE", training_skip_predicate(config));
+    set_env(
+        "ENYO_BULLET_SFBINPACK_READER_THREADS",
+        training_nested_usize(config, "sfbinpack", "reader_threads", 1),
+    );
     set_env(
         "ENYO_BULLET_ENYO_L0_STD",
         f64_at(&config.arch, "l0_std", 8.0),
@@ -2003,6 +2232,9 @@ fn cmd_run(config: &Config, force: bool) {
         usize::from(data.interleave),
     );
     set_env("ENYO_BULLET_SFBINPACK_RANDOM_SKIP", data.random_skip);
+    if is_layer_stacks(&config.arch) {
+        set_layer_stack_env(&config.arch);
+    }
 
     trainer_main::run_from_env();
     write_model(config);
@@ -2863,6 +3095,24 @@ fn cmd_all(config: &Config, force: bool) {
 
 fn write_model(config: &Config) {
     let checkpoint = latest_checkpoint(config);
+    if is_layer_stacks(&config.arch) {
+        // A Stockfish-format .nnue (the engine detects the format by content).
+        let weights = checkpoint.with_file_name("optimiser_state").join("weights.bin");
+        let model = export_layer_stacks(&config.arch, &weights, &layer_stack_description(config));
+        let model_path = model_path(config);
+        if let Some(parent) = model_path.parent() {
+            fs::create_dir_all(parent).unwrap_or_else(|err| {
+                eprintln!("error: cannot create {}: {err}", parent.display());
+                process::exit(1);
+            });
+        }
+        fs::write(&model_path, model).unwrap_or_else(|err| {
+            eprintln!("error: cannot write {}: {err}", model_path.display());
+            process::exit(1);
+        });
+        println!("wrote {} from {}", model_path.display(), weights.display());
+        return;
+    }
     let raw = fs::read(&checkpoint).unwrap_or_else(|err| {
         eprintln!("error: cannot read {}: {err}", checkpoint.display());
         process::exit(1);
@@ -3821,6 +4071,10 @@ mod tests {
 
 fn main() {
     let args = env::args().skip(1).collect::<Vec<_>>();
+    if args.first().map(String::as_str) == Some("eval") {
+        cmd_eval(&args);
+        return;
+    }
     let (command, config, force) = load_config(&args);
     match command.as_str() {
         "plan" => cmd_plan(&config),
