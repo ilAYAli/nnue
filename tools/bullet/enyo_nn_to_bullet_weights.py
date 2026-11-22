@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import struct
 import sys
@@ -171,6 +172,28 @@ def convert_input_weights(
                 target[target_feature] = input_weights[source_features].mean(axis=0)
     return target
 
+
+
+def float_units_from_integer_dense(net):
+    """Undo the integer-dense export scaling so the dense head starts where the
+    parent was. The trainer saves L2 weights/biases x64, output weights x16 and
+    the output bias x(16 * steps), skip weights x(16 * steps / 127) on top of the
+    float eval_scale * 32 factor the rest of this converter already removes,
+    with steps = 2^(6 - int_l2_shift)."""
+    import dataclasses
+    steps = float(1 << (6 - int(net.int_l2_shift)))
+    f = lambda a: np.asarray(a, dtype=np.float32)
+    return dataclasses.replace(
+        net,
+        l2_weights=f(net.l2_weights) / 64.0,
+        l2_biases=f(net.l2_biases) / 64.0,
+        l2_squared_weights=f(net.l2_squared_weights) / 64.0,
+        l2_squared_biases=f(net.l2_squared_biases) / 64.0,
+        output_weights=f(net.output_weights) / 16.0,
+        output_biases=f(net.output_biases) / (16.0 * steps),
+        l2_output_skip_weights=f(net.l2_output_skip_weights) * 127.0 / (16.0 * steps),
+        integer_dense=False,
+    )
 
 def add_full_threat_rows(
         input_weights: np.ndarray,
@@ -487,6 +510,8 @@ def main() -> int:
         if args.legacy_inputs
         else load_net(args.input.expanduser())
     )
+    if getattr(net, "integer_dense", False):
+        net = float_units_from_integer_dense(net)
     source_buckets = int(getattr(net, "input_buckets", 16))
     source_channels = int(getattr(net, "feature_channels", 12))
     args.input_buckets = args.input_buckets or source_buckets
@@ -533,7 +558,11 @@ def main() -> int:
         or bool(getattr(net, "slider_xray_threats", False))
     )
     if (args.full_threats or args.slider_xray_threats) and not source_threat_features:
-        input_weights = add_full_threat_rows(input_weights)
+        # ENYO_THREAT_INIT_SCALE: std of the new rows relative to each parent
+        # column. 0.1 starts measurable but perturbs the parent evals
+        # (first-superbatch loss ~60x the parent); smaller keeps the parent.
+        input_weights = add_full_threat_rows(
+            input_weights, scale=float(os.environ.get("ENYO_THREAT_INIT_SCALE", "0.1")))
     if args.pawn_pairs:
         if source_threat_features:
             raise SystemExit("pawn-pair warm start requires a base-input parent")
