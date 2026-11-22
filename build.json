@@ -1,12 +1,12 @@
 {
-  "run": "enyo-23.0.0-rc6",
-  "hypothesis": "Recipe test: the native architecture 23 trained from scratch with the recipe that made the overnight nnue-pytorch net reach -39 vs nn-1a298 (native rc1: -156): all 10 Stockfish binpacks interleaved by size, random skip 3, min ply 18, eval-only targets (wdl 0), batch 16384, one cosine schedule lr 0.001 over ~25B positions.",
+  "run": "enyo-23.0.0-rc7",
+  "hypothesis": "Diagnostic: is the new data path (interleaved binpacks, random skip 3, min ply 18, wdl 0, batch 16384) broken, or is the native architecture weak from scratch? rc6 (scratch, 25B positions) scored -417 vs nn-1a298 against rc1 -156. Continue rc1 for 1000 superbatches (~1B positions) with the same recipe at lr 0.001 cosine; a large loss vs rc1 means the data path hurts.",
   "loader": "sfbinpack",
-  "superbatches": 24000,
+  "superbatches": 1000,
   "batch_size": 16384,
   "lr": 0.001,
   "wdl": 0.0,
-  "save_rate": 2000,
+  "save_rate": 1000,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack;~/assets/training/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack;~/assets/training/stockfish/master-binpacks/nodes5000pv2_UHO.binpack;~/assets/training/stockfish/master-binpacks/farseerT74.binpack;~/assets/training/stockfish/master-binpacks/farseerT75.binpack;~/assets/training/stockfish/master-binpacks/farseerT76.binpack;~/assets/training/stockfish/master-binpacks/multinet_pv-2_diff-100_nodes-5000.binpack;~/assets/training/stockfish/master-binpacks/data_pv-2_diff-100_nodes-5000.binpack;~/assets/training/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack;~/assets/training/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack"
   },
@@ -14,5 +14,6 @@
     "interleave": true,
     "random_skip": 3,
     "min_ply": 18
-  }
+  },
+  "continue_from": "enyo-23.0.0-rc1"
 }
