@@ -789,6 +789,9 @@ def material_head_features_from_pieces(
 
 
 def load_net(path: str | Path) -> Net:
+    with open(path, "rb") as handle:
+        if handle.read(8) == b"ENYONNUE":
+            return _load_net_v1(path)
     data = Path(path).read_bytes()
     trained_hidden = N_HIDDEN
     format_version = 1
@@ -1218,3 +1221,34 @@ def write_net(net: Net, path: str | Path) -> None:
         expected += NETWORK_HEADER_SIZE
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")
+
+
+def _load_net_v1(path) -> "Net":
+    """Format 1 / architecture 24, mapped onto the integer-dense v8 Net."""
+    from lib import enyo_net_v1 as v1
+    net = v1.read(path)
+    a = net.arrays
+    return Net(
+        input_weights=a["input_weights"],
+        input_biases=a["input_biases"],
+        l1_weights=a["l1_weights"],
+        l1_biases=a["l1_biases"],
+        l2_weights=a["l2_weights"].astype(np.float32),
+        l2_biases=a["l2_biases"].astype(np.float32),
+        output_weights=a["output_weights"].astype(np.float32),
+        output_biases=a["output_biases"].astype(np.float32),
+        input_buckets=32,
+        feature_channels=12,
+        output_buckets=8,
+        output_head_features=0,
+        trained_hidden=N_HIDDEN,
+        format_version=8,
+        mixed_activation=True,
+        l2_output_skip=True,
+        l2_squared_weights=a["l2_squared_weights"].astype(np.float32),
+        l2_squared_biases=np.zeros(v1.N_L3, dtype=np.float32),
+        l2_output_skip_weights=a["skip_weights"].astype(np.float32),
+        integer_dense=True,
+        int_l1_shift=net.int_l1_shift,
+        int_l2_shift=net.int_l2_shift,
+    )

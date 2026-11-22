@@ -3136,6 +3136,26 @@ fn cmd_export(config: &Config, force: bool) {
         );
         process::exit(1);
     });
+    // Architecture 24 and later publish the format-1 container the engine
+    // loads; runs/<run>/model.nn stays in the internal v8 layout.
+    if string_at(&config.arch, "net_format") == Some("enyo-v1") {
+        let status = process::Command::new(".venv/bin/python")
+            .arg("tools/lib/enyo_net_v1.py")
+            .arg(&model_path)
+            .arg(&net)
+            .arg("--name")
+            .arg(run_name(config))
+            .status()
+            .unwrap_or_else(|err| {
+                eprintln!("error: cannot run the format-1 converter: {err}");
+                process::exit(1);
+            });
+        if !status.success() {
+            let _ = fs::remove_file(&net);
+            eprintln!("error: format-1 conversion failed for {}", net.display());
+            process::exit(1);
+        }
+    }
     let size = net.metadata().map(|m| m.len()).unwrap_or(0);
     println!("wrote {} ({} bytes)", net.display(), size);
 }
