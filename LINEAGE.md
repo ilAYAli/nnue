@@ -548,3 +548,4 @@ Reserved: `enyo-26.0.0-rc1` on pwa-llm (architecture 26 = Bullet layer-stacks mo
 Void: `enyo-26.0.0-rc1` (stopped at superbatch ~22: old loader starved the piece-count filter, 0.6M pos/s).
 Reserved: `enyo-26.0.0-rc2` on pwa-llm (same configuration as rc1, fixed loader ad5ef1c0).
 Reserved: `enyo-26.0.0-rc3` on pwa-5090 (4B baseline for own-architecture variants: rc2 configuration with a 40-superbatch one-cycle schedule, input_set halfkav2_hm; runs from a synced trainer copy under /tmp/sfa-run; data includes the full 33 GB T60T70wIsRightFarseer.binpack).
+Reserved: `enyo-26.0.0-rc4` on pwa-hak (variant of rc3: input_set enyo_halfka_32x12 = Enyo king layout, otherwise identical 4B schedule; arch-26 export).
