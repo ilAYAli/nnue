@@ -485,9 +485,17 @@ startpos_gate() {
   hidden=$(jq -r .hidden "$ARCH")
   buckets=$(jq -r '.runtime_input_buckets // .input_buckets' "$ARCH")
   channels=$(jq -r .feature_channels "$ARCH")
-  grep -q "hidden=$hidden" "$log" || fail "hidden mismatch, expected $hidden" startpos
-  grep -q "input_buckets=$buckets" "$log" || fail "input_buckets mismatch, expected $buckets" startpos
-  grep -q "feature_channels=$channels" "$log" || fail "feature_channels mismatch, expected $channels" startpos
+  if [[ $(jq -r '.net_format // ""' "$ARCH") == enyo-v1 ]]; then
+    # Format-1 nets carry only an architecture number; the engine reports it.
+    local architecture=24
+    [[ $(jq -r '.full_threats // false' "$ARCH") == true ]] && architecture=25
+    grep -q "architecture=$architecture" "$log" \
+      || fail "architecture mismatch, expected $architecture" startpos
+  else
+    grep -q "hidden=$hidden" "$log" || fail "hidden mismatch, expected $hidden" startpos
+    grep -q "input_buckets=$buckets" "$log" || fail "input_buckets mismatch, expected $buckets" startpos
+    grep -q "feature_channels=$channels" "$log" || fail "feature_channels mismatch, expected $channels" startpos
+  fi
 
   cp=$(awk '$1 == "info" && $2 == "depth" && $3 >= 3 { for (i = 1; i <= NF; i++) if ($i == "cp") print $(i + 1) }' "$log" | tail -1)
   [[ -n "$cp" ]] || fail "startpos had no cp score at depth 3 or greater" startpos
