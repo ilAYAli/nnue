@@ -735,11 +735,16 @@ impl<L: DataLoader<ChessBoard>> DataLoader<ChessBoard> for RemappedLoader<L> {
         let Some(remap) = self.remap else {
             return self.inner.map_chunks(start_position, f);
         };
+        // One reused buffer: a fresh copy of every (shuffle-buffer sized)
+        // chunk costs an allocation and its page faults on the batch path.
+        let mut out = Vec::new();
         self.inner.map_chunks(start_position, |chunk| {
-            let mut out = chunk.to_vec();
-            for board in &mut out {
+            out.clear();
+            out.extend(chunk.iter().map(|board| {
+                let mut board = *board;
                 board.score = remap_tablebase_score(board.score, remap.base, remap.scale, remap.decay);
-            }
+                board
+            }));
             f(&out)
         });
     }
