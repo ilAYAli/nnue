@@ -1,19 +1,26 @@
 {
-  "run": "enyo-25.0.0-rc1",
-  "hypothesis": "Architecture 25: architecture 23/24 plus Stockfish-exact FullThreats inputs (int8 rows, format 1). The nnue-pytorch net with threat inputs reached -39 vs nn-1a298 against -146 for the native rc7. initialize_from enyo-23.0.0-rc7 (exact head via the integer-dense converter fix), threat rows at 3% of each column std, 10000 superbatches (~10B positions) on the interleaved recipe (random skip 3, min ply 18, wdl 0, batch 16384, cosine lr 0.001).",
+  "run": "enyo-26.0.0-rc1",
+  "hypothesis": "Architecture 26, scratch root: the layer-stacks structure that reached -39 vs nn-1a298 in nnue-pytorch (FullThreats + HalfKAv2_hm, pairwise product, PSQT, 8 per-bucket stacks), now trained in Bullet with the same recipe (280 x 100M positions, AdamW lr 4e-4 one-cycle, lambda 1, nnue-pytorch filter). Checkpoints at 40/100/200 superbatches compare with nnue-pytorch -116/-79/-38.",
   "loader": "sfbinpack",
-  "superbatches": 10000,
-  "batch_size": 16384,
-  "lr": 0.001,
+  "batch_size": 65536,
+  "batches": 1526,
+  "superbatches": 280,
+  "save_rate": 20,
+  "lr": 0.0004,
+  "final_lr": 1.6e-08,
+  "lr_schedule": "onecycle",
+  "lr_warmup_pct": 0.05,
+  "lr_start_div": 25.0,
   "wdl": 0.0,
-  "save_rate": 2000,
+  "weight_decay": 0.0,
   "data": {
     "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack;~/assets/training/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack;~/assets/training/stockfish/master-binpacks/nodes5000pv2_UHO.binpack;~/assets/training/stockfish/master-binpacks/farseerT74.binpack;~/assets/training/stockfish/master-binpacks/farseerT75.binpack;~/assets/training/stockfish/master-binpacks/farseerT76.binpack;~/assets/training/stockfish/master-binpacks/multinet_pv-2_diff-100_nodes-5000.binpack;~/assets/training/stockfish/master-binpacks/data_pv-2_diff-100_nodes-5000.binpack;~/assets/training/stockfish/master-binpacks/wrongIsRight_nodes5000pv2.binpack;~/assets/training/stockfish/master-binpacks/T60T70wIsRightFarseer.binpack"
   },
   "sfbinpack": {
     "interleave": true,
     "random_skip": 3,
-    "min_ply": 18
-  },
-  "initialize_from": "enyo-23.0.0-rc7"
+    "min_ply": 19,
+    "skip_predicate": "nnue-pytorch",
+    "reader_threads": 8
+  }
 }
