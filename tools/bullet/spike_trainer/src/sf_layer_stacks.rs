@@ -11,10 +11,13 @@
 //!   with the same 768-row virtual factor;
 //! * per perspective clamp(acc, 0, 255/256), pairwise product of the two
 //!   halves (L1/2 values), side to move first;
-//! * 8 layer stacks picked by (pieces - 1) / 4: fc0 L1 -> L2 (factorised
-//!   across stacks), [sqr(fc0), fc0] clipped to 127/128, fc1 2*L2 -> L3,
-//!   [sqr(fc1), fc1] clipped, fc2 over [fc0 branch, fc1 branch] -> 1, plus
-//!   fc0[L2-2] - fc0[L2-1] passthrough, plus (psqt_stm - psqt_nstm) / 2.
+//! * 8 layer stacks picked by the bucket scheme (`BucketScheme`: Stockfish's
+//!   (pieces - 1) / 4, or Enyo's game phase), which also picks the PSQT
+//!   bucket: fc0 L1 -> L2 (factorised across stacks), [sqr(fc0), fc0]
+//!   clipped to 127/128, fc1 2*L2 -> L3, [sqr(fc1), fc1] clipped, fc2 over
+//!   [fc0 branch, fc1 branch] -> 1, plus fc0[L2-2] - fc0[L2-1] passthrough,
+//!   plus (psqt_stm - psqt_nstm) / 2. L2 is the architecture-26 fc0_out (the
+//!   engine loads 32 and 64), L3 its fc1_out.
 //!
 //! Everything here is CPU-side and graph independent: input indexing, the
 //! nnue-pytorch initialisation, Stockfish .nnue export/import (nnue-pytorch
@@ -144,22 +147,85 @@ impl InputSet {
     }
 }
 
-/// Layer widths and the king input set. The engine's Stockfish path runs
-/// 1024/32/32.
+/// What picks the layer stack and the PSQT bucket of a position (the
+/// architecture-26 layout field bucket_scheme; the engine's
+/// NNUE::Stockfish::LayerStackBucket).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BucketScheme {
+    /// Stockfish: (pieces - 1) / 4, kings and pawns counted. bucket_scheme 0;
+    /// the only scheme a Stockfish .nnue holds.
+    #[default]
+    PieceCount,
+    /// Enyo game phase: phase = N + B + 2 R + 4 Q over both sides (24 at the
+    /// start, clamped to 24 after promotions), bucket = phase * 8 / 25, so
+    /// phases 0-3 are bucket 0 and every further three points one bucket up.
+    /// bucket_scheme 1.
+    Phase,
+}
+
+impl BucketScheme {
+    pub fn from_name(name: &str) -> Result<BucketScheme, String> {
+        match name {
+            "piece_count" => Ok(BucketScheme::PieceCount),
+            "phase" => Ok(BucketScheme::Phase),
+            other => Err(format!("unknown bucket_scheme {other} (piece_count or phase)")),
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            BucketScheme::PieceCount => "piece_count",
+            BucketScheme::Phase => "phase",
+        }
+    }
+
+    /// The architecture-26 layout value.
+    pub fn layout_id(self) -> u32 {
+        match self {
+            BucketScheme::PieceCount => 0,
+            BucketScheme::Phase => 1,
+        }
+    }
+
+    /// Layer-stack and PSQT bucket of a position.
+    pub fn bucket(self, pos: &ChessBoard) -> usize {
+        match self {
+            BucketScheme::PieceCount => stack_index(pos.occ().count_ones()),
+            BucketScheme::Phase => phase_index(pos),
+        }
+    }
+}
+
+/// Layer widths, the king input set and the bucket scheme. The engine loads
+/// L1 1024, L2 (fc0_out) 32 or 64 and L3 32.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Spec {
     pub l1: usize,
     pub l2: usize,
     pub l3: usize,
     pub input_set: InputSet,
+    pub bucket_scheme: BucketScheme,
 }
 
 impl Spec {
-    pub const STOCKFISH: Spec = Spec { l1: 1024, l2: 32, l3: 32, input_set: InputSet::HalfKav2Hm };
+    pub const STOCKFISH: Spec =
+        Spec { l1: 1024, l2: 32, l3: 32, input_set: InputSet::HalfKav2Hm, bucket_scheme: BucketScheme::PieceCount };
+    /// The fc0 widths (L2) the engine loads.
+    pub const ENGINE_L2: [usize; 2] = [32, 64];
 
-    /// The widths the engine loads (1024/32/32), whatever the input set.
+    /// Widths the engine loads (1024/32|64/32), whatever the input set and
+    /// bucket scheme.
     pub fn engine_widths(self) -> bool {
-        (self.l1, self.l2, self.l3) == (Self::STOCKFISH.l1, Self::STOCKFISH.l2, Self::STOCKFISH.l3)
+        self.l1 == Self::STOCKFISH.l1 && Self::ENGINE_L2.contains(&self.l2) && self.l3 == Self::STOCKFISH.l3
+    }
+
+    /// Whether a run publishes the net as a Stockfish .nnue: HalfKAv2_hm with
+    /// piece-count buckets, except the engine-loadable variants other than
+    /// 1024/32/32, which the engine loads only as architecture 26.
+    pub fn nnue_form(self) -> bool {
+        self.input_set == InputSet::HalfKav2Hm
+            && self.bucket_scheme == BucketScheme::PieceCount
+            && (self.l2 == Self::STOCKFISH.l2 || !self.engine_widths())
     }
 
     pub fn validate(self) -> Result<(), String> {
@@ -325,19 +391,31 @@ impl SparseInputType for LayerStackInputs {
     }
 }
 
-/// Layer-stack and PSQT bucket: (pieces - 1) / 4.
+/// Piece-count bucket: (pieces - 1) / 4.
 pub fn stack_index(pieces: u32) -> usize {
     ((pieces.max(1) - 1) / 4).min(STACKS as u32 - 1) as usize
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct PieceCountBuckets;
+/// Phase bucket (`BucketScheme::Phase`): min(7, phase * 8 / 25) with
+/// phase = min(24, N + B + 2 R + 4 Q) over both sides.
+pub fn phase_index(pos: &ChessBoard) -> usize {
+    // Bullet piece types: pawn 0, knight 1, bishop 2, rook 3, queen 4, king 5.
+    const PHASE: [u32; 8] = [0, 1, 1, 2, 4, 0, 0, 0];
+    let phase: u32 = pos.into_iter().map(|(piece, _)| PHASE[usize::from(piece & 7)]).sum();
+    (phase.min(24) * 8 / 25).min(STACKS as u32 - 1) as usize
+}
 
-impl OutputBuckets<ChessBoard> for PieceCountBuckets {
+/// Bullet's output buckets: the layer stack (and PSQT bucket) of a position.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LayerStackBuckets {
+    pub scheme: BucketScheme,
+}
+
+impl OutputBuckets<ChessBoard> for LayerStackBuckets {
     const BUCKETS: usize = STACKS;
 
     fn bucket(&self, pos: &ChessBoard) -> u8 {
-        stack_index(pos.occ().count_ones()) as u8
+        self.scheme.bucket(pos) as u8
     }
 }
 
@@ -354,7 +432,7 @@ fn uniform(rng: &mut ChaCha8Rng, len: usize, bound: f32) -> Vec<f32> {
 /// rows zero; dense layers torch.nn.Linear defaults with identical stacks,
 /// output bias and the fc0 factoriser zero.
 pub fn initial_weights(spec: Spec, seed: u64) -> Weights {
-    let Spec { l1, l2, l3, input_set } = spec;
+    let Spec { l1, l2, l3, input_set, .. } = spec;
     let mut weights = Weights::new();
     let mut tensor = |id: &str, values: Vec<f32>| {
         weights.insert(id.to_string(), values);
@@ -564,7 +642,7 @@ const I32_RANGE: (i64, i64) = (-(i32::MAX as i64), i32::MAX as i64);
 /// HalfKAv2_hm.
 fn quantise_net(spec: Spec, weights: &Weights) -> Result<QuantNet, String> {
     spec.validate()?;
-    let Spec { l1, l2, l3, input_set } = spec;
+    let Spec { l1, l2, l3, input_set, .. } = spec;
     let q_all = |values: &[f32], scale: f32, range: (i64, i64), what: &str| {
         values.iter().map(|&v| quantise(v, scale, range.0, range.1, what)).collect::<Result<Vec<_>, _>>()
     };
@@ -657,7 +735,7 @@ fn quantise_net(spec: Spec, weights: &Weights) -> Result<QuantNet, String> {
 /// split back into own/opponent planes as nnue-pytorch's
 /// load_export_weights does).
 fn dequantise_net(spec: Spec, q: &QuantNet) -> Weights {
-    let Spec { l1, l2, l3, input_set } = spec;
+    let Spec { l1, l2, l3, input_set, .. } = spec;
     let deq = |values: &[i64], scale: f32| values.iter().map(|&v| v as f32 / scale).collect::<Vec<f32>>();
     let mut weights = Weights::new();
     weights.insert("l0b".into(), deq(&q.ft_biases, FT_ONE));
@@ -723,10 +801,17 @@ fn push_i32(out: &mut Vec<u8>, value: i64) {
     out.extend_from_slice(&(value as i32).to_le_bytes());
 }
 
-/// Builds the .nnue bytes from Bullet weights (HalfKAv2_hm only).
+/// Builds the .nnue bytes from Bullet weights (HalfKAv2_hm, piece-count
+/// buckets only).
 pub fn export_nnue(spec: Spec, weights: &Weights, description: &str) -> Result<Vec<u8>, String> {
     if spec.input_set != InputSet::HalfKav2Hm {
         return Err(format!("input_set {} has no Stockfish .nnue form; export net_format enyo-v1", spec.input_set.name()));
+    }
+    if spec.bucket_scheme != BucketScheme::PieceCount {
+        return Err(format!(
+            "bucket_scheme {} has no Stockfish .nnue form; export net_format enyo-v1",
+            spec.bucket_scheme.name()
+        ));
     }
     let q = quantise_net(spec, weights)?;
     let Spec { l1, l2, l3, .. } = spec;
@@ -862,7 +947,13 @@ pub fn import_nnue(spec: Spec, bytes: &[u8]) -> Result<(Weights, String), String
     if spec.input_set != InputSet::HalfKav2Hm {
         return Err(format!("a Stockfish .nnue holds HalfKAv2_hm, not input_set {}", spec.input_set.name()));
     }
-    let Spec { l1, l2, l3, input_set } = spec;
+    if spec.bucket_scheme != BucketScheme::PieceCount {
+        return Err(format!(
+            "a Stockfish .nnue has piece-count buckets, not bucket_scheme {}",
+            spec.bucket_scheme.name()
+        ));
+    }
+    let Spec { l1, l2, l3, input_set, .. } = spec;
     let mut r = Reader { bytes, offset: 0 };
     r.expect_u32(VERSION, "version")?;
     r.expect_u32(spec.network_hash(), "network hash")?;
@@ -925,12 +1016,21 @@ pub fn is_enyo_net(bytes: &[u8]) -> bool {
 
 /// The architecture-26 layout block of `spec`.
 fn enyo_layout(spec: Spec) -> [u32; 8] {
-    [spec.input_set.layout_id(), 1, spec.l1 as u32, PSQT_BUCKETS as u32, STACKS as u32, spec.l2 as u32, spec.l3 as u32, 0]
+    [
+        spec.input_set.layout_id(),
+        1,
+        spec.l1 as u32,
+        PSQT_BUCKETS as u32,
+        STACKS as u32,
+        spec.l2 as u32,
+        spec.l3 as u32,
+        spec.bucket_scheme.layout_id(),
+    ]
 }
 
-/// Builds an architecture-26 net (either input set) from Bullet weights.
-/// `metadata` is written as "key=value" lines in order (name, trained). The
-/// engine loads only `Spec::engine_widths`.
+/// Builds an architecture-26 net (any input set and bucket scheme) from
+/// Bullet weights. `metadata` is written as "key=value" lines in order (name,
+/// trained). The engine loads only `Spec::engine_widths`.
 pub fn export_enyo_v1(spec: Spec, weights: &Weights, metadata: &[(String, String)]) -> Result<Vec<u8>, String> {
     let q = quantise_net(spec, weights)?;
     let mut payload = Vec::new();
@@ -1002,10 +1102,18 @@ pub fn import_enyo_v1(spec: Spec, bytes: &[u8]) -> Result<(Weights, Vec<(String,
     if layout[0] != spec.input_set.layout_id() {
         return Err(format!("net has input_set {}, the architecture selects {} ({})", layout[0], spec.input_set.layout_id(), spec.input_set.name()));
     }
+    if layout[7] != spec.bucket_scheme.layout_id() {
+        return Err(format!(
+            "net has bucket_scheme {}, the architecture selects {} ({})",
+            layout[7],
+            spec.bucket_scheme.layout_id(),
+            spec.bucket_scheme.name()
+        ));
+    }
     if layout != enyo_layout(spec) {
         return Err(format!("net layout {layout:?} does not match the architecture ({:?})", enyo_layout(spec)));
     }
-    let Spec { l1, l2, l3, input_set } = spec;
+    let Spec { l1, l2, l3, input_set, .. } = spec;
     let ft_biases = r.i16s(l1, "ft biases")?;
     let halfka_weights = r.leb128_sized(input_set.export_rows() * l1, "halfka weights")?;
     let halfka_psqt = r.leb128_sized(input_set.export_rows() * PSQT_BUCKETS, "halfka psqt")?;
@@ -1035,7 +1143,7 @@ pub fn psqt_term(spec: Spec, weights: &Weights, pos: &ChessBoard) -> Result<f32,
     let p0t = tensor(spec, weights, "p0t")?;
     let p0h = tensor(spec, weights, "p0h")?;
     let p0v = tensor(spec, weights, "p0v")?;
-    let bucket = stack_index(pos.occ().count_ones());
+    let bucket = spec.bucket_scheme.bucket(pos);
     let row = |feature: usize| {
         if feature < THREAT_FEATURES {
             p0t[feature * PSQT_BUCKETS + bucket]
@@ -1416,7 +1524,7 @@ mod tests {
     #[test]
     fn enyo_v1_export_import_export_is_identical() {
         for input_set in [InputSet::HalfKav2Hm, InputSet::EnyoHalfKa32x12] {
-            let spec = Spec { l1: 64, l2: 4, l3: 4, input_set };
+            let spec = Spec { l1: 64, l2: 4, l3: 4, input_set, bucket_scheme: BucketScheme::PieceCount };
             let first = export_enyo_v1(spec, &noisy_weights(spec), &test_metadata()).unwrap();
             assert!(is_enyo_net(&first));
             let layout = ENYO_HEADER_SIZE + u32::from_le_bytes(first[16..20].try_into().unwrap()) as usize;
@@ -1427,6 +1535,74 @@ mod tests {
             let other = Spec { input_set: if input_set == InputSet::HalfKav2Hm { InputSet::EnyoHalfKa32x12 } else { InputSet::HalfKav2Hm }, ..spec };
             assert!(import_enyo_v1(other, &first).unwrap_err().contains("input_set"));
         }
+    }
+
+    #[test]
+    fn enyo_v1_layout_carries_fc0_out_and_bucket_scheme() {
+        for (l2, bucket_scheme) in [(4, BucketScheme::Phase), (8, BucketScheme::PieceCount), (8, BucketScheme::Phase)] {
+            for input_set in [InputSet::HalfKav2Hm, InputSet::EnyoHalfKa32x12] {
+                let spec = Spec { l1: 64, l2, l3: 4, input_set, bucket_scheme };
+                let first = export_enyo_v1(spec, &noisy_weights(spec), &test_metadata()).unwrap();
+                let layout = ENYO_HEADER_SIZE + u32::from_le_bytes(first[16..20].try_into().unwrap()) as usize;
+                let field = |i: usize| u32::from_le_bytes(first[layout + 4 * i..layout + 4 * i + 4].try_into().unwrap());
+                assert_eq!((field(5), field(6), field(7)), (l2 as u32, 4, bucket_scheme.layout_id()));
+                let (imported, metadata) = import_enyo_v1(spec, &first).unwrap();
+                assert_eq!(export_enyo_v1(spec, &imported, &metadata).unwrap(), first, "{spec:?}");
+                let other_scheme = match bucket_scheme {
+                    BucketScheme::PieceCount => BucketScheme::Phase,
+                    BucketScheme::Phase => BucketScheme::PieceCount,
+                };
+                let err = import_enyo_v1(Spec { bucket_scheme: other_scheme, ..spec }, &first).unwrap_err();
+                assert!(err.contains("bucket_scheme"), "{err}");
+                let err = import_enyo_v1(Spec { l2: l2 * 2, ..spec }, &first).unwrap_err();
+                assert!(err.contains("does not match"), "{err}");
+            }
+        }
+        let phase = Spec { l1: 64, l2: 4, l3: 4, bucket_scheme: BucketScheme::Phase, ..Spec::STOCKFISH };
+        assert!(export_nnue(phase, &initial_weights(phase, 1), "test").unwrap_err().contains("bucket_scheme"));
+    }
+
+    #[test]
+    fn engine_loadable_specs_and_their_published_form() {
+        let wide = Spec { l2: 64, ..Spec::STOCKFISH };
+        let phase = Spec { bucket_scheme: BucketScheme::Phase, ..Spec::STOCKFISH };
+        let enyo = Spec { input_set: InputSet::EnyoHalfKa32x12, ..Spec::STOCKFISH };
+        for spec in [Spec::STOCKFISH, wide, phase, Spec { l2: 64, ..phase }, enyo, Spec { l2: 64, ..enyo }] {
+            assert!(spec.engine_widths(), "{spec:?}");
+        }
+        assert!(!Spec { l2: 16, ..Spec::STOCKFISH }.engine_widths());
+        assert!(Spec::STOCKFISH.nnue_form());
+        assert!(Spec { l1: 512, l2: 16, ..Spec::STOCKFISH }.nnue_form());
+        assert!(!wide.nnue_form() && !phase.nnue_form() && !enyo.nnue_form());
+    }
+
+    fn board(fen: &str) -> ChessBoard {
+        format!("{fen} | 0 | 0.5").parse::<ChessBoard>().unwrap()
+    }
+
+    #[test]
+    fn bucket_schemes_match_the_engine() {
+        // The engine's layer_stack_bucket.piece_count_and_phase cases.
+        let buckets = |fen: &str| {
+            let pos = board(fen);
+            (BucketScheme::PieceCount.bucket(&pos), BucketScheme::Phase.bucket(&pos))
+        };
+        assert_eq!(buckets("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"), (7, 7));
+        assert_eq!(buckets("8/2p5/3p4/1P1Pp1k1/4P3/5K2/8/8 w - - 0 40"), (1, 0));
+        assert_eq!(buckets("3rk3/pppq1ppp/8/8/8/8/PPPQ1PPP/3RK3 w - - 0 1"), (4, 3));
+        assert_eq!(buckets("4k3/8/8/8/8/8/8/3NK3 w - - 0 1").1, 0);
+        assert_eq!(buckets("4k3/8/8/8/8/8/8/2BNK1N1 w - - 0 1").1, 0);
+        assert_eq!(buckets("4k3/8/8/8/8/8/8/2RNK1N1 w - - 0 1").1, 1);
+        assert_eq!(buckets("qqbqkbnr/pp1ppppp/8/8/8/8/PP1PPPPP/QQBQKBNR w Kk - 0 1").1, 7);
+        assert_eq!(buckets("r1bqkb1r/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq - 0 1").1, 6);
+        assert_eq!(buckets("r1bqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq - 0 1").1, 7);
+        // Side to move does not matter.
+        assert_eq!(buckets("r1bqkb1r/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR b KQkq - 0 1").1, 6);
+        // Every phase 0..=24 maps onto all eight buckets, three points each
+        // above bucket 0.
+        let by_phase: Vec<u32> = (0..=24).map(|phase: u32| (phase * 8 / 25).min(7)).collect();
+        assert_eq!(by_phase[..4], [0; 4]);
+        assert_eq!(by_phase[22..], [7; 3]);
     }
 
     #[test]

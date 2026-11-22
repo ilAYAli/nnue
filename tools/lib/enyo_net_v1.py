@@ -26,8 +26,10 @@ Payload, architecture 26 (layer stacks; the engine's native architecture):
     input_set=0 (HalfKAv2_hm as Stockfish, F = 22528 rows) or 1 (Enyo HalfKA 32 king
     buckets x 12 planes, the architecture-24/25 layout, F = 24576 rows; engine
     src/nnue/enyo/enyo_halfka.hpp), threats=1 (Stockfish FullThreats), H=1024, P=8,
-    stacks=8, fc0_out=32 (incl. passthrough), fc1_out=32, bucket_scheme=0
-    ((pieces - 1) / 4).
+    stacks=8, fc0_out=32 or 64 (incl. the passthrough pair), fc1_out=32,
+    bucket_scheme=0 ((pieces - 1) / 4) or 1 (game phase: min(7, phase * 8 / 25),
+    phase = min(24, N + B + 2 R + 4 Q) over both sides). Only input_set 0,
+    fc0_out 32, bucket_scheme 0 has a Stockfish .nnue form.
   feature biases  i16[H]
   HalfKA weights  leb i16[F][H]
   HalfKA PSQT     leb i32[F][P]
@@ -88,6 +90,8 @@ LAYOUT_FIELDS = ("input_set", "threats", "hidden", "psqt_buckets", "stacks",
 LAYOUT = struct.Struct("<8I")
 SUPPORTED_LAYOUT = {"input_set": 0, "threats": 1, "hidden": 1024, "psqt_buckets": 8,
                     "stacks": 8, "fc0_out": 32, "fc1_out": 32, "bucket_scheme": 0}
+# Fields that may take other values than SUPPORTED_LAYOUT's.
+LAYOUT_CHOICES = {"input_set": (0, 1), "fc0_out": (32, 64), "bucket_scheme": (0, 1)}
 HALFKA_V2_FEATURES = 22_528
 # King rows per input_set: HalfKAv2_hm, Enyo HalfKA 32x12.
 INPUT_SET_ROWS = {0: HALFKA_V2_FEATURES, 1: N_FEATURES}
@@ -197,9 +201,12 @@ def stack_sections(layout: dict[str, int]):
 
 
 def check_layout(layout: dict[str, int]) -> None:
-    if layout["input_set"] not in INPUT_SET_ROWS or dict(layout, input_set=0) != SUPPORTED_LAYOUT:
+    fixed = {k: v for k, v in layout.items() if k not in LAYOUT_CHOICES}
+    if (any(layout[k] not in choices for k, choices in LAYOUT_CHOICES.items())
+            or fixed != {k: v for k, v in SUPPORTED_LAYOUT.items() if k not in LAYOUT_CHOICES}):
         got = " ".join(f"{k}={layout[k]}" for k in LAYOUT_FIELDS)
-        want = " ".join(f"{k}={SUPPORTED_LAYOUT[k]}" for k in LAYOUT_FIELDS).replace("input_set=0", "input_set=0|1")
+        want = " ".join(f"{k}={'|'.join(map(str, LAYOUT_CHOICES[k]))}" if k in LAYOUT_CHOICES
+                        else f"{k}={SUPPORTED_LAYOUT[k]}" for k in LAYOUT_FIELDS)
         raise ValueError(f"unsupported layout {got} (supported: {want})")
 
 
@@ -351,6 +358,9 @@ def to_nnue(net: NetV1, description: str) -> bytes:
     check_layout(layout)
     if layout["input_set"] != 0:
         raise ValueError(f"input_set {layout['input_set']} (Enyo HalfKA 32x12) has no Stockfish .nnue form")
+    if layout["fc0_out"] != SUPPORTED_LAYOUT["fc0_out"] or layout["bucket_scheme"] != SUPPORTED_LAYOUT["bucket_scheme"]:
+        raise ValueError(f"fc0_out {layout['fc0_out']} / bucket_scheme {layout['bucket_scheme']} "
+                         "has no Stockfish .nnue form (only 32 / 0)")
     network_hash, ft_hash, fc_hash = _sf_hashes(layout)
     a = net.arrays
     desc = description.encode("utf-8", "surrogateescape")

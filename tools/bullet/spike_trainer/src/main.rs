@@ -2091,7 +2091,7 @@ fn train_layer_stacks(
     if !(0.0..=1.0).contains(&wdl_proportion) {
         panic!("wdl must be in [0, 1]");
     }
-    let sfls::Spec { l1, l2, l3, input_set } = spec;
+    let sfls::Spec { l1, l2, l3, input_set, bucket_scheme } = spec;
     let fake_quant = env_parse("ENYO_BULLET_LS_FAKE_QUANT", 1usize) != 0;
     let loss = LayerStackLoss {
         in_offset: env_parse("ENYO_BULLET_LOSS_IN_OFFSET", 270.0f32),
@@ -2113,9 +2113,10 @@ fn train_layer_stacks(
     println!("output={output}");
     println!("net_id={net_id}");
     println!(
-        "layer_stacks l1={l1} l2={l2} l3={l3} stacks={} input_set={} fake_quant={fake_quant}",
+        "layer_stacks l1={l1} l2={l2} l3={l3} stacks={} input_set={} bucket_scheme={} fake_quant={fake_quant}",
         sfls::STACKS,
-        input_set.name()
+        input_set.name(),
+        bucket_scheme.name()
     );
     println!("loss={loss:?} tb_remap={tb_remap:?}");
     println!(
@@ -2154,7 +2155,7 @@ fn train_layer_stacks(
         .dual_perspective()
         .optimiser(AdamW)
         .inputs(sfls::LayerStackInputs { input_set })
-        .output_buckets(sfls::PieceCountBuckets)
+        .output_buckets(sfls::LayerStackBuckets { scheme: bucket_scheme })
         // Export reads optimiser_state/weights.bin (tools/bullet/train).
         .save_format(&[SavedFormat::custom(b"layer-stacks: export from optimiser_state/weights.bin".to_vec())])
         .build_custom(move |builder, (stm, nstm, buckets), _targets| {
@@ -2432,6 +2433,11 @@ fn main() {
             input_set: enyo_bullet_spike::sf_layer_stacks::InputSet::from_name(&env_string(
                 "ENYO_BULLET_LS_INPUT_SET",
                 "halfkav2_hm",
+            ))
+            .unwrap_or_else(|err| panic!("{err}")),
+            bucket_scheme: enyo_bullet_spike::sf_layer_stacks::BucketScheme::from_name(&env_string(
+                "ENYO_BULLET_LS_BUCKET_SCHEME",
+                "piece_count",
             ))
             .unwrap_or_else(|err| panic!("{err}")),
         };

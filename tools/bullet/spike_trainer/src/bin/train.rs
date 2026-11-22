@@ -1077,20 +1077,27 @@ fn is_layer_stacks(arch: &Value) -> bool {
     string_at(arch, "mode") == Some("layer-stacks")
 }
 
-/// architecture.json of mode "layer-stacks": hidden (L1), l2_size, l3_size,
-/// input_set ("halfkav2_hm", the default, or "enyo_halfka_32x12"),
-/// fake_quantization, description, and the nnue-pytorch loss under "loss".
+/// architecture.json of mode "layer-stacks": hidden (L1), l2_size (fc0
+/// outputs including the passthrough pair, the architecture-26 fc0_out: 32 or
+/// 64 for the engine), l3_size, input_set ("halfkav2_hm", the default, or
+/// "enyo_halfka_32x12"), bucket_scheme ("piece_count", the default, or
+/// "phase"), fake_quantization, description, and the nnue-pytorch loss under
+/// "loss".
 fn layer_stack_spec(arch: &Value) -> sfls::Spec {
-    let input_set = sfls::InputSet::from_name(string_at(arch, "input_set").unwrap_or("halfkav2_hm"))
-        .unwrap_or_else(|err| {
-            eprintln!("error: layer-stacks: {err}");
-            process::exit(2);
-        });
+    let fail = |err: String| -> ! {
+        eprintln!("error: layer-stacks: {err}");
+        process::exit(2);
+    };
+    let input_set =
+        sfls::InputSet::from_name(string_at(arch, "input_set").unwrap_or("halfkav2_hm")).unwrap_or_else(|err| fail(err));
+    let bucket_scheme = sfls::BucketScheme::from_name(string_at(arch, "bucket_scheme").unwrap_or("piece_count"))
+        .unwrap_or_else(|err| fail(err));
     sfls::Spec {
         l1: usize_at(arch, "hidden", 1024),
         l2: usize_at(arch, "l2_size", 32),
         l3: usize_at(arch, "l3_size", 32),
         input_set,
+        bucket_scheme,
     }
 }
 
@@ -1118,22 +1125,24 @@ fn validate_layer_stacks(config: &Config) {
     let spec = layer_stack_spec(&config.arch);
     spec.validate().unwrap_or_else(|err| fail(err));
     if !spec.engine_widths() {
-        eprintln!("warning: layer-stacks widths differ from 1024/32/32; the engine only loads 1024/32/32");
+        eprintln!("warning: layer-stacks widths differ from 1024/32|64/32; the engine only loads those");
     }
     if !uses_sfbinpack_loader(config) {
         fail("requires loader=sfbinpack".to_string());
     }
     // net_format enyo-v1 publishes the export as an architecture-26 net,
-    // which holds only the widths the engine loads.
-    // An input set other than HalfKAv2_hm has no .nnue form, so it needs it.
+    // which holds only the widths the engine loads. A net without a .nnue
+    // form (input set Enyo HalfKA, phase buckets, fc0 64) needs it.
     match string_at(&config.arch, "net_format") {
-        None if spec.input_set != sfls::InputSet::HalfKav2Hm => fail(format!(
-            "input_set {} has no Stockfish .nnue form; set net_format enyo-v1",
-            spec.input_set.name()
+        None if !spec.nnue_form() => fail(format!(
+            "input_set {} / bucket_scheme {} / l2_size {} has no Stockfish .nnue form; set net_format enyo-v1",
+            spec.input_set.name(),
+            spec.bucket_scheme.name(),
+            spec.l2
         )),
         None => {}
         Some("enyo-v1") if spec.engine_widths() => {}
-        Some("enyo-v1") => fail("net_format enyo-v1 (architecture 26) needs widths 1024/32/32".to_string()),
+        Some("enyo-v1") => fail("net_format enyo-v1 (architecture 26) needs widths 1024/32|64/32".to_string()),
         Some(other) => fail(format!("unknown net_format {other}")),
     }
     let loss = object_at(&config.arch, "loss");
@@ -1177,6 +1186,7 @@ fn set_layer_stack_env(arch: &Value) {
     set_env("ENYO_BULLET_L2", spec.l2);
     set_env("ENYO_BULLET_L3", spec.l3);
     set_env("ENYO_BULLET_LS_INPUT_SET", spec.input_set.name());
+    set_env("ENYO_BULLET_LS_BUCKET_SCHEME", spec.bucket_scheme.name());
     set_env("ENYO_BULLET_LS_FAKE_QUANT", usize::from(bool_at(arch, "fake_quantization", true)));
     let loss = object_at(arch, "loss");
     for (key, default) in LAYER_STACK_LOSS_KEYS {
@@ -1249,16 +1259,16 @@ fn import_layer_stacks(arch: &Value, input: &Path, output: &Path) {
     println!("imported {} ('{description}') -> {}", input.display(), output.display());
 }
 
-/// The run's model.nn: a Stockfish .nnue for HalfKAv2_hm (net_format
-/// enyo-v1 converts it on export), architecture 26 itself for an input set
-/// with no .nnue form.
+/// The run's model.nn: a Stockfish .nnue when the net has that form
+/// (`Spec::nnue_form`; net_format enyo-v1 converts it on export),
+/// architecture 26 itself otherwise.
 fn export_layer_stacks(config: &Config, weights: &Path) -> Vec<u8> {
     let weights = sfls::read_weights(weights).unwrap_or_else(|err| {
         eprintln!("error: {err}");
         process::exit(1);
     });
     let spec = layer_stack_spec(&config.arch);
-    let exported = if spec.input_set == sfls::InputSet::HalfKav2Hm {
+    let exported = if spec.nnue_form() {
         sfls::export_nnue(spec, &weights, &layer_stack_description(config))
     } else {
         let metadata = vec![("name".to_string(), run_name(config)), ("trained".to_string(), utc_minute_now())];
@@ -3524,6 +3534,17 @@ mod tests {
         let spec = layer_stack_spec(&json!({"mode": "layer-stacks", "input_set": "enyo_halfka_32x12"}));
         assert_eq!(spec.input_set, sfls::InputSet::EnyoHalfKa32x12);
         assert!(spec.engine_widths());
+    }
+
+    #[test]
+    fn layer_stack_bucket_scheme_and_fc0_are_read_from_the_architecture() {
+        let spec = layer_stack_spec(&json!({"mode": "layer-stacks", "bucket_scheme": "phase", "l2_size": 64}));
+        assert_eq!(spec.bucket_scheme, sfls::BucketScheme::Phase);
+        assert_eq!(spec.l2, 64);
+        assert!(spec.engine_widths());
+        assert!(!spec.nnue_form());
+        let spec = layer_stack_spec(&json!({"mode": "layer-stacks", "bucket_scheme": "piece_count"}));
+        assert_eq!(spec, sfls::Spec::STOCKFISH);
     }
 
     fn defaults() -> Value {

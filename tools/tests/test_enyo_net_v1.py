@@ -52,6 +52,23 @@ def test_input_set_1_sizes_the_king_rows_and_has_no_nnue_form():
         v1.to_nnue(v1.NetV1(v1.LAYER_STACKS, 0, 0, {}, {}, layout), "")
 
 
+def test_fc0_64_and_phase_buckets_are_layouts_without_nnue_form():
+    for fc0_out, scheme in ((64, 0), (32, 1), (64, 1)):
+        for input_set in (0, 1):
+            layout = dict(v1.SUPPORTED_LAYOUT, input_set=input_set, fc0_out=fc0_out, bucket_scheme=scheme)
+            v1.check_layout(layout)
+            sections = {name: shape for name, _, shape in v1.stack_sections(layout)}
+            assert sections["fc0_weights"] == (fc0_out, 1024)
+            assert sections["fc1_weights"] == (32, 2 * fc0_out)
+            assert sections["fc2_weights"] == (2 * fc0_out + 64,)
+            with pytest.raises(ValueError, match="no Stockfish .nnue form"):
+                v1.to_nnue(v1.NetV1(v1.LAYER_STACKS, 0, 0, {}, {}, layout), "")
+    with pytest.raises(ValueError, match="fc0_out=48 .*supported: .*fc0_out=32[|]64 .*bucket_scheme=0[|]1"):
+        v1.check_layout(dict(v1.SUPPORTED_LAYOUT, fc0_out=48))
+    with pytest.raises(ValueError, match="bucket_scheme=2"):
+        v1.check_layout(dict(v1.SUPPORTED_LAYOUT, bucket_scheme=2))
+
+
 @pytest.mark.skipif(not os.environ.get("ENYO_NNUE_TEST_SOURCE"),
                     reason="ENYO_NNUE_TEST_SOURCE (a layer-stacks .nnue) is not set")
 def test_nnue_converts_losslessly_both_ways():
