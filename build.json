@@ -1,6 +1,6 @@
 {
-  "run": "enyo-23.0.0-rc7",
-  "hypothesis": "Diagnostic: is the new data path (interleaved binpacks, random skip 3, min ply 18, wdl 0, batch 16384) broken, or is the native architecture weak from scratch? rc6 (scratch, 25B positions) scored -417 vs nn-1a298 against rc1 -156. Continue rc1 for 1000 superbatches (~1B positions) with the same recipe at lr 0.001 cosine; a large loss vs rc1 means the data path hurts.",
+  "run": "enyo-23.1.0-rc1",
+  "hypothesis": "Promotion after rc7 (+15.5 vs rc1 on the interleaved data path): same regimen (interleaved binpacks, random skip 3, min ply 18, wdl 0, batch 16384, cosine lr 0.001 over 1000 superbatches), fresh positions via random start chunks.",
   "loader": "sfbinpack",
   "superbatches": 1000,
   "batch_size": 16384,
@@ -15,5 +15,5 @@
     "random_skip": 3,
     "min_ply": 18
   },
-  "continue_from": "enyo-23.0.0-rc1"
+  "continue_from": "enyo-23.0.0-rc7"
 }
