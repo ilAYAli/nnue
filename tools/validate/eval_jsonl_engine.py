@@ -16,6 +16,9 @@ from pathlib import Path
 
 
 EVALNET_RE = re.compile(r"^evalnet\s+(-?\d+)\s+cp\s+\(stm=(white|black)\)")
+# Stockfish-format nets: `evalnet` only handles native Enyo nets, `eval` prints
+# the side-to-move eval of whatever net is active.
+EVAL_RE = re.compile(r"^eval\s+(-?\d+)\s*$")
 
 
 class EngineError(RuntimeError):
@@ -89,8 +92,16 @@ class EnyoEvalNet:
             if token in line:
                 return
 
+    use_eval_command = False
+
     def eval_stm_cp(self, fen: str) -> int:
         self.send(f"position fen {fen}")
+        if self.use_eval_command:
+            self.send("eval")
+            while True:
+                match = EVAL_RE.match(self.read_line(self.timeout))
+                if match:
+                    return int(match.group(1))
         self.send("evalnet")
         while True:
             line = self.read_line(self.timeout)
@@ -98,6 +109,9 @@ class EnyoEvalNet:
             if match:
                 return int(match.group(1))
             if line.startswith("evalnet error:"):
+                if "not an Enyo net" in line:
+                    self.use_eval_command = True
+                    return self.eval_stm_cp(fen)
                 raise EngineError(line)
 
 
