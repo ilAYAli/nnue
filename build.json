@@ -1,13 +1,13 @@
 {
-  "run": "enyo-23.0.0-rc4",
-  "hypothesis": "Learning rate: fine-tune from enyo-23.0.0-rc1 starting at lr 0.0005 instead of 0.004 (cosine to 5e-6). rc2 (+100M) was level (+0.2) and rc3 (+500M) slightly worse (-7.9): restarting at 0.004 may undo the parent. 100M Pylon positions, otherwise the rc38 regimen.",
+  "run": "enyo-23.0.0-rc5",
+  "hypothesis": "Data source: Leela T80 (test80-2022-08, Stockfish training data) instead of Pylon, 100M positions from rc1; rc2-rc4 showed Pylon dose and lr do not move rc1.",
   "superbatches": 768,
   "trainable": "all",
   "wdl": 0.025,
-  "lr": 0.0005,
+  "lr": 0.004,
   "data": {
-    "source_binpack": "~/assets/training/stockfish/master-binpacks/training_data_pylon.binpack",
-    "offset": 2900000000,
+    "source_binpack": "~/assets/training/stockfish/master-binpacks/test80-2022-08-aug-16tb7p.v6-dd.min.binpack",
+    "offset": 0,
     "limit": 100000000
   },
   "sfbinpack": {
