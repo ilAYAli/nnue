@@ -37,9 +37,19 @@ def test_stockfish_hashes_match_the_current_variant():
 
 
 def test_unsupported_layout_is_rejected():
-    layout = dict(v1.SUPPORTED_LAYOUT, input_set=1)
-    with pytest.raises(ValueError, match="unsupported layout input_set=1"):
+    layout = dict(v1.SUPPORTED_LAYOUT, input_set=2)
+    with pytest.raises(ValueError, match="unsupported layout input_set=2 .*supported: input_set=0[|]1"):
         v1.check_layout(layout)
+    v1.check_layout(dict(v1.SUPPORTED_LAYOUT, input_set=1))
+
+
+def test_input_set_1_sizes_the_king_rows_and_has_no_nnue_form():
+    layout = dict(v1.SUPPORTED_LAYOUT, input_set=1)
+    sections = {name: shape for name, _, shape, _ in v1.feature_sections(layout)}
+    assert sections["halfka_weights"] == (32 * 12 * 64, 1024)
+    assert sections["halfka_psqt"] == (32 * 12 * 64, 8)
+    with pytest.raises(ValueError, match="no Stockfish .nnue form"):
+        v1.to_nnue(v1.NetV1(v1.LAYER_STACKS, 0, 0, {}, {}, layout), "")
 
 
 @pytest.mark.skipif(not os.environ.get("ENYO_NNUE_TEST_SOURCE"),

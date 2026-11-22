@@ -194,7 +194,7 @@ fn usage() -> ! {
     eprintln!(
         "usage: tools/bullet/train <plan|data|run|export|all> \
          [--build build.json] [--arch architecture.json] [--defaults defaults.json] [--force]\n\
-         \x20      tools/bullet/train eval --arch architecture.json --net NET.nnue --fens FENS --out DIR [--float]"
+         \x20      tools/bullet/train eval --arch architecture.json --net NET.nnue|NET.nn --fens FENS --out DIR [--float]"
     );
     process::exit(2);
 }
@@ -1078,12 +1078,19 @@ fn is_layer_stacks(arch: &Value) -> bool {
 }
 
 /// architecture.json of mode "layer-stacks": hidden (L1), l2_size, l3_size,
+/// input_set ("halfkav2_hm", the default, or "enyo_halfka_32x12"),
 /// fake_quantization, description, and the nnue-pytorch loss under "loss".
 fn layer_stack_spec(arch: &Value) -> sfls::Spec {
+    let input_set = sfls::InputSet::from_name(string_at(arch, "input_set").unwrap_or("halfkav2_hm"))
+        .unwrap_or_else(|err| {
+            eprintln!("error: layer-stacks: {err}");
+            process::exit(2);
+        });
     sfls::Spec {
         l1: usize_at(arch, "hidden", 1024),
         l2: usize_at(arch, "l2_size", 32),
         l3: usize_at(arch, "l3_size", 32),
+        input_set,
     }
 }
 
@@ -1108,8 +1115,9 @@ fn validate_layer_stacks(config: &Config) {
         eprintln!("error: layer-stacks: {message}");
         process::exit(2);
     };
-    layer_stack_spec(&config.arch).validate().unwrap_or_else(|err| fail(err));
-    if layer_stack_spec(&config.arch) != sfls::Spec::STOCKFISH {
+    let spec = layer_stack_spec(&config.arch);
+    spec.validate().unwrap_or_else(|err| fail(err));
+    if !spec.engine_widths() {
         eprintln!("warning: layer-stacks widths differ from 1024/32/32; the engine only loads 1024/32/32");
     }
     if !uses_sfbinpack_loader(config) {
@@ -1117,9 +1125,14 @@ fn validate_layer_stacks(config: &Config) {
     }
     // net_format enyo-v1 publishes the export as an architecture-26 net,
     // which holds only the widths the engine loads.
+    // An input set other than HalfKAv2_hm has no .nnue form, so it needs it.
     match string_at(&config.arch, "net_format") {
+        None if spec.input_set != sfls::InputSet::HalfKav2Hm => fail(format!(
+            "input_set {} has no Stockfish .nnue form; set net_format enyo-v1",
+            spec.input_set.name()
+        )),
         None => {}
-        Some("enyo-v1") if layer_stack_spec(&config.arch) == sfls::Spec::STOCKFISH => {}
+        Some("enyo-v1") if spec.engine_widths() => {}
         Some("enyo-v1") => fail("net_format enyo-v1 (architecture 26) needs widths 1024/32/32".to_string()),
         Some(other) => fail(format!("unknown net_format {other}")),
     }
@@ -1163,6 +1176,7 @@ fn set_layer_stack_env(arch: &Value) {
     set_env("ENYO_BULLET_HIDDEN", spec.l1);
     set_env("ENYO_BULLET_L2", spec.l2);
     set_env("ENYO_BULLET_L3", spec.l3);
+    set_env("ENYO_BULLET_LS_INPUT_SET", spec.input_set.name());
     set_env("ENYO_BULLET_LS_FAKE_QUANT", usize::from(bool_at(arch, "fake_quantization", true)));
     let loss = object_at(arch, "loss");
     for (key, default) in LAYER_STACK_LOSS_KEYS {
@@ -1188,16 +1202,40 @@ fn training_skip_predicate(config: &Config) -> String {
         .unwrap_or_else(|| "enyo".to_owned())
 }
 
-/// Converts a Full_Threats+HalfKAv2_hm^ .nnue into Bullet initial weights.
-fn import_layer_stacks(arch: &Value, input: &Path, output: &Path) {
+/// A layer-stacks net as Bullet weights plus how to write it back: the .nnue
+/// description, or the architecture-26 metadata.
+enum ImportedLabel {
+    Nnue(String),
+    EnyoV1(Vec<(String, String)>),
+}
+
+fn read_layer_stacks(arch: &Value, input: &Path) -> (sfls::Weights, ImportedLabel) {
     let bytes = fs::read(input).unwrap_or_else(|err| {
         eprintln!("error: cannot read {}: {err}", input.display());
         process::exit(1);
     });
-    let (weights, description) = sfls::import_nnue(layer_stack_spec(arch), &bytes).unwrap_or_else(|err| {
+    let spec = layer_stack_spec(arch);
+    let imported = if sfls::is_enyo_net(&bytes) {
+        sfls::import_enyo_v1(spec, &bytes).map(|(w, metadata)| (w, ImportedLabel::EnyoV1(metadata)))
+    } else {
+        sfls::import_nnue(spec, &bytes).map(|(w, description)| (w, ImportedLabel::Nnue(description)))
+    };
+    imported.unwrap_or_else(|err| {
         eprintln!("error: {}: {err}", input.display());
         process::exit(1);
-    });
+    })
+}
+
+/// Converts a Full_Threats+HalfKAv2_hm^ .nnue, or an architecture-26 net of
+/// the configured input set, into Bullet initial weights.
+fn import_layer_stacks(arch: &Value, input: &Path, output: &Path) {
+    let (weights, label) = read_layer_stacks(arch, input);
+    let description = match &label {
+        ImportedLabel::Nnue(description) => description.clone(),
+        ImportedLabel::EnyoV1(metadata) => {
+            metadata.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join(", ")
+        }
+    };
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
             eprintln!("error: cannot create {}: {err}", parent.display());
@@ -1211,15 +1249,50 @@ fn import_layer_stacks(arch: &Value, input: &Path, output: &Path) {
     println!("imported {} ('{description}') -> {}", input.display(), output.display());
 }
 
-fn export_layer_stacks(arch: &Value, weights: &Path, description: &str) -> Vec<u8> {
+/// The run's model.nn: a Stockfish .nnue for HalfKAv2_hm (net_format
+/// enyo-v1 converts it on export), architecture 26 itself for an input set
+/// with no .nnue form.
+fn export_layer_stacks(config: &Config, weights: &Path) -> Vec<u8> {
     let weights = sfls::read_weights(weights).unwrap_or_else(|err| {
         eprintln!("error: {err}");
         process::exit(1);
     });
-    sfls::export_nnue(layer_stack_spec(arch), &weights, description).unwrap_or_else(|err| {
+    let spec = layer_stack_spec(&config.arch);
+    let exported = if spec.input_set == sfls::InputSet::HalfKav2Hm {
+        sfls::export_nnue(spec, &weights, &layer_stack_description(config))
+    } else {
+        let metadata = vec![("name".to_string(), run_name(config)), ("trained".to_string(), utc_minute_now())];
+        sfls::export_enyo_v1(spec, &weights, &metadata)
+    };
+    exported.unwrap_or_else(|err| {
         eprintln!("error: layer-stacks export: {err}");
         process::exit(1);
     })
+}
+
+/// The current UTC time as "YYYY-MM-DDTHH:MMZ" (the format-1 trained key).
+fn utc_minute_now() -> String {
+    utc_minute(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    )
+}
+
+fn utc_minute(secs: u64) -> String {
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let days = (secs / 86_400) as i64 + 719_468;
+    let era = days.div_euclid(146_097);
+    let doe = days.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    let minute = secs % 86_400 / 60;
+    format!("{year:04}-{month:02}-{day:02}T{:02}:{:02}Z", minute / 60, minute % 60)
 }
 
 /// `eval`: imports a .nnue into the Bullet graph, evaluates FENs with it,
@@ -1252,7 +1325,8 @@ fn cmd_eval(args: &[String]) {
     }
     let out = expand_path(&out);
     let init = out.join("import.bin");
-    import_layer_stacks(&arch, &expand_path(&net), &init);
+    let net = expand_path(&net);
+    import_layer_stacks(&arch, &net, &init);
     set_layer_stack_env(&arch);
     if float {
         set_env("ENYO_BULLET_LS_FAKE_QUANT", 0);
@@ -1271,13 +1345,19 @@ fn cmd_eval(args: &[String]) {
         eprintln!("error: {err}");
         process::exit(1);
     });
-    let description = sfls::import_nnue(spec, &fs::read(expand_path(&net)).unwrap()).unwrap().1;
-    let bytes = sfls::export_nnue(spec, &weights, &description).unwrap_or_else(|err| {
+    // Re-export in the source's own format: byte-identical to it when the
+    // graph holds the net exactly.
+    let (exported, roundtrip) = match read_layer_stacks(&arch, &net).1 {
+        ImportedLabel::Nnue(description) => (sfls::export_nnue(spec, &weights, &description), out.join("roundtrip.nnue")),
+        ImportedLabel::EnyoV1(metadata) => (sfls::export_enyo_v1(spec, &weights, &metadata), out.join("roundtrip.nn")),
+    };
+    let bytes = exported.unwrap_or_else(|err| {
         eprintln!("error: layer-stacks export: {err}");
         process::exit(1);
     });
-    fs::write(out.join("roundtrip.nnue"), &bytes).unwrap();
-    println!("wrote {} ({} bytes)", out.join("roundtrip.nnue").display(), bytes.len());
+    let identical = fs::read(&net).map(|source| source == bytes).unwrap_or(false);
+    fs::write(&roundtrip, &bytes).unwrap();
+    println!("wrote {} ({} bytes, identical to the source: {identical})", roundtrip.display(), bytes.len());
 
     let mut rows = String::new();
     for line in fs::read_to_string(&table).unwrap().lines() {
@@ -3104,9 +3184,10 @@ fn cmd_all(config: &Config, force: bool) {
 fn write_model(config: &Config) {
     let checkpoint = latest_checkpoint(config);
     if is_layer_stacks(&config.arch) {
-        // A Stockfish-format .nnue (the engine detects the format by content).
+        // A Stockfish-format .nnue or an architecture-26 net (the engine
+        // detects the format by content).
         let weights = checkpoint.with_file_name("optimiser_state").join("weights.bin");
-        let model = export_layer_stacks(&config.arch, &weights, &layer_stack_description(config));
+        let model = export_layer_stacks(config, &weights);
         let model_path = model_path(config);
         if let Some(parent) = model_path.parent() {
             fs::create_dir_all(parent).unwrap_or_else(|err| {
@@ -3397,7 +3478,12 @@ fn cmd_export(config: &Config, force: bool) {
     // net_format enyo-v1 publishes the format-1 container the engine loads:
     // architecture 26 from a layer-stacks model.nn (a Stockfish .nnue), 24/25
     // from the internal v8/v12 layout. runs/<run>/model.nn is left as it is.
-    if string_at(&config.arch, "net_format") == Some("enyo-v1") {
+    // A layer-stacks model.nn that is already architecture 26 (an input set
+    // with no .nnue form) is published as it is.
+    let mut magic = [0_u8; 8];
+    let model_is_enyo_v1 =
+        File::open(&model_path).and_then(|mut f| f.read_exact(&mut magic)).is_ok() && sfls::is_enyo_net(&magic);
+    if string_at(&config.arch, "net_format") == Some("enyo-v1") && !(is_layer_stacks(&config.arch) && model_is_enyo_v1) {
         let status = process::Command::new(".venv/bin/python")
             .arg("tools/lib/enyo_net_v1.py")
             .arg(&model_path)
@@ -3423,6 +3509,22 @@ fn cmd_export(config: &Config, force: bool) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn utc_minute_formats_the_trained_key() {
+        assert_eq!(utc_minute(0), "1970-01-01T00:00Z");
+        assert_eq!(utc_minute(1_709_251_140), "2024-02-29T23:59Z");
+        assert_eq!(utc_minute(1_795_381_620), "2026-11-22T21:07Z");
+    }
+
+    #[test]
+    fn layer_stack_input_set_is_read_from_the_architecture() {
+        let spec = layer_stack_spec(&json!({"mode": "layer-stacks"}));
+        assert_eq!(spec, sfls::Spec::STOCKFISH);
+        let spec = layer_stack_spec(&json!({"mode": "layer-stacks", "input_set": "enyo_halfka_32x12"}));
+        assert_eq!(spec.input_set, sfls::InputSet::EnyoHalfKa32x12);
+        assert!(spec.engine_widths());
+    }
 
     fn defaults() -> Value {
         json!({

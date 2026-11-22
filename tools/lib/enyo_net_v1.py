@@ -23,12 +23,14 @@ Payload, architecture 25 (= 24 + Stockfish-exact FullThreats inputs):
 Payload, architecture 26 (layer stacks; the engine's native architecture):
   layout block, u32 each: input_set, threats, hidden (H), psqt_buckets (P), stacks,
     fc0_out, fc1_out, bucket_scheme. The engine loads only
-    input_set=0 (HalfKAv2_hm as Stockfish; 1 is reserved for Enyo HalfKA 32 king
-    buckets x 12 planes), threats=1 (Stockfish FullThreats), H=1024, P=8, stacks=8,
-    fc0_out=32 (incl. passthrough), fc1_out=32, bucket_scheme=0 ((pieces - 1) / 4).
+    input_set=0 (HalfKAv2_hm as Stockfish, F = 22528 rows) or 1 (Enyo HalfKA 32 king
+    buckets x 12 planes, the architecture-24/25 layout, F = 24576 rows; engine
+    src/nnue/enyo/enyo_halfka.hpp), threats=1 (Stockfish FullThreats), H=1024, P=8,
+    stacks=8, fc0_out=32 (incl. passthrough), fc1_out=32, bucket_scheme=0
+    ((pieces - 1) / 4).
   feature biases  i16[H]
-  HalfKA weights  leb i16[22528][H]
-  HalfKA PSQT     leb i32[22528][P]
+  HalfKA weights  leb i16[F][H]
+  HalfKA PSQT     leb i32[F][P]
   threat weights  i8[59808][H]
   threat PSQT     leb i32[59808][P]
   per stack: fc0 biases i32[fc0_out], fc0 weights i8[fc0_out][H],
@@ -36,7 +38,8 @@ Payload, architecture 26 (layer stacks; the engine's native architecture):
              fc2 bias i32, fc2 weights i8[2 * fc0_out + 2 * fc1_out]
   "leb" is u32 byte count + one minimal signed LEB128 varint per value.
   Values and quantisation are those of the Stockfish layer-stacks .nnue
-  (HalfKAv2_hm + FullThreats, sfnnv15), so it converts losslessly both ways.
+  (HalfKAv2_hm + FullThreats, sfnnv15), so an input_set-0 net converts
+  losslessly both ways; input_set 1 has no .nnue form (the trainer writes it).
 
 Command line:
   enyo_net_v1.py SOURCE TARGET [--name N] [--trained T] [--description D]
@@ -86,6 +89,8 @@ LAYOUT = struct.Struct("<8I")
 SUPPORTED_LAYOUT = {"input_set": 0, "threats": 1, "hidden": 1024, "psqt_buckets": 8,
                     "stacks": 8, "fc0_out": 32, "fc1_out": 32, "bucket_scheme": 0}
 HALFKA_V2_FEATURES = 22_528
+# King rows per input_set: HalfKAv2_hm, Enyo HalfKA 32x12.
+INPUT_SET_ROWS = {0: HALFKA_V2_FEATURES, 1: N_FEATURES}
 LEB = "leb"
 RAW = "raw"
 
@@ -169,10 +174,11 @@ def _raw(arrays, sections) -> bytes:
 
 def feature_sections(layout: dict[str, int]):
     h, p = layout["hidden"], layout["psqt_buckets"]
+    rows = INPUT_SET_ROWS[layout["input_set"]]
     return (
         ("ft_biases", np.int16, (h,), RAW),
-        ("halfka_weights", np.int16, (HALFKA_V2_FEATURES, h), LEB),
-        ("halfka_psqt", np.int32, (HALFKA_V2_FEATURES, p), LEB),
+        ("halfka_weights", np.int16, (rows, h), LEB),
+        ("halfka_psqt", np.int32, (rows, p), LEB),
         ("threat_weights", np.int8, (N_THREAT_FEATURES, h), RAW),
         ("threat_psqt", np.int32, (N_THREAT_FEATURES, p), LEB),
     )
@@ -191,9 +197,9 @@ def stack_sections(layout: dict[str, int]):
 
 
 def check_layout(layout: dict[str, int]) -> None:
-    if layout != SUPPORTED_LAYOUT:
+    if layout["input_set"] not in INPUT_SET_ROWS or dict(layout, input_set=0) != SUPPORTED_LAYOUT:
         got = " ".join(f"{k}={layout[k]}" for k in LAYOUT_FIELDS)
-        want = " ".join(f"{k}={SUPPORTED_LAYOUT[k]}" for k in LAYOUT_FIELDS)
+        want = " ".join(f"{k}={SUPPORTED_LAYOUT[k]}" for k in LAYOUT_FIELDS).replace("input_set=0", "input_set=0|1")
         raise ValueError(f"unsupported layout {got} (supported: {want})")
 
 
@@ -343,6 +349,8 @@ def to_nnue(net: NetV1, description: str) -> bytes:
         raise ValueError(f"architecture {net.architecture} has no .nnue form")
     layout = net.layout
     check_layout(layout)
+    if layout["input_set"] != 0:
+        raise ValueError(f"input_set {layout['input_set']} (Enyo HalfKA 32x12) has no Stockfish .nnue form")
     network_hash, ft_hash, fc_hash = _sf_hashes(layout)
     a = net.arrays
     desc = description.encode("utf-8", "surrogateescape")

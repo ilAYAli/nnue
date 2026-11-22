@@ -2091,7 +2091,7 @@ fn train_layer_stacks(
     if !(0.0..=1.0).contains(&wdl_proportion) {
         panic!("wdl must be in [0, 1]");
     }
-    let sfls::Spec { l1, l2, l3 } = spec;
+    let sfls::Spec { l1, l2, l3, input_set } = spec;
     let fake_quant = env_parse("ENYO_BULLET_LS_FAKE_QUANT", 1usize) != 0;
     let loss = LayerStackLoss {
         in_offset: env_parse("ENYO_BULLET_LOSS_IN_OFFSET", 270.0f32),
@@ -2112,7 +2112,11 @@ fn train_layer_stacks(
     println!("dataset={dataset}");
     println!("output={output}");
     println!("net_id={net_id}");
-    println!("layer_stacks l1={l1} l2={l2} l3={l3} stacks={} fake_quant={fake_quant}", sfls::STACKS);
+    println!(
+        "layer_stacks l1={l1} l2={l2} l3={l3} stacks={} input_set={} fake_quant={fake_quant}",
+        sfls::STACKS,
+        input_set.name()
+    );
     println!("loss={loss:?} tb_remap={tb_remap:?}");
     println!(
         "batch_size={batch_size} batches_per_superbatch={batches_per_superbatch} \
@@ -2149,7 +2153,7 @@ fn train_layer_stacks(
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
-        .inputs(sfls::LayerStackInputs)
+        .inputs(sfls::LayerStackInputs { input_set })
         .output_buckets(sfls::PieceCountBuckets)
         // Export reads optimiser_state/weights.bin (tools/bullet/train).
         .save_format(&[SavedFormat::custom(b"layer-stacks: export from optimiser_state/weights.bin".to_vec())])
@@ -2164,6 +2168,8 @@ fn train_layer_stacks(
             let stacks = sfls::STACKS;
 
             // Feature transformer: [threat rows | HalfKA rows + shared factor].
+            // Both input sets lay a king bucket out as 768 rows (12 planes x
+            // 64 oriented squares), so the factor is the same for either.
             let l0h = w("l0h", l1, halfka)
                 + w("l0v", l1, sfls::PLANES).repeat(sfls::KING_BUCKETS).reshape(Shape::new(l1, halfka));
             let ft = concat_cols(w("l0t", l1, threats), l0h);
@@ -2423,6 +2429,11 @@ fn main() {
             l1: hidden,
             l2: l2_size,
             l3: env_parse("ENYO_BULLET_L3", 32usize),
+            input_set: enyo_bullet_spike::sf_layer_stacks::InputSet::from_name(&env_string(
+                "ENYO_BULLET_LS_INPUT_SET",
+                "halfkav2_hm",
+            ))
+            .unwrap_or_else(|err| panic!("{err}")),
         };
         train_layer_stacks(
             dataset,

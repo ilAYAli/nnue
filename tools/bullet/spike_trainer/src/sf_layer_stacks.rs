@@ -5,7 +5,10 @@
 //! * feature transformer: Full_Threats rows (int8 export) followed by
 //!   HalfKAv2_hm^ rows (12 piece planes while training, one shared 768-row
 //!   virtual factor; 11 planes with merged kings in the export), L1 outputs
-//!   plus 8 PSQT outputs per row;
+//!   plus 8 PSQT outputs per row. With input set Enyo HalfKA 32x12
+//!   (architecture 26 input_set 1, see `enyo_halfka_index`) the king rows are
+//!   Enyo's 32 buckets x 12 planes instead, trained and exported as they are,
+//!   with the same 768-row virtual factor;
 //! * per perspective clamp(acc, 0, 255/256), pairwise product of the two
 //!   halves (L1/2 values), side to move first;
 //! * 8 layer stacks picked by (pieces - 1) / 4: fc0 L1 -> L2 (factorised
@@ -15,8 +18,9 @@
 //!
 //! Everything here is CPU-side and graph independent: input indexing, the
 //! nnue-pytorch initialisation, Stockfish .nnue export/import (nnue-pytorch
-//! serialize.py byte layout), the nnue-pytorch data skip predicate and the
-//! tablebase score remap. The Bullet graph lives in main.rs.
+//! serialize.py byte layout), Enyo format-1 architecture-26 export/import
+//! (tools/lib/enyo_net_v1.py layout), the nnue-pytorch data skip predicate
+//! and the tablebase score remap. The Bullet graph lives in main.rs.
 
 use std::{
     cell::Cell,
@@ -44,6 +48,7 @@ pub const THREAT_FEATURES: usize = enyo_threats::DIMENSIONS;
 pub const KING_BUCKETS: usize = 32;
 pub const PLANES: usize = 12 * 64;
 pub const EXPORT_PLANES: usize = 11 * 64;
+/// Training rows of either input set (32 king buckets x 12 planes).
 pub const HALFKA_FEATURES: usize = KING_BUCKETS * PLANES;
 pub const HALFKA_EXPORT_FEATURES: usize = KING_BUCKETS * EXPORT_PLANES;
 pub const INPUTS: usize = THREAT_FEATURES + HALFKA_FEATURES;
@@ -68,16 +73,94 @@ pub const HALFKA_HASH: u32 = 0x7F23_4CB8;
 pub const DEFAULT_DESCRIPTION: &str = "Network trained with the Enyo Bullet layer-stacks trainer.";
 const LEB128_MAGIC: &[u8] = b"COMPRESSED_LEB128";
 
-/// Layer widths. The engine's Stockfish path runs 1024/32/32.
+/// The king-relative piece-square inputs of the feature transformer (the
+/// architecture-26 layout field input_set).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum InputSet {
+    /// Stockfish HalfKAv2_hm: 32 mirrored king buckets x 11 planes (kings
+    /// merged) in the export. input_set 0.
+    #[default]
+    HalfKav2Hm,
+    /// Enyo HalfKA: 32 king buckets x 12 planes, the layout of Enyo's
+    /// architecture-24/25 nets. input_set 1; no Stockfish .nnue form.
+    EnyoHalfKa32x12,
+}
+
+impl InputSet {
+    pub fn from_name(name: &str) -> Result<InputSet, String> {
+        match name {
+            "halfkav2_hm" => Ok(InputSet::HalfKav2Hm),
+            "enyo_halfka_32x12" => Ok(InputSet::EnyoHalfKa32x12),
+            other => Err(format!("unknown input_set {other} (halfkav2_hm or enyo_halfka_32x12)")),
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            InputSet::HalfKav2Hm => "halfkav2_hm",
+            InputSet::EnyoHalfKa32x12 => "enyo_halfka_32x12",
+        }
+    }
+
+    /// The architecture-26 layout value.
+    pub fn layout_id(self) -> u32 {
+        match self {
+            InputSet::HalfKav2Hm => 0,
+            InputSet::EnyoHalfKa32x12 => 1,
+        }
+    }
+
+    /// Training row of a piece for one perspective; see `halfka_index` and
+    /// `enyo_halfka_index`.
+    pub fn index(self, piece_type: usize, own: bool, square: usize, king: usize) -> usize {
+        match self {
+            InputSet::HalfKav2Hm => halfka_index(piece_type, own, square, king),
+            InputSet::EnyoHalfKa32x12 => enyo_halfka_index(piece_type, own, square, king),
+        }
+    }
+
+    /// The piece type (0 pawn .. 5 king) and ownership of a training plane.
+    fn plane_piece(self, plane: usize) -> (usize, bool) {
+        match self {
+            InputSet::HalfKav2Hm => (plane / 2, plane % 2 == 0),
+            InputSet::EnyoHalfKa32x12 => (plane % 6, plane < 6),
+        }
+    }
+
+    /// King rows in the exported net.
+    pub fn export_rows(self) -> usize {
+        match self {
+            InputSet::HalfKav2Hm => HALFKA_EXPORT_FEATURES,
+            InputSet::EnyoHalfKa32x12 => HALFKA_FEATURES,
+        }
+    }
+
+    /// The training row an exported row comes from.
+    fn export_source_row(self, row: usize) -> usize {
+        match self {
+            InputSet::HalfKav2Hm => export_halfka_row(row),
+            InputSet::EnyoHalfKa32x12 => row,
+        }
+    }
+}
+
+/// Layer widths and the king input set. The engine's Stockfish path runs
+/// 1024/32/32.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Spec {
     pub l1: usize,
     pub l2: usize,
     pub l3: usize,
+    pub input_set: InputSet,
 }
 
 impl Spec {
-    pub const STOCKFISH: Spec = Spec { l1: 1024, l2: 32, l3: 32 };
+    pub const STOCKFISH: Spec = Spec { l1: 1024, l2: 32, l3: 32, input_set: InputSet::HalfKav2Hm };
+
+    /// The widths the engine loads (1024/32/32), whatever the input set.
+    pub fn engine_widths(self) -> bool {
+        (self.l1, self.l2, self.l3) == (Self::STOCKFISH.l1, Self::STOCKFISH.l2, Self::STOCKFISH.l3)
+    }
 
     pub fn validate(self) -> Result<(), String> {
         if self.l1 == 0 || self.l1 % 64 != 0 {
@@ -92,7 +175,7 @@ impl Spec {
     /// (id, rows, cols) of every Bullet weight, column-major as Bullet
     /// stores it: element (row, col) at col * rows + row.
     pub fn weight_shapes(self) -> Vec<(&'static str, usize, usize)> {
-        let Spec { l1, l2, l3 } = self;
+        let Spec { l1, l2, l3, .. } = self;
         vec![
             ("l0t", l1, THREAT_FEATURES),
             ("l0h", l1, HALFKA_FEATURES),
@@ -161,8 +244,38 @@ pub fn halfka_index(piece_type: usize, own: bool, square: usize, king: usize) ->
     (square ^ mirror) + 64 * plane + PLANES * king_bucket(king ^ mirror)
 }
 
+/// Enyo king buckets (after Berserk), indexed by the oriented king square
+/// with a8 = 0 from the perspective's side: the engine's
+/// src/nnue/enyo/enyo_halfka.cpp and the architecture-24/25 table.
+#[rustfmt::skip]
+const ENYO_KING_BUCKETS: [usize; 64] = [
+    31, 30, 29, 28, 28, 29, 30, 31,
+    27, 26, 25, 24, 24, 25, 26, 27,
+    23, 22, 21, 20, 20, 21, 22, 23,
+    19, 18, 17, 16, 16, 17, 18, 19,
+    15, 14, 13, 12, 12, 13, 14, 15,
+    11, 10,  9,  8,  8,  9, 10, 11,
+     7,  6,  5,  4,  4,  5,  6,  7,
+     3,  2,  1,  0,  0,  1,  2,  3,
+];
+
+/// Enyo HalfKA 32x12 index (architecture-26 input_set 1, identical to the
+/// architecture-24/25 FeatureIdx) for one perspective, with `square` and
+/// `king` as for `halfka_index`. The board is seen from the perspective with
+/// a8 = 0 (square ^ 56) and mirrored so the king stands on files e-h:
+/// bucket * 768 + plane * 64 + oriented square, planes own pawn..king 0-5,
+/// opponent pawn..king 6-11, buckets 0-3 on the back rank (file e..h), +4 per
+/// rank.
+pub fn enyo_halfka_index(piece_type: usize, own: bool, square: usize, king: usize) -> usize {
+    let orient = 56 ^ if king % 8 < 4 { 7 } else { 0 };
+    let plane = 6 * usize::from(!own) + piece_type;
+    PLANES * ENYO_KING_BUCKETS[king ^ orient] + 64 * plane + (square ^ orient)
+}
+
 #[derive(Clone, Copy, Debug, Default)]
-pub struct LayerStackInputs;
+pub struct LayerStackInputs {
+    pub input_set: InputSet,
+}
 
 impl SparseInputType for LayerStackInputs {
     type RequiredDataType = ChessBoard;
@@ -185,23 +298,30 @@ impl SparseInputType for LayerStackInputs {
         }
         let stm_king = usize::from(pos.our_ksq());
         let nstm_king = usize::from(pos.opp_ksq());
+        let set = self.input_set;
         for (piece, square) in pos.into_iter() {
             let piece_type = usize::from(piece & 7);
             let ours = piece & 8 == 0;
             let square = usize::from(square);
             f(
-                THREAT_FEATURES + halfka_index(piece_type, ours, square, stm_king),
-                THREAT_FEATURES + halfka_index(piece_type, !ours, square ^ 56, nstm_king),
+                THREAT_FEATURES + set.index(piece_type, ours, square, stm_king),
+                THREAT_FEATURES + set.index(piece_type, !ours, square ^ 56, nstm_king),
             );
         }
     }
 
     fn shorthand(&self) -> String {
-        "full-threats+halfkav2hm".to_string()
+        match self.input_set {
+            InputSet::HalfKav2Hm => "full-threats+halfkav2hm".to_string(),
+            InputSet::EnyoHalfKa32x12 => "full-threats+enyo-halfka-32x12".to_string(),
+        }
     }
 
     fn description(&self) -> String {
-        "nnue-pytorch Full_Threats+HalfKAv2_hm^ (12-plane training layout)".to_string()
+        match self.input_set {
+            InputSet::HalfKav2Hm => "nnue-pytorch Full_Threats+HalfKAv2_hm^ (12-plane training layout)".to_string(),
+            InputSet::EnyoHalfKa32x12 => "Full_Threats + Enyo HalfKA 32 king buckets x 12 planes".to_string(),
+        }
     }
 }
 
@@ -234,7 +354,7 @@ fn uniform(rng: &mut ChaCha8Rng, len: usize, bound: f32) -> Vec<f32> {
 /// rows zero; dense layers torch.nn.Linear defaults with identical stacks,
 /// output bias and the fc0 factoriser zero.
 pub fn initial_weights(spec: Spec, seed: u64) -> Weights {
-    let Spec { l1, l2, l3 } = spec;
+    let Spec { l1, l2, l3, input_set } = spec;
     let mut weights = Weights::new();
     let mut tensor = |id: &str, values: Vec<f32>| {
         weights.insert(id.to_string(), values);
@@ -255,10 +375,9 @@ pub fn initial_weights(spec: Spec, seed: u64) -> Weights {
     let mut psqt = vec![0.0; PSQT_BUCKETS * HALFKA_FEATURES];
     const PIECE_VALUES: [f32; 5] = [126.0, 781.0, 825.0, 1276.0, 2538.0];
     for feature in 0..HALFKA_FEATURES {
-        let plane = (feature % PLANES) / 64;
-        let piece_type = plane / 2;
+        let (piece_type, own) = input_set.plane_piece((feature % PLANES) / 64);
         if piece_type < 5 {
-            let sign = if plane % 2 == 0 { 1.0 } else { -1.0 };
+            let sign = if own { 1.0 } else { -1.0 };
             let value = sign * PIECE_VALUES[piece_type] / NNUE2SCORE;
             psqt[feature * PSQT_BUCKETS..(feature + 1) * PSQT_BUCKETS].fill(value);
         }
@@ -365,7 +484,7 @@ fn quantise(value: f32, scale: f32, min: i64, max: i64, what: &str) -> Result<i6
     Ok(q)
 }
 
-pub fn encode_leb128(values: impl IntoIterator<Item = i64>, out: &mut Vec<u8>) {
+fn leb128_varints(values: impl IntoIterator<Item = i64>) -> Vec<u8> {
     let mut encoded = Vec::new();
     for mut value in values {
         loop {
@@ -378,7 +497,20 @@ pub fn encode_leb128(values: impl IntoIterator<Item = i64>, out: &mut Vec<u8>) {
             encoded.push(byte | 0x80);
         }
     }
+    encoded
+}
+
+/// Stockfish's LEB128 block: magic, u32 byte count, varints.
+pub fn encode_leb128(values: impl IntoIterator<Item = i64>, out: &mut Vec<u8>) {
+    let encoded = leb128_varints(values);
     out.extend_from_slice(LEB128_MAGIC);
+    out.extend_from_slice(&(encoded.len() as u32).to_le_bytes());
+    out.extend_from_slice(&encoded);
+}
+
+/// The format-1 LEB128 block: u32 byte count, varints.
+fn encode_leb128_sized(values: impl IntoIterator<Item = i64>, out: &mut Vec<u8>) {
+    let encoded = leb128_varints(values);
     out.extend_from_slice(&(encoded.len() as u32).to_le_bytes());
     out.extend_from_slice(&encoded);
 }
@@ -401,63 +533,66 @@ fn export_halfka_row(row: usize) -> usize {
     }
 }
 
-/// Builds the .nnue bytes from Bullet weights.
-pub fn export_nnue(spec: Spec, weights: &Weights, description: &str) -> Result<Vec<u8>, String> {
+/// One layer stack on its export grid; weights [output][input], unpadded.
+#[derive(Clone, Debug, PartialEq)]
+struct QuantStack {
+    fc0_biases: Vec<i64>,
+    fc0_weights: Vec<i64>,
+    fc1_biases: Vec<i64>,
+    fc1_weights: Vec<i64>,
+    fc2_bias: i64,
+    fc2_weights: Vec<i64>,
+}
+
+/// The integer net both export formats hold: feature rows in export order
+/// (`InputSet::export_rows` king rows), then the layer stacks.
+#[derive(Clone, Debug, PartialEq)]
+struct QuantNet {
+    ft_biases: Vec<i64>,
+    threat_weights: Vec<i64>,
+    threat_psqt: Vec<i64>,
+    halfka_weights: Vec<i64>,
+    halfka_psqt: Vec<i64>,
+    stacks: Vec<QuantStack>,
+}
+
+const I8_RANGE: (i64, i64) = (-(i8::MAX as i64), i8::MAX as i64);
+const I16_RANGE: (i64, i64) = (-(i16::MAX as i64), i16::MAX as i64);
+const I32_RANGE: (i64, i64) = (-(i32::MAX as i64), i32::MAX as i64);
+
+/// Bullet weights on the export grid: factors coalesced, kings merged for
+/// HalfKAv2_hm.
+fn quantise_net(spec: Spec, weights: &Weights) -> Result<QuantNet, String> {
     spec.validate()?;
-    let Spec { l1, l2, l3 } = spec;
-    let mut out = Vec::new();
-    let u32le = |out: &mut Vec<u8>, v: u32| out.extend_from_slice(&v.to_le_bytes());
-    u32le(&mut out, VERSION);
-    u32le(&mut out, spec.network_hash());
-    u32le(&mut out, description.len() as u32);
-    out.extend_from_slice(description.as_bytes());
-    u32le(&mut out, spec.feature_hash() ^ (l1 as u32 * 2));
+    let Spec { l1, l2, l3, input_set } = spec;
+    let q_all = |values: &[f32], scale: f32, range: (i64, i64), what: &str| {
+        values.iter().map(|&v| quantise(v, scale, range.0, range.1, what)).collect::<Result<Vec<_>, _>>()
+    };
 
-    let i16_range = (-(i16::MAX as i64), i16::MAX as i64);
-    let i32_range = (-(i32::MAX as i64), i32::MAX as i64);
-    let i8_range = (-(i8::MAX as i64), i8::MAX as i64);
+    let ft_biases = q_all(tensor(spec, weights, "l0b")?, FT_ONE, I16_RANGE, "ft bias")?;
+    let threat_weights = q_all(tensor(spec, weights, "l0t")?, FT_ONE, I8_RANGE, "threat weight")?;
+    let threat_psqt = q_all(tensor(spec, weights, "p0t")?, PSQT_SCALE, I32_RANGE, "threat psqt")?;
 
-    let l0b = tensor(spec, weights, "l0b")?;
-    let biases = l0b
-        .iter()
-        .map(|&b| quantise(b, FT_ONE, i16_range.0, i16_range.1, "ft bias"))
-        .collect::<Result<Vec<_>, _>>()?;
-    encode_leb128(biases, &mut out);
-
-    // Full_Threats: int8 rows, uncompressed, then LEB128 PSQT.
-    let l0t = tensor(spec, weights, "l0t")?;
-    out.reserve(l1 * THREAT_FEATURES);
-    for &w in l0t {
-        out.push(quantise(w, FT_ONE, i8_range.0, i8_range.1, "threat weight")? as i8 as u8);
-    }
-    let p0t = tensor(spec, weights, "p0t")?;
-    let psqt = p0t
-        .iter()
-        .map(|&w| quantise(w, PSQT_SCALE, i32_range.0, i32_range.1, "threat psqt"))
-        .collect::<Result<Vec<_>, _>>()?;
-    encode_leb128(psqt, &mut out);
-
-    // HalfKAv2_hm: coalesce the factor, merge kings, int16 + int32 PSQT.
+    // King rows: coalesce the factor (and merge kings for HalfKAv2_hm).
     let l0h = tensor(spec, weights, "l0h")?;
     let l0v = tensor(spec, weights, "l0v")?;
     let p0h = tensor(spec, weights, "p0h")?;
     let p0v = tensor(spec, weights, "p0v")?;
-    let mut halfka = Vec::with_capacity(HALFKA_EXPORT_FEATURES * l1);
-    let mut halfka_psqt = Vec::with_capacity(HALFKA_EXPORT_FEATURES * PSQT_BUCKETS);
-    for row in 0..HALFKA_EXPORT_FEATURES {
-        let source = export_halfka_row(row);
+    let rows = input_set.export_rows();
+    let mut halfka_weights = Vec::with_capacity(rows * l1);
+    let mut halfka_psqt = Vec::with_capacity(rows * PSQT_BUCKETS);
+    for row in 0..rows {
+        let source = input_set.export_source_row(row);
         let plane = source % PLANES;
         for o in 0..l1 {
             let w = l0h[source * l1 + o] + l0v[plane * l1 + o];
-            halfka.push(quantise(w, FT_ONE, i16_range.0, i16_range.1, "halfka weight")?);
+            halfka_weights.push(quantise(w, FT_ONE, I16_RANGE.0, I16_RANGE.1, "halfka weight")?);
         }
         for o in 0..PSQT_BUCKETS {
             let w = p0h[source * PSQT_BUCKETS + o] + p0v[plane * PSQT_BUCKETS + o];
-            halfka_psqt.push(quantise(w, PSQT_SCALE, i32_range.0, i32_range.1, "halfka psqt")?);
+            halfka_psqt.push(quantise(w, PSQT_SCALE, I32_RANGE.0, I32_RANGE.1, "halfka psqt")?);
         }
     }
-    encode_leb128(halfka, &mut out);
-    encode_leb128(halfka_psqt, &mut out);
 
     let l1w = tensor(spec, weights, "l1w")?;
     let l1b = tensor(spec, weights, "l1b")?;
@@ -467,52 +602,163 @@ pub fn export_nnue(spec: Spec, weights: &Weights, description: &str) -> Result<V
     let l2b = tensor(spec, weights, "l2b")?;
     let l3w = tensor(spec, weights, "l3w")?;
     let l3b = tensor(spec, weights, "l3b")?;
-    let fc_hash = spec.fc_hash();
-    let pad32 = |n: usize| n.div_ceil(32) * 32;
+    let mut stacks = Vec::with_capacity(STACKS);
     for stack in 0..STACKS {
-        u32le(&mut out, fc_hash);
+        let mut s = QuantStack {
+            fc0_biases: Vec::with_capacity(l2),
+            fc0_weights: Vec::with_capacity(l2 * l1),
+            fc1_biases: Vec::with_capacity(l3),
+            fc1_weights: Vec::with_capacity(l3 * 2 * l2),
+            fc2_bias: 0,
+            fc2_weights: Vec::with_capacity(2 * l2 + 2 * l3),
+        };
         // fc0: the graph clamps the merged weight to the int8 grid range.
         for o in 0..l2 {
             let b = l1b[stack * l2 + o] + l1fb[o];
-            let q = quantise(b, FC0_SCALE * HIDDEN_ONE, i32_range.0, i32_range.1, "fc0 bias")?;
-            out.extend_from_slice(&(q as i32).to_le_bytes());
+            s.fc0_biases.push(quantise(b, FC0_SCALE * HIDDEN_ONE, I32_RANGE.0, I32_RANGE.1, "fc0 bias")?);
         }
         for o in 0..l2 {
-            for i in 0..pad32(l1) {
-                let q = if i < l1 {
-                    let w = (l1w[i * STACKS * l2 + stack * l2 + o] + l1f[i * l2 + o])
-                        .clamp(-127.0 / FC0_SCALE, 127.0 / FC0_SCALE);
-                    quantise(w, FC0_SCALE, i8_range.0, i8_range.1, "fc0 weight")?
-                } else {
-                    0
-                };
-                out.push(q as i8 as u8);
+            for i in 0..l1 {
+                let w = (l1w[i * STACKS * l2 + stack * l2 + o] + l1f[i * l2 + o])
+                    .clamp(-127.0 / FC0_SCALE, 127.0 / FC0_SCALE);
+                s.fc0_weights.push(quantise(w, FC0_SCALE, I8_RANGE.0, I8_RANGE.1, "fc0 weight")?);
             }
         }
         for o in 0..l3 {
-            let q = quantise(l2b[stack * l3 + o], FC1_SCALE * HIDDEN_ONE, i32_range.0, i32_range.1, "fc1 bias")?;
-            out.extend_from_slice(&(q as i32).to_le_bytes());
+            s.fc1_biases.push(quantise(
+                l2b[stack * l3 + o],
+                FC1_SCALE * HIDDEN_ONE,
+                I32_RANGE.0,
+                I32_RANGE.1,
+                "fc1 bias",
+            )?);
         }
         for o in 0..l3 {
-            for i in 0..pad32(2 * l2) {
-                let q = if i < 2 * l2 {
-                    quantise(l2w[i * STACKS * l3 + stack * l3 + o], FC1_SCALE, i8_range.0, i8_range.1, "fc1 weight")?
-                } else {
-                    0
-                };
-                out.push(q as i8 as u8);
+            for i in 0..2 * l2 {
+                s.fc1_weights.push(quantise(
+                    l2w[i * STACKS * l3 + stack * l3 + o],
+                    FC1_SCALE,
+                    I8_RANGE.0,
+                    I8_RANGE.1,
+                    "fc1 weight",
+                )?);
             }
         }
-        let q = quantise(l3b[stack], FC2_SCALE * HIDDEN_ONE, i32_range.0, i32_range.1, "fc2 bias")?;
-        out.extend_from_slice(&(q as i32).to_le_bytes());
-        for i in 0..pad32(2 * l2 + 2 * l3) {
-            let q = if i < 2 * l2 + 2 * l3 {
-                quantise(l3w[i * STACKS + stack], FC2_SCALE, i8_range.0, i8_range.1, "fc2 weight")?
-            } else {
-                0
-            };
-            out.push(q as i8 as u8);
+        s.fc2_bias = quantise(l3b[stack], FC2_SCALE * HIDDEN_ONE, I32_RANGE.0, I32_RANGE.1, "fc2 bias")?;
+        for i in 0..2 * l2 + 2 * l3 {
+            s.fc2_weights.push(quantise(l3w[i * STACKS + stack], FC2_SCALE, I8_RANGE.0, I8_RANGE.1, "fc2 weight")?);
         }
+        stacks.push(s);
+    }
+    Ok(QuantNet { ft_biases, threat_weights, threat_psqt, halfka_weights, halfka_psqt, stacks })
+}
+
+/// Bullet weights of an integer net (factorisers zero; HalfKAv2_hm kings
+/// split back into own/opponent planes as nnue-pytorch's
+/// load_export_weights does).
+fn dequantise_net(spec: Spec, q: &QuantNet) -> Weights {
+    let Spec { l1, l2, l3, input_set } = spec;
+    let deq = |values: &[i64], scale: f32| values.iter().map(|&v| v as f32 / scale).collect::<Vec<f32>>();
+    let mut weights = Weights::new();
+    weights.insert("l0b".into(), deq(&q.ft_biases, FT_ONE));
+    weights.insert("l0t".into(), deq(&q.threat_weights, FT_ONE));
+    weights.insert("p0t".into(), deq(&q.threat_psqt, PSQT_SCALE));
+    let mut l0h = vec![0.0; HALFKA_FEATURES * l1];
+    let mut p0h = vec![0.0; HALFKA_FEATURES * PSQT_BUCKETS];
+    for row in 0..input_set.export_rows() {
+        let target = input_set.export_source_row(row);
+        for o in 0..l1 {
+            l0h[target * l1 + o] = q.halfka_weights[row * l1 + o] as f32 / FT_ONE;
+        }
+        for o in 0..PSQT_BUCKETS {
+            p0h[target * PSQT_BUCKETS + o] = q.halfka_psqt[row * PSQT_BUCKETS + o] as f32 / PSQT_SCALE;
+        }
+    }
+    weights.insert("l0h".into(), l0h);
+    weights.insert("p0h".into(), p0h);
+    weights.insert("l0v".into(), vec![0.0; PLANES * l1]);
+    weights.insert("p0v".into(), vec![0.0; PLANES * PSQT_BUCKETS]);
+
+    let mut l1w = vec![0.0; STACKS * l2 * l1];
+    let mut l1b = vec![0.0; STACKS * l2];
+    let mut l2w = vec![0.0; STACKS * l3 * 2 * l2];
+    let mut l2b = vec![0.0; STACKS * l3];
+    let mut l3w = vec![0.0; STACKS * (2 * l2 + 2 * l3)];
+    let mut l3b = vec![0.0; STACKS];
+    for (stack, s) in q.stacks.iter().enumerate() {
+        for o in 0..l2 {
+            l1b[stack * l2 + o] = s.fc0_biases[o] as f32 / (FC0_SCALE * HIDDEN_ONE);
+            for i in 0..l1 {
+                l1w[i * STACKS * l2 + stack * l2 + o] = s.fc0_weights[o * l1 + i] as f32 / FC0_SCALE;
+            }
+        }
+        for o in 0..l3 {
+            l2b[stack * l3 + o] = s.fc1_biases[o] as f32 / (FC1_SCALE * HIDDEN_ONE);
+            for i in 0..2 * l2 {
+                l2w[i * STACKS * l3 + stack * l3 + o] = s.fc1_weights[o * 2 * l2 + i] as f32 / FC1_SCALE;
+            }
+        }
+        l3b[stack] = s.fc2_bias as f32 / (FC2_SCALE * HIDDEN_ONE);
+        for i in 0..2 * l2 + 2 * l3 {
+            l3w[i * STACKS + stack] = s.fc2_weights[i] as f32 / FC2_SCALE;
+        }
+    }
+    weights.insert("l1w".into(), l1w);
+    weights.insert("l1b".into(), l1b);
+    weights.insert("l1f".into(), vec![0.0; l2 * l1]);
+    weights.insert("l1fb".into(), vec![0.0; l2]);
+    weights.insert("l2w".into(), l2w);
+    weights.insert("l2b".into(), l2b);
+    weights.insert("l3w".into(), l3w);
+    weights.insert("l3b".into(), l3b);
+    weights
+}
+
+fn push_i8s(out: &mut Vec<u8>, values: &[i64], padded: usize) {
+    out.extend(values.iter().map(|&q| q as i8 as u8));
+    out.resize(out.len() + padded - values.len(), 0);
+}
+
+fn push_i32(out: &mut Vec<u8>, value: i64) {
+    out.extend_from_slice(&(value as i32).to_le_bytes());
+}
+
+/// Builds the .nnue bytes from Bullet weights (HalfKAv2_hm only).
+pub fn export_nnue(spec: Spec, weights: &Weights, description: &str) -> Result<Vec<u8>, String> {
+    if spec.input_set != InputSet::HalfKav2Hm {
+        return Err(format!("input_set {} has no Stockfish .nnue form; export net_format enyo-v1", spec.input_set.name()));
+    }
+    let q = quantise_net(spec, weights)?;
+    let Spec { l1, l2, l3, .. } = spec;
+    let mut out = Vec::new();
+    let u32le = |out: &mut Vec<u8>, v: u32| out.extend_from_slice(&v.to_le_bytes());
+    u32le(&mut out, VERSION);
+    u32le(&mut out, spec.network_hash());
+    u32le(&mut out, description.len() as u32);
+    out.extend_from_slice(description.as_bytes());
+    u32le(&mut out, spec.feature_hash() ^ (l1 as u32 * 2));
+
+    encode_leb128(q.ft_biases.iter().copied(), &mut out);
+    // Full_Threats: int8 rows, uncompressed, then LEB128 PSQT.
+    push_i8s(&mut out, &q.threat_weights, q.threat_weights.len());
+    encode_leb128(q.threat_psqt.iter().copied(), &mut out);
+    encode_leb128(q.halfka_weights.iter().copied(), &mut out);
+    encode_leb128(q.halfka_psqt.iter().copied(), &mut out);
+
+    let fc_hash = spec.fc_hash();
+    let pad32 = |n: usize| n.div_ceil(32) * 32;
+    for s in &q.stacks {
+        u32le(&mut out, fc_hash);
+        s.fc0_biases.iter().for_each(|&b| push_i32(&mut out, b));
+        for row in s.fc0_weights.chunks_exact(l1) {
+            push_i8s(&mut out, row, pad32(l1));
+        }
+        s.fc1_biases.iter().for_each(|&b| push_i32(&mut out, b));
+        for row in s.fc1_weights.chunks_exact(2 * l2) {
+            push_i8s(&mut out, row, pad32(2 * l2));
+        }
+        push_i32(&mut out, s.fc2_bias);
+        push_i8s(&mut out, &s.fc2_weights, pad32(2 * l2 + 2 * l3));
     }
     Ok(out)
 }
@@ -527,7 +773,7 @@ impl<'a> Reader<'a> {
         let slice = self
             .bytes
             .get(self.offset..self.offset + n)
-            .ok_or_else(|| format!("truncated .nnue while reading {what} at {}", self.offset))?;
+            .ok_or_else(|| format!("truncated net while reading {what} at {}", self.offset))?;
         self.offset += n;
         Ok(slice)
     }
@@ -544,10 +790,16 @@ impl<'a> Reader<'a> {
         Ok(())
     }
 
+    /// Stockfish LEB128 block (magic, size, varints).
     fn leb128(&mut self, count: usize, what: &str) -> Result<Vec<i64>, String> {
         if self.take(LEB128_MAGIC.len(), what)? != LEB128_MAGIC {
             return Err(format!("{what}: missing LEB128 magic"));
         }
+        self.leb128_sized(count, what)
+    }
+
+    /// Format-1 LEB128 block (size, varints).
+    fn leb128_sized(&mut self, count: usize, what: &str) -> Result<Vec<i64>, String> {
         let len = self.u32(what)? as usize;
         let data = self.take(len, what)?;
         let mut values = Vec::with_capacity(count);
@@ -579,12 +831,26 @@ impl<'a> Reader<'a> {
         Ok(self.take(count, what)?.iter().map(|&b| i64::from(b as i8)).collect())
     }
 
+    fn i16s(&mut self, count: usize, what: &str) -> Result<Vec<i64>, String> {
+        Ok(self
+            .take(2 * count, what)?
+            .chunks_exact(2)
+            .map(|c| i64::from(i16::from_le_bytes(c.try_into().unwrap())))
+            .collect())
+    }
+
     fn i32s(&mut self, count: usize, what: &str) -> Result<Vec<i64>, String> {
         Ok(self
             .take(4 * count, what)?
             .chunks_exact(4)
             .map(|c| i64::from(i32::from_le_bytes(c.try_into().unwrap())))
             .collect())
+    }
+
+    /// An i8 [rows][padded] block, the padding dropped.
+    fn i8_rows(&mut self, rows: usize, cols: usize, padded: usize, what: &str) -> Result<Vec<i64>, String> {
+        let raw = self.i8s(rows * padded, what)?;
+        Ok(raw.chunks_exact(padded).flat_map(|row| row[..cols].iter().copied()).collect())
     }
 }
 
@@ -593,7 +859,10 @@ impl<'a> Reader<'a> {
 /// load_export_weights does). Returns the weights and the description.
 pub fn import_nnue(spec: Spec, bytes: &[u8]) -> Result<(Weights, String), String> {
     spec.validate()?;
-    let Spec { l1, l2, l3 } = spec;
+    if spec.input_set != InputSet::HalfKav2Hm {
+        return Err(format!("a Stockfish .nnue holds HalfKAv2_hm, not input_set {}", spec.input_set.name()));
+    }
+    let Spec { l1, l2, l3, input_set } = spec;
     let mut r = Reader { bytes, offset: 0 };
     r.expect_u32(VERSION, "version")?;
     r.expect_u32(spec.network_hash(), "network hash")?;
@@ -601,74 +870,163 @@ pub fn import_nnue(spec: Spec, bytes: &[u8]) -> Result<(Weights, String), String
     let description = String::from_utf8_lossy(r.take(description_len, "description")?).into_owned();
     r.expect_u32(spec.feature_hash() ^ (l1 as u32 * 2), "feature transformer hash")?;
 
-    let mut weights = Weights::new();
-    let deq = |values: Vec<i64>, scale: f32| values.into_iter().map(|q| q as f32 / scale).collect::<Vec<f32>>();
-    weights.insert("l0b".into(), deq(r.leb128(l1, "ft bias")?, FT_ONE));
-    weights.insert("l0t".into(), deq(r.i8s(THREAT_FEATURES * l1, "threat weights")?, FT_ONE));
-    weights.insert("p0t".into(), deq(r.leb128(THREAT_FEATURES * PSQT_BUCKETS, "threat psqt")?, PSQT_SCALE));
-    let halfka = r.leb128(HALFKA_EXPORT_FEATURES * l1, "halfka weights")?;
-    let halfka_psqt = r.leb128(HALFKA_EXPORT_FEATURES * PSQT_BUCKETS, "halfka psqt")?;
-    let mut l0h = vec![0.0; HALFKA_FEATURES * l1];
-    let mut p0h = vec![0.0; HALFKA_FEATURES * PSQT_BUCKETS];
-    for row in 0..HALFKA_EXPORT_FEATURES {
-        let target = export_halfka_row(row);
-        for o in 0..l1 {
-            l0h[target * l1 + o] = halfka[row * l1 + o] as f32 / FT_ONE;
-        }
-        for o in 0..PSQT_BUCKETS {
-            p0h[target * PSQT_BUCKETS + o] = halfka_psqt[row * PSQT_BUCKETS + o] as f32 / PSQT_SCALE;
-        }
-    }
-    weights.insert("l0h".into(), l0h);
-    weights.insert("p0h".into(), p0h);
-    weights.insert("l0v".into(), vec![0.0; PLANES * l1]);
-    weights.insert("p0v".into(), vec![0.0; PLANES * PSQT_BUCKETS]);
+    let ft_biases = r.leb128(l1, "ft bias")?;
+    let threat_weights = r.i8s(THREAT_FEATURES * l1, "threat weights")?;
+    let threat_psqt = r.leb128(THREAT_FEATURES * PSQT_BUCKETS, "threat psqt")?;
+    let halfka_weights = r.leb128(input_set.export_rows() * l1, "halfka weights")?;
+    let halfka_psqt = r.leb128(input_set.export_rows() * PSQT_BUCKETS, "halfka psqt")?;
 
     let pad32 = |n: usize| n.div_ceil(32) * 32;
-    let mut l1w = vec![0.0; STACKS * l2 * l1];
-    let mut l1b = vec![0.0; STACKS * l2];
-    let mut l2w = vec![0.0; STACKS * l3 * 2 * l2];
-    let mut l2b = vec![0.0; STACKS * l3];
-    let mut l3w = vec![0.0; STACKS * (2 * l2 + 2 * l3)];
-    let mut l3b = vec![0.0; STACKS];
-    for stack in 0..STACKS {
+    let mut stacks = Vec::with_capacity(STACKS);
+    for _ in 0..STACKS {
         r.expect_u32(spec.fc_hash(), "layer stack hash")?;
-        for (o, q) in r.i32s(l2, "fc0 bias")?.into_iter().enumerate() {
-            l1b[stack * l2 + o] = q as f32 / (FC0_SCALE * HIDDEN_ONE);
-        }
-        let w = r.i8s(l2 * pad32(l1), "fc0 weights")?;
-        for o in 0..l2 {
-            for i in 0..l1 {
-                l1w[i * STACKS * l2 + stack * l2 + o] = w[o * pad32(l1) + i] as f32 / FC0_SCALE;
-            }
-        }
-        for (o, q) in r.i32s(l3, "fc1 bias")?.into_iter().enumerate() {
-            l2b[stack * l3 + o] = q as f32 / (FC1_SCALE * HIDDEN_ONE);
-        }
-        let w = r.i8s(l3 * pad32(2 * l2), "fc1 weights")?;
-        for o in 0..l3 {
-            for i in 0..2 * l2 {
-                l2w[i * STACKS * l3 + stack * l3 + o] = w[o * pad32(2 * l2) + i] as f32 / FC1_SCALE;
-            }
-        }
-        l3b[stack] = r.i32s(1, "fc2 bias")?[0] as f32 / (FC2_SCALE * HIDDEN_ONE);
-        let w = r.i8s(pad32(2 * l2 + 2 * l3), "fc2 weights")?;
-        for i in 0..2 * l2 + 2 * l3 {
-            l3w[i * STACKS + stack] = w[i] as f32 / FC2_SCALE;
-        }
+        stacks.push(QuantStack {
+            fc0_biases: r.i32s(l2, "fc0 bias")?,
+            fc0_weights: r.i8_rows(l2, l1, pad32(l1), "fc0 weights")?,
+            fc1_biases: r.i32s(l3, "fc1 bias")?,
+            fc1_weights: r.i8_rows(l3, 2 * l2, pad32(2 * l2), "fc1 weights")?,
+            fc2_bias: r.i32s(1, "fc2 bias")?[0],
+            fc2_weights: r.i8_rows(1, 2 * l2 + 2 * l3, pad32(2 * l2 + 2 * l3), "fc2 weights")?,
+        });
     }
     if r.offset != bytes.len() {
         return Err(format!("{} trailing bytes after the last layer stack", bytes.len() - r.offset));
     }
-    weights.insert("l1w".into(), l1w);
-    weights.insert("l1b".into(), l1b);
-    weights.insert("l1f".into(), vec![0.0; l2 * l1]);
-    weights.insert("l1fb".into(), vec![0.0; l2]);
-    weights.insert("l2w".into(), l2w);
-    weights.insert("l2b".into(), l2b);
-    weights.insert("l3w".into(), l3w);
-    weights.insert("l3b".into(), l3b);
-    Ok((weights, description))
+    let q = QuantNet { ft_biases, threat_weights, threat_psqt, halfka_weights, halfka_psqt, stacks };
+    Ok((dequantise_net(spec, &q), description))
+}
+
+// ---------------------------------------------------------------------------
+// Enyo format-1 container, architecture 26 (tools/lib/enyo_net_v1.py and the
+// engine's src/nnue/enyo/enyo_nn_loader.cpp)
+
+pub const ENYO_MAGIC: &[u8; 8] = b"ENYONNUE";
+const ENYO_FORMAT_VERSION: u32 = 1;
+const ENYO_ARCHITECTURE: u32 = 26;
+const ENYO_HEADER_SIZE: usize = 40;
+
+fn fnv1a64(data: &[u8]) -> u64 {
+    const PRIME: u64 = 0x100_0000_01b3;
+    let mut h = 0xcbf2_9ce4_8422_2325_u64;
+    let words = data.chunks_exact(8);
+    let tail = words.remainder();
+    for word in words {
+        h = (h ^ u64::from_le_bytes(word.try_into().unwrap())).wrapping_mul(PRIME);
+    }
+    for &b in tail {
+        h = (h ^ u64::from(b)).wrapping_mul(PRIME);
+    }
+    h
+}
+
+pub fn is_enyo_net(bytes: &[u8]) -> bool {
+    bytes.starts_with(ENYO_MAGIC)
+}
+
+/// The architecture-26 layout block of `spec`.
+fn enyo_layout(spec: Spec) -> [u32; 8] {
+    [spec.input_set.layout_id(), 1, spec.l1 as u32, PSQT_BUCKETS as u32, STACKS as u32, spec.l2 as u32, spec.l3 as u32, 0]
+}
+
+/// Builds an architecture-26 net (either input set) from Bullet weights.
+/// `metadata` is written as "key=value" lines in order (name, trained). The
+/// engine loads only `Spec::engine_widths`.
+pub fn export_enyo_v1(spec: Spec, weights: &Weights, metadata: &[(String, String)]) -> Result<Vec<u8>, String> {
+    let q = quantise_net(spec, weights)?;
+    let mut payload = Vec::new();
+    for field in enyo_layout(spec) {
+        payload.extend_from_slice(&field.to_le_bytes());
+    }
+    payload.extend(q.ft_biases.iter().flat_map(|&b| (b as i16).to_le_bytes()));
+    encode_leb128_sized(q.halfka_weights.iter().copied(), &mut payload);
+    encode_leb128_sized(q.halfka_psqt.iter().copied(), &mut payload);
+    push_i8s(&mut payload, &q.threat_weights, q.threat_weights.len());
+    encode_leb128_sized(q.threat_psqt.iter().copied(), &mut payload);
+    for s in &q.stacks {
+        s.fc0_biases.iter().for_each(|&b| push_i32(&mut payload, b));
+        push_i8s(&mut payload, &s.fc0_weights, s.fc0_weights.len());
+        s.fc1_biases.iter().for_each(|&b| push_i32(&mut payload, b));
+        push_i8s(&mut payload, &s.fc1_weights, s.fc1_weights.len());
+        push_i32(&mut payload, s.fc2_bias);
+        push_i8s(&mut payload, &s.fc2_weights, s.fc2_weights.len());
+    }
+
+    let meta: String = metadata.iter().map(|(k, v)| format!("{k}={v}\n")).collect();
+    let mut out = Vec::with_capacity(ENYO_HEADER_SIZE + meta.len() + payload.len());
+    out.extend_from_slice(ENYO_MAGIC);
+    out.extend_from_slice(&ENYO_FORMAT_VERSION.to_le_bytes());
+    out.extend_from_slice(&ENYO_ARCHITECTURE.to_le_bytes());
+    out.extend_from_slice(&(meta.len() as u32).to_le_bytes());
+    out.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    out.extend_from_slice(&fnv1a64(&payload).to_le_bytes());
+    out.extend_from_slice(&[0; 8]);
+    out.extend_from_slice(meta.as_bytes());
+    out.extend_from_slice(&payload);
+    Ok(out)
+}
+
+/// Reads an architecture-26 net into Bullet weights (factorisers zero).
+/// Its input_set must be the one `spec` selects. Returns the weights and the
+/// metadata lines.
+pub fn import_enyo_v1(spec: Spec, bytes: &[u8]) -> Result<(Weights, Vec<(String, String)>), String> {
+    spec.validate()?;
+    let mut r = Reader { bytes, offset: 0 };
+    if r.take(8, "magic")? != ENYO_MAGIC {
+        return Err("not an Enyo format-1 net".to_string());
+    }
+    r.expect_u32(ENYO_FORMAT_VERSION, "format version")?;
+    r.expect_u32(ENYO_ARCHITECTURE, "architecture")?;
+    let meta_size = r.u32("metadata size")? as usize;
+    let payload_size = r.u32("payload size")? as usize;
+    let checksum = u64::from_le_bytes(r.take(8, "checksum")?.try_into().unwrap());
+    if r.take(8, "reserved")?.iter().any(|&b| b != 0) {
+        return Err("header reserved bytes are not zero".to_string());
+    }
+    let meta = String::from_utf8_lossy(r.take(meta_size, "metadata")?).into_owned();
+    if bytes.len() != ENYO_HEADER_SIZE + meta_size + payload_size {
+        return Err(format!("size mismatch: header declares {} bytes, file has {}", ENYO_HEADER_SIZE + meta_size + payload_size, bytes.len()));
+    }
+    if fnv1a64(&bytes[r.offset..]) != checksum {
+        return Err("checksum mismatch".to_string());
+    }
+    let metadata = meta
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+
+    let mut layout = [0_u32; 8];
+    for field in &mut layout {
+        *field = r.u32("layout")?;
+    }
+    if layout[0] != spec.input_set.layout_id() {
+        return Err(format!("net has input_set {}, the architecture selects {} ({})", layout[0], spec.input_set.layout_id(), spec.input_set.name()));
+    }
+    if layout != enyo_layout(spec) {
+        return Err(format!("net layout {layout:?} does not match the architecture ({:?})", enyo_layout(spec)));
+    }
+    let Spec { l1, l2, l3, input_set } = spec;
+    let ft_biases = r.i16s(l1, "ft biases")?;
+    let halfka_weights = r.leb128_sized(input_set.export_rows() * l1, "halfka weights")?;
+    let halfka_psqt = r.leb128_sized(input_set.export_rows() * PSQT_BUCKETS, "halfka psqt")?;
+    let threat_weights = r.i8s(THREAT_FEATURES * l1, "threat weights")?;
+    let threat_psqt = r.leb128_sized(THREAT_FEATURES * PSQT_BUCKETS, "threat psqt")?;
+    let mut stacks = Vec::with_capacity(STACKS);
+    for _ in 0..STACKS {
+        stacks.push(QuantStack {
+            fc0_biases: r.i32s(l2, "fc0 bias")?,
+            fc0_weights: r.i8s(l2 * l1, "fc0 weights")?,
+            fc1_biases: r.i32s(l3, "fc1 bias")?,
+            fc1_weights: r.i8s(l3 * 2 * l2, "fc1 weights")?,
+            fc2_bias: r.i32s(1, "fc2 bias")?[0],
+            fc2_weights: r.i8s(2 * l2 + 2 * l3, "fc2 weights")?,
+        });
+    }
+    if r.offset != bytes.len() {
+        return Err(format!("{} trailing bytes after the last layer stack", bytes.len() - r.offset));
+    }
+    let q = QuantNet { ft_biases, threat_weights, threat_psqt, halfka_weights, halfka_psqt, stacks };
+    Ok((dequantise_net(spec, &q), metadata))
 }
 
 /// (psqt_stm - psqt_nstm) / 2 of the position's bucket, in network units
@@ -687,7 +1045,8 @@ pub fn psqt_term(spec: Spec, weights: &Weights, pos: &ChessBoard) -> Result<f32,
         }
     };
     let mut total = 0.0_f64;
-    LayerStackInputs.map_features(pos, |stm, nstm| total += f64::from(row(stm)) - f64::from(row(nstm)));
+    LayerStackInputs { input_set: spec.input_set }
+        .map_features(pos, |stm, nstm| total += f64::from(row(stm)) - f64::from(row(nstm)));
     Ok((total / 2.0) as f32)
 }
 
@@ -984,6 +1343,103 @@ mod tests {
         assert_eq!(halfka_index(0, false, 12, 3), 11 + 64 + 31 * PLANES);
     }
 
+    /// Architecture-24/25 FeatureIdx as the trainer computed it for those nets
+    /// (main.rs enyo_feature::<32, 12>): `sq` and `king` a8 = 0 from white's
+    /// side of the perspective's board, `view` 0 for the side to move.
+    fn arch25_feature(piece: usize, sq: usize, king: usize, view: usize) -> usize {
+        let colour = usize::from(piece & 8 != 0);
+        let piece_code = ((piece & 7) << 1) | colour;
+        let orient = (7 * usize::from(king & 4 == 0)) ^ (56 * view);
+        let plane = 6 * ((piece_code ^ view) & 1) + (piece_code >> 1);
+        ENYO_KING_BUCKETS[orient ^ king] * PLANES + plane * 64 + (orient ^ sq)
+    }
+
+    #[test]
+    fn enyo_halfka_matches_the_architecture_25_inputs() {
+        // As EnyoInputs::map_features fed arch25_feature: side to move with
+        // our_ksq ^ 56, the other side with opp_ksq (already flipped).
+        for piece in (0..6).chain(8..14) {
+            let piece_type = piece & 7;
+            let ours = piece & 8 == 0;
+            for square in 0..64 {
+                for king in 0..64 {
+                    assert_eq!(
+                        enyo_halfka_index(piece_type, ours, square, king),
+                        arch25_feature(piece, square ^ 56, king ^ 56, 0)
+                    );
+                    assert_eq!(
+                        enyo_halfka_index(piece_type, !ours, square ^ 56, king),
+                        arch25_feature(piece, square ^ 56, king, 1)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn enyo_halfka_worked_examples() {
+        // The engine's tests (enyo_halfka.worked_examples) in Bullet squares.
+        assert_eq!(enyo_halfka_index(0, true, 12, 4), 52); // pawn e2, king e1
+        assert_eq!(enyo_halfka_index(0, false, 52, 4), 6 * 64 + 12); // their pawn e7
+        assert_eq!(enyo_halfka_index(0, true, 12, 3), 51); // king d1 mirrors e2 -> d2
+        assert_eq!(enyo_halfka_index(5, true, 22, 22), 10 * PLANES + 5 * 64 + 46); // king g3
+        assert_eq!(enyo_halfka_index(5, false, 62, 22), 10 * PLANES + 11 * 64 + 6); // their king g8
+        let mut seen = vec![false; HALFKA_FEATURES];
+        for piece_type in 0..6 {
+            for own in [true, false] {
+                for square in 0..64 {
+                    for king in 0..64 {
+                        seen[enyo_halfka_index(piece_type, own, square, king)] = true;
+                    }
+                }
+            }
+        }
+        assert!(seen.iter().all(|&s| s), "every Enyo HalfKA row is reachable");
+    }
+
+    fn noisy_weights(spec: Spec) -> Weights {
+        let mut weights = initial_weights(spec, 7);
+        let mut rng = ChaCha8Rng::seed_from_u64(3);
+        for v in weights.get_mut("l0v").unwrap() {
+            *v = (rng.random_range(-20..20) as f32) / FT_ONE;
+        }
+        for v in weights.get_mut("l1f").unwrap() {
+            *v = (rng.random_range(-20..20) as f32) / FC0_SCALE;
+        }
+        weights
+    }
+
+    fn test_metadata() -> Vec<(String, String)> {
+        vec![("name".into(), "test".into()), ("trained".into(), "2026-11-22T21:00Z".into())]
+    }
+
+    #[test]
+    fn enyo_v1_export_import_export_is_identical() {
+        for input_set in [InputSet::HalfKav2Hm, InputSet::EnyoHalfKa32x12] {
+            let spec = Spec { l1: 64, l2: 4, l3: 4, input_set };
+            let first = export_enyo_v1(spec, &noisy_weights(spec), &test_metadata()).unwrap();
+            assert!(is_enyo_net(&first));
+            let layout = ENYO_HEADER_SIZE + u32::from_le_bytes(first[16..20].try_into().unwrap()) as usize;
+            assert_eq!(u32::from_le_bytes(first[layout..layout + 4].try_into().unwrap()), input_set.layout_id());
+            let (imported, metadata) = import_enyo_v1(spec, &first).unwrap();
+            assert_eq!(metadata, test_metadata());
+            assert_eq!(export_enyo_v1(spec, &imported, &metadata).unwrap(), first, "{input_set:?}");
+            let other = Spec { input_set: if input_set == InputSet::HalfKav2Hm { InputSet::EnyoHalfKa32x12 } else { InputSet::HalfKav2Hm }, ..spec };
+            assert!(import_enyo_v1(other, &first).unwrap_err().contains("input_set"));
+        }
+    }
+
+    #[test]
+    fn enyo_v1_and_nnue_hold_the_same_halfkav2_hm_net() {
+        let spec = Spec { l1: 64, l2: 4, l3: 4, ..Spec::STOCKFISH };
+        let weights = noisy_weights(spec);
+        let (from_nnue, _) = import_nnue(spec, &export_nnue(spec, &weights, "test").unwrap()).unwrap();
+        let (from_enyo, _) = import_enyo_v1(spec, &export_enyo_v1(spec, &weights, &test_metadata()).unwrap()).unwrap();
+        assert_eq!(from_nnue, from_enyo);
+        let enyo = Spec { input_set: InputSet::EnyoHalfKa32x12, ..spec };
+        assert!(export_nnue(enyo, &initial_weights(enyo, 1), "test").is_err());
+    }
+
     #[test]
     fn hashes_match_the_engine() {
         // Values of the engine's FeatureTransformerHash / NetworkHash for
@@ -1009,7 +1465,7 @@ mod tests {
 
     #[test]
     fn export_import_export_is_identical() {
-        let spec = Spec { l1: 64, l2: 4, l3: 4 };
+        let spec = Spec { l1: 64, l2: 4, l3: 4, ..Spec::STOCKFISH };
         let mut weights = initial_weights(spec, 7);
         // Non-zero factors exercise coalescing; import zeroes them, so
         // the second export must still match byte for byte.
