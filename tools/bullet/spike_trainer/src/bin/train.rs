@@ -1115,6 +1115,14 @@ fn validate_layer_stacks(config: &Config) {
     if !uses_sfbinpack_loader(config) {
         fail("requires loader=sfbinpack".to_string());
     }
+    // net_format enyo-v1 publishes the export as an architecture-26 net,
+    // which holds only the widths the engine loads.
+    match string_at(&config.arch, "net_format") {
+        None => {}
+        Some("enyo-v1") if layer_stack_spec(&config.arch) == sfls::Spec::STOCKFISH => {}
+        Some("enyo-v1") => fail("net_format enyo-v1 (architecture 26) needs widths 1024/32/32".to_string()),
+        Some(other) => fail(format!("unknown net_format {other}")),
+    }
     let loss = object_at(&config.arch, "loss");
     if !loss.is_null() && !loss.is_object() {
         fail("architecture.loss must be an object".to_string());
@@ -3386,8 +3394,9 @@ fn cmd_export(config: &Config, force: bool) {
         );
         process::exit(1);
     });
-    // Architecture 24 and later publish the format-1 container the engine
-    // loads; runs/<run>/model.nn stays in the internal v8 layout.
+    // net_format enyo-v1 publishes the format-1 container the engine loads:
+    // architecture 26 from a layer-stacks model.nn (a Stockfish .nnue), 24/25
+    // from the internal v8/v12 layout. runs/<run>/model.nn is left as it is.
     if string_at(&config.arch, "net_format") == Some("enyo-v1") {
         let status = process::Command::new(".venv/bin/python")
             .arg("tools/lib/enyo_net_v1.py")

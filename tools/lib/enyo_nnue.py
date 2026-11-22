@@ -1227,6 +1227,9 @@ def _load_net_v1(path) -> "Net":
     """Format 1 (architecture 24 or 25), mapped onto the integer-dense v8/v12 Net."""
     from lib import enyo_net_v1 as v1
     net = v1.read(path)
+    if net.architecture == v1.LAYER_STACKS:
+        raise ValueError(f"{path}: architecture 26 (layer stacks) has no Python forward model; "
+                         "evaluate it with the engine (eval/evalnet)")
     a = net.arrays
     threats = net.architecture == 25
     input_weights = (np.concatenate([a["input_weights"], a["threat_weights"].astype(np.int16)])
