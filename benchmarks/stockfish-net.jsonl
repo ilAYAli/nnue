@@ -63,3 +63,4 @@
 {"candidate":"enyo-7.5.0-rc96","reference":"nn-1a298aa575a0.nnue","games":4000,"elo":-129.7,"ci":7.0}
 {"candidate":"enyo-23.0.0-rc2","reference":"nn-1a298aa575a0.nnue","games":1500,"elo":-159.2,"ci":10.9}
 {"candidate":"enyo-23.0.0-rc3","reference":"nn-1a298aa575a0.nnue","games":1500,"elo":-162.1,"ci":11.0}
+{"candidate":"enyo-23.0.0-rc6","reference":"nn-1a298aa575a0.nnue","games":1500,"elo":-417.3,"ci":21.8}
