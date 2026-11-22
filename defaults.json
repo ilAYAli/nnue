@@ -23,7 +23,9 @@
     "offset": 0,
     "min_ply": 16,
     "max_abs_cp": 10000,
-    "quiet_only": true
+    "quiet_only": true,
+    "interleave": false,
+    "random_skip": 0
   },
   "validation": {
     "static_rows": 50000,

@@ -115,7 +115,7 @@ const TRAINING_DEFAULT_KEYS: &[&str] = &[
 ];
 
 const SFBINPACK_DEFAULT_KEYS: &[&str] =
-    &["buffer_mb", "offset", "min_ply", "max_abs_cp", "quiet_only"];
+    &["buffer_mb", "offset", "min_ply", "max_abs_cp", "quiet_only", "interleave", "random_skip"];
 
 const BUILD_METADATA_KEYS: &[&str] = &[
     "run",
@@ -155,6 +155,8 @@ struct DataConfig {
     min_ply: u16,
     max_abs_cp: u32,
     quiet_only: bool,
+    interleave: bool,
+    random_skip: usize,
     output_bucket_weights: Vec<f32>,
     eval_bucket_weights: Vec<f32>,
 }
@@ -670,6 +672,8 @@ fn data_config(config: &Config) -> DataConfig {
         min_ply: training_nested_usize(config, "sfbinpack", "min_ply", 16) as u16,
         max_abs_cp: training_nested_usize(config, "sfbinpack", "max_abs_cp", 10000) as u32,
         quiet_only: training_nested_bool(config, "sfbinpack", "quiet_only", true),
+        interleave: training_nested_bool(config, "sfbinpack", "interleave", false),
+        random_skip: training_nested_usize(config, "sfbinpack", "random_skip", 0),
         output_bucket_weights: parse_output_bucket_weights(
             &training_output_bucket_weights(config),
             usize_at(&config.arch, "output_buckets", 8),
@@ -1994,6 +1998,11 @@ fn cmd_run(config: &Config, force: bool) {
         "ENYO_BULLET_SFBINPACK_QUIET_ONLY",
         usize::from(data.quiet_only),
     );
+    set_env(
+        "ENYO_BULLET_SFBINPACK_INTERLEAVE",
+        usize::from(data.interleave),
+    );
+    set_env("ENYO_BULLET_SFBINPACK_RANDOM_SKIP", data.random_skip);
 
     trainer_main::run_from_env();
     write_model(config);

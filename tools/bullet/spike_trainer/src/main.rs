@@ -380,9 +380,32 @@ fn make_sfbinpack_filter() -> impl Fn(&TrainingDataEntry) -> bool + Clone {
     let min_ply = env_parse("ENYO_BULLET_SFBINPACK_MIN_PLY", 16u16);
     let max_abs_cp = env_parse("ENYO_BULLET_SFBINPACK_MAX_ABS_CP", 10000u32);
     let quiet_only = env_parse("ENYO_BULLET_SFBINPACK_QUIET_ONLY", 1usize) != 0;
+    // Keep a position with probability 1 / (random_skip + 1), so consecutive
+    // positions of one game rarely land in the same shuffle buffer.
+    let random_skip = env_parse("ENYO_BULLET_SFBINPACK_RANDOM_SKIP", 0u64);
     move |entry: &TrainingDataEntry| {
         if entry.ply < min_ply {
             return false;
+        }
+        if random_skip > 0 {
+            thread_local!(static STATE: std::cell::Cell<u64> = std::cell::Cell::new(0));
+            let r = STATE.with(|state| {
+                let mut x = state.get();
+                if x == 0 {
+                    use std::hash::{Hash, Hasher};
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    std::thread::current().id().hash(&mut hasher);
+                    x = hasher.finish() | 1;
+                }
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                state.set(x);
+                x
+            });
+            if r % (random_skip + 1) != 0 {
+                return false;
+            }
         }
         if i32::from(entry.score).unsigned_abs() > max_abs_cp {
             return false;
@@ -1679,12 +1702,21 @@ fn train_enyo<
                 "sfbinpack" => {
                     let buffer_mb = env_parse("ENYO_BULLET_SFBINPACK_BUFFER_MB", 1024usize);
                     let dataloader = PhaseNormalizedSfBinpackLoader {
-                        inner: SfBinpackLoader::new_concat_multiple(
-                            &path_refs,
-                            buffer_mb,
-                            threads,
-                            make_sfbinpack_filter(),
-                        ),
+                        inner: if env_parse("ENYO_BULLET_SFBINPACK_INTERLEAVE", 0usize) != 0 {
+                            SfBinpackLoader::new_interleaved(
+                                &path_refs,
+                                buffer_mb,
+                                threads,
+                                make_sfbinpack_filter(),
+                            )
+                        } else {
+                            SfBinpackLoader::new_concat_multiple(
+                                &path_refs,
+                                buffer_mb,
+                                threads,
+                                make_sfbinpack_filter(),
+                            )
+                        },
                     };
                     run_trainer(&mut trainer, &schedule, &settings, &dataloader);
                 }
