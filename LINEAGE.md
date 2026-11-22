@@ -541,3 +541,4 @@ Reserved: `enyo-23.0.0-rc5` on pwa-llm (continue_from enyo-23.0.0-rc1; data: tes
 Void: `enyo-23.0.0-rc5` (abandoned at 214/1500 games; data-source series dropped; number consumed).
 Reserved: `enyo-23.0.0-rc6` on pwa-llm (scratch, architecture 23 unchanged; recipe test: 10 Stockfish binpacks interleaved, random skip 3, min ply 18, wdl 0, batch 16384, cosine lr 0.001 over 24000 superbatches = ~25B positions; Stockfish benchmark at 1500 games on enyo_11e57a2).
 Reserved: `enyo-23.0.0-rc7` on pwa-llm (diagnostic: continue_from enyo-23.0.0-rc1 with the rc6 data path and recipe for 1000 superbatches = ~1B positions; parent-relative SPRT vs rc1).
+Promoted: `enyo-23.0.0-rc7` (+15.5 vs rc1). Reserved: `enyo-23.1.0-rc1` on pwa-llm (continue_from rc7, unchanged regimen, random start chunks).
