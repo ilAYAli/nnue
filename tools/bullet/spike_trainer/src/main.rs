@@ -395,6 +395,7 @@ fn make_sfbinpack_filter() -> impl Fn(&TrainingDataEntry) -> bool + Clone {
                     use std::hash::{Hash, Hasher};
                     let mut hasher = std::collections::hash_map::DefaultHasher::new();
                     std::thread::current().id().hash(&mut hasher);
+                    std::time::SystemTime::now().hash(&mut hasher);
                     x = hasher.finish() | 1;
                 }
                 x ^= x << 13;
