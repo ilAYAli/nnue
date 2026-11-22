@@ -540,3 +540,4 @@ Reserved: `enyo-23.0.0-rc4` on pwa-llm (continue_from enyo-23.0.0-rc1; lr 0.0005
 Reserved: `enyo-23.0.0-rc5` on pwa-llm (continue_from enyo-23.0.0-rc1; data: test80-2022-08-aug-16tb7p.v6-dd.min.binpack offset 0 limit 100000000; otherwise the rc38 regimen; games on enyo_11e57a2).
 Void: `enyo-23.0.0-rc5` (abandoned at 214/1500 games; data-source series dropped; number consumed).
 Reserved: `enyo-23.0.0-rc6` on pwa-llm (scratch, architecture 23 unchanged; recipe test: 10 Stockfish binpacks interleaved, random skip 3, min ply 18, wdl 0, batch 16384, cosine lr 0.001 over 24000 superbatches = ~25B positions; Stockfish benchmark at 1500 games on enyo_11e57a2).
+Reserved: `enyo-23.0.0-rc7` on pwa-llm (diagnostic: continue_from enyo-23.0.0-rc1 with the rc6 data path and recipe for 1000 superbatches = ~1B positions; parent-relative SPRT vs rc1).
