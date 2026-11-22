@@ -544,3 +544,4 @@ Reserved: `enyo-23.0.0-rc7` on pwa-llm (diagnostic: continue_from enyo-23.0.0-rc
 Promoted: `enyo-23.0.0-rc7` (+15.5 vs rc1). Reserved: `enyo-23.1.0-rc1` on pwa-llm (continue_from rc7, unchanged regimen, random start chunks).
 Note: architecture 24 is the format-1 container of architecture 23 (engine c115d19); no training runs use number 24.
 Reserved: `enyo-25.0.0-rc1` on pwa-llm (architecture 25 = 23 + Stockfish-exact FullThreats inputs, format 1, engine 47e9ec2; initialize_from enyo-23.0.0-rc7, threat init scale 0.03; 10000 superbatches on the interleaved recipe; SPRT vs rc7 with REFERENCE_ENGINE=enyo_11e57a2).
+Reserved: `enyo-26.0.0-rc1` on pwa-llm (architecture 26 = Bullet layer-stacks mode: FullThreats + HalfKAv2_hm, pairwise product, PSQT, 8 stacks; scratch root with the nnue-pytorch recipe, 280 x 100M positions; exports Stockfish .nnue, engine 3d2f7d1+).
