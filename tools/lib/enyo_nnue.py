@@ -1217,19 +1217,22 @@ def write_net(net: Net, path: str | Path) -> None:
         net.input_buckets, net.output_buckets, net.output_head_features,
         net.feature_channels, net.full_threats or net.slider_xray_threats, net.full_heads,
         net.mixed_activation, net.psqt_residual, net.l2_output_skip, net.pawn_pairs)
-    if net.format_version in (2, 3, 4, 5, 6, 8, 9, 10, 11):
+    if net.format_version in (2, 3, 4, 5, 6, 8, 9, 10, 11, 12):
         expected += NETWORK_HEADER_SIZE
     if size != expected:
         raise RuntimeError(f"wrote {size} bytes, expected {expected}")
 
 
 def _load_net_v1(path) -> "Net":
-    """Format 1 / architecture 24, mapped onto the integer-dense v8 Net."""
+    """Format 1 (architecture 24 or 25), mapped onto the integer-dense v8/v12 Net."""
     from lib import enyo_net_v1 as v1
     net = v1.read(path)
     a = net.arrays
+    threats = net.architecture == 25
+    input_weights = (np.concatenate([a["input_weights"], a["threat_weights"].astype(np.int16)])
+                     if threats else a["input_weights"])
     return Net(
-        input_weights=a["input_weights"],
+        input_weights=input_weights,
         input_biases=a["input_biases"],
         l1_weights=a["l1_weights"],
         l1_biases=a["l1_biases"],
@@ -1242,7 +1245,8 @@ def _load_net_v1(path) -> "Net":
         output_buckets=8,
         output_head_features=0,
         trained_hidden=N_HIDDEN,
-        format_version=8,
+        format_version=12 if threats else 8,
+        full_threats=threats,
         mixed_activation=True,
         l2_output_skip=True,
         l2_squared_weights=a["l2_squared_weights"].astype(np.float32),
