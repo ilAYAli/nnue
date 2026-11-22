@@ -73,6 +73,7 @@ def existing_run_matches(
 def run_sprt(
     *,
     engine: Path,
+    reference_engine: Path | None = None,
     candidate_net: Path,
     reference_net: Path,
     games: int,
@@ -83,7 +84,7 @@ def run_sprt(
     command = [
         "forge", "run", "sprt",
         "--comment", comment or f"{candidate_net.name} vs {reference_net.name}",
-        "--reference", str(engine),
+        "--reference", str(reference_engine or engine),
         "--candidate", str(engine),
         "--reference-net", str(reference_net),
         "--candidate-net", str(candidate_net),
@@ -157,6 +158,11 @@ def main() -> None:
         "--reference", default=os.environ.get("REFERENCE_NET", "~/assets/nets/nn-1a298aa575a0.nnue")
     )
     parser.add_argument("--engine", default=os.environ.get("ENGINE", "~/assets/engines/enyo_40e0d7e"))
+    parser.add_argument(
+        "--reference-engine",
+        default=os.environ.get("REFERENCE_ENGINE") or None,
+        help="engine for the reference net when it needs an older build (net architecture change); defaults to --engine",
+    )
     parser.add_argument("--comment")
     parser.add_argument(
         "--early-stop",
@@ -169,6 +175,7 @@ def main() -> None:
     candidate_net = Path(args.candidate).expanduser()
     reference_net = Path(args.reference).expanduser()
     engine = Path(args.engine).expanduser()
+    reference_engine = Path(args.reference_engine).expanduser() if args.reference_engine else engine
 
     if not (engine.is_file() and os.access(engine, os.X_OK)):
         sys.exit(f"Error: ENGINE is not executable: {engine}")
@@ -178,10 +185,13 @@ def main() -> None:
         sys.exit(f"Error: REFERENCE_NET not found: {reference_net}")
 
     check_engine_loads_net(engine, "CANDIDATE_NET", candidate_net)
-    check_engine_loads_net(engine, "REFERENCE_NET", reference_net)
+    if not (reference_engine.is_file() and os.access(reference_engine, os.X_OK)):
+        sys.exit(f"Error: REFERENCE_ENGINE is not executable: {reference_engine}")
+    check_engine_loads_net(reference_engine, "REFERENCE_NET", reference_net)
 
     run = run_sprt(
         engine=engine,
+        reference_engine=reference_engine,
         candidate_net=candidate_net,
         reference_net=reference_net,
         games=games,
