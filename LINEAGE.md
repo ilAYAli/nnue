@@ -537,3 +537,4 @@ Baseline: `enyo-7.5.0-rc38` vs Stockfish nn-1a298aa575a0 on enyo_11e57a2 at 1500
 Reserved: `enyo-23.0.0-rc2` on pwa-llm (continue_from enyo-23.0.0-rc1; unchanged rc38 regimen on Pylon offset 2.3e9; games on enyo_11e57a2).
 Reserved: `enyo-23.0.0-rc3` on pwa-llm (continue_from enyo-23.0.0-rc1; dose 5x: 500M Pylon positions from offset 2.4e9, 3840 superbatches; otherwise the rc38 regimen; games on enyo_11e57a2).
 Reserved: `enyo-23.0.0-rc4` on pwa-llm (continue_from enyo-23.0.0-rc1; lr 0.0005 instead of 0.004; 100M Pylon positions from offset 2.9e9, 768 superbatches; games on enyo_11e57a2).
+Reserved: `enyo-23.0.0-rc5` on pwa-llm (continue_from enyo-23.0.0-rc1; data: test80-2022-08-aug-16tb7p.v6-dd.min.binpack offset 0 limit 100000000; otherwise the rc38 regimen; games on enyo_11e57a2).
