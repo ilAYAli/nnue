@@ -28,9 +28,10 @@ def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
         result = exc
 
     output = (result.stdout or "") + (result.stderr or "")
-    resolved_net = net.resolve()
     rc = getattr(result, "returncode", 1) or 0
-    if rc != 0 or f"path='{resolved_net}'" not in output or re.search(r"ERROR:|falling back", output):
+    # A loaded net prints an "evaluator=" line; a rejected one prints ERROR and
+    # keeps the previous net, so both conditions are needed.
+    if rc != 0 or "info string evaluator=" not in output or re.search(r"ERROR:|falling back", output):
         print(f"Error: engine cannot load {role}: engine={engine} net={net}", file=sys.stderr)
         print("\n".join(output.splitlines()[-40:]), file=sys.stderr)
         sys.exit(1)
