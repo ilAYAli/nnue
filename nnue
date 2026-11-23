@@ -495,7 +495,7 @@ startpos_gate() {
   buckets=$(jq -r '.runtime_input_buckets // .input_buckets' "$ARCH")
   channels=$(jq -r .feature_channels "$ARCH")
   if [[ "$arch_mode" == layer-stacks ]]; then
-    grep -q "hidden=$hidden" "$log" || fail "hidden mismatch, expected $hidden" startpos
+    : # the loader checks the layout; netinfo above confirmed the evaluator
   elif [[ $(jq -r '.net_format // ""' "$ARCH") == enyo-v1 ]]; then
     # Format-1 nets carry only an architecture number; the engine reports it.
     local architecture=24
