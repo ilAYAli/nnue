@@ -557,3 +557,4 @@ Result: `enyo-26.0.0-rc4` (Enyo king layout) vs rc3: FAIL non-regression, Elo -2
 Note: `enyo-26.0.0-rc7` SPRT cancelled: it contains the Enyo king layout, which failed in rc4.
 Reserved: `enyo-26.0.0-rc9` on pwa-llm (continue_from rc2, second stage: 280 x 100M, one-cycle peak lr 2e-4; rc2 was -56 vs the bot net nn-0ee0657fb25e).
 Result: `enyo-26.0.0-rc5` (game-phase buckets) vs rc3: PASS (identity), Elo +3.5 +-5.1, LOS 91%, 6000 games (sprt-enyo_556170d-6000-20261123-052601). Phase buckets kept.
+Result: `enyo-26.0.0-rc6` (fc0 width 64) vs rc3: FAIL (gain test), Elo -15.2 +-6.6, LLR -2.97/2.94, 3604 games (sprt-enyo_556170d-6000-20261123-052626). fc0 stays 32.
