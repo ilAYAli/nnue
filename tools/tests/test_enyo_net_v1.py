@@ -63,22 +63,22 @@ def test_fc0_64_and_phase_buckets_are_layouts_without_nnue_form():
             assert sections["fc2_weights"] == (2 * fc0_out + 64,)
             with pytest.raises(ValueError, match="no Stockfish .nnue form"):
                 v1.to_nnue(v1.NetV1(v1.LAYER_STACKS, 0, 0, {}, {}, layout), "")
-    with pytest.raises(ValueError, match="fc0_out=48 .*supported: .*hidden=1024[|]1536 .*fc0_out=32[|]64 .*bucket_scheme=0[|]1"):
+    with pytest.raises(ValueError, match="fc0_out=48 .*supported: .*hidden=1024[|]1280 .*fc0_out=32[|]64 .*bucket_scheme=0[|]1"):
         v1.check_layout(dict(v1.SUPPORTED_LAYOUT, fc0_out=48))
     with pytest.raises(ValueError, match="bucket_scheme=2"):
         v1.check_layout(dict(v1.SUPPORTED_LAYOUT, bucket_scheme=2))
 
 
-def test_hidden_1536_is_a_layout_without_nnue_form():
+def test_hidden_1280_is_a_layout_without_nnue_form():
     for fc0_out in (32, 64):
         for input_set in (0, 1):
-            layout = dict(v1.SUPPORTED_LAYOUT, input_set=input_set, hidden=1536, fc0_out=fc0_out)
+            layout = dict(v1.SUPPORTED_LAYOUT, input_set=input_set, hidden=1280, fc0_out=fc0_out)
             v1.check_layout(layout)
             sections = {name: shape for name, _, shape in v1.stack_sections(layout)}
-            assert sections["fc0_weights"] == (fc0_out, 1536)
+            assert sections["fc0_weights"] == (fc0_out, 1280)
             with pytest.raises(ValueError, match="no Stockfish .nnue form"):
                 v1.to_nnue(v1.NetV1(v1.LAYER_STACKS, 0, 0, {}, {}, layout), "")
-    with pytest.raises(ValueError, match="hidden=2048 .*supported: .*hidden=1024[|]1536"):
+    with pytest.raises(ValueError, match="hidden=2048 .*supported: .*hidden=1024[|]1280"):
         v1.check_layout(dict(v1.SUPPORTED_LAYOUT, hidden=2048))
 
 

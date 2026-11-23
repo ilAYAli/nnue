@@ -26,7 +26,7 @@ Payload, architecture 26 (layer stacks; the engine's native architecture):
     input_set=0 (HalfKAv2_hm as Stockfish, F = 22528 rows) or 1 (Enyo HalfKA 32 king
     buckets x 12 planes, the architecture-24/25 layout, F = 24576 rows; engine
     src/nnue/enyo/enyo_halfka.hpp), threats=1 (Stockfish FullThreats), H=1024 or
-    1536 (fc0 reads the pairwise products of each perspective's two H/2 halves,
+    1280 (fc0 reads the pairwise products of each perspective's two H/2 halves,
     H inputs in all), P=8, stacks=8, fc0_out=32 or 64 (incl. the passthrough
     pair), fc1_out=32, bucket_scheme=0 ((pieces - 1) / 4) or 1 (game phase:
     min(7, phase * 8 / 25), phase = min(24, N + B + 2 R + 4 Q) over both sides).
@@ -93,7 +93,7 @@ LAYOUT = struct.Struct("<8I")
 SUPPORTED_LAYOUT = {"input_set": 0, "threats": 1, "hidden": 1024, "psqt_buckets": 8,
                     "stacks": 8, "fc0_out": 32, "fc1_out": 32, "bucket_scheme": 0}
 # Fields that may take other values than SUPPORTED_LAYOUT's.
-LAYOUT_CHOICES = {"input_set": (0, 1), "hidden": (1024, 1536), "fc0_out": (32, 64),
+LAYOUT_CHOICES = {"input_set": (0, 1), "hidden": (1024, 1280), "fc0_out": (32, 64),
                   "bucket_scheme": (0, 1)}
 HALFKA_V2_FEATURES = 22_528
 # King rows per input_set: HalfKAv2_hm, Enyo HalfKA 32x12.
