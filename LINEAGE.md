@@ -553,3 +553,4 @@ Reserved: `enyo-26.0.0-rc5` on pwa-5090 (variant of rc3: game-phase buckets, buc
 Reserved: `enyo-26.0.0-rc6` on pwa-hak (variant of rc3: fc0 width 64; 4B schedule; strength test).
 Reserved: `enyo-26.0.0-rc7` on pwa-hak (combination: Enyo king layout + game-phase buckets; 4B schedule; compared with rc3).
 Reserved: `enyo-26.0.0-rc8` on pwa-5090 (variant of rc3: accumulator width 1536; 4B schedule; strength test).
+Result: `enyo-26.0.0-rc4` (Enyo king layout) vs rc3: FAIL non-regression, Elo -2.9 +-2.9, LLR -2.94/2.94, 18k games (sprt-enyo_58821b7-20000-20261122-234912). HalfKAv2_hm kept.
