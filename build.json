@@ -1,13 +1,13 @@
 {
-  "run": "enyo-26.0.0-rc12",
-  "hypothesis": "Phase buckets on the strongest net: initialize enyo-26.0.0-rc9 (relabelled bucket_scheme 1 as enyo-26.0.0-rc9-phase-init.nn, same weights) (56B, +15.6 vs rc2, -15.3 vs nn-1a298) under bucket_scheme phase (kept as rc5, +3.5 vs rc3) and fine-tune 60 x 100M positions, one-cycle peak lr 1e-4. Same weights, stacks re-routed by game phase instead of piece count.",
+  "run": "enyo-26.0.0-rc15",
+  "hypothesis": "Third stage: continue enyo-26.0.0-rc9 (56B, +15.6 vs rc2, -15.3 vs nn-1a298) for another 280 x 100M positions with the rc9 recipe (one-cycle peak lr 2e-4). Data now includes the full T60T70wIsRightFarseer.binpack on pwa-llm (rc2/rc9 read a 95 MB truncated copy).",
   "loader": "sfbinpack",
   "batch_size": 65536,
   "batches": 1526,
-  "superbatches": 60,
+  "superbatches": 280,
   "save_rate": 20,
-  "lr": 0.0001,
-  "final_lr": 1.6E-8,
+  "lr": 0.0002,
+  "final_lr": 1.6e-08,
   "lr_schedule": "onecycle",
   "lr_warmup_pct": 0.05,
   "lr_start_div": 25.0,
@@ -23,5 +23,5 @@
     "skip_predicate": "nnue-pytorch",
     "reader_threads": 8
   },
-  "initialize_from": "enyo-26.0.0-rc9-phase-init"
+  "continue_from": "enyo-26.0.0-rc9"
 }
