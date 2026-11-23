@@ -1,12 +1,12 @@
 {
-  "run": "enyo-26.0.0-rc2",
-  "hypothesis": "Architecture 26, scratch root (rerun of void rc1 with the fixed, fast loader): the layer-stacks structure that reached -39 vs nn-1a298 in nnue-pytorch (FullThreats + HalfKAv2_hm, pairwise product, PSQT, 8 per-bucket stacks), now trained in Bullet with the same recipe (280 x 100M positions, AdamW lr 4e-4 one-cycle, lambda 1, nnue-pytorch filter). Checkpoints at 40/100/200 superbatches compare with nnue-pytorch -116/-79/-38.",
+  "run": "enyo-26.0.0-rc9",
+  "hypothesis": "Second stage: continue enyo-26.0.0-rc2 (28B, -26.5 vs nn-1a298, -56 vs the bot net nn-0ee0657fb25e) for another 280 x 100M positions with the same recipe at half the peak learning rate (2e-4 one-cycle). rc2 was still improving steeply at the end of stage 1.",
   "loader": "sfbinpack",
   "batch_size": 65536,
   "batches": 1526,
   "superbatches": 280,
   "save_rate": 20,
-  "lr": 0.0004,
+  "lr": 0.0002,
   "final_lr": 1.6e-08,
   "lr_schedule": "onecycle",
   "lr_warmup_pct": 0.05,
@@ -22,5 +22,6 @@
     "min_ply": 19,
     "skip_predicate": "nnue-pytorch",
     "reader_threads": 8
-  }
+  },
+  "continue_from": "enyo-26.0.0-rc2"
 }
