@@ -564,3 +564,4 @@ Result: `enyo-26.0.0-rc8` (width 1536) vs rc3: FAIL (gain test, 4B schedule), El
 Result: `enyo-26.0.0-rc9` (rc2 second stage) vs rc2: PASS, Elo +15.6 +-10.6, LLR 2.32/2.20, 1270 games (enyo-26.0.0-rc9-sprt-1500-20261123-113754). vs nn-1a298aa575a0: Elo -15.3 +-9.8, 1500 games (sprt-enyo_901a54b-1500-20261123-115724). Strongest Enyo-owned net; reference.net -> enyo-26.0.0-rc9.a26.nn.
 Reserved: `enyo-26.0.0-rc12` on pwa-llm (initialize_from rc9 under phase buckets, 60 x 100M fine-tune, peak lr 1e-4).
 Running: `enyo-26.0.0-rc11` (width 1536) vs `enyo-26.0.0-rc10` (width 1024), both phase buckets on a 10B schedule: gain SPRT 0..5, alpha/beta 0.05, 6000-game cap, engine enyo_607cac7 (sprt-enyo_607cac7-6000-20261123-131409). rc10 sha256 dd8abd4d..., rc11 sha256 0ec9ae7d....
+Reserved: `enyo-26.0.0-rc13` on pwa-5090 (phase buckets, width 1280, 10B schedule; SPRT vs rc10, gain test).
