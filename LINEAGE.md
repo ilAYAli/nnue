@@ -551,3 +551,4 @@ Reserved: `enyo-26.0.0-rc3` on pwa-5090 (4B baseline for own-architecture varian
 Reserved: `enyo-26.0.0-rc4` on pwa-hak (variant of rc3: input_set enyo_halfka_32x12 = Enyo king layout, otherwise identical 4B schedule; arch-26 export).
 Reserved: `enyo-26.0.0-rc5` on pwa-5090 (variant of rc3: game-phase buckets, bucket_scheme phase; 4B schedule; non-regression test).
 Reserved: `enyo-26.0.0-rc6` on pwa-hak (variant of rc3: fc0 width 64; 4B schedule; strength test).
+Reserved: `enyo-26.0.0-rc7` on pwa-hak (combination: Enyo king layout + game-phase buckets; 4B schedule; compared with rc3).
