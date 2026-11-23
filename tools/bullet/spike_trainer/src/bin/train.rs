@@ -1077,9 +1077,9 @@ fn is_layer_stacks(arch: &Value) -> bool {
     string_at(arch, "mode") == Some("layer-stacks")
 }
 
-/// architecture.json of mode "layer-stacks": hidden (L1), l2_size (fc0
-/// outputs including the passthrough pair, the architecture-26 fc0_out: 32 or
-/// 64 for the engine), l3_size, input_set ("halfkav2_hm", the default, or
+/// architecture.json of mode "layer-stacks": hidden (L1, the architecture-26
+/// hidden: 1024 or 1536 for the engine), l2_size (fc0 outputs including the
+/// passthrough pair, the architecture-26 fc0_out: 32 or 64), l3_size, input_set ("halfkav2_hm", the default, or
 /// "enyo_halfka_32x12"), bucket_scheme ("piece_count", the default, or
 /// "phase"), fake_quantization, description, and the nnue-pytorch loss under
 /// "loss".
@@ -1125,24 +1125,26 @@ fn validate_layer_stacks(config: &Config) {
     let spec = layer_stack_spec(&config.arch);
     spec.validate().unwrap_or_else(|err| fail(err));
     if !spec.engine_widths() {
-        eprintln!("warning: layer-stacks widths differ from 1024/32|64/32; the engine only loads those");
+        eprintln!("warning: layer-stacks widths differ from 1024|1536/32|64/32; the engine only loads those");
     }
     if !uses_sfbinpack_loader(config) {
         fail("requires loader=sfbinpack".to_string());
     }
     // net_format enyo-v1 publishes the export as an architecture-26 net,
     // which holds only the widths the engine loads. A net without a .nnue
-    // form (input set Enyo HalfKA, phase buckets, fc0 64) needs it.
+    // form (input set Enyo HalfKA, phase buckets, hidden 1536, fc0 64) needs
+    // it.
     match string_at(&config.arch, "net_format") {
         None if !spec.nnue_form() => fail(format!(
-            "input_set {} / bucket_scheme {} / l2_size {} has no Stockfish .nnue form; set net_format enyo-v1",
+            "input_set {} / bucket_scheme {} / hidden {} / l2_size {} has no Stockfish .nnue form; set net_format enyo-v1",
             spec.input_set.name(),
             spec.bucket_scheme.name(),
+            spec.l1,
             spec.l2
         )),
         None => {}
         Some("enyo-v1") if spec.engine_widths() => {}
-        Some("enyo-v1") => fail("net_format enyo-v1 (architecture 26) needs widths 1024/32|64/32".to_string()),
+        Some("enyo-v1") => fail("net_format enyo-v1 (architecture 26) needs widths 1024|1536/32|64/32".to_string()),
         Some(other) => fail(format!("unknown net_format {other}")),
     }
     let loss = object_at(&config.arch, "loss");
@@ -3545,6 +3547,14 @@ mod tests {
         assert!(!spec.nnue_form());
         let spec = layer_stack_spec(&json!({"mode": "layer-stacks", "bucket_scheme": "piece_count"}));
         assert_eq!(spec, sfls::Spec::STOCKFISH);
+    }
+
+    #[test]
+    fn layer_stack_hidden_1536_is_an_architecture_26_net() {
+        let spec = layer_stack_spec(&json!({"mode": "layer-stacks", "hidden": 1536}));
+        assert_eq!(spec, sfls::Spec { l1: 1536, ..sfls::Spec::STOCKFISH });
+        assert!(spec.engine_widths());
+        assert!(!spec.nnue_form());
     }
 
     fn defaults() -> Value {

@@ -16,8 +16,8 @@
 //!   bucket: fc0 L1 -> L2 (factorised across stacks), [sqr(fc0), fc0]
 //!   clipped to 127/128, fc1 2*L2 -> L3, [sqr(fc1), fc1] clipped, fc2 over
 //!   [fc0 branch, fc1 branch] -> 1, plus fc0[L2-2] - fc0[L2-1] passthrough,
-//!   plus (psqt_stm - psqt_nstm) / 2. L2 is the architecture-26 fc0_out (the
-//!   engine loads 32 and 64), L3 its fc1_out.
+//!   plus (psqt_stm - psqt_nstm) / 2. L1 is the architecture-26 hidden (the
+//!   engine loads 1024 and 1536), L2 its fc0_out (32 and 64), L3 its fc1_out.
 //!
 //! Everything here is CPU-side and graph independent: input indexing, the
 //! nnue-pytorch initialisation, Stockfish .nnue export/import (nnue-pytorch
@@ -197,7 +197,7 @@ impl BucketScheme {
 }
 
 /// Layer widths, the king input set and the bucket scheme. The engine loads
-/// L1 1024, L2 (fc0_out) 32 or 64 and L3 32.
+/// L1 (hidden) 1024 or 1536, L2 (fc0_out) 32 or 64 and L3 32.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Spec {
     pub l1: usize,
@@ -210,13 +210,15 @@ pub struct Spec {
 impl Spec {
     pub const STOCKFISH: Spec =
         Spec { l1: 1024, l2: 32, l3: 32, input_set: InputSet::HalfKav2Hm, bucket_scheme: BucketScheme::PieceCount };
+    /// The accumulator widths (L1, hidden) the engine loads.
+    pub const ENGINE_L1: [usize; 2] = [1024, 1536];
     /// The fc0 widths (L2) the engine loads.
     pub const ENGINE_L2: [usize; 2] = [32, 64];
 
-    /// Widths the engine loads (1024/32|64/32), whatever the input set and
-    /// bucket scheme.
+    /// Widths the engine loads (1024|1536/32|64/32), whatever the input set
+    /// and bucket scheme.
     pub fn engine_widths(self) -> bool {
-        self.l1 == Self::STOCKFISH.l1 && Self::ENGINE_L2.contains(&self.l2) && self.l3 == Self::STOCKFISH.l3
+        Self::ENGINE_L1.contains(&self.l1) && Self::ENGINE_L2.contains(&self.l2) && self.l3 == Self::STOCKFISH.l3
     }
 
     /// Whether a run publishes the net as a Stockfish .nnue: HalfKAv2_hm with
@@ -225,7 +227,7 @@ impl Spec {
     pub fn nnue_form(self) -> bool {
         self.input_set == InputSet::HalfKav2Hm
             && self.bucket_scheme == BucketScheme::PieceCount
-            && (self.l2 == Self::STOCKFISH.l2 || !self.engine_widths())
+            && ((self.l1, self.l2) == (Self::STOCKFISH.l1, Self::STOCKFISH.l2) || !self.engine_widths())
     }
 
     pub fn validate(self) -> Result<(), String> {
@@ -1569,10 +1571,14 @@ mod tests {
         let enyo = Spec { input_set: InputSet::EnyoHalfKa32x12, ..Spec::STOCKFISH };
         for spec in [Spec::STOCKFISH, wide, phase, Spec { l2: 64, ..phase }, enyo, Spec { l2: 64, ..enyo }] {
             assert!(spec.engine_widths(), "{spec:?}");
+            assert!(Spec { l1: 1536, ..spec }.engine_widths(), "{spec:?}");
+            assert!(!Spec { l1: 1536, ..spec }.nnue_form(), "{spec:?}");
         }
         assert!(!Spec { l2: 16, ..Spec::STOCKFISH }.engine_widths());
+        assert!(!Spec { l1: 2048, ..Spec::STOCKFISH }.engine_widths());
         assert!(Spec::STOCKFISH.nnue_form());
         assert!(Spec { l1: 512, l2: 16, ..Spec::STOCKFISH }.nnue_form());
+        assert!(Spec { l1: 2048, ..Spec::STOCKFISH }.nnue_form());
         assert!(!wide.nnue_form() && !phase.nnue_form() && !enyo.nnue_form());
     }
 
