@@ -1,6 +1,6 @@
 {
-  "run": "enyo-26.0.0-rc1",
-  "hypothesis": "Architecture 26, scratch root: the layer-stacks structure that reached -39 vs nn-1a298 in nnue-pytorch (FullThreats + HalfKAv2_hm, pairwise product, PSQT, 8 per-bucket stacks), now trained in Bullet with the same recipe (280 x 100M positions, AdamW lr 4e-4 one-cycle, lambda 1, nnue-pytorch filter). Checkpoints at 40/100/200 superbatches compare with nnue-pytorch -116/-79/-38.",
+  "run": "enyo-26.0.0-rc2",
+  "hypothesis": "Architecture 26, scratch root (rerun of void rc1 with the fixed, fast loader): the layer-stacks structure that reached -39 vs nn-1a298 in nnue-pytorch (FullThreats + HalfKAv2_hm, pairwise product, PSQT, 8 per-bucket stacks), now trained in Bullet with the same recipe (280 x 100M positions, AdamW lr 4e-4 one-cycle, lambda 1, nnue-pytorch filter). Checkpoints at 40/100/200 superbatches compare with nnue-pytorch -116/-79/-38.",
   "loader": "sfbinpack",
   "batch_size": 65536,
   "batches": 1526,
