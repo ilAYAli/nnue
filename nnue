@@ -480,8 +480,12 @@ startpos_gate() {
     grep -Eq 'evaluator=(enyo|native)-nnue|evaluator=legacy-default source=file' "$log" \
       || fail "engine did not load legacy direct NNUE" startpos
   elif [[ "$arch_mode" == layer-stacks ]]; then
-    # Stockfish-format .nnue (Full_Threats+HalfKAv2_hm^ layer stacks).
-    grep -q 'evaluator=stockfish-nnue' "$log" || fail "engine did not load the Stockfish-format net" startpos
+    # A Stockfish-format .nnue, or architecture 26 with net_format enyo-v1.
+    if [[ $(jq -r '.net_format // "nnue"' "$ARCH") == enyo-v1 ]]; then
+      grep -q 'evaluator=enyo-nnue .*architecture=26' "$log" || fail "engine did not load the architecture-26 net" startpos
+    else
+      grep -q 'evaluator=stockfish-nnue' "$log" || fail "engine did not load the Stockfish-format net" startpos
+    fi
   else
     grep -Eq 'evaluator=(enyo|native)-nnue' "$log" || fail "engine did not load Enyo NNUE" startpos
   fi
