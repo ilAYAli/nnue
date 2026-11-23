@@ -471,7 +471,7 @@ startpos_gate() {
   [[ -f "$candidate_net" ]] || fail "missing candidate net: $candidate_net" startpos
 
   local log="$log_dir/02-startpos.log"
-  printf 'uci\nsetoption name nnue_file value %s\nisready\nposition startpos\ngo depth 4\nquit\n' "$candidate_net" \
+  printf 'uci\nsetoption name nnue_file value %s\nisready\nnetinfo\nposition startpos\ngo depth 4\nquit\n' "$candidate_net" \
     | "$ENGINE" | tee "$log"
 
   local arch_mode

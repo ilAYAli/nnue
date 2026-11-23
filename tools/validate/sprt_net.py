@@ -19,7 +19,7 @@ def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
     try:
         result = subprocess.run(
             [str(engine)],
-            input=f"setoption name nnue_file value {net}\nquit\n",
+            input=f"setoption name nnue_file value {net}\nisready\nnetinfo\nquit\n",
             capture_output=True,
             text=True,
             timeout=20,
@@ -29,9 +29,10 @@ def check_engine_loads_net(engine: Path, role: str, net: Path) -> None:
 
     output = (result.stdout or "") + (result.stderr or "")
     rc = getattr(result, "returncode", 1) or 0
-    # A loaded net prints an "evaluator=" line; a rejected one prints ERROR and
-    # keeps the previous net, so both conditions are needed.
-    if rc != 0 or "info string evaluator=" not in output or re.search(r"ERROR:|falling back", output):
+    # `netinfo` names the active net (older engines print an "info string
+    # evaluator=" line on load instead); a rejected net prints ERROR and keeps
+    # the previous one, so both conditions are needed.
+    if rc != 0 or "evaluator=" not in output or re.search(r"ERROR:|falling back", output):
         print(f"Error: engine cannot load {role}: engine={engine} net={net}", file=sys.stderr)
         print("\n".join(output.splitlines()[-40:]), file=sys.stderr)
         sys.exit(1)
