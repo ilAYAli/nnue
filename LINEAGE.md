@@ -569,3 +569,4 @@ Reserved: `enyo-26.0.0-rc14` on pwa-5090 (piece-count buckets, width 1024, 10B s
 Result: `enyo-26.0.0-rc12` (rc9 relabelled to phase buckets + 6B fine-tune, peak lr 1e-4) vs rc9: FAIL, Elo -9.5 +-9.5, LLR -1.80/2.20, 1500 games (enyo-26.0.0-rc12-sprt-1500-20261123-135232). Converting a trained piece-count net to phase buckets loses more than phase buckets gain (+3.5 +-5.1 from scratch); the lineage keeps piece-count buckets.
 Reserved: `enyo-26.0.0-rc15` on pwa-llm (continue_from rc9, third stage, 280 x 100M, peak lr 2e-4; full T60T70 data).
 Running: `enyo-26.0.0-rc13` (1280) vs `enyo-26.0.0-rc14` (1024), piece-count, 10B: gain SPRT 0..5, alpha/beta 0.05, 6000 cap, engine enyo_2090cc0. rc13 sha256 cf6bddf8..., rc14 sha256 b0912df2....
+Reserved: `enyo-26.0.0-rc16` on pwa-hak (rc9 widened to 1280 by tools/lib/widen_net.py, then the rc15 third-stage recipe: 280 x 100M, peak lr 2e-4; SPRT vs rc15 at equal history).
