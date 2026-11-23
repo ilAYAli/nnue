@@ -26,6 +26,7 @@ Earlier names (all `enyo-26.0.0-rcN`) stay as committed. This table is their key
 | 26.0.0-rc13 | - | variant | piece-count, 1280, 10B | about even (-3.0) vs rc14 |
 | 26.0.0-rc14 | - | baseline | piece-count, 1024, 10B | - |
 | **26.0.0-rc15** | **26.2** | **main line** | rc9 + 28B (stage 3), full T60T70 data | +13.0 vs rc9; **+2.5 +-10.1 vs nn-1a298** (even) |
+| 26.3.0-rc1 | (26.3 if accepted) | main line candidate | rc15 + 28B (stage 4) | training |
 | 27.0.0-rc1 | - | architecture test | rc9 widened to 1280 + 28B (trainer dir enyo-26.0.0-rc16 on pwa-hak) | training, vs rc15 |
 
 Next names:
@@ -605,3 +606,4 @@ Reserved: `enyo-26.0.0-rc15` on pwa-llm (continue_from rc9, third stage, 280 x 1
 Result: `enyo-26.0.0-rc13` (1280) vs `enyo-26.0.0-rc14` (1024), piece-count, 10B: gain SPRT 0..5, alpha/beta 0.05, 6000 cap, engine enyo_2090cc0. rc13 sha256 cf6bddf8..., rc14 sha256 b0912df2.... Stopped early: about even at 10B (elo=-3.0 llr=-0.80/2.94 (-27%) los=16.1% ci=5.9 draw=49.1% games=4046/6000 tasks=2023/3000, sprt-enyo_2090cc0-6000-20261123-173703). Not a rejection of 1280: tested at equal long training as rc16 vs rc15.
 Reserved: `enyo-27.0.0-rc1` on pwa-hak (architecture 27, first of the width-1280 lineage; trainer run directory enyo-26.0.0-rc16 on pwa-hak only. rc9 widened to 1280 by tools/lib/widen_net.py, then the rc15 third-stage recipe: 280 x 100M, peak lr 2e-4; SPRT vs rc15 at equal history).
 Result: `enyo-26.0.0-rc15` (26.2, rc9 third stage) vs nn-1a298aa575a0: Elo +2.5 +-10.1, 1500 games (sprt-enyo_2090cc0-1500-20261123-221302), LOS 68.9%. Statistically equal to the Stockfish net. vs rc9: +13.0 +-9.5 (enyo-26.0.0-rc15-sprt-1500-20261123-215501). reference.net -> enyo-26.0.0-rc15.a26.nn on all hosts.
+Reserved: `enyo-26.3.0-rc1` on pwa-llm (continue_from enyo-26.0.0-rc15, fourth stage, 280 x 100M, peak lr 2e-4).
