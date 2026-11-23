@@ -560,3 +560,4 @@ Result: `enyo-26.0.0-rc5` (game-phase buckets) vs rc3: PASS (identity), Elo +3.5
 Result: `enyo-26.0.0-rc6` (fc0 width 64) vs rc3: FAIL (gain test), Elo -15.2 +-6.6, LLR -2.97/2.94, 3604 games (sprt-enyo_556170d-6000-20261123-052626). fc0 stays 32.
 Reserved: `enyo-26.0.0-rc10` on pwa-5090 (phase buckets, width 1024, 10B schedule: capacity-test baseline).
 Reserved: `enyo-26.0.0-rc11` on pwa-hak (phase buckets, width 1536, 10B schedule; SPRT vs rc10, gain test).
+Result: `enyo-26.0.0-rc8` (width 1536) vs rc3: FAIL (gain test, 4B schedule), Elo -17.2 +-6.8, LLR -3.10/2.94, 3426 games (sprt-enyo_556170d-6000-20261123-052651). Retested on a 10B schedule as rc10/rc11.
