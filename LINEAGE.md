@@ -1,3 +1,37 @@
+# Current lineage map (architectures 26-27, 2026-11-23)
+
+Naming from 2026-11-23 on, per the iteration policy:
+- `enyo-A.P.0-rcN`: A = architecture number, P = promotion, N = iteration.
+- Any `architecture.json` change gets a new A.
+- An accepted main-line net advances P and restarts at rc1.
+- Throwaway experiments (baselines, variants) are rcN under the current promotion and never become parents.
+
+Earlier names (all `enyo-26.0.0-rcN`) stay as committed. This table is their key.
+"Main line" marks the nets that each became the strongest Enyo net.
+
+| Committed name | Promotion name | Role | What it is | Result |
+|---|---|---|---|---|
+| 26.0.0-rc1 | - | void | first Bullet layer-stacks run, loader bug | - |
+| **26.0.0-rc2** | **26.0** | **main line** | scratch root: layer stacks, piece-count buckets, width 1024, 28B | -26.5 vs nn-1a298 |
+| 26.0.0-rc3 | - | baseline | 4B, for the variant tests rc4-rc8 | - |
+| 26.0.0-rc4 | - | variant | Enyo HalfKA king layout | rejected -2.9 |
+| 26.0.0-rc5 | - | variant | phase buckets | +3.5 (kept, later dropped) |
+| 26.0.0-rc6 | - | variant | fc0 width 64 | rejected -15.2 |
+| 26.0.0-rc7 | - | variant | king layout + phase | cancelled |
+| 26.0.0-rc8 | - | variant | width 1536, 4B | rejected -17.2 |
+| **26.0.0-rc9** | **26.1** | **main line** | rc2 + 28B (stage 2), peak lr 2e-4 | +15.6 vs rc2; -15.3 vs nn-1a298 |
+| 26.0.0-rc10 | - | baseline | phase buckets, 1024, 10B | - |
+| 26.0.0-rc11 | - | variant | phase buckets, 1536, 10B | rejected -7.4 vs rc10 |
+| 26.0.0-rc12 | - | variant | rc9 converted to phase buckets + 6B | rejected -9.5 vs rc9 |
+| 26.0.0-rc13 | - | variant | piece-count, 1280, 10B | about even (-3.0) vs rc14 |
+| 26.0.0-rc14 | - | baseline | piece-count, 1024, 10B | - |
+| **26.0.0-rc15** | **26.2** | **main line** | rc9 + 28B (stage 3), full T60T70 data | +13.0 vs rc9 |
+| 27.0.0-rc1 | - | architecture test | rc9 widened to 1280 + 28B (trainer dir enyo-26.0.0-rc16 on pwa-hak) | training, vs rc15 |
+
+Next names:
+- Next main-line stage: `enyo-26.3.0-rc1`.
+- If 27.0.0-rc1 beats rc15, the 1280 line continues as `enyo-27.1.0-rc1`.
+
 # Enyo 5 Lineage
   ┌───────────────┬───────────┬────────────────┐
   │    Engine     │ Mean eval │ Spread (stdev) │
