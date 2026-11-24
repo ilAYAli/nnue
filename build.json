@@ -1,6 +1,6 @@
 {
-  "run": "enyo-26.0.0-rc15",
-  "hypothesis": "Third stage: continue enyo-26.0.0-rc9 (56B, +15.6 vs rc2, -15.3 vs nn-1a298) for another 280 x 100M positions with the rc9 recipe (one-cycle peak lr 2e-4). Data now includes the full T60T70wIsRightFarseer.binpack on pwa-llm (rc2/rc9 read a 95 MB truncated copy).",
+  "run": "enyo-26.3.0-rc1",
+  "hypothesis": "Main line 26.3 (fourth stage): continue enyo-26.0.0-rc15 (26.2; +13.0 vs rc9, +2.5 +-10.1 vs nn-1a298) for another 280 x 100M positions with the same recipe (one-cycle peak lr 2e-4, full T60T70 data).",
   "loader": "sfbinpack",
   "batch_size": 65536,
   "batches": 1526,
@@ -23,5 +23,5 @@
     "skip_predicate": "nnue-pytorch",
     "reader_threads": 8
   },
-  "continue_from": "enyo-26.0.0-rc9"
+  "continue_from": "enyo-26.0.0-rc15"
 }
