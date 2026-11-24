@@ -27,11 +27,11 @@ Earlier names (all `enyo-26.0.0-rcN`) stay as committed. This table is their key
 | 26.0.0-rc14 | - | baseline | piece-count, 1024, 10B | - |
 | **26.0.0-rc15** | **26.2** | **main line** | rc9 + 28B (stage 3), full T60T70 data | +13.0 vs rc9; **+2.5 +-10.1 vs nn-1a298** (even) |
 | 26.3.0-rc1 | (26.3 if accepted) | main line candidate | rc15 + 28B (stage 4) | training |
-| 27.0.0-rc1 | - | architecture test | rc9 widened to 1280 + 28B (trainer dir enyo-26.0.0-rc16 on pwa-hak) | rejected: -8.9 +-5.5 vs rc15 (equal history) |
+| 27.0.0-rc1 | - | architecture test | rc9 widened to 1280 + 28B (trainer dir enyo-26.0.0-rc16 on pwa-hak) | rejected: -8.6 +-5.4 vs rc15 (equal history) |
 
 Next names:
 - Next main-line stage: `enyo-26.3.0-rc1`.
-- If 27.0.0-rc1 beats rc15, the 1280 line continues as `enyo-27.1.0-rc1`.
+- Width 1280 is rejected (27.0.0-rc1: -8.6 +-5.4 vs rc15 at equal history, 3786 games); the main line stays at 1024.
 
 # Enyo 5 Lineage
   ┌───────────────┬───────────┬────────────────┐
@@ -607,4 +607,4 @@ Result: `enyo-26.0.0-rc13` (1280) vs `enyo-26.0.0-rc14` (1024), piece-count, 10B
 Reserved: `enyo-27.0.0-rc1` on pwa-hak (architecture 27, first of the width-1280 lineage; trainer run directory enyo-26.0.0-rc16 on pwa-hak only. rc9 widened to 1280 by tools/lib/widen_net.py, then the rc15 third-stage recipe: 280 x 100M, peak lr 2e-4; SPRT vs rc15 at equal history).
 Result: `enyo-26.0.0-rc15` (26.2, rc9 third stage) vs nn-1a298aa575a0: Elo +2.5 +-10.1, 1500 games (sprt-enyo_2090cc0-1500-20261123-221302), LOS 68.9%. Statistically equal to the Stockfish net. vs rc9: +13.0 +-9.5 (enyo-26.0.0-rc15-sprt-1500-20261123-215501). reference.net -> enyo-26.0.0-rc15.a26.nn on all hosts.
 Reserved: `enyo-26.3.0-rc1` on pwa-llm (continue_from enyo-26.0.0-rc15, fourth stage, 280 x 100M, peak lr 2e-4).
-Result:  (architecture 27: rc9 widened to 1280 by tools/lib/widen_net.py + rc15 recipe 280 x 100M) vs  (1024): FAIL (gain 0..5), elo=-8.6 llr=-1.91/2.20 (-87%) los=0.1% ci=5.4 draw=30.5% games=3786/6000 tasks=1893/3000 (sprt-enyo-27.0.0-rc1-vs-enyo-26.0.0-rc15-20261124-024720, engine enyo_639b2ce, stopped near H0). Net sha256 d822c142... (pwa-llm ~/assets/nets/enyo-27.0.0-rc1.nn).
+Result: `enyo-27.0.0-rc1` (architecture 27: rc9 widened to 1280 by tools/lib/widen_net.py + rc15 recipe 280 x 100M) vs `enyo-26.0.0-rc15` (1024): FAIL (gain 0..5), elo=-8.6 llr=-1.91/2.20 (-87%) los=0.1% ci=5.4 draw=30.5% games=3786/6000 tasks=1893/3000 (sprt-enyo-27.0.0-rc1-vs-enyo-26.0.0-rc15-20261124-024720, engine enyo_639b2ce, stopped near H0). Net sha256 d822c142... (pwa-llm ~/assets/nets/enyo-27.0.0-rc1.nn).
