@@ -27,10 +27,11 @@ Earlier names (all `enyo-26.0.0-rcN`) stay as committed. This table is their key
 | 26.0.0-rc14 | - | baseline | piece-count, 1024, 10B | - |
 | **26.0.0-rc15** | **26.2** | **main line** | rc9 + 28B (stage 3), full T60T70 data | +13.0 vs rc9; **+2.5 +-10.1 vs nn-1a298** (even) |
 | 26.3.0-rc1 | - | main line candidate | rc15 + 28B (stage 4) | even with rc15: +1.4 +-4.3 (6000 games); -6.5 +-9.7 vs nn-1a298; not promoted |
-| 28.0.0-rc1 | (28.0 if kept) | own architecture | architecture 28 = 26 with phase buckets; rc15 relabelled + 28B (rc15 recipe) | training |
+| **28.0.0-rc1** | **28.0** | **main line (own architecture)** | architecture 28 = 26 with phase buckets; rc15 relabelled + 28B (rc15 recipe) | +3.3 +-4.2 vs rc15 (6000 games, non-regression) |
 | 27.0.0-rc1 | - | architecture test | rc9 widened to 1280 + 28B (trainer dir enyo-26.0.0-rc16 on pwa-hak) | rejected: -8.6 +-5.4 vs rc15 (equal history) |
 
 Next names:
+- Main line is now architecture 28 (phase buckets): 28.0 = enyo-28.0.0-rc1. Next main-line stage: `enyo-28.1.0-rc1`.
 - 26.3.0-rc1 (stage 4) did not improve on rc15: the training curve has flattened at about 84B positions. The next net gain needs a new idea (data, labels or architecture), not more of the same recipe.
 - Width 1280 is rejected (27.0.0-rc1: -8.6 +-5.4 vs rc15 at equal history, 3786 games); the main line stays at 1024.
 
@@ -611,3 +612,4 @@ Reserved: `enyo-26.3.0-rc1` on pwa-llm (continue_from enyo-26.0.0-rc15, fourth s
 Result: `enyo-27.0.0-rc1` (architecture 27: rc9 widened to 1280 by tools/lib/widen_net.py + rc15 recipe 280 x 100M) vs `enyo-26.0.0-rc15` (1024): FAIL (gain 0..5), elo=-8.6 llr=-1.91/2.20 (-87%) los=0.1% ci=5.4 draw=30.5% games=3786/6000 tasks=1893/3000 (sprt-enyo-27.0.0-rc1-vs-enyo-26.0.0-rc15-20261124-024720, engine enyo_639b2ce, stopped near H0). Net sha256 d822c142... (pwa-llm ~/assets/nets/enyo-27.0.0-rc1.nn).
 Result: `enyo-26.3.0-rc1` (rc15 + 28B, stage 4) vs `enyo-26.0.0-rc15`: pipeline 1500 games +6.0 +-9.7 (inconclusive, 919e73ae); extended to 6000 games: +1.4 +-4.3, LLR 0.40/2.20 (sprt-enyo-26.3.0-rc1-vs-enyo-26.0.0-rc15-ext-20261124-044133). vs nn-1a298aa575a0: -6.5 +-9.7 (1500 games). Not promoted; rc15 stays the strongest net. Stage 4 brought no measurable gain.
 Reserved: `enyo-28.0.0-rc1` on pwa-llm (architecture 28: phase buckets; initialize_from rc15 relabelled to phase, 280 x 100M, peak lr 2e-4; bar: no regression vs rc15).
+Result: `enyo-28.0.0-rc1` (architecture 28: phase buckets; rc15 relabelled to phase + 280 x 100M, peak lr 2e-4) vs `enyo-26.0.0-rc15`: pipeline 1500 games +0.9 +-9.4 (inconclusive, ec2727d4); non-regression SPRT (-3..1) to 6000 games: +3.3 +-4.2, LOS 93.7% (sprt-enyo-28.0.0-rc1-vs-enyo-26.0.0-rc15-nonreg-20261124-122332). PROMOTED: 28.0, the Enyo-owned architecture and new main line. reference.net -> enyo-28.0.0-rc1.nn on all hosts.
