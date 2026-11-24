@@ -27,6 +27,7 @@ Earlier names (all `enyo-26.0.0-rcN`) stay as committed. This table is their key
 | 26.0.0-rc14 | - | baseline | piece-count, 1024, 10B | - |
 | **26.0.0-rc15** | **26.2** | **main line** | rc9 + 28B (stage 3), full T60T70 data | +13.0 vs rc9; **+2.5 +-10.1 vs nn-1a298** (even) |
 | 26.3.0-rc1 | - | main line candidate | rc15 + 28B (stage 4) | even with rc15: +1.4 +-4.3 (6000 games); -6.5 +-9.7 vs nn-1a298; not promoted |
+| 28.0.0-rc1 | (28.0 if kept) | own architecture | architecture 28 = 26 with phase buckets; rc15 relabelled + 28B (rc15 recipe) | training |
 | 27.0.0-rc1 | - | architecture test | rc9 widened to 1280 + 28B (trainer dir enyo-26.0.0-rc16 on pwa-hak) | rejected: -8.6 +-5.4 vs rc15 (equal history) |
 
 Next names:
@@ -609,3 +610,4 @@ Result: `enyo-26.0.0-rc15` (26.2, rc9 third stage) vs nn-1a298aa575a0: Elo +2.5 
 Reserved: `enyo-26.3.0-rc1` on pwa-llm (continue_from enyo-26.0.0-rc15, fourth stage, 280 x 100M, peak lr 2e-4).
 Result: `enyo-27.0.0-rc1` (architecture 27: rc9 widened to 1280 by tools/lib/widen_net.py + rc15 recipe 280 x 100M) vs `enyo-26.0.0-rc15` (1024): FAIL (gain 0..5), elo=-8.6 llr=-1.91/2.20 (-87%) los=0.1% ci=5.4 draw=30.5% games=3786/6000 tasks=1893/3000 (sprt-enyo-27.0.0-rc1-vs-enyo-26.0.0-rc15-20261124-024720, engine enyo_639b2ce, stopped near H0). Net sha256 d822c142... (pwa-llm ~/assets/nets/enyo-27.0.0-rc1.nn).
 Result: `enyo-26.3.0-rc1` (rc15 + 28B, stage 4) vs `enyo-26.0.0-rc15`: pipeline 1500 games +6.0 +-9.7 (inconclusive, 919e73ae); extended to 6000 games: +1.4 +-4.3, LLR 0.40/2.20 (sprt-enyo-26.3.0-rc1-vs-enyo-26.0.0-rc15-ext-20261124-044133). vs nn-1a298aa575a0: -6.5 +-9.7 (1500 games). Not promoted; rc15 stays the strongest net. Stage 4 brought no measurable gain.
+Reserved: `enyo-28.0.0-rc1` on pwa-llm (architecture 28: phase buckets; initialize_from rc15 relabelled to phase, 280 x 100M, peak lr 2e-4; bar: no regression vs rc15).
