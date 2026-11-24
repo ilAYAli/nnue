@@ -1,6 +1,6 @@
 {
-  "run": "enyo-26.3.0-rc1",
-  "hypothesis": "Main line 26.3 (fourth stage): continue enyo-26.0.0-rc15 (26.2; +13.0 vs rc9, +2.5 +-10.1 vs nn-1a298) for another 280 x 100M positions with the same recipe (one-cycle peak lr 2e-4, full T60T70 data).",
+  "run": "enyo-28.0.0-rc1",
+  "hypothesis": "Architecture 28 = architecture 26 with game-phase layer-stack/PSQT buckets (bucket_scheme 1), the Enyo-specific structure. Initialize from enyo-26.0.0-rc15 (26.2, level with nn-1a298) relabelled to phase buckets (enyo-26.0.0-rc15-phase-init.nn, same weights) and train a full stage with the rc15 recipe: 280 x 100M, one-cycle peak lr 2e-4. rc12 failed with only 6B at lr 1e-4; a full stage lets the stacks re-learn their phase ranges. Bar: no regression vs rc15.",
   "loader": "sfbinpack",
   "batch_size": 65536,
   "batches": 1526,
@@ -23,5 +23,5 @@
     "skip_predicate": "nnue-pytorch",
     "reader_threads": 8
   },
-  "continue_from": "enyo-26.0.0-rc15"
+  "initialize_from": "enyo-26.0.0-rc15-phase-init"
 }

@@ -1,11 +1,23 @@
 {
-  "name": "layer-stacks-full-threats-halfkav2hm-1024x2-32-32-1x8",
+  "name": "layer-stacks-phase-full-threats-halfkav2hm-1024x2-32-32-1x8",
   "lineage": "native",
   "mode": "layer-stacks",
   "hidden": 1024,
   "l2_size": 32,
   "l3_size": 32,
   "fake_quantization": true,
-  "loss": {"in_offset": 270, "in_scaling": 340, "out_offset": 270, "out_scaling": 380, "pow_exp": 2.5,
-           "tb_remap": {"base": 4000, "scale": 4000, "decay": 0.85}}
+  "loss": {
+    "in_offset": 270,
+    "in_scaling": 340,
+    "out_offset": 270,
+    "out_scaling": 380,
+    "pow_exp": 2.5,
+    "tb_remap": {
+      "base": 4000,
+      "scale": 4000,
+      "decay": 0.85
+    }
+  },
+  "bucket_scheme": "phase",
+  "net_format": "enyo-v1"
 }
