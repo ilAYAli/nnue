@@ -1,6 +1,6 @@
 {
-  "run": "enyo-28.1.0-rc1",
-  "hypothesis": "Relabel A/B, arm A: continue 28.0 (enyo-28.0.0-rc1) on 100M positions sampled from the master binpacks and relabelled by Enyo itself (enyo_6009577 + 28.0, 20k nodes). 10 x 100M (10 passes), one-cycle peak lr 5e-5, wdl 0, no position skipping (enyo filter, min_ply 0, random_skip 0, max_abs_cp 32000) so it sees exactly the positions of arm B (enyo-28.1.0-rc2). Bar: beat rc2 in a direct SPRT.",
+  "run": "enyo-28.1.0-rc2",
+  "hypothesis": "Relabel A/B, arm B (control): identical to enyo-28.1.0-rc1 (same 100M positions, recipe and filter) but with the original Stockfish labels. Isolates the effect of Enyo's labels.",
   "loader": "sfbinpack",
   "batch_size": 65536,
   "batches": 1526,
@@ -24,6 +24,6 @@
   },
   "continue_from": "enyo-28.0.0-rc1",
   "data": {
-    "source_binpack": "~/assets/training/enyo-relabel/out-100m/enyo.binpack"
+    "source_binpack": "~/assets/training/enyo-relabel/out-100m/orig.binpack"
   }
 }
