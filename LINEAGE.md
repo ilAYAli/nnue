@@ -28,6 +28,8 @@ Earlier names (all `enyo-26.0.0-rcN`) stay as committed. This table is their key
 | **26.0.0-rc15** | **26.2** | **main line** | rc9 + 28B (stage 3), full T60T70 data | +13.0 vs rc9; **+2.5 +-10.1 vs nn-1a298** (even) |
 | 26.3.0-rc1 | - | main line candidate | rc15 + 28B (stage 4) | even with rc15: +1.4 +-4.3 (6000 games); -6.5 +-9.7 vs nn-1a298; not promoted |
 | **28.0.0-rc1** | **28.0** | **main line (own architecture)** | architecture 28 = 26 with phase buckets; rc15 relabelled + 28B (rc15 recipe) | +3.3 +-4.2 vs rc15 (6000 games, non-regression); +2.5 +-10.1 vs nn-1a298 |
+| 28.1.0-rc1 | - | A/B arm A | 28.0 + 10 x 100M of the same positions relabelled by Enyo (enyo_6009577 + 28.0, 20k nodes), peak lr 5e-5, wdl 0, no skipping | rejected: -10.0 +-6.2 vs rc2 (2828 games, stopped; LOS 0.1%) |
+| 28.1.0-rc2 | - | A/B arm B (control) | identical to rc1 but with the original Stockfish labels | control; not tested vs 28.0 |
 | 27.0.0-rc1 | - | architecture test | rc9 widened to 1280 + 28B (trainer dir enyo-26.0.0-rc16 on pwa-hak) | rejected: -8.6 +-5.4 vs rc15 (equal history) |
 
 Next names:
@@ -614,3 +616,4 @@ Result: `enyo-26.3.0-rc1` (rc15 + 28B, stage 4) vs `enyo-26.0.0-rc15`: pipeline 
 Reserved: `enyo-28.0.0-rc1` on pwa-llm (architecture 28: phase buckets; initialize_from rc15 relabelled to phase, 280 x 100M, peak lr 2e-4; bar: no regression vs rc15).
 Result: `enyo-28.0.0-rc1` (architecture 28: phase buckets; rc15 relabelled to phase + 280 x 100M, peak lr 2e-4) vs `enyo-26.0.0-rc15`: pipeline 1500 games +0.9 +-9.4 (inconclusive, ec2727d4); non-regression SPRT (-3..1) to 6000 games: +3.3 +-4.2, LOS 93.7% (sprt-enyo-28.0.0-rc1-vs-enyo-26.0.0-rc15-nonreg-20261124-122332). PROMOTED: 28.0, the Enyo-owned architecture and new main line. reference.net -> enyo-28.0.0-rc1.nn on all hosts.
 Result: `enyo-28.0.0-rc1` (28.0) vs nn-1a298aa575a0: Elo +2.5 +-10.1, 1500 games (sprt-enyo_7608f34-1500-20261124-132002, engine enyo_7608f34): level with the Stockfish net, like rc15.
+Result: relabel A/B on the same 100M positions (sampled from the master binpacks, same 28.0 start, same recipe, no skipping): `enyo-28.1.0-rc1` (labels from Enyo itself, enyo_6009577 + 28.0 at 20k nodes) vs `enyo-28.1.0-rc2` (original Stockfish labels): -10.0 +-6.2, LOS 0.1%, LLR -1.40/2.20 after 2828 games (sprt-enyo-28.1.0-rc1-vs-enyo-28.1.0-rc2-20261125-170704, stopped). Enyo's 20k-node labels are worse than the Stockfish labels; neither net is promoted, 28.0 stays the main line.
